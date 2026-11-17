@@ -20,3 +20,13 @@ func Private(path string, want fs.FileMode) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.Mode().Perm() == want
 }
+
+// PrivateStrict es Private para lo que el usuario exporta a una ruta que él eligió: en Windows exige además la DACL
+// protegida (sys.IsPrivate), porque ahí no hay carpeta de salidas de la que heredar. En Linux es igual que Private.
+func PrivateStrict(path string, want fs.FileMode) bool {
+	if runtime.GOOS == "windows" {
+		ok, err := sys.IsPrivate(path)
+		return err == nil && ok
+	}
+	return Private(path, want)
+}

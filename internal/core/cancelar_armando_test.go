@@ -1,6 +1,10 @@
 package core
 
 import (
+	"context"
+	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"os"
 	"strings"
 	"testing"
@@ -114,5 +118,26 @@ func TestSuspensionDuranteElArmadoDejaElTrabajoPausado(t *testing.T) {
 	h.core.mu.Unlock()
 	if st != "armed" || !paused {
 		t.Fatalf("state=%s paused=%v, quería armed y pausado", st, paused)
+	}
+}
+
+// Si sched.Arm falla tras tomar el inhibidor, la bitácora cierra el par: job.arm, power.inhibit, power.release, job.arm_failed.
+func TestArmFallidoAuditaPowerRelease(t *testing.T) {
+	inh := &fakeInhibitor{}
+	h := newHarness(t, func(o *Options) { o.Inhibitor = inh })
+	cred := h.ready(t)
+	job, fp := h.created(t, cred, nil)
+	// Un planificador que ya tiene el trabajo armado hace que sched.Arm falle con «armed».
+	run := func(ctx context.Context, _ int, _ string) error { <-ctx.Done(); return nil } // sigue armado hasta Cancel
+	if err := h.core.sched.Arm(job, engine.Schedule{}, h.core.o.Now().Add(time.Hour), []string{"x"}, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { h.core.sched.Cancel(job) })
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}}); err == nil {
+		t.Fatal("el armado debía fallar")
+	}
+	actionsInOrder(t, h.auditText(t), "job.arm", "power.inhibit", "power.release", "job.arm_failed")
+	if a, r := inh.counts(); a != r {
+		t.Errorf("inhibidor sin liberar: %d tomados, %d liberados", a, r)
 	}
 }

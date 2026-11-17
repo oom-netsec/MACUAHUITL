@@ -25,7 +25,7 @@ func TestWriteFile(t *testing.T) {
 	if got, _ := os.ReadFile(p); string(got) != "hora,cpu\n" {
 		t.Fatalf("contenido: %q", got)
 	}
-	if fi, _ := os.Stat(p); !testperm.Private(p, 0o600) {
+	if fi, _ := os.Stat(p); !testperm.PrivateStrict(p, 0o600) {
 		t.Fatalf("permisos: %v", fi.Mode().Perm())
 	}
 	png := filepath.Join(dir, "g.png")

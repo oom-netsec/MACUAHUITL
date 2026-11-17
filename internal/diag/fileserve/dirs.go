@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // sensitiveDirs son carpetas donde ni se publica ni se recibe nada: ni ellas ni lo que
@@ -36,6 +37,17 @@ func sinLetraDeUnidad(p string) bool {
 	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
 }
 
+// finalPath es la ruta real de un handle abierto (sys.FinalPath); variable para simularla en pruebas.
+var finalPath = sys.FinalPath
+
+// accountHome es la carpeta de perfil de la cuenta (en Windows sale del token, no del entorno); "" si no se sabe.
+var accountHome = func() string {
+	if u, err := user.Current(); err == nil && filepath.IsAbs(u.HomeDir) {
+		return u.HomeDir
+	}
+	return ""
+}
+
 // evalSymlinks y homeDir son variables para que las pruebas simulen su fallo.
 var evalSymlinks = filepath.EvalSymlinks
 
@@ -54,7 +66,7 @@ var homeDir = func() (string, error) {
 // ni se publica ni se recibe en ellas ni en lo que cuelga de ellas. Vacías si la variable no está.
 func windowsSensitiveDirs() []string {
 	var out []string
-	for _, env := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"} {
+	for _, env := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "APPDATA", "LOCALAPPDATA"} {
 		if v := os.Getenv(env); filepath.IsAbs(v) {
 			out = append(out, v)
 			if r, err := evalSymlinks(v); err == nil && r != v { // la ruta real también (C:\WINDOWS, enlaces, nombres cortos)
@@ -70,12 +82,8 @@ func denyList(extra []string) []string {
 	if goos == "windows" {
 		out = append(out, windowsSensitiveDirs()...)
 	}
-	if home, err := homeDir(); err == nil {
-		homes := []string{home}
-		if r, err := evalSymlinks(home); err == nil && r != home { // $HOME bajo un enlace: la ruta real es la que se elige
-			homes = append(homes, r)
-		}
-		for _, hm := range homes {
+	if _, err := homeDir(); err == nil {
+		for _, hm := range homesOf() { // $HOME (y en Windows el perfil real) tal cual y resuelto: la ruta real es la que se elige
 			for _, h := range sensitiveHome {
 				out = append(out, filepath.Join(hm, h))
 			}
@@ -97,7 +105,13 @@ func denyList(extra []string) []string {
 	if v := os.Getenv("XDG_STATE_HOME"); filepath.IsAbs(v) {
 		out = append(out, filepath.Join(v, "macuahuitl"))
 	}
-	return append(out, extra...)
+	for _, e := range extra {
+		out = append(out, e)
+		if r, err := evalSymlinks(e); err == nil && r != e { // como las XDG: la ruta real también
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // ValidateDir valida una carpeta elegida por el usuario y devuelve su ruta real, que es la
@@ -126,6 +140,15 @@ func OpenDir(dir string, extraDeny ...string) (*os.Root, string, error) {
 	if rst, err := root.Stat("."); err != nil || !os.SameFile(st, rst) {
 		root.Close()
 		return nil, "", i18n.New("fileserve.err.dir_changed", i18n.A("dir", real))
+	}
+	d, err := root.Open(".")
+	if err == nil {
+		err = checkFinal(d, extraDeny)
+		d.Close()
+	}
+	if err != nil {
+		root.Close()
+		return nil, "", err
 	}
 	return root, real, nil
 }
@@ -203,17 +226,49 @@ func denied(p, d string) bool {
 	return true
 }
 
-// homesOf es $HOME tal cual y resuelto.
+// homesOf es $HOME tal cual y resuelto; en Windows también el perfil de la cuenta (HOME lo definen Git for Windows,
+// Emacs y otros y no manda sobre el perfil real), igualmente tal cual y resuelto.
 func homesOf() []string {
-	home, err := homeDir()
-	if err != nil {
-		return nil
+	var cands []string
+	if home, err := homeDir(); err == nil {
+		cands = append(cands, home)
 	}
-	out := []string{filepath.Clean(home)}
-	if r, err := evalSymlinks(home); err == nil && r != out[0] {
-		out = append(out, r)
+	if goos == "windows" {
+		if a := accountHome(); a != "" {
+			cands = append(cands, a)
+		}
+	}
+	var out []string
+	add := func(p string) {
+		p = filepath.Clean(p)
+		for _, o := range out {
+			if o == p || goos == "windows" && strings.EqualFold(o, p) {
+				return
+			}
+		}
+		out = append(out, p)
+	}
+	for _, c := range cands {
+		add(c)
+		if r, err := evalSymlinks(c); err == nil {
+			add(r)
+		}
 	}
 	return out
+}
+
+// checkFinal aplica la lista negada a la ruta real del handle ya abierto (f): en Windows una junction, un subst o una
+// unidad de red en un tramo intermedio no los resuelve EvalSymlinks, y esta ruta es la de lo que de verdad se abrió.
+// En Linux finalPath no devuelve nada y no se hace nada.
+func checkFinal(f *os.File, extra []string) error {
+	p, err := finalPath(f)
+	if err != nil {
+		return fmt.Errorf("fileserve: %w", err)
+	}
+	if p == "" {
+		return nil
+	}
+	return checkPathsDeny(extra, p)
 }
 
 // inside dice si p es d o cuelga de d (en Windows sin distinguir mayúsculas).

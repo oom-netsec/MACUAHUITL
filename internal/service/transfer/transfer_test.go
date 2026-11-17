@@ -514,3 +514,17 @@ func TestCarpetasDeLaAppSeRechazan(t *testing.T) {
 		t.Errorf("put: %v", err)
 	}
 }
+
+// Put con un archivo que sí existe en una carpeta negada se rechaza por la lista, no por falta de archivo.
+func TestPutDesdeCarpetaNegadaConArchivoReal(t *testing.T) {
+	s, d := newTest(t)
+	datos := t.TempDir()
+	if err := os.WriteFile(filepath.Join(datos, "x"), []byte("secreto"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.Deny = []string{datos}
+	_, err := s.Put(context.Background(), &v1.PutRequest{Url: "http://127.0.0.1/a", FromDir: datos, Name: "x"})
+	if code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), datos) {
+		t.Errorf("put: %v", err)
+	}
+}

@@ -51,7 +51,7 @@ func TestBackupCommands(t *testing.T) {
 	}
 	dst := filepath.Join(t.TempDir(), "r.cfg")
 	must(t, "", "backup", "export", id, "-o", dst)
-	if st, err := os.Stat(dst); err != nil || !testperm.Private(dst, 0o600) {
+	if st, err := os.Stat(dst); err != nil || !testperm.PrivateStrict(dst, 0o600) {
 		t.Fatalf("archivo %v %v", st, err)
 	}
 	if _, err := mctl(t, "", "backup", "export", id, "-o", dst); err == nil {

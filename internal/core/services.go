@@ -351,10 +351,14 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	prevVerified, prevChanges, prevUntil, prevCreds := j.verified, j.changes, j.Until, j.creds
 	c.mu.Unlock()
 	var undo []func()
+	inhibited := false // power.inhibit ya está en la bitácora: si el armado se deshace, también va power.release
 	// reason es el motivo en inglés para la auditoría (no depende del idioma del cliente).
 	fail := func(err error, reason string) (*v1.ArmJobResponse, error) {
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
+		}
+		if inhibited {
+			c.audit("power.release", j.id, "")
 		}
 		c.mu.Lock()
 		j.state = "created"
@@ -486,6 +490,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	// Si Arm falla, fail deja job.arm_failed detrás.
 	c.audit("job.arm", j.id, fmt.Sprintf("window_until=%s excluded=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
 	c.audit("power.inhibit", j.id, fmt.Sprintf("missing=%v", missing))
+	inhibited = true
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
 		return fail(service.ErrFrom(ctx, codes.InvalidArgument, err), i18n.English(err))

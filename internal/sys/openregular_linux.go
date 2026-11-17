@@ -65,3 +65,6 @@ var ErrNoAtomicRename error = unix.EINVAL
 func NoAtomicRename(err error) bool {
 	return errors.Is(err, unix.EINVAL) || errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EPERM)
 }
+
+// FinalPath no resuelve nada en Linux: EvalSymlinks ya sigue todos los enlaces. "" = sin ruta extra que comprobar.
+func FinalPath(*os.File) (string, error) { return "", nil }

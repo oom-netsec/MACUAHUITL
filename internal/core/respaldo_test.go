@@ -131,7 +131,7 @@ func sinSecretos(t *testing.T, texto string, prohibidos ...string) {
 
 func TestRespaldoIdaYVuelta(t *testing.T) {
 	h, path := bovedaConRespaldo(t, nil)
-	if fi, err := os.Stat(path); err != nil || !testperm.Private(path, 0o600) {
+	if fi, err := os.Stat(path); err != nil || !testperm.PrivateStrict(path, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
 	// Bóveda vacía distinta: importa las 3.
