@@ -94,7 +94,7 @@ interface TransferRejection {
 | SCP destino (`scpSink`) | `rcv.create` aceptado | `recvFile.WriteAt` | `size` de la orden `C` |
 | SFTP lectura (`sftpReader`) | `Fileread` abierto | `ReadAt`: el máximo leído, el que ya calcula `r.max` | `fi.Size()` |
 | SFTP escritura (`sftpWriter`) | `Filewrite` abierto | `recvFile.WriteAt` (máximo escrito; SFTP escribe fuera de orden) | 0: SFTP no anuncia tamaño |
-| HTTP GET/HEAD | archivo abierto, antes de `ServeContent` | `countingWriter.Write` | `Content-Length` que fija `ServeContent` al llamar a `WriteHeader` (con `Range`, el tamaño del tramo; sin él, el del archivo) |
+| HTTP GET | primera cabecera 2xx de `ServeContent` (HEAD, 304, 412 y 416 no crean sesión) | `countingWriter.Write` | `Content-Length` que fija `ServeContent` al llamar a `WriteHeader` (con `Range`, el tamaño del tramo; sin él, el del archivo) |
 
 `Live` (en `fileserve`):
 
@@ -192,7 +192,7 @@ Archivos: `ui/bridge/transfer.go` (`TransferSessionDTO`, `TransferRejectionDTO`,
 
 - **Fuga de sesiones activas** si un camino nuevo de un protocolo olvida `OnTransfer`. Mitigan el cierre de seguridad y una prueba por protocolo; la revisión debe recorrer los `return` posteriores a `start`.
 - **HTTP con `Range`:** IOS puede pedir por tramos. Cada petición es una sesión con su total del tramo, y la lista puede mostrar varias sesiones por archivo. Si Front quiere agruparlas, puede hacerlo por `client` + `name`.
-- **HEAD de HTTP** crea una sesión `done` de 0 bytes. Es inofensiva y real: el equipo sí preguntó.
+- **HEAD y respuestas no 2xx de HTTP** (304, 412, 416) no crean sesión: un escáner con `Range` inválidos no desplaza la historia. El `OnTransfer` sale igual, con `Live` nil.
 - **Tasa con encuestas espaciadas:** si nadie lee en un rato, la primera lectura promedia toda esa ventana. Es aceptable para una barra.
 - **Reloj:** `started`/`ended` usan `Deps.Now()`. El servicio estampa la hora al recibir `OnStart` y `OnTransfer`, no en `fileserve`, así que una pausa del planificador puede correrla algunos ms.
 - **Memoria:** acotada (§ Registro). Si se suben los topes de servidores, revisar el cálculo.

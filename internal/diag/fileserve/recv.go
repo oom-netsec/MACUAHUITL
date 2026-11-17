@@ -171,6 +171,7 @@ type recvFile struct {
 	f            *os.File
 	path, name   string
 	mu           sync.Mutex
+	live         *Live // opcional: avance de lo escrito (máximo)
 	size, cursor int64 // size es hasta dónde se ha escrito (SFTP puede escribir fuera de orden)
 	done         bool
 }
@@ -191,7 +192,9 @@ func (w *recvFile) WriteAt(p []byte, off int64) (int, error) {
 		}
 		w.size = end
 	}
-	return w.f.WriteAt(p, off)
+	n, err := w.f.WriteAt(p, off)
+	w.live.atLeast(off + int64(n))
+	return n, err
 }
 
 func (w *recvFile) Write(p []byte) (int, error) {
