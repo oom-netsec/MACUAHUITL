@@ -43,6 +43,9 @@ var (
 	pingLimits  = func(Request) (duration time.Duration) { return 0 }
 )
 
+// goos es el sistema en el que corre Run; las pruebas lo cambian para ejercitar el comportamiento de Windows.
+var goos = runtime.GOOS
+
 // iperfServerMax es el tope de vida del servidor de iperf3 (-s -1 espera un cliente indefinidamente).
 var iperfServerMax = 10 * time.Minute
 
@@ -136,7 +139,7 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	stopNow := func() { stopOnce.Do(func() { close(stopc) }) }
 	var stats *PingStats
 	if req.Tool == Ping {
-		stats = NewPingStats(runtime.GOOS == "windows")
+		stats = NewPingStats(goos == "windows")
 	}
 	emit := func(line string) {
 		mu.Lock()
@@ -202,6 +205,17 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		res.Ping = &sum
 	}
 	var ee *exec.ExitError
+	select {
+	case <-stopc:
+		if stats != nil && goos == "windows" { // el Job Object sale con 143: tras una parada pedida es éxito, como iputils
+			res.ExitCode = 1
+			if res.Ping.Received > 0 {
+				res.ExitCode = 0
+			}
+			return res, nil
+		}
+	default:
+	}
 	switch {
 	case err == nil:
 	case errors.As(err, &ee):

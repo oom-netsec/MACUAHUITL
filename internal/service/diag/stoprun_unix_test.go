@@ -95,6 +95,9 @@ func TestStopRunDetieneYMandaResumen(t *testing.T) {
 	ev := st.snapshot()
 	last := ev[len(ev)-1]
 	sum := last.PingSummary
+	if last.ExitCode != 0 { // salida ordenada por SIGINT (el trap sale con 0), no el respaldo SIGTERM (143)
+		t.Errorf("exit_code = %d", last.ExitCode)
+	}
 	if !last.Done || sum == nil || sum.Sent < 3 || sum.Received != sum.Sent || sum.LossPct != 0 || sum.MinMs != 2 || sum.AvgMs != 2 || sum.MaxMs != 2 || sum.MdevMs != 0 {
 		t.Fatalf("evento final: %+v", last)
 	}
@@ -118,6 +121,10 @@ func TestStopRunDetieneYMandaResumen(t *testing.T) {
 	}
 	if !strings.Contains(d.AuditText(), `diag.stop`) || !strings.Contains(d.AuditText(), first.RunId) {
 		t.Errorf("sin auditoría diag.stop: %s", d.AuditText())
+	}
+	// diag.run y diag.done llevan run=<id> para ligarlos con diag.stop.
+	if n := strings.Count(d.AuditText(), "run="+first.RunId); n != 2 {
+		t.Errorf("run=%s en %d entradas, quería 2: %s", first.RunId, n, d.AuditText())
 	}
 }
 

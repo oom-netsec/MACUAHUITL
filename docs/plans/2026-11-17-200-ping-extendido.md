@@ -47,7 +47,7 @@ Reglas: `continuous` y barrido no van juntos; el barrido no va con `size`; con b
 
 ## Resumen
 
-El núcleo lee cada respuesta del proceso (líneas de eco con tiempo y las de «sin respuesta») con un parser por sistema en `internal/diag` y cuenta enviados, recibidos y tiempos. `loss_pct = (sent-received)/sent*100`; `mdev` = desviación media absoluta, como iputils. El resumen va en el evento final (done=true) al terminar `count`, `duration`, `StopRun` o el tope. Las líneas de texto siguen saliendo como hoy.
+El núcleo lee cada respuesta del proceso (líneas de eco con tiempo y las de «sin respuesta») con un parser por sistema en `internal/diag` y cuenta enviados, recibidos y tiempos. `loss_pct = (sent-received)/sent*100`; `mdev` = desviación estándar poblacional, como iputils; en Linux se toman los valores de la línea `rtt` cuando aparece. El resumen va en el evento final (done=true) al terminar `count`, `duration`, `StopRun` o el tope. Las líneas de texto siguen saliendo como hoy.
 
 ## Barrido
 

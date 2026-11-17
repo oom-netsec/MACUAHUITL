@@ -264,6 +264,10 @@ func TestDiagPing(t *testing.T) {
 	if !strings.Contains(out, "ARGV: -n -c 3 192.0.2.1") || !strings.Contains(out, "guardado en") {
 		t.Fatalf("out = %q", out)
 	}
+	// El primer evento solo trae run_id: no se imprime como línea vacía.
+	if strings.HasPrefix(out, "\n") {
+		t.Fatalf("línea vacía al inicio: %q", out)
+	}
 	if _, err := mctl(t, "", "diag", "ping", "-iL"); err == nil {
 		t.Fatal("bad target accepted")
 	}

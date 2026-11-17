@@ -86,8 +86,8 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("ingest.err.out_dir", err, nil))
 		}
 	}
-	s.d.Audit("diag.run", string(tool), fmt.Sprintf("%s %q", bin, argv))
 	id, live := service.NewID(), &liveRun{stop: make(chan struct{})}
+	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q", id, bin, argv))
 	s.mu.Lock()
 	if s.runs == nil {
 		s.runs = map[string]*liveRun{}
@@ -110,7 +110,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 		code = -1
 	}
 	// Lo que corrió de verdad: binario resuelto (tracepath por traceroute) y argv completo, entrecomillado.
-	s.d.Audit("diag.done", string(tool), fmt.Sprintf("exit=%d bin=%s argv=%q output=%s", code, res.Bin, res.Argv, res.OutputPath))
+	s.d.Audit("diag.done", string(tool), fmt.Sprintf("run=%s exit=%d bin=%s argv=%q output=%s", id, code, res.Bin, res.Argv, res.OutputPath))
 	if errors.Is(err, diag.ErrNotInstalled) {
 		return service.ErrFrom(st.Context(), codes.FailedPrecondition, err)
 	}
