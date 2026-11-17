@@ -20,6 +20,7 @@ func init() {
 		"diag.err.pcap_target":       e("la captura no lleva destino; usa el filtro", "the capture takes no target; use the filter"),
 		"diag.err.pcap_dir":          e("la captura necesita una carpeta de salida", "the capture needs an output folder"),
 		"diag.err.pcap_iface":        e("interfaz inválida o ausente", "invalid or missing interface"),
+		"diag.err.pcap_filter":       e("el filtro de captura no puede llevar caracteres NUL", "the capture filter cannot contain NUL characters"),
 		"diag.err.tool_unknown":      e("herramienta {tool:q} desconocida", "unknown tool {tool:q}", "tool"),
 		"diag.err.flag_like":         e("el valor {value:q} parece una bandera", "the value {value:q} looks like a flag", "value"),
 		"diag.err.not_installed":     e("diag: herramienta no instalada", "diag: tool not installed"),
