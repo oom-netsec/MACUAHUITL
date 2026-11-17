@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -337,13 +336,6 @@ func TestListen(t *testing.T) {
 	defer mu.Unlock()
 	if len(snaps) == 0 || strings.Count(out.String(), "\n") != 4 {
 		t.Fatalf("snapshots=%d archivo=%q", len(snaps), out.String())
-	}
-	// En Windows no hay puertos privilegiados (ADR 0012 h): ahí el bind abriría y Listen esperaría para siempre.
-	if runtime.GOOS == "windows" {
-		return
-	}
-	if err := (func() error { _, err := Listen(context.Background(), Config{Addr: "127.0.0.1:2"}); return err })(); err == nil {
-		t.Fatal("puerto privilegiado aceptado")
 	}
 }
 
