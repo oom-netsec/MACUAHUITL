@@ -389,7 +389,7 @@ func TestFailedAndAbandonedRunsLeavePendingRollbacks(t *testing.T) {
 	}
 
 	r2 := newRig(t, simulator.Config{})
-	r2.svc.decisionTimeout = 200 * time.Millisecond
+	r2.svc.decisionTimeout = decision(200 * time.Millisecond)
 	run2 := r2.changedAtClose()
 	r2.waitState(run2, "abandoned")
 	r2.waitDone(run2)
