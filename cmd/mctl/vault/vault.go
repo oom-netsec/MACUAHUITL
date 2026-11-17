@@ -6,7 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -204,12 +208,97 @@ func credRekey(c *cli.Env, args []string) error {
 	if !yes {
 		return cli.Err("mctl.vault.rekey_confirm_yes")
 	}
-	r, err := v1.NewVaultServiceClient(c.Conn).RegenerateKeyCredential(context.Background(), &v1.RegenerateKeyCredentialRequest{Id: fs.Arg(0), Confirm: true})
+	cl := v1.NewVaultServiceClient(c.Conn)
+	r, err := cl.RegenerateKeyCredential(context.Background(), &v1.RegenerateKeyCredentialRequest{Id: fs.Arg(0), Confirm: true})
 	if err != nil {
 		return err
 	}
+	if r.PreviousOrigin == "imported" {
+		fmt.Fprintln(c.Out, cli.T("mctl.vault.rekey_was_imported"))
+	}
 	fmt.Fprintln(c.Out, strings.TrimSpace(r.PublicKey))
 	fmt.Fprintln(c.Out, cli.T("mctl.vault.rekey_done"))
+	return nil
+}
+
+// maxKeyFile es el tope del núcleo para una llave importada (vault.MaxFieldBytes); mctl lo aplica antes de leer el archivo entero.
+const maxKeyFile = 64 << 10
+
+// readKeyFile lee la llave con el tope: ni abre un archivo enorme ni lo lee entero.
+func readKeyFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, cli.ErrWrap("mctl.vault.import_read", err, "path", path)
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err == nil && st.Size() > maxKeyFile {
+		return nil, cli.Err("mctl.vault.import_too_big", "max", maxKeyFile>>10)
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxKeyFile+1))
+	if err != nil {
+		return nil, cli.ErrWrap("mctl.vault.import_read", err, "path", path)
+	}
+	if len(b) > maxKeyFile {
+		wipe(b)
+		return nil, cli.Err("mctl.vault.import_too_big", "max", maxKeyFile>>10)
+	}
+	return b, nil
+}
+
+// needsPassphrase dice si el núcleo respondió que la llave está cifrada y falta la frase.
+func needsPassphrase(err error) bool {
+	for _, d := range status.Convert(err).Details() {
+		if ei, ok := d.(*errdetails.ErrorInfo); ok && ei.Reason == "vault.err.key_passphrase_required" {
+			return true
+		}
+	}
+	return false
+}
+
+// cred import-key --label L --user U --file PATH: guarda en la bóveda una llave privada que ya tienes. mctl lee el
+// archivo (el núcleo recibe el contenido, nunca la ruta). La frase se pide sin eco solo si el núcleo dice que hace falta (o se lee de
+// stdin sin terminal); nunca como argumento.
+func credImportKey(c *cli.Env, args []string) error {
+	var label, user, file string
+	if _, err := cli.Flags("cred import-key", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&label, "label", "", "etiqueta")
+		fs.StringVar(&user, "user", "", "usuario")
+		fs.StringVar(&file, "file", "", "archivo de la llave privada")
+	}); err != nil {
+		return err
+	}
+	if user == "" {
+		return cli.Err("mctl.vault.missing_user")
+	}
+	if file == "" {
+		return cli.Err("mctl.vault.import_missing_file")
+	}
+	key, err := readKeyFile(file)
+	if err != nil {
+		return err
+	}
+	defer wipe(key)
+	var pass []byte
+	defer func() { wipe(pass) }()
+	cl := v1.NewVaultServiceClient(c.Conn)
+	r, err := cl.ImportKeyCredential(context.Background(), &v1.ImportKeyCredentialRequest{Label: label, Username: user, PrivateKey: key, Passphrase: pass})
+	if err != nil && needsPassphrase(err) {
+		// El núcleo ya no usa el búfer enviado (el cable lo copia): se vuelve a mandar una vez con la frase pedida.
+		if pass, err = c.Secret(cli.T("mctl.vault.prompt_key_passphrase")); err != nil {
+			return err
+		}
+		r, err = cl.ImportKeyCredential(context.Background(), &v1.ImportKeyCredentialRequest{Label: label, Username: user, PrivateKey: key, Passphrase: pass})
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, r.Id)
+	fmt.Fprintln(c.Out, strings.TrimSpace(r.PublicKey))
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.import_fingerprint", "fingerprint", r.Fingerprint))
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.import_algorithm", "algorithm", r.Algorithm, "bits", r.Bits))
+	if r.Weak {
+		fmt.Fprintln(c.Out, cli.T("mctl.vault.import_weak", "bits", r.Bits))
+	}
 	return nil
 }
 
@@ -228,6 +317,9 @@ const help = `  vault status | create | unlock | lock | passwd
   cred  keygen --label L --user U | pubkey ID | rekey ID --yes
         (llave SSH ed25519 generada en el núcleo: la privada nunca sale. keygen imprime el id y la pública; pubkey imprime SOLO la línea authorized_keys, para «>> authorized_keys»;
          rekey cambia la llave conservando el id: autoriza la nueva en cada equipo, la anterior deja de servir. No confundir con «cred rotate», que rota una contraseña en un equipo)
+  cred  import-key --label L --user U --file RUTA
+        (importa a la bóveda una llave privada que ya tienes (OpenSSH, PKCS#1, PKCS#8 sin cifrar, SEC1 o PEM legado cifrado; ed25519, ECDSA o RSA de 1024 bits o más; máximo 64 KiB). mctl lee el archivo; la frase se pide sin eco (o se lee una línea de stdin si no hay terminal) solo si la llave está cifrada, nunca como argumento. Una PKCS#8 cifrada («ENCRYPTED PRIVATE KEY») se rechaza: conviértela antes con «ssh-keygen -p». Imprime el id, la pública, la huella y el algoritmo; avisa si es RSA de menos de 3072 bits. La privada nunca sale del núcleo, como las generadas;
+         rekey sobre una importada la reemplaza por una ed25519 generada)
   cred  backup export RUTA [--overwrite] [--yes]  |  backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);
@@ -245,6 +337,7 @@ func Area() cli.Area {
 		{Name: "cred add", Run: credAdd},
 		{Name: "cred keygen", Run: credKeygen},
 		{Name: "cred pubkey", Run: credPubkey},
+		{Name: "cred import-key", Run: credImportKey},
 		{Name: "cred rekey", Run: credRekey},
 		{Name: "cred rm", Run: credRm},
 		{Name: "cred backup export", Run: backupExport},

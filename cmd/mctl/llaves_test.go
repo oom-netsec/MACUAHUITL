@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -130,5 +131,52 @@ func TestHostsPlataformaYOrdenDeInicio(t *testing.T) {
 	must(t, "", "hosts", "edit", m[1], "--startup-command", "")
 	if j := must(t, "", "hosts", "list", "--json"); strings.Contains(j, "cmd /c echo ok") {
 		t.Fatalf("la orden no se borró:\n%s", j)
+	}
+}
+
+// Fase 47c: llaves de ssh-keygen real (ed25519 OpenSSH y RSA 2048 PKCS#1 con frase legada), frase «frase-de-prueba».
+const keysDir = "../../internal/sshkey/testdata/"
+
+func TestCredImportKeyPuntaAPunta(t *testing.T) {
+	startCore(t)
+	must(t, "maestra\nmaestra\n", "vault", "create")
+	// Cifrada: el núcleo pide la frase y mctl la lee (stdin sin terminal) y reintenta una vez.
+	out := must(t, "frase-de-prueba\n", "cred", "import-key", "--label", "pi", "--user", "pi", "--file", keysDir+"k_ed25519")
+	ls := strings.Split(strings.TrimSpace(out), "\n")
+	pub, _ := os.ReadFile(keysDir + "k_ed25519.pub")
+	if len(ls) != 4 || !strings.HasPrefix(ls[1], "ssh-ed25519 ") || !strings.Contains(ls[1], strings.Fields(string(pub))[1]) ||
+		!strings.Contains(ls[2], "SHA256:") || !strings.Contains(ls[3], "ssh-ed25519, 256") || strings.Contains(out, "aviso") {
+		t.Fatalf("import ed25519:\n%s", out)
+	}
+	if got := must(t, "", "cred", "pubkey", ls[0]); got != ls[1]+"\n" {
+		t.Fatalf("pubkey = %q", got)
+	}
+	// Frase mala: error sin la frase; nada se guarda.
+	if _, err := mctl(t, "mala-frase\n", "cred", "import-key", "--label", "x", "--user", "u", "--file", keysDir+"k_rsa"); err == nil || strings.Contains(err.Error(), "mala-frase") {
+		t.Fatalf("frase mala: %v", err)
+	}
+	// RSA 2048: aviso de weak.
+	out = must(t, "frase-de-prueba\n", "cred", "import-key", "--label", "rsa", "--user", "pi", "--file", keysDir+"k_rsa")
+	if !strings.Contains(out, "ssh-rsa, 2048") || !strings.Contains(out, "aviso: RSA de 2048 bits") {
+		t.Fatalf("import RSA:\n%s", out)
+	}
+	// rekey de una importada avisa.
+	rid := strings.Fields(out)[0]
+	if out := must(t, "", "cred", "rekey", rid, "--yes"); !strings.Contains(out, "importada se reemplazó") {
+		t.Fatalf("rekey sin aviso:\n%s", out)
+	}
+	// Sin --user, sin --file y un archivo enorme (el tope se aplica antes de leerlo).
+	if _, err := mctl(t, "", "cred", "import-key", "--label", "x", "--file", "f"); err == nil {
+		t.Fatal("sin --user debió fallar")
+	}
+	if _, err := mctl(t, "", "cred", "import-key", "--label", "x", "--user", "u"); err == nil {
+		t.Fatal("sin --file debió fallar")
+	}
+	big := filepath.Join(t.TempDir(), "grande")
+	f, _ := os.Create(big)
+	f.Truncate(64<<10 + 1)
+	f.Close()
+	if _, err := mctl(t, "", "cred", "import-key", "--label", "x", "--user", "u", "--file", big); err == nil || !strings.Contains(err.Error(), "64 KiB") {
+		t.Fatalf("archivo grande: %v", err)
 	}
 }

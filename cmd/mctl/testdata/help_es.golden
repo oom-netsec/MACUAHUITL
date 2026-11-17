@@ -4,6 +4,9 @@ uso: mctl <comando>
   cred  keygen --label L --user U | pubkey ID | rekey ID --yes
         (llave SSH ed25519 generada en el núcleo: la privada nunca sale. keygen imprime el id y la pública; pubkey imprime SOLO la línea authorized_keys, para «>> authorized_keys»;
          rekey cambia la llave conservando el id: autoriza la nueva en cada equipo, la anterior deja de servir. No confundir con «cred rotate», que rota una contraseña en un equipo)
+  cred  import-key --label L --user U --file RUTA
+        (importa a la bóveda una llave privada que ya tienes (OpenSSH, PKCS#1, PKCS#8 sin cifrar, SEC1 o PEM legado cifrado; ed25519, ECDSA o RSA de 1024 bits o más; máximo 64 KiB). mctl lee el archivo; la frase se pide sin eco (o se lee una línea de stdin si no hay terminal) solo si la llave está cifrada, nunca como argumento. Una PKCS#8 cifrada («ENCRYPTED PRIVATE KEY») se rechaza: conviértela antes con «ssh-keygen -p». Imprime el id, la pública, la huella y el algoritmo; avisa si es RSA de menos de 3072 bits. La privada nunca sale del núcleo, como las generadas;
+         rekey sobre una importada la reemplaza por una ed25519 generada)
   cred  backup export RUTA [--overwrite] [--yes]  |  backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);

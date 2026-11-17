@@ -4,6 +4,9 @@ usage: mctl <command>
   cred  keygen --label L --user U | pubkey ID | rekey ID --yes
         (ed25519 SSH key generated in the core: the private key never leaves it. keygen prints the id and the public key; pubkey prints ONLY the authorized_keys line, for «>> authorized_keys»;
          rekey replaces the key keeping the id: authorize the new one on every host, the old one stops working. Not to be confused with «cred rotate», which rotates a password on a device)
+  cred  import-key --label L --user U --file PATH
+        (imports into the vault a private key you already have (OpenSSH, PKCS#1, unencrypted PKCS#8, SEC1 or encrypted legacy PEM; ed25519, ECDSA or RSA of 1024 bits or more; 64 KiB at most). mctl reads the file; the passphrase is asked without echo (or one line is read from stdin if there is no terminal) only if the key is encrypted, never as an argument. An encrypted PKCS#8 («ENCRYPTED PRIVATE KEY») is rejected: convert it first with «ssh-keygen -p». Prints the id, the public key, the fingerprint and the algorithm; warns if it is RSA under 3072 bits. The private key never leaves the core, like the generated ones;
+         rekey on an imported key replaces it with a generated ed25519 one)
   cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
          export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);

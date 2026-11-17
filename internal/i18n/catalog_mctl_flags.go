@@ -84,6 +84,8 @@ func init() {
 		"mctl.flag.cred.backup.export.overwrite": {Es: "reemplazar el archivo si existe", En: "overwrite the file if it exists"},
 		"mctl.flag.cred.backup.export.yes":       {Es: "confirmar que el archivo trae todas las credenciales", En: "confirm that the file contains all the credentials"},
 		"mctl.flag.cred.backup.import.decision":  {Es: "ID=acción (o ETIQUETA=acción) para un conflicto (repetible)", En: "ID=action (or TAG=action) for a conflict (repeatable)"},
+		"mctl.flag.cred.import-key.file":         {Es: "archivo de la llave privada (máximo 64 KiB)", En: "private key file (64 KiB at most)"},
+		"mctl.flag.cred.import-key.user":         {Es: "usuario", En: "username"},
 		"mctl.flag.cred.keygen.user":             {Es: "usuario", En: "username"},
 		"mctl.flag.cred.rekey.yes":               {Es: "confirmar el reemplazo de la llave", En: "confirm replacing the key"},
 		"mctl.flag.hosts.add.startup-command":    {Es: "orden que corre el terminal al conectar (linux y windows); vacío la borra", En: "command the terminal runs on connect (linux and windows); empty clears it"},

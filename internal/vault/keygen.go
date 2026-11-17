@@ -7,11 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"os"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sshkey"
 )
 
 // ErrKeyUnsupported: la llave guardada no es una ed25519 en formato OpenSSH sin frase, la única de la que se deriva la pública aquí.
@@ -44,7 +46,13 @@ func (p PublicKey) Fingerprint() string {
 // AuthorizedKey es la línea de authorized_keys con el comentario macuahuitl@<hostname>. El hostname es el de hoy, no se guarda.
 func (p PublicKey) AuthorizedKey() string {
 	h, _ := os.Hostname()
-	return keyType + " " + base64.StdEncoding.EncodeToString(p) + " macuahuitl@" + cleanHost(h)
+	typ := keyType
+	if len(p) >= 4 {
+		if n := binary.BigEndian.Uint32(p); uint64(n) <= uint64(len(p)-4) {
+			typ = string(p[4 : 4+n])
+		}
+	}
+	return typ + " " + base64.StdEncoding.EncodeToString(p) + " macuahuitl@" + cleanHost(h)
 }
 
 // newKeyPair genera una ed25519 con crypto/rand y devuelve la privada en formato OpenSSH sin frase (openssh-key-v1, el que lee
@@ -133,15 +141,15 @@ func unarmor(pemBytes []byte) ([]byte, error) {
 
 // pubOf deriva la pública de una privada openssh-key-v1 ed25519 sin frase y exige que las tres copias coincidan (la de la cabecera,
 // la de la sección privada y la derivada de la semilla, que es la que firma); cualquier otra cosa da ErrKeyUnsupported.
-func pubOf(pemBytes []byte) (PublicKey, error) {
+func pubOf(pemBytes []byte) (PublicKey, string, error) {
 	b, err := unarmor(pemBytes)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer wipe(b)
 	const magic = "openssh-key-v1\x00"
 	if len(b) < len(magic) || string(b[:len(magic)]) != magic {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	b = b[len(magic):]
 	next := func() []byte {
@@ -158,34 +166,35 @@ func pubOf(pemBytes []byte) (PublicKey, error) {
 	}
 	cipher, kdf := string(next()), string(next())
 	if cipher != "none" || kdf != "none" {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	next() // kdfoptions
 	if len(b) < 4 || binary.BigEndian.Uint32(b) != 1 {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	b = b[4:]
 	hdr := next() // pública en el encabezado
 	b = next()
 	if len(b) < 8 {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	b = b[8:] // checkints
 	if string(next()) != keyType {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	pub := next()
 	priv := next()
+	comment := next()
 	if len(pub) != ed25519.PublicKeySize || len(priv) != ed25519.PrivateKeySize {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
 	derived := ed25519.NewKeyFromSeed(priv[:ed25519.SeedSize])
 	defer wipe(derived)
 	w := wirePub(pub)
 	if !bytes.Equal(hdr, w) || !bytes.Equal(priv[ed25519.SeedSize:], pub) || !bytes.Equal(derived[ed25519.SeedSize:], pub) {
-		return nil, ErrKeyUnsupported
+		return nil, "", ErrKeyUnsupported
 	}
-	return w, nil
+	return w, string(comment), nil // la copia a string solo después de validar
 }
 
 // GenerateKey crea una credencial "key" (solo llave ed25519, sin contraseña ni enable) y devuelve su id y su pública.
@@ -204,69 +213,156 @@ func (v *Vault) GenerateKey(label, user string) (string, PublicKey, error) {
 	return id, pub, nil
 }
 
-// PublicKey deriva la pública de la privada guardada. Solo sirve con una ed25519 OpenSSH sin frase; las demás (RSA, ECDSA, PKCS#8,
-// cifradas, de antes de la fase 44) dan ErrKeyUnsupported. Va bajo v.mu y exige la bóveda abierta: una ventana de trabajo no basta.
-func (v *Vault) PublicKey(id string) (PublicKey, error) {
+// withKey corre f con la privada guardada de la credencial "id" (bóveda abierta; una ventana de trabajo no basta). f no la guarda.
+func (v *Vault) withKey(id string, f func(key []byte) error) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.requireFull(); err != nil {
-		return nil, err
+		return err
 	}
 	i, err := v.find(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	c, err := v.decrypt(v.entries[i])
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	defer c.SSHKey.Destroy()
 	if Reserved(c.Label) {
-		return nil, ErrReserved
+		return ErrReserved
 	}
 	if c.SSHKey.Empty() {
-		return nil, ErrNoKey
+		return ErrNoKey
 	}
-	return pubOf(c.SSHKey.Bytes())
+	return f(c.SSHKey.Bytes())
+}
+
+// pubWire deriva la pública de una privada guardada: ed25519 OpenSSH con la comprobación estricta de pubOf; ecdsa, RSA y los demás
+// formatos legibles sin frase, por sshkey. Lo ilegible o cifrado da ErrKeyUnsupported.
+func pubWire(key []byte) (PublicKey, error) {
+	if p, _, err := pubOf(key); err == nil {
+		return p, nil
+	}
+	i, err := sshkey.Inspect(key)
+	if err != nil {
+		return nil, ErrKeyUnsupported
+	}
+	return PublicKey(i.Wire), nil
+}
+
+// PublicKey deriva la pública de la privada guardada (ed25519, ecdsa o RSA sin frase); lo demás (cifradas, basura) da ErrKeyUnsupported.
+func (v *Vault) PublicKey(id string) (PublicKey, error) {
+	var out PublicKey
+	err := v.withKey(id, func(k []byte) (err error) { out, err = pubWire(k); return })
+	return out, err
+}
+
+// Orígenes de una credencial "key". Informativos: no son un control de seguridad (un .mcvault armado a mano puede decir cualquiera).
+const (
+	OriginGenerated = "generated"
+	OriginImported  = "imported"
+)
+
+// originOf: "generated" si es una ed25519 OpenSSH sin frase con el comentario vacío (lo que escribe newKeyPair); cualquier otra llave
+// guardada es "imported" (las importadas llevan sshkey.ImportedTag).
+func originOf(key []byte) string {
+	if _, c, err := pubOf(key); err == nil && c == "" {
+		return OriginGenerated
+	}
+	return OriginImported
+}
+
+// ImportKey guarda como credencial "key" una privada que el usuario ya tiene (OpenSSH, PKCS#1, PKCS#8, SEC1 o PEM legado cifrado; pass es la
+// frase si va cifrada). Se guarda en OpenSSH sin frase con el comentario sshkey.ImportedTag. Pone en ceros pem y pass al terminar. El análisis
+// (bcrypt puede tardar segundos) va fuera de v.mu; solo guardar entra a la bóveda, con la frontera estricta de Put.
+func (v *Vault) ImportKey(label, user string, pem, pass []byte) (string, sshkey.Info, error) {
+	defer wipe(pem)
+	defer wipe(pass)
+	if len(pem) > MaxFieldBytes || len(pass) > MaxFieldBytes {
+		return "", sshkey.Info{}, ErrFieldTooLong
+	}
+	v.mu.Lock()
+	err := v.requireFull() // comprobación barata: con la bóveda cerrada no se pide la frase; Put la repite
+	v.mu.Unlock()
+	if err != nil {
+		return "", sshkey.Info{}, err
+	}
+	out, info, err := sshkey.Import(pem, pass)
+	if err != nil {
+		return "", sshkey.Info{}, importErr(err)
+	}
+	k := secret.New(out) // pone en ceros out
+	defer k.Destroy()
+	id, err := v.Put(Credential{Label: label, Username: user, SSHKey: k})
+	if err != nil {
+		return "", sshkey.Info{}, err
+	}
+	return id, info, nil
+}
+
+var (
+	ErrKeyPassphraseRequired = i18n.New("vault.err.key_passphrase_required", nil)
+	ErrKeyPassphraseWrong    = i18n.New("vault.err.key_passphrase_wrong", nil)
+	ErrKeyImportInvalid      = i18n.New("vault.err.key_import_invalid", nil)
+	ErrKeyImportUnsupported  = i18n.New("vault.err.key_import_unsupported", nil)
+)
+
+// importErr traduce el error de sshkey a uno con código del catálogo; la metadata (format, type) sale de listas cerradas.
+func importErr(err error) error {
+	var ke *sshkey.Error
+	if !errors.As(err, &ke) {
+		return ErrKeyImportInvalid
+	}
+	switch {
+	case errors.Is(err, sshkey.ErrPassphraseRequired):
+		return ErrKeyPassphraseRequired
+	case errors.Is(err, sshkey.ErrPassphraseWrong):
+		return ErrKeyPassphraseWrong
+	case errors.Is(err, sshkey.ErrUnsupported):
+		return i18n.Wrap("vault.err.key_import_unsupported", ErrKeyImportUnsupported, i18n.A("format", ke.Format, "type", ke.Type))
+	}
+	return i18n.Wrap("vault.err.key_import_invalid", ErrKeyImportInvalid, i18n.A("format", ke.Format))
 }
 
 // RegenerateKey cambia la llave de una credencial "key" conservando id, etiqueta y usuario, en una sola persistencia, y destruye
-// la vieja. Devuelve la pública vieja (nil si la llave no era una ed25519 OpenSSH sin frase) y la nueva (la auditoría guarda ambas huellas).
-func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, err error) {
+// la vieja. Devuelve el origen de la llave reemplazada, la pública vieja (nil si la llave no era una ed25519 OpenSSH sin frase) y la nueva (la auditoría guarda ambas huellas).
+func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, prevOrigin string, err error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.requireFull(); err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	i, err := v.find(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	c, err := v.decrypt(v.entries[i])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	if Reserved(c.Label) {
 		c.SSHKey.Destroy()
-		return nil, nil, ErrReserved
+		return nil, nil, "", ErrReserved
 	}
 	if c.SSHKey.Empty() || !c.Password.Empty() || !c.Enable.Empty() {
 		c.SSHKey.Destroy()
-		return nil, nil, ErrNotKey
+		return nil, nil, "", ErrNotKey
 	}
-	old, err := pubOf(c.SSHKey.Bytes())
+	old, err := pubWire(c.SSHKey.Bytes())
 	if err != nil {
 		old = nil // llave de antes de la fase 44 (RSA, ECDSA, cifrada…): se reemplaza igual, sin huella vieja
 	}
 	k, pub, err := newKeyPair()
 	if err != nil {
 		c.SSHKey.Destroy()
-		return nil, nil, err
+		return nil, nil, "", err
 	}
+	prevOrigin = originOf(c.SSHKey.Bytes())
 	oldKey := c.SSHKey
 	c.SSHKey = k
 	_, err = v.putBatchLocked([]Credential{c}, false, true)
@@ -276,9 +372,9 @@ func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, err error) {
 		afterRekey(oldKey)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
-	return old, pub, nil
+	return old, pub, prevOrigin, nil
 }
 
 // cleanHost deja solo [A-Za-z0-9._-]; si no queda nada, "localhost".

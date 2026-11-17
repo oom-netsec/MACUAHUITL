@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -973,4 +974,20 @@ func trunkAllowed(cur []string, line string) []string {
 		return append(rest, p+" none")
 	}
 	return append(rest, p+" "+strings.Join(strs, ","))
+}
+
+// EncryptedEd25519 arma una llave privada ed25519 en formato OpenSSH cifrada con pass (bcrypt-pbkdf + aes256-ctr), como la deja
+// ssh-keygen con -N. Devuelve el PEM y la semilla (para que las pruebas busquen que no se filtre). Las pruebas de core no pueden
+// importar x/crypto/ssh (noegress); este paquete sí.
+func EncryptedEd25519(t testing.TB, pass []byte) (pemBytes, seed []byte) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := ssh.MarshalPrivateKeyWithPassphrase(priv, "descartable", pass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(b), priv.Seed()
 }
