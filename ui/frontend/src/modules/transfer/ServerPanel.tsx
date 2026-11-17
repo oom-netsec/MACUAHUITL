@@ -7,6 +7,7 @@ import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { iosCommands, splitListen } from "./ios";
+import { errInfo } from "../../lib/coreError";
 import { portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
@@ -101,6 +102,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [legacy, setLegacy] = useState(false);
   const legacyNext = useRef(false); // lo que se pidió al abrir: la tarjeta lo recuerda
   const [err, setErr] = useState("");
+  const [errCmd, setErrCmd] = useState(""); // orden de sysctl que trae el error de puerto negado: solo para copiar
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
@@ -128,6 +130,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otro servidor
   const start = async () => {
     const p = serveProblem(form);
+    setErrCmd("");
     if (p) { setErr(t(p)); return; }
     setErr("");
     const host = any ? "0.0.0.0" : listen;
@@ -140,6 +143,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       });
     } catch (e) {
       setErr(errorText(e));
+      setErrCmd(errInfo(e)?.metadata.cmd ?? "");
     } finally {
       setStarting(false);
     }
@@ -170,6 +174,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
         <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
         {err && <Notice kind="error">{err}</Notice>}
+        {err && errCmd && <Console label={t("transfer.portDenied.cmd")} text={errCmd} copy={core.copyText} />}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}
       {servers.map((s) => (

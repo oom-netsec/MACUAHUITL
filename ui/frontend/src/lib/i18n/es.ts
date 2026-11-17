@@ -1623,7 +1623,7 @@ export const es = {
   "transfer.listen.hint": "La de la interfaz que ve al equipo; la IP queda explícita en la regla del servidor.",
   "transfer.any": "Escuchar en todas las interfaces (avanzado)",
   "transfer.port": "Puerto",
-  "transfer.port.hint": "Puerto alto (1024 o más): la app no abre puertos privilegiados.",
+  "transfer.port.hint": "De 1 a 65535. Por omisión, el puerto estándar del protocolo; si el sistema no deja abrirlo, se explica cómo permitirlo.",
   "transfer.minutes": "Duración (minutos)",
   "transfer.fromDir": "Carpeta de envío (opcional)",
   "transfer.fromDir.hint": "Se publican solo los archivos de su primer nivel, por su nombre.",
@@ -1645,7 +1645,7 @@ export const es = {
   "transfer.open": "Abrir servidor",
   "transfer.servers.none": "No hay servidores abiertos.",
   "transfer.err.listen": "Elige la IP de escucha.",
-  "transfer.err.port": "El puerto debe estar entre 1024 y 65535.",
+  "transfer.err.port": "El puerto debe estar entre 1 y 65535.",
   "transfer.err.nothing": "Elige una carpeta de envío, archivos sueltos o permite recibir.",
   "transfer.err.allow": "Una de las IP permitidas no es válida.",
   "transfer.err.anyAllow": "Para escuchar en todas las interfaces indica las IP permitidas.",
@@ -2806,8 +2806,6 @@ export const es = {
   "settings.storage.err.permisos.windows": "La carpeta da acceso a otros usuarios. La aplicación no lo cambia: quita ese acceso (Propiedades → Seguridad, o con icacls en cmd) y vuelve a intentarlo.",
   "settings.storage.err.ancestro_inseguro.windows": "La carpeta cuelga de otra donde otros usuarios pueden escribir (p. ej. C:\\Users\\Public), y podrían reemplazar la ruta. Elige una carpeta bajo tu perfil de usuario.",
   // Puertos en Windows (ADR 0012 h): sin puertos privilegiados; lo que hace falta es la regla de entrada del firewall.
-  "transfer.port.hint.windows": "De 1 a 65535: Windows no tiene puertos privilegiados. Por omisión, el estándar del protocolo.",
-  "transfer.err.port.windows": "El puerto debe estar entre 1 y 65535.",
   "transfer.privileged.windows": "IOS usa el puerto estándar {std} y en Windows no hay redirección: este servidor escucha en el {port}, así que ábrelo en el estándar para que IOS llegue. La regla es para el puerto en que escucha ahora: córrela una vez, como administrador, en PowerShell (o acepta el diálogo del firewall al abrir el servidor; si lo CANCELAS, Windows crea reglas de bloqueo que ganan a las de permiso: revísalas en Firewall de Windows → Configuración avanzada → Reglas de entrada). La app nunca la aplica.",
   "transfer.privilegedSame": "IOS usa el puerto estándar {std} y este servidor escucha ahí. Para que el tráfico entre, corre una vez, como administrador, esta regla de entrada del Firewall de Windows (o acepta el diálogo del firewall al abrir el servidor; si lo CANCELAS, Windows crea reglas de bloqueo que ganan a las de permiso: revísalas en Firewall de Windows → Configuración avanzada → Reglas de entrada). La app nunca la aplica.",
   "transfer.redirect.windows": "Regla de firewall (PowerShell, como administrador)",
@@ -2816,6 +2814,8 @@ export const es = {
   "diag.port.hint.windows": "De 1 a 65535; 5201 es el de iperf3.",
   "diag.port.invalid.windows": "Un entero de 1 a 65535.",
   "visibility.traps.note.windows": "En Windows no hay puertos privilegiados: puedes escuchar directo en el 162 (o usar 1162). Hace falta una regla de entrada del Firewall de Windows para UDP en ese puerto: córrela una vez como administrador o acepta el diálogo del firewall; la app nunca la aplica.",
+  // Puerto estándar negado por el sistema (fase 45): la orden viene en la metadata del error.
+  "transfer.portDenied.cmd": "Orden para permitirlo (cópiala y córrela tú si estás de acuerdo; la app nunca la aplica)",
 };
 
 export type Key = keyof typeof es;

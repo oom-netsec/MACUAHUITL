@@ -1,12 +1,9 @@
 import type { Key } from "../../lib/i18n/es";
 import type { TransferProto } from "./api";
-import { isWindows } from "../../lib/platform";
 
-export const defaultPort: Record<TransferProto, string> = { tftp: "6969", ftp: "2121", scp: "2222", sftp: "2222", http: "8080" };
-
-// ADR 0012 (h): en Windows no hay puertos privilegiados, así que se escucha directo en el estándar (la regla de firewall hace el resto).
-const windowsPort: Record<TransferProto, string> = { ...defaultPort, tftp: "69", ftp: "21", scp: "22", sftp: "22" };
-export const portFor = (p: TransferProto) => (isWindows() ? windowsPort : defaultPort)[p];
+// Puerto estándar del protocolo por omisión (IOS no deja elegir otro). Si el sistema niega el bind, el núcleo explica cómo permitirlo.
+const defaultPort: Record<TransferProto, string> = { tftp: "69", ftp: "21", scp: "22", sftp: "22", http: "80" };
+export const portFor = (p: TransferProto) => defaultPort[p];
 
 export const isIP = (s: string) =>
   (/^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split(".").every((n) => Number(n) <= 255)) || (s.includes(":") && /^[0-9a-f:.]+$/i.test(s) && (s.match(/:/g) ?? []).length >= 2);
@@ -15,11 +12,11 @@ export const splitList = (s: string) => s.split(/[\s,;]+/).filter(Boolean);
 
 export interface ServeForm { proto: TransferProto; any: boolean; listen: string; port: string; write: boolean; recvDir: string; fromDir: string; files: string; allow: string; minutes: string }
 
-// Primer problema del formulario (clave de i18n) o null. Los puertos privilegiados no se abren (ADR 0004).
+// Primer problema del formulario (clave de i18n) o null. El puerto bajo lo decide el bind del núcleo, no la UI.
 export function serveProblem(f: ServeForm): Key | null {
   if (!f.any && !f.listen) return "transfer.err.listen";
   const port = Number(f.port);
-  if (!Number.isInteger(port) || port < (isWindows() ? 1 : 1024) || port > 65535) return "transfer.err.port";
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return "transfer.err.port";
   if (!f.write && !f.fromDir && splitList(f.files).length === 0) return "transfer.err.nothing";
   if (!splitList(f.allow).every(isIP)) return "transfer.err.allow";
   const none = splitList(f.allow).length === 0;

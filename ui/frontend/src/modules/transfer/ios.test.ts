@@ -25,7 +25,7 @@ const form = { proto: "tftp" as const, any: false, listen: "192.0.2.10", port: "
 test("validación del servidor", () => {
   expect(serveProblem(form)).toBeNull();
   expect(serveProblem({ ...form, listen: "" })).toBe("transfer.err.listen");
-  expect(serveProblem({ ...form, port: "69" })).toBe("transfer.err.port");
+  expect(serveProblem({ ...form, port: "0" })).toBe("transfer.err.port");
   expect(serveProblem({ ...form, fromDir: "" })).toBe("transfer.err.nothing");
   expect(serveProblem({ ...form, fromDir: "", write: true, proto: "scp" })).toBeNull();
   expect(serveProblem({ ...form, fromDir: "", write: true })).toBe("transfer.err.tftpAllow"); // en UDP el origen se falsifica: la lista es obligatoria
@@ -50,16 +50,16 @@ test("URL, hash esperado y llave de host", () => {
   expect(hostKeyFromError("timeout")).toBeNull();
 });
 
-// ADR 0012 (h): en Windows no hay puertos privilegiados; en Linux el 22 sigue rechazado.
-test("serveProblem: 1-65535 en Windows y de 1024 en adelante en Linux; puertos por omisión del estándar en Windows", () => {
+// Puertos estándar por omisión en los dos sistemas: el núcleo intenta el bind y explica si el sistema lo niega.
+test("serveProblem: 1-65535 y puertos por omisión del estándar en Linux y en Windows", () => {
   const f = { proto: "tftp" as const, any: false, listen: "10.0.0.5", port: "69", write: false, recvDir: "", fromDir: "/x", files: "", allow: "", minutes: "30" };
-  expect(serveProblem(f)).toBe("transfer.err.port");
-  expect(portFor("tftp")).toBe("6969");
-  setOSForTests("windows");
-  try {
-    expect(serveProblem(f)).toBeNull();
-    expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
-    expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");
-    expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("http")]).toEqual(["69", "21", "22", "8080"]);
-  } finally { setOSForTests(undefined); }
+  for (const os of [undefined, "windows"] as const) {
+    setOSForTests(os);
+    try {
+      expect(serveProblem(f)).toBeNull();
+      expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
+      expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");
+      expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("sftp"), portFor("http")]).toEqual(["69", "21", "22", "22", "80"]);
+    } finally { setOSForTests(undefined); }
+  }
 });

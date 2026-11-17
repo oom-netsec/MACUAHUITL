@@ -30,20 +30,20 @@ test("el formulario inválido no abre nada y el válido usa el puerto alto por o
   expect(core.transferServe).not.toHaveBeenCalled();
   await openServer(core);
   expect(core.transferServe).toHaveBeenCalledWith({
-    protocol: "tftp", listen: "192.0.2.10:6969", allowAny: false, files: [], fromDir: "/srv/img", write: false, recvDir: "", allow: [], seconds: 1800, legacySsh: false,
+    protocol: "tftp", listen: "192.0.2.10:69", allowAny: false, files: [], fromDir: "/srv/img", write: false, recvDir: "", allow: [], seconds: 1800, legacySsh: false,
   });
 });
 
-test("el puerto cambia con el protocolo y uno privilegiado se rechaza", async () => {
+test("el puerto cambia con el protocolo y uno fuera de rango se rechaza", async () => {
   const core = setup();
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "scp");
-  expect(screen.getByLabelText("Puerto")).toHaveValue(2222);
+  expect(screen.getByLabelText("Puerto")).toHaveValue(22);
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
   await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
   await userEvent.clear(screen.getByLabelText("Puerto"));
-  await userEvent.type(screen.getByLabelText("Puerto"), "22");
+  await userEvent.type(screen.getByLabelText("Puerto"), "0");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("entre 1024 y 65535");
+  expect(await screen.findByRole("alert")).toHaveTextContent("entre 1 y 65535");
   expect(core.transferServe).not.toHaveBeenCalled();
 });
 
@@ -119,6 +119,23 @@ test("un servidor que no llega a abrir muestra el error del núcleo", async () =
   const core = await openServer(setup());
   act(() => core.emitTransfer({ runId: "r1", done: true, error: "rpc error: code = InvalidArgument desc = carpeta sensible" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("carpeta sensible");
+});
+
+test("el puerto estándar negado por el sistema muestra la orden de sysctl para copiar, sin aplicarla", async () => {
+  const cmd = "echo 'net.ipv4.ip_unprivileged_port_start=21' | sudo tee /etc/sysctl.d/60-macuahuitl.conf && sudo sysctl --system";
+  const denied = Object.assign(new Error("rpc error: code = FailedPrecondition desc = Linux no deja abrir el puerto 69"), {
+    cause: { code: "FailedPrecondition", reason: "fileserve.err.port_denied", metadata: { port: "69", min_port: "21", cmd } },
+  });
+  const core = await openServer(setup({ transferServe: vi.fn(async () => { throw denied; }) }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Linux no deja abrir el puerto 69");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Copiar/ }));
+  expect(core.copyText).toHaveBeenCalledWith(cmd);
+  expect(screen.getByLabelText("Puerto")).not.toBeDisabled(); // se puede elegir otro puerto en lugar de aplicar la orden
+  // Un intento siguiente que falla por otra causa no deja la orden vieja a la vista.
+  vi.mocked(core.transferServe).mockRejectedValueOnce(new Error("puerto en uso"));
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  await waitFor(() => expect(screen.queryByText(cmd)).toBeNull());
 });
 
 const client = async (core: ReturnType<typeof setup>, url: string) => {
@@ -204,7 +221,7 @@ test("0.0.0.0 no se ofrece en la lista; «todas las interfaces» es una opción 
   expect(core.transferServe).not.toHaveBeenCalled();
   await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.1");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
-  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:6969", allowAny: true, allow: ["192.0.2.1"] }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:69", allowAny: true, allow: ["192.0.2.1"] }));
 });
 
 test("recibir por TFTP exige la lista de IP y avisa que en UDP no autentica", async () => {

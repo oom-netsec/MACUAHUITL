@@ -1625,7 +1625,7 @@ export const en: Record<Key, string> = {
   "transfer.listen.hint": "Use the IP of the interface facing the device; the server binds only to that IP.",
   "transfer.any": "Listen on all interfaces (advanced)",
   "transfer.port": "Port",
-  "transfer.port.hint": "High port (1024 or above): the app never opens privileged ports.",
+  "transfer.port.hint": "1 to 65535. The protocol's standard port by default; if the system does not allow opening it, you are told how to allow it.",
   "transfer.minutes": "Duration (minutes)",
   "transfer.fromDir": "Folder to serve (optional)",
   "transfer.fromDir.hint": "Only top-level files are served, by name.",
@@ -1647,7 +1647,7 @@ export const en: Record<Key, string> = {
   "transfer.open": "Open server",
   "transfer.servers.none": "No servers are open.",
   "transfer.err.listen": "Choose the listen address.",
-  "transfer.err.port": "The port must be between 1024 and 65535.",
+  "transfer.err.port": "The port must be between 1 and 65535.",
   "transfer.err.nothing": "Choose a folder to serve, individual files, or allow uploads.",
   "transfer.err.allow": "One of the allowed IPs is not valid.",
   "transfer.err.anyAllow": "To listen on all interfaces, list the allowed IPs.",
@@ -2807,8 +2807,6 @@ export const en: Record<Key, string> = {
   "settings.storage.err.permisos.windows": "The folder gives access to other users. The application does not change it: remove that access (Properties → Security, or with icacls in cmd) and try again.",
   "settings.storage.err.ancestro_inseguro.windows": "The folder is inside a directory that other users can write to (e.g. C:\\Users\\Public), so they could replace the path. Pick a folder under your user profile.",
   // Ports on Windows (ADR 0012 h): no privileged ports; what is needed is the inbound firewall rule.
-  "transfer.port.hint.windows": "1 to 65535: Windows has no privileged ports. The protocol's standard port by default.",
-  "transfer.err.port.windows": "The port must be between 1 and 65535.",
   "transfer.privileged.windows": "IOS uses the standard port {std} and Windows has no redirection: this server listens on {port}, so open it on the standard port for IOS to reach it. The rule is for the port it listens on now: run it once, as administrator, in PowerShell (or accept the firewall dialog when the server opens; if you CANCEL it, Windows creates block rules that win over allow rules: check them in Windows Firewall → Advanced settings → Inbound Rules). The app never applies it.",
   "transfer.privilegedSame": "IOS uses the standard port {std} and this server listens there. For the traffic to get in, run this inbound Windows Firewall rule once, as administrator (or accept the firewall dialog when the server opens; if you CANCEL it, Windows creates block rules that win over allow rules: check them in Windows Firewall → Advanced settings → Inbound Rules). The app never applies it.",
   "transfer.redirect.windows": "Firewall rule (PowerShell, as administrator)",
@@ -2817,4 +2815,6 @@ export const en: Record<Key, string> = {
   "diag.port.hint.windows": "1 to 65535; 5201 is the iperf3 default.",
   "diag.port.invalid.windows": "A whole number from 1 to 65535.",
   "visibility.traps.note.windows": "Windows has no privileged ports: you can listen on 162 directly (or use 1162). An inbound Windows Firewall rule for UDP on that port is needed: run it once as administrator or accept the firewall dialog; the app never applies it.",
+  // Standard port denied by the system (phase 45): the command comes in the error metadata.
+  "transfer.portDenied.cmd": "Command to allow it (copy it and run it yourself if you agree; the app never applies it)",
 };
