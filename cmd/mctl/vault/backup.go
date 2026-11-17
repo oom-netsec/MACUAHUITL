@@ -49,6 +49,17 @@ func backupExport(c *cli.Env, args []string) error {
 	if err := confirmed(c, yes); err != nil {
 		return err
 	}
+	if l, err := v1.NewVaultServiceClient(c.Conn).ListCredentials(context.Background(), &v1.ListCredentialsRequest{}); err == nil {
+		n := 0
+		for _, i := range l.Credentials {
+			if i.HasSshKey {
+				n++
+			}
+		}
+		if n > 0 {
+			fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_keys_before", "n", n))
+		}
+	}
 	a, err := c.Secret(cli.T("mctl.vault.prompt_backup_phrase_new"))
 	if err != nil {
 		return err
@@ -67,6 +78,9 @@ func backupExport(c *cli.Env, args []string) error {
 		return err
 	}
 	fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_done", "n", r.Count, "path", path))
+	if r.SshKeysIncluded > 0 {
+		fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_keys_after", "n", r.SshKeysIncluded))
+	}
 	if r.NoPermissions {
 		fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_no_perms"))
 	}
