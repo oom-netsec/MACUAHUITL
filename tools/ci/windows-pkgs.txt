@@ -1,4 +1,4 @@
-# Paquetes que compilan y pasan sus pruebas en Windows (fase 43, ADR 0012). Crece PR a PR; al cerrar 43a se reemplaza por ./...
+# Paquetes que compilan y pasan sus pruebas en Windows (fase 43, ADR 0012). Tiene que cubrir todo paquete con pruebas: lo vigila TestWindowsPkgsCubreLosPaquetesConPruebas (tools/ci).
 # Todos compilan en Windows: go-checks les corre GOOS=windows go vet y el job windows noegress y archcheck.
 # Los que llevan « # motivo» compilan pero sus pruebas esperan esa fase: el job windows no les corre go test.
 ./cmd/macuahuitld
@@ -133,6 +133,7 @@
 ./test/simulator
 ./tools/archcheck
 ./tools/archcheck/cmd/archcheck
+./tools/ci
 ./tools/icowin
 ./tools/labcheck
 ./tools/noegress

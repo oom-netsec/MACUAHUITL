@@ -70,7 +70,7 @@ func TestRespaldoDeExtremoAExtremo(t *testing.T) {
 		}
 	}
 	fi, err := os.Stat(filepath.Join(h.out, "respaldos", id+".cfg"))
-	if err != nil || !testperm.Private(fi, 0o600) {
+	if err != nil || !testperm.Private(filepath.Join(h.out, "respaldos", id+".cfg"), 0o600) {
 		t.Errorf("archivo: %v %v", fi, err)
 	}
 	// La carpeta de Patrol se limpió: lo único en respaldos/ es la del equipo y .trabajos vacío.

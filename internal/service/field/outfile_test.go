@@ -44,7 +44,7 @@ func TestOutFileNoSigueEnlacesNiReusaNombres(t *testing.T) {
 	if g.Name() == f.Name() {
 		t.Fatalf("dos aperturas dieron el mismo archivo: %s", g.Name())
 	}
-	if fi, _ := g.Stat(); !testperm.Private(fi, 0o600) {
+	if fi, _ := g.Stat(); !testperm.Private(g.Name(), 0o600) {
 		t.Errorf("permisos %v", fi.Mode().Perm())
 	}
 }

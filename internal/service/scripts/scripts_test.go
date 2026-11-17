@@ -325,7 +325,7 @@ func TestExportImportIdaYVuelta15Importa8(t *testing.T) {
 		t.Fatalf("export = %v err = %v", r, err)
 	}
 	fi, _ := os.Stat(path)
-	if !testperm.Private(fi, 0o600) {
+	if !testperm.Private(path, 0o600) {
 		t.Errorf("permisos = %v", fi.Mode().Perm())
 	}
 	if au := da.AuditText(); !strings.Contains(au, "scripts.exportar") || !strings.Contains(au, path) || !strings.Contains(au, "8") {
@@ -668,7 +668,7 @@ func TestExportNoSobrescribeNiSigueEnlaces(t *testing.T) {
 	if raw, _ := os.ReadFile(path); !strings.Contains(string(raw), "script 01") {
 		t.Fatal("overwrite no escribió")
 	}
-	if fi, _ := os.Stat(path); !testperm.Private(fi, 0o600) {
+	if fi, _ := os.Stat(path); !testperm.Private(path, 0o600) {
 		t.Errorf("permisos tras overwrite = %v", fi.Mode().Perm())
 	}
 	// un enlace simbólico en la ruta: ni con overwrite se escribe en su destino

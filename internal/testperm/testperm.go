@@ -3,11 +3,19 @@ package testperm
 
 import (
 	"io/fs"
+	"os"
 	"runtime"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
-// Private dice si el modo de fi es el privado esperado (want, p. ej. 0o600). En Windows el modo POSIX no existe
-// (Go da 0666 o 0444): la privacidad es la ACL (ADR 0012) y no se mide con el modo, así que ahí siempre es true.
-func Private(fi fs.FileInfo, want fs.FileMode) bool {
-	return runtime.GOOS == "windows" || fi.Mode().Perm() == want
+// Private dice si el archivo o carpeta path es privado: en Linux, que su modo sea exactamente want (p. ej. 0o600); en
+// Windows el modo POSIX no existe (Go da 0666 o 0444) y la privacidad es la ACL (ADR 0012), así que se pregunta a sys.IsPrivate.
+func Private(path string, want fs.FileMode) bool {
+	if runtime.GOOS == "windows" {
+		ok, err := sys.IsPrivate(path)
+		return err == nil && ok
+	}
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().Perm() == want
 }

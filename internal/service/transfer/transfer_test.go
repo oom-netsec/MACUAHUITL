@@ -110,7 +110,7 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 	if !strings.HasPrefix(rd.RecvDir, filepath.Join(d.Out, "recibidos")) {
 		t.Fatalf("recv_dir = %q", rd.RecvDir)
 	}
-	if st, err := os.Stat(rd.RecvDir); err != nil || !testperm.Private(st, 0o700) {
+	if st, err := os.Stat(rd.RecvDir); err != nil || !testperm.Private(rd.RecvDir, 0o700) {
 		t.Fatalf("carpeta de recepción: %v %v", st, err)
 	}
 	if !strings.Contains(rd.Hint, "copy running-config tftp://127.0.0.1/") || (runtime.GOOS != "windows" && !strings.Contains(rd.Hint, "udp dport 69 redirect to :")) { // en Windows la pista es la regla del firewall

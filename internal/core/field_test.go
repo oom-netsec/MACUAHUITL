@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -60,7 +61,11 @@ func TestFieldServeListensHintsAndAudits(t *testing.T) {
 		t.Fatalf("first: %v", err)
 	}
 	port, _ := strings.CutPrefix(first.Listening, "127.0.0.1:")
-	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, port) {
+	hintPort := ":" + port
+	if runtime.GOOS == "windows" {
+		hintPort = port
+	}
+	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, hintPort) { // Windows: la pista de firewall trae el puerto sin «:»
 		t.Fatalf("first = %+v", first)
 	}
 	for err == nil {

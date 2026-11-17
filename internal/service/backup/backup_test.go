@@ -72,7 +72,7 @@ func TestCollectGuardaConPermisosYEsIdempotente(t *testing.T) {
 		t.Fatalf("archivos: %v", ents)
 	}
 	for _, e := range ents {
-		if fi, _ := e.Info(); !testperm.Private(fi, 0o600) {
+		if fi, _ := e.Info(); !testperm.Private(filepath.Join(root, e.Name()), 0o600) {
 			t.Errorf("%s = %v", e.Name(), fi.Mode().Perm())
 		}
 	}

@@ -40,7 +40,7 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	if !strings.Contains(out, "2 credenciales") || !strings.Contains(out, ruta) {
 		t.Fatalf("export: %q", out)
 	}
-	if fi, err := os.Stat(ruta); err != nil || !testperm.Private(fi, 0o600) {
+	if fi, err := os.Stat(ruta); err != nil || !testperm.Private(ruta, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
 	if _, err := mctl(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"); err == nil {

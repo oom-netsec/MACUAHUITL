@@ -143,7 +143,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	if out := must(t, "", "hosts", "export", "--out", path); !strings.Contains(out, "exportados 2") {
 		t.Fatalf("export: %q", out)
 	}
-	if fi, _ := os.Stat(path); !testperm.Private(fi, 0o600) {
+	if fi, _ := os.Stat(path); !testperm.Private(path, 0o600) {
 		t.Fatalf("modo = %v", fi.Mode())
 	}
 	if _, err := mctl(t, "", "hosts", "export", "--out", path); err == nil {

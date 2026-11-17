@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"runtime"
 	"strings"
@@ -59,5 +60,21 @@ func TestHardenFallidoNoArranca(t *testing.T) {
 	err := run(func() ([]i18n.Text, error) { return nil, i18n.New("harden.err.lockquota", i18n.A("cause", "boom")) })
 	if err == nil || !strings.Contains(err.Error(), "boom") || !strings.Contains(err.Error(), "does not start") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Elevado (root en Linux, token elevado en Windows) el núcleo no arranca, y ni siquiera llega a endurecer.
+func TestElevadoNoArranca(t *testing.T) {
+	old := privileged
+	privileged = func() bool { return true }
+	t.Cleanup(func() { privileged = old })
+	want := "harden.err.root"
+	if runtime.GOOS == "windows" {
+		want = "harden.err.elevated"
+	}
+	err := run(func() ([]i18n.Text, error) { t.Fatal("no debe endurecer"); return nil, nil })
+	var ie *i18n.Error
+	if !errors.As(err, &ie) || ie.Code != want {
+		t.Fatalf("err = %v, quería %s", err, want)
 	}
 }
