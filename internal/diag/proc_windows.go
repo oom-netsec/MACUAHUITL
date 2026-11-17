@@ -127,3 +127,7 @@ func resume(pid uint32) error {
 	}
 	return nil
 }
+
+// interrupt en Windows termina el Job Object (ping.exe no tiene una señal de salida ordenada): el resumen lo
+// calcula el núcleo de las respuestas ya leídas.
+func interrupt(cmd *exec.Cmd) { cmd.Cancel() }

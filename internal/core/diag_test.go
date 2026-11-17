@@ -51,11 +51,11 @@ func TestDiagRunStreamsAndAudits(t *testing.T) {
 		}
 		if r.Done {
 			last = r
-		} else {
+		} else if r.RunId == "" { // el primer evento solo trae run_id
 			lines = append(lines, r.OutputLine)
 		}
 	}
-	if last == nil || last.ExitCode != 0 || !strings.HasPrefix(filepath.Base(last.OutputPath), "diag_ping_") || len(lines) != 3 {
+	if last == nil || last.PingSummary == nil || last.ExitCode != 0 || !strings.HasPrefix(filepath.Base(last.OutputPath), "diag_ping_") || len(lines) != 3 {
 		t.Fatalf("last=%+v lines=%v", last, lines)
 	}
 	if !strings.HasPrefix(last.OutputPath, h.out) {

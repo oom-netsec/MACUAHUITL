@@ -44,6 +44,9 @@ func diag(tool string) func(*cli.Env, []string) error {
 			if err != nil {
 				return err
 			}
+			if r.RunId != "" { // primer evento: solo el id de la ejecución (200-5 lo usará para Ctrl+C)
+				continue
+			}
 			if r.Done {
 				fmt.Fprintln(c.Out, cli.T("mctl.diag.saved", "path", r.OutputPath, "code", r.ExitCode))
 				if r.ExitCode != 0 {

@@ -24,3 +24,6 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 	}
 	return func() error { return nil }, func() {}, nil
 }
+
+// interrupt pide a la herramienta que termine sola: SIGINT al grupo, como Ctrl+C (ping imprime su resumen).
+func interrupt(cmd *exec.Cmd) { syscall.Kill(-cmd.Process.Pid, syscall.SIGINT) }

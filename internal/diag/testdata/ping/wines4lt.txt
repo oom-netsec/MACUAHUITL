@@ -1,0 +1,5 @@
+Haciendo ping a 192.0.2.1 con 32 bytes de datos:
+Respuesta desde 192.0.2.1: bytes=32 tiempo<1m TTL=64
+Respuesta desde 192.0.2.1: bytes=32 tiempo=1ms TTL=64
+Respuesta desde 192.0.2.1: bytes=32 tiempo=1ms TTL=64
+Respuesta desde 192.0.2.1: bytes=32 tiempo<1m TTL=64
