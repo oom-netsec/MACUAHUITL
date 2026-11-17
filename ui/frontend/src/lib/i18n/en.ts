@@ -1047,7 +1047,7 @@ export const en: Record<Key, string> = {
   "field.files": "Files (absolute paths, comma-separated)",
   "field.minutes": "Duration (minutes)",
   "field.any": "Listen on all interfaces (0.0.0.0)",
-  "field.serveNote": "Only the chosen files are served, by name; no listings and no uploads. IOS uses port 69 for TFTP: on start, the nftables rule to redirect it is shown and must be applied manually.",
+  "field.serveNote": "Only the chosen files are served, by name; no listings and no uploads. It listens on the standard port (TFTP 69, HTTP 80), the one IOS uses; if the system does not allow opening it, the error explains how to allow it.",
   "field.serve": "Serve",
   "field.serving": "serving on {addr}/{proto}",
   "field.stopped": "stopped",

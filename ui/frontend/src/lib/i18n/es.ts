@@ -1045,7 +1045,7 @@ export const es = {
   "field.files": "Archivos (rutas absolutas, separadas por coma)",
   "field.minutes": "Duración (minutos)",
   "field.any": "Escuchar en todas las interfaces (0.0.0.0)",
-  "field.serveNote": "Solo se sirven los archivos elegidos, por su nombre; sin listados ni escritura. IOS usa el puerto 69 para TFTP: al iniciar se muestra la regla nftables para redirigirlo, que debe aplicarse manualmente.",
+  "field.serveNote": "Solo se sirven los archivos elegidos, por su nombre; sin listados ni escritura. Escucha en el puerto estándar (TFTP 69, HTTP 80), el que usa IOS; si el sistema no deja abrirlo, el error explica cómo permitirlo.",
   "field.serve": "Servir",
   "field.serving": "sirviendo en {addr}/{proto}",
   "field.stopped": "detenido",

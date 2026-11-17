@@ -153,7 +153,7 @@ test("el bind negado llega por el evento de cierre (StartServer es un stream) y 
 });
 
 test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
-  const core = await openServer(setup());
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
   act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
   const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
   await waitFor(() => expect(core.transferHint).toHaveBeenCalled());

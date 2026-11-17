@@ -8,7 +8,6 @@ import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { iosCommands, splitListen } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
-import { isWindows } from "../../lib/platform";
 
 const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
 import { portFor, serveProblem, splitList } from "./validate";
@@ -69,7 +68,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {r.user && <p className="hint">{t("transfer.cred.note")}</p>}
       {r.fingerprints?.map((fp, i) => <p key={fp} className="meta">{t("transfer.fingerprint", { n: i + 1 })}: <code>{fp}</code> <CopyButton value={fp} label={t("transfer.fingerprint", { n: i + 1 })} /></p>)}
       {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
-      {hint && (isWindows() || hint.standardPort !== port) && ( /* en Linux, en el puerto estándar no hay redirección que aplicar */
+      {hint?.nftables && ( /* sin regla (Linux ya en el puerto estándar): nada que redirigir ni abrir */
         <>
           <Notice kind="warn">{t(hint.standardPort === port ? "transfer.privilegedSame" : "transfer.privileged", { std: hint.standardPort, port })}</Notice>
           <Console label={t("transfer.redirect")} text={hint.nftables} copy={core.copyText} />
