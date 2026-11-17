@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"google.golang.org/grpc/codes"
 
@@ -28,7 +27,7 @@ func e2eHost(t *testing.T) (h *harness, hostID, keyID string, log *[]string, rec
 		t.Fatal(err)
 	}
 	log, rec, conns = new([]string), &simulator.Recorder{}, new(atomic.Int32)
-	addr, _ := simulator.Start(t, simulator.Config{Hostname: "win", Username: "pi", NoPassword: true, AuthLog: log, Recorder: rec, Conns: conns,
+	addr, _ := simulator.Start(t, simulator.Config{Hostname: "win", Username: "pi", AuthLog: log, Recorder: rec, Conns: conns,
 		Transcripts: t.TempDir(), AuthorizedKeys: simulator.Keys(simulator.ParseAuthorizedKey(t, pub.PublicKey)),
 		Exec: func(cmd string) string { return strings.TrimPrefix(cmd, "cmd /c echo ") + "\r\n" }})
 	ap := netip.MustParseAddrPort(addr)
@@ -51,7 +50,9 @@ func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Send(req)
+	if err := st.Send(req); err != nil {
+		t.Fatal(err)
+	}
 	_, err = st.Recv()
 	if err == nil || !strings.Contains(err.Error(), "SHA256:") {
 		t.Fatalf("llave nueva: %v", err)
@@ -62,7 +63,9 @@ func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Send(req)
+	if err := st.Send(req); err != nil {
+		t.Fatal(err)
+	}
 	var got strings.Builder
 	done := make(chan error, 1)
 	go func() {
@@ -75,11 +78,7 @@ func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {
 			got.Write(r.Data)
 		}
 	}()
-	select {
-	case err = <-done:
-	case <-time.After(60 * time.Second):
-		t.Fatalf("la sesión no terminó sola: %q", got.String())
-	}
+	err = <-done // ctx(t) acota la espera: si la sesión no termina sola, Recv devuelve DeadlineExceeded
 	if err != io.EOF {
 		t.Fatalf("la sesión debía terminar sin error: %v (%q)", err, got.String())
 	}
@@ -104,7 +103,7 @@ func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {
 
 	// Auditoría: keygen, alta con startup=, terminal.open con host= y startup=; ni semilla ni PEM de la privada.
 	a := h.auditText(t)
-	for _, want := range []string{`"action":"credential.keygen"`, `"action":"terminal.open"`, "host=" + hostID, "startup="} {
+	for _, want := range []string{`"action":"credential.keygen"`, `"action":"terminal.open"`, "host=" + hostID + ` startup=\"` + e2eStartup + `\"`} {
 		if !strings.Contains(a, want) {
 			t.Fatalf("falta %q en la auditoría:\n%s", want, a)
 		}
