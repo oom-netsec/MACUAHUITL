@@ -358,3 +358,42 @@ func TestForeignWritersWindows(t *testing.T) {
 		t.Fatalf("Everyone con control total: %+v %v", w, err)
 	}
 }
+
+// 43d-2: la DACL de solo lectura de ReadOnlyDir no cuenta como escritor ajeno; un ACE solo-herencia de Authenticated Users con
+// escritura sí (lo que se cree adentro lo hereda); y la carpeta propia en NTFS tiene dueño el usuario.
+func TestForeignWritersSoloLecturaYSoloHerencia(t *testing.T) {
+	d := filepath.Join(privateTemp(t), "recv")
+	if err := MkdirPrivate(d); err != nil {
+		t.Fatal(err)
+	}
+	restore, err := ReadOnlyDir(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := ForeignWriters(d)
+	restore()
+	if err != nil || len(w.Who) != 0 || w.ForeignOwner {
+		t.Fatalf("solo lectura: %+v %v", w, err)
+	}
+	const authUsers = "S-1-5-11"
+	var entries []windows.EXPLICIT_ACCESS
+	for _, s := range []string{userString(t), authUsers} {
+		sid, _ := windows.StringToSid(s)
+		inh := uint32(windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT)
+		if s == authUsers {
+			inh |= 0x8 // INHERIT_ONLY_ACE
+		}
+		entries = append(entries, windows.EXPLICIT_ACCESS{AccessPermissions: fileAllAccess, AccessMode: windows.GRANT_ACCESS, Inheritance: inh,
+			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(sid)}})
+	}
+	acl, err := windows.ACLFromEntries(entries, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := windows.SetNamedSecurityInfo(d, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil); err != nil {
+		t.Fatal(err)
+	}
+	if w, err = ForeignWriters(d); err != nil || len(w.Who) != 1 || w.Who[0] != authUsers {
+		t.Fatalf("ACE solo-herencia de Authenticated Users: %+v %v", w, err)
+	}
+}

@@ -63,3 +63,12 @@ func TestOrdenesDeArreglo(t *testing.T) {
 		t.Errorf("%q", got)
 	}
 }
+
+func TestForeignOwnerPuro(t *testing.T) {
+	const user = "S-1-5-21-1-2-3-1001"
+	for owner, want := range map[string]bool{user: false, sidSystem: false, sidAdmins: false, "S-1-5-21-1-2-3-1002": true, "S-1-1-0": true} {
+		if foreignOwner(owner, user) != want {
+			t.Errorf("%s: quería %v", owner, want)
+		}
+	}
+}
