@@ -375,7 +375,7 @@ test("si el núcleo rechaza una opción en Windows se muestra su texto con la cl
   expect(await screen.findByRole("alert")).toHaveTextContent("Esta opción no está disponible en Windows: tos");
 });
 
-test("500 líneas seguidas pasan en pocos renders y done no pierde las pendientes", async () => {
+test("500 líneas seguidas llegan en orden y done no pierde las pendientes del lote", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
   render(<DiagView core={core} tool="ping" />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");

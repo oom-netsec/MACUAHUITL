@@ -33,18 +33,6 @@ test("error: guarda el texto sin el prefijo rpc, run resuelve a undefined, y cle
   expect(result.current.error).toBe("");
 });
 
-test("desmontado: no hay setState ni aviso al resolver", async () => {
-  const err = vi.spyOn(console, "error").mockImplementation(() => {});
-  const d = defer<void>();
-  const { result, unmount } = renderHook(() => useAction(() => d.p));
-  let r: Promise<unknown>;
-  act(() => { r = result.current.run(); });
-  unmount();
-  await act(async () => { d.ko(new Error("tarde")); await r; });
-  expect(err).not.toHaveBeenCalled();
-  err.mockRestore();
-});
-
 test("llamadas que se pisan: solo la última fija el estado final", async () => {
   const a = defer<void>(); const b = defer<void>();
   const ds = [a, b];

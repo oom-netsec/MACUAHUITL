@@ -41,20 +41,22 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   const [prev, setPrev] = useState<HostsImportPreview | null>(null);
   const [acts, setActs] = useState<Record<string, HostImportAction>>({});
   const [result, setResult] = useState<HostsImportResult | null>(null);
+  const action = useAction((f: () => Promise<void>) => f());
+  // Un fallo de lectura reemplaza al error de la acción anterior: se ve siempre el último.
+  const loadFail = (e: unknown) => { action.clearError(); setLoadErr(errorText(e)); };
 
   useEffect(() => {
     let live = true;
-    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setLoadErr(errorText(e)); });
+    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) loadFail(e); });
     return () => { live = false; };
   }, [core]);
   useEffect(() => {
     if (scope !== "some") return;
     let live = true;
-    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setLoadErr(errorText(e)); });
+    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) loadFail(e); });
     return () => { live = false; };
   }, [core, scope, hv]);
 
-  const action = useAction((f: () => Promise<void>) => f());
   const { busy } = action;
   const err = action.error || loadErr;
   const run = (f: () => Promise<void>) => { setLoadErr(""); setMsg(""); setWarn(""); return action.run(f); };

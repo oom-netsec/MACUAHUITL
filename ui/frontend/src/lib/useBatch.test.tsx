@@ -23,3 +23,11 @@ test("flush entrega lo pendiente de inmediato y reset lo descarta", () => {
   act(() => { result.current.push("b"); result.current.reset(); vi.advanceTimersByTime(500); });
   expect(apply).toHaveBeenCalledTimes(1);
 });
+
+test("al pasar de 2x keep descarta los más viejos y cuenta todos", () => {
+  vi.useFakeTimers();
+  const apply = vi.fn();
+  const { result } = renderHook(() => useBatch<number>(apply, 10));
+  act(() => { for (let i = 0; i < 21; i++) result.current.push(i); result.current.flush(); });
+  expect(apply).toHaveBeenCalledWith(Array.from({ length: 10 }, (_, i) => i + 11), 21);
+});

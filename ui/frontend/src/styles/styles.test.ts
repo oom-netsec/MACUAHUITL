@@ -32,6 +32,11 @@ test("alto contraste de Windows: casilla, radio, punto del radio y segmented usa
   const s = forced(shell);
   expect(s).toContain('.nav-item[aria-current="page"]');
   expect(s).toContain('.palette-item[aria-selected="true"]');
+  // forced-color-adjust: none se hereda: el texto secundario del ítem elegido también va en HighlightText.
+  expect(s).toMatch(/:is\(small, kbd\) \{ color: HighlightText;/);
+  // Los deshabilitados (más específicos fuera del bloque) también se redefinen dentro.
+  expect(b).toMatch(/:disabled:checked[^{]*\{ background: GrayText;/);
+  expect(c).not.toMatch(/border-bottom: \d+px/); // solo el color: la pestaña activa no cambia de alto
 });
 
 test("las flechas de input[type=number] se ocultan igual en WebKitGTK y Chromium", () => {
@@ -42,6 +47,10 @@ test("las flechas de input[type=number] se ocultan igual en WebKitGTK y Chromium
 test("las barras de desplazamiento tienen la variante ::-webkit-scrollbar con los mismos selectores acotados", () => {
   expect(base).toMatch(/\.content::-webkit-scrollbar/);
   expect(base).not.toMatch(/(^|\n)\*::-webkit-scrollbar/);
-  // scrollbar-width/color anulan ::-webkit-scrollbar en WebKitGTK y no se aplican: no deben volver.
-  expect(base).not.toMatch(/scrollbar-(width|color):/);
+  // scrollbar-width/color anulan ::-webkit-scrollbar en WebKitGTK y no se aplican: no deben volver en ningún .css.
+  const all = import.meta.glob("../**/*.css", { eager: true, query: "?url" });
+  const files = Object.keys(all).map((k) => readFileSync(k.startsWith("./") ? `src/styles/${k.slice(2)}` : `src/${k.slice(3)}`, "utf8") as string);
+  expect(files.length).toBeGreaterThan(10);
+  for (const f of files) expect(f).not.toMatch(/scrollbar-(width|color):/);
+  expect(base).toMatch(/\.dialog-body::-webkit-scrollbar-thumb/);
 });

@@ -227,3 +227,15 @@ test("la vista previa del import muestra la orden de inicio de cada host", async
   expect(within(t).getByText("tmux attach")).toBeVisible();
   expect(within(t).getAllByText("Se ejecutará al conectar")).toHaveLength(1); // solo el host que trae orden lleva la marca
 });
+
+test("se ve el último error: un fallo al releer la libreta reemplaza al de la acción anterior", async () => {
+  const inv = fakeInventory();
+  setup({ ...inv, hostsImportTemplate: vi.fn(async () => { throw new Error("fallo de la plantilla"); }) });
+  await userEvent.selectOptions(screen.getByLabelText("Qué exportar"), "some");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar plantilla CSV" }));
+  expect(await screen.findByText("fallo de la plantilla")).toBeVisible();
+  inv.listHosts.mockRejectedValueOnce(new Error("fallo al leer la libreta"));
+  act(() => hostsChanged());
+  expect(await screen.findByText("fallo al leer la libreta")).toBeVisible();
+  expect(screen.queryByText("fallo de la plantilla")).toBeNull();
+});

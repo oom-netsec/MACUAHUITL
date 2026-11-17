@@ -125,6 +125,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const ips = ifaces.filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as const));
 
   // Las líneas de todos los servidores pasan a pantalla una vez cada FLUSH_MS, en orden y con tope de 500 por servidor.
+  // shortcut: la cola es una sola; si un servidor manda más de 4000 líneas en 100 ms, se pierden las pendientes de otro. Cola por runId si llega a pasar.
   const batch = useBatch<{ runId: string; line: TransferLine }>((b) => setServers((l) => l.map((s) => {
     const mine = b.filter((x) => x.runId === s.runId);
     return mine.length ? { ...s, lines: s.lines.concat(mine.map((x) => x.line)).slice(-500) } : s;

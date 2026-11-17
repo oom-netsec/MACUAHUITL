@@ -132,6 +132,9 @@ main { max-width: 1440px; }
   .nav-item[aria-current="page"], .palette-item[aria-selected="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .nav-item[aria-current="page"] svg, .palette-item[aria-selected="true"] svg { color: HighlightText; }
   .flyout-item[aria-current="page"] { outline: 2px solid Highlight; }
+  /* forced-color-adjust se hereda: el texto secundario y las teclas del ítem elegido también van en HighlightText. */
+  .nav-item[aria-current="page"] :is(small, kbd), .palette-item[aria-selected="true"] :is(small, kbd) { color: HighlightText; border-color: HighlightText; background: none; }
+  .nav-item[aria-current="page"] .busy { background: HighlightText; }
 }
 .palette-empty { padding: var(--s-6) var(--s-4); color: var(--text-3); }
 .palette-foot { display: flex; gap: var(--s-4); padding: 8px var(--s-4); border-top: 1px solid var(--hairline); color: var(--text-3); font-size: var(--fs-small); }

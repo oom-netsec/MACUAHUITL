@@ -73,7 +73,7 @@ button.inline { margin-left: var(--s-2); height: var(--control-h-sm); }
 @media (forced-colors: active) {
   .segmented input:checked + span { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .segmented input:focus-visible + span { outline-color: Highlight; }
-  .tabs [role="tab"][aria-selected="true"] { border-bottom: 3px solid Highlight; }
+  .tabs [role="tab"][aria-selected="true"] { border-bottom-color: Highlight; }
 }
 
 /* Avisos: ícono + texto; role=alert solo para crítico. */
@@ -290,7 +290,7 @@ th.num, td.num { text-align: right; }
 /* (.scrim.dialog-scrim: shell.css carga después y su .scrim pisaba el fondo y el centrado.) Diálogo modal (components/Dialog.tsx): «Ver detalles» de Ajustes → Datos. El cuerpo se desplaza por dentro. */
 .scrim.dialog-scrim { align-items: center; padding-top: 0; background: var(--scrim-modal); }
 .dialog { width: min(760px, 92vw); max-height: min(80vh, 100%); display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-4); box-shadow: var(--shadow-2); animation: rise var(--t-in) var(--ease); }
-.dialog-body { overflow: auto; padding: var(--s-3) var(--s-4) var(--s-4); display: grid; gap: var(--s-3); align-content: start; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+.dialog-body { overflow: auto; padding: var(--s-3) var(--s-4) var(--s-4); display: grid; gap: var(--s-3); align-content: start; }
 .dialog-body p { margin: 0; }
 .dialog-body table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
 .dialog-body th, .dialog-body td { text-align: left; padding: var(--s-1) var(--s-2); border-bottom: 1px solid var(--hairline); vertical-align: top; }
