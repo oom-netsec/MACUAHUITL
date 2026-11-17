@@ -17,3 +17,13 @@ func sockPath(t *testing.T) string {
 	t.Cleanup(func() { os.RemoveAll(d) })
 	return filepath.Join(d, "run", "core.sock")
 }
+
+// 3.6: XDG_RUNTIME_DIR vacío o relativo no da una ruta de socket (sería relativa al directorio actual).
+func TestSocketPathRechazaRuntimeVacioORelativo(t *testing.T) {
+	for _, rt := range []string{"", "rel", ".", "./x", "../x", "run/user/1000", "~"} {
+		t.Setenv("XDG_RUNTIME_DIR", rt)
+		if p, err := SocketPath(); err == nil {
+			t.Errorf("XDG_RUNTIME_DIR=%q aceptado: %q", rt, p)
+		}
+	}
+}

@@ -69,6 +69,8 @@ func TestSinLetraDeUnidad(t *testing.T) {
 	for p, want := range map[string]bool{
 		`C:\x`: false, `d:\x\y`: false, `C:`: false,
 		`\\?\C:\x`: true, `\\.\C:\x`: true, `\??\C:\x`: true, `\\srv\share\x`: true, `\\?\UNC\srv\share`: true, `/etc`: true, ``: true, `1:\x`: true,
+		// 2.7: volumen por GUID y variantes de dispositivo
+		`\\?\Volume{12345678-1234-1234-1234-123456789abc}\x`: true, `\\?\GLOBALROOT\Device\x`: true, `\Device\HarddiskVolume1\x`: true, "\u202eC:\\x": true, "C\u200b:\\x": true,
 	} {
 		if got := sinLetraDeUnidad(p); got != want {
 			t.Errorf("sinLetraDeUnidad(%q)=%v, quería %v", p, got, want)
