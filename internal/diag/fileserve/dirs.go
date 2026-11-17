@@ -75,6 +75,21 @@ func windowsSensitiveDirs() []string {
 	return out
 }
 
+// powerShellProfiles son las carpetas de perfil de PowerShell que Windows ejecuta al abrir una consola, bajo cada Documents (la del
+// perfil, la de OneDrive y las de las variables OneDrive*: con la redirección de carpetas Documents vive en OneDrive).
+func powerShellProfiles(docs ...string) []string {
+	for _, env := range []string{"OneDrive", "OneDriveConsumer", "OneDriveCommercial"} {
+		if v := os.Getenv(env); filepath.IsAbs(v) {
+			docs = append(docs, filepath.Join(v, "Documents"))
+		}
+	}
+	var out []string
+	for _, d := range docs {
+		out = append(out, filepath.Join(d, "WindowsPowerShell"), filepath.Join(d, "PowerShell"))
+	}
+	return out
+}
+
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
 	if goos == "windows" {
@@ -87,6 +102,7 @@ func denyList(extra []string) []string {
 			}
 			if goos == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
 				out = append(out, filepath.Join(hm, "AppData"))
+				out = append(out, powerShellProfiles(filepath.Join(hm, "Documents"), filepath.Join(hm, "OneDrive", "Documents"))...)
 			}
 		}
 	}

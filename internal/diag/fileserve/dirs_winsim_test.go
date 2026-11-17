@@ -97,3 +97,37 @@ func TestWindowsPerfilRealEsHomeExactoYOcultos(t *testing.T) {
 		}
 	}
 }
+
+// B3: los perfiles de PowerShell (Documents\WindowsPowerShell y Documents\PowerShell, también con Documents redirigida a OneDrive)
+// los ejecuta Windows al abrir una consola: ni se publica ni se recibe ahí. Startup ya queda cubierto por AppData. Documents a secas no.
+func TestWindowsPerfilesDePowerShellYStartupRechazados(t *testing.T) {
+	fijaGOOS(t, "windows")
+	home := realTemp(t)
+	oneDrive := realTemp(t) // OneDrive fuera del perfil (cuentas con otra ubicación)
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("OneDrive", oneDrive)
+	t.Setenv("OneDriveConsumer", "")
+	t.Setenv("OneDriveCommercial", "")
+	var malas []string
+	for _, base := range []string{filepath.Join(home, "Documents"), filepath.Join(home, "OneDrive", "Documents"), filepath.Join(oneDrive, "Documents")} {
+		for _, ps := range []string{"WindowsPowerShell", "PowerShell"} {
+			malas = append(malas, filepath.Join(base, ps), filepath.Join(base, ps, "Modules"), filepath.Join(base, ps, "Modules", "x"))
+		}
+	}
+	malas = append(malas, filepath.Join(home, "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup"))
+	buenas := []string{filepath.Join(home, "Documents", "firmware"), filepath.Join(home, "Documents", "PowerShellNotas"), filepath.Join(oneDrive, "Documents", "firmware")}
+	for _, d := range append(append([]string{}, malas...), buenas...) {
+		os.MkdirAll(d, 0o700)
+	}
+	for _, d := range malas {
+		if _, err := ValidateDir(d); err == nil {
+			t.Errorf("%s debió rechazarse", d)
+		}
+	}
+	for _, d := range buenas {
+		if _, err := ValidateDir(d); err != nil {
+			t.Errorf("%s debe permitirse: %v", d, err)
+		}
+	}
+}
