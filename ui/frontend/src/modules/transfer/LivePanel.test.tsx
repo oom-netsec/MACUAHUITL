@@ -80,3 +80,34 @@ test("errorCode con clave i18n se localiza; sin clave se muestra error", async (
   expect(screen.getByText("Se agotó el tiempo de espera")).toBeInTheDocument();
   expect(screen.getByText("causa cruda")).toBeInTheDocument();
 });
+
+test("no lanza otra llamada mientras la anterior sigue pendiente", async () => {
+  let release = () => {};
+  const fn = vi.fn(() => new Promise<TransferSession[]>((r) => { release = () => r([]); }));
+  mount(fn);
+  await tick(3000);
+  expect(fn).toHaveBeenCalledTimes(1);
+  await act(async () => { release(); });
+  await tick();
+  expect(fn).toHaveBeenCalledTimes(2);
+});
+
+test("con Unimplemented deja de encuestar", async () => {
+  const fn = vi.fn(async () => { throw Object.assign(new Error("rpc error: code = Unimplemented desc = unknown method"), { cause: { code: "Unimplemented" } }); });
+  mount(fn);
+  await tick(5000);
+  expect(fn).toHaveBeenCalledTimes(1);
+});
+
+test("la causa de una fallida no es una alerta, la barra no pasa de 100 y un cliente raro no rompe la lista", async () => {
+  const base = sampleSessions(Date.now());
+  const act0 = base.find((s) => s.state === "active")!;
+  mount(async () => [...base, { ...act0, id: "x", name: "grande.bin", bytes: 300, total: 100, client: "[2001:db8::9" }, { ...act0, id: "y", name: "vacio.bin", client: "" }]);
+  await tick();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("progressbar", { name: /grande\.bin/ })).toHaveAttribute("aria-valuenow", "100");
+  expect(screen.getAllByText(/\[2001:db8::9/).length).toBeGreaterThan(0);
+  const line = screen.getByText((_, el) => el?.tagName === "P" && /^Clientes/.test(el.textContent ?? "")).textContent ?? "";
+  expect(line).toContain("192.0.2.21");
+  expect(line).not.toMatch(/, ,|, $|: ,/); // el cliente vacío no deja un hueco
+});

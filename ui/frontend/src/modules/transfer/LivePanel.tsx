@@ -7,8 +7,9 @@ import { es, type Key } from "../../lib/i18n/es";
 import type { TransferSession } from "./api";
 
 const MAX_RECENT = 20;
+const unimplemented = (e: unknown) => (e as { cause?: { code?: string } } | null)?.cause?.code === "Unimplemented" || /code = Unimplemented/.test(String(e));
 // «IP:puerto» o «[v6]:puerto» → solo la IP (v6 entre corchetes).
-export const clientIP = (c: string) => (c.startsWith("[") ? c.slice(0, c.indexOf("]") + 1) : /^[^:]*:\d+$/.test(c) ? c.slice(0, c.lastIndexOf(":")) : c);
+export const clientIP = (c: string) => (c.startsWith("[") && c.includes("]") ? c.slice(0, c.indexOf("]") + 1) : /^[^:]*:\d+$/.test(c) ? c.slice(0, c.lastIndexOf(":")) : c);
 
 export function LivePanel({ serverId, open, fetchSessions }: { serverId: string; open: boolean; fetchSessions: (id: string) => Promise<TransferSession[]> }) {
   const t = useT();
@@ -18,12 +19,18 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
   useEffect(() => {
     if (!open) return;
     let alive = true;
+    let busy = false; // una llamada a la vez: una respuesta vieja nunca pisa a una nueva
     const poll = () => {
-      if (document.visibilityState === "hidden") return;
-      fetchSessions(serverId).then((l) => alive && setList(l ?? []), () => alive && setList(null)); // fallo: el panel se oculta sin ruido
+      if (busy || document.visibilityState === "hidden") return;
+      busy = true;
+      fetchSessions(serverId).then((l) => alive && setList(l ?? []), (e) => {
+        if (!alive) return;
+        setList(null); // fallo: el panel se oculta sin ruido
+        if (unimplemented(e)) clearInterval(h); // el núcleo no lo tiene: no insistir cada segundo
+      }).finally(() => { busy = false; });
     };
-    poll();
     const h = setInterval(poll, 1000);
+    poll();
     return () => { alive = false; clearInterval(h); };
   }, [open, serverId, fetchSessions]);
   useEffect(() => {
@@ -36,7 +43,7 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
   if (!open || !list) return null;
   const active = list.filter((s) => s.state === "active");
   const recent = list.filter((s) => s.state !== "active").sort((a, b) => b.ended - a.ended).slice(0, MAX_RECENT);
-  const clients = [...new Set(active.map((s) => clientIP(s.client)))];
+  const clients = [...new Set(active.map((s) => clientIP(s.client)).filter(Boolean))];
   const row = (s: TransferSession) => {
     const code = s.errorCode ? (`transfer.live.err.${s.errorCode}` as Key) : undefined;
     const err = s.state === "failed" ? (code && code in es ? t(code) : s.error ?? t("transfer.live.err.unknown")) : undefined;
@@ -47,7 +54,7 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
           {s.state !== "done" && <><StatusPill tone={s.state === "active" ? "run" : "bad"} label={t(`transfer.live.state.${s.state}` as Key)} />{" "}</>/* la completa ya la marca TransferProgress */}
           {t(s.direction === "in" ? "transfer.live.in" : "transfer.live.out")} · {s.protocol.toUpperCase()} · <span className="mono">{clientIP(s.client)}</span>
         </div>
-        <TransferProgress file={s.name} bytes={s.bytes} total={s.total} rateBps={s.bytesPerSec} etaSeconds={eta} done={s.state !== "active"} error={err} />
+        <TransferProgress file={s.name} bytes={s.bytes} total={s.total} rateBps={s.bytesPerSec} etaSeconds={eta} done={s.state !== "active"} error={err} quietError />
       </li>
     );
   };
