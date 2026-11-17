@@ -82,8 +82,8 @@ export function VaultView({ core }: { core: CoreAPI }) {
             lastView.current = c.id;
             try {
               const publicKey = await core.regenerateKeyCredential(c.id, true); // la confirmación la dio la persona en el botón
-              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") }); return; } // la persona ya miró otra credencial: no se la pisa
-              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true });
+              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") + (c.origin === "imported" ? " " + t("vault.key.regenImported") : "") }); return; } // la persona ya miró otra credencial: no se la pisa
+              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true, wasImported: c.origin === "imported" });
               setMsg(null);
             } catch (e) { fail(e); }
           }} onDelete={async (id) => {
@@ -219,7 +219,7 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
   );
 }
 
-type ShownKey = { id: string; label: string; username: string; publicKey: string; regenerated?: boolean };
+type ShownKey = { id: string; label: string; username: string; publicKey: string; regenerated?: boolean; wasImported?: boolean };
 
 // Llave pública: texto de solo lectura, monoespaciado y seleccionable, con Copiar y dónde pegarla en el equipo.
 // Al aparecer toma el foco (el lector de pantalla anuncia el título y quien la abrió la ve sin buscarla).
@@ -231,7 +231,7 @@ function PublicKey({ k, onClose }: { k: ShownKey; onClose: () => void }) {
   return (
     <section ref={ref} tabIndex={-1} className="section vault-pubbox" aria-labelledby={h} aria-describedby={`${h}-d`}>
       <h3 id={h}>{t("vault.key.titleOf", { label: k.label })}</h3>
-      {k.regenerated && <Notice kind="warn">{t("vault.key.regenerated")}</Notice>}
+      {k.regenerated && <Notice kind="warn">{t("vault.key.regenerated")}{k.wasImported && " " + t("vault.key.regenImported")}</Notice>}
       <p id={`${h}-d`} className="meta">{t("vault.key.hint")}</p>
       <p><code className="mono vault-pub">{k.publicKey}</code> <CopyButton value={k.publicKey} label={t("vault.key.copyLabel")} /></p>
       <h4>{t("vault.key.where")}</h4>

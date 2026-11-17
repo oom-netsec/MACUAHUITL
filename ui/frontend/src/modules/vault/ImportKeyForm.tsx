@@ -20,7 +20,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
   const [needPass, setNeedPass] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<VaultImportKeyResult | null>(null);
+  const [res, setRes] = useState<(VaultImportKeyResult & { label: string }) | null>(null);
   const passRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => { setText(""); setPass(""); }, []); // al desmontar
   useEffect(() => { if (needPass) passRef.current?.focus(); }, [needPass]);
@@ -28,10 +28,10 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
   const reasonText = (e: unknown) => {
     const i = errInfo(e);
     switch (i?.reason) {
-      case "vault.key_passphrase_wrong": return t("vault.import.err.passWrong");
-      case "vault.key_invalid": return t("vault.import.err.invalid", { format: i.metadata.format ?? "?" });
-      case "vault.key_unsupported": return t("vault.import.err.unsupported", { type: i.metadata.type ?? "?" });
-      case "vault.field_too_long": return t("vault.import.err.tooLong");
+      case "vault.err.key_passphrase_wrong": return t("vault.import.err.passWrong");
+      case "vault.err.key_import_invalid": return t("vault.import.err.invalid", { format: i.metadata.format ?? "?" });
+      case "vault.err.key_import_unsupported": return t("vault.import.err.unsupported", { type: i.metadata.type ?? "?" }) + (i.metadata.format === "pkcs8-encrypted" ? " " + t("vault.import.err.pkcs8") : "");
+      case "vault.err.field_too_long": return t("vault.import.err.tooLong");
       default: return errorText(e);
     }
   };
@@ -44,10 +44,10 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
     setErr(""); setNeedPass(false); setBusy(true);
     try {
       const r = await core.vaultImportKey({ label, username: user, ...(path ? { path } : { privateKey: text }), ...(pass ? { passphrase: pass } : {}) });
-      setRes(r); setLabel(""); setUser(""); setPath("");
+      setRes({ ...r, label: label || user }); setLabel(""); setUser(""); setPath("");
       onDone();
     } catch (x) {
-      if (errInfo(x)?.reason === "vault.key_passphrase_required") { setNeedPass(true); setErr(t("vault.import.err.passRequired")); } else setErr(reasonText(x));
+      if (errInfo(x)?.reason === "vault.err.key_passphrase_required") { setNeedPass(true); setErr(t("vault.import.err.passRequired")); } else setErr(reasonText(x));
     } finally {
       setText(""); setPass(""); setBusy(false);
     }
@@ -56,7 +56,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
 
   if (res) {
     return (
-      <Section title={t("vault.import.done", { label: res.credential.label })}>
+      <Section title={t("vault.import.done", { label: res.label })}>
         <Notice kind="ok">{t("vault.import.stored")}</Notice>
         {res.weak && <Notice kind="warn">{t("vault.import.weak", { bits: res.bits })}</Notice>}
         <p className="meta">{t("vault.import.kept")}</p>

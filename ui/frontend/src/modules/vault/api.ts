@@ -17,7 +17,7 @@ export interface VaultBackupResult { created: number; replaced: number; renamed:
 
 // Fase 47: importar una privada existente. Con archivo va path (el puente lee los bytes) y privateKey no; con texto pegado, al revés.
 export interface VaultImportKeyInput { label: string; username: string; privateKey?: string; path?: string; passphrase?: string }
-export interface VaultImportKeyResult { credential: Credential; publicKey: string; fingerprint: string; algorithm: string; bits: number; origin: "generated" | "imported"; weak: boolean } // weak: RSA de menos de 3072 bits; es un aviso
+export interface VaultImportKeyResult { id: string; publicKey: string; fingerprint: string; algorithm: string; bits: number; weak: boolean } // weak: RSA de menos de 3072 bits; es un aviso
 
 export interface VaultAPI {
   vaultStatus(): Promise<VaultStatus>;

@@ -29,14 +29,16 @@ export function fakeVault() {
     createKeyCredential: vi.fn(async () => ({ id: "k1", publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIfake macuahuitl" })),
     vaultImportKey: vi.fn(async (i: VaultImportKeyInput) => {
       const text = i.privateKey ?? "";
-      if (text.includes("ENCRYPTED") && !i.passphrase) throw coreErr("vault.key_passphrase_required");
-      if (text.includes("ENCRYPTED") && i.passphrase !== "correcta") throw coreErr("vault.key_passphrase_wrong");
-      if (text.includes("DSA-KEY")) throw coreErr("vault.key_unsupported", { type: "ssh-dss" });
-      if (text.includes("INVALID")) throw coreErr("vault.key_invalid", { format: "pem" });
+      if (text.includes("ENCRYPTED") && !i.passphrase) throw coreErr("vault.err.key_passphrase_required");
+      if (text.includes("ENCRYPTED") && i.passphrase !== "correcta") throw coreErr("vault.err.key_passphrase_wrong");
+      if (text.includes("DSA-KEY")) throw coreErr("vault.err.key_import_unsupported", { type: "ssh-dss", format: "pem-legacy" });
+      if (text.includes("PKCS8-ENC")) throw coreErr("vault.err.key_import_unsupported", { type: "other", format: "pkcs8-encrypted" });
+      if (text.includes("TOOLONG")) throw coreErr("vault.err.field_too_long", { max: "65536" });
+      if (text.includes("INVALID")) throw coreErr("vault.err.key_import_invalid", { format: "pem" });
       const credential: Credential = { id: "i" + (imported.length + 1), label: i.label || i.username, username: i.username, kind: "key", origin: "imported", hasEnable: false, hasSshKey: true };
       imported.push(credential);
       const weak = text.includes("RSA-2048");
-      return { credential, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIimp macuahuitl", fingerprint: "SHA256:abcDEF123fake", algorithm: weak ? "rsa" : "ed25519", bits: weak ? 2048 : 256, origin: "imported" as const, weak };
+      return { id: credential.id, publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIimp macuahuitl", fingerprint: "SHA256:abcDEF123fake", algorithm: weak ? "ssh-rsa" : "ssh-ed25519", bits: weak ? 2048 : 256, weak };
     }),
     credentialPublicKey: vi.fn(async () => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIfake macuahuitl"),
     regenerateKeyCredential: vi.fn(async (_id: string, _confirm: boolean) => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew macuahuitl"),

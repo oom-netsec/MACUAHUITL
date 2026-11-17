@@ -552,6 +552,40 @@ test("RSA de menos de 3072 bits avisa que es débil", async () => {
   expect(await screen.findByText(/2048 bits.*débil/)).toBeInTheDocument();
 });
 
+test("PKCS#8 cifrada no soportada sugiere ssh-keygen -p -f", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "PKCS8-ENC");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent(/ssh-keygen -p -f/);
+  await userEvent.type(keyBox(), "DSA-KEY");
+  await send();
+  expect(screen.queryByText(/ssh-keygen/)).toBeNull();
+});
+
+test("field_too_long del núcleo (archivo grande por ruta) muestra el tamaño excedido", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "TOOLONG");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent("La llave supera el tamaño permitido.");
+});
+
+test("el aviso de RSA débil menciona RHEL/Fedora", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "RSA-2048");
+  await send();
+  expect(await screen.findByText(/RHEL/)).toBeInTheDocument();
+});
+
+test("regenerar una llave importada avisa que se reemplaza por una generada", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const imp = { ...keyCred, origin: "imported" as const };
+  const core = fakeCore({ listCredentials: vi.fn(async () => [imp]), regenerateKeyCredential: vi.fn(async () => NEW) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Regenerar la llave de/ }));
+  await userEvent.click(await screen.findByRole("button", { name: /Confirmar: regenerar/ }));
+  expect(await screen.findByText(/importada se reemplazó/)).toBeInTheDocument();
+});
+
 test("la lista marca Importada o Generada según origin y nada sin origin", async () => {
   const base = { username: "u", kind: "key" as const, hasEnable: false, hasSshKey: true };
   const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...base, id: "a", label: "uno", origin: "imported" as const }, { ...base, id: "b", label: "dos", origin: "generated" as const }, { ...base, id: "c", label: "tres" }]) });
