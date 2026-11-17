@@ -35,13 +35,20 @@ type Result struct {
 	Ping       *PingSummary // solo ping: resumen calculado de las respuestas
 }
 
-// Límites del ping continuo (Review Focus 2). pingLimits devuelve la duración total pedida (0 = sin ella);
-// shortcut: devuelve los valores fijos hasta que 200-2 lo reemplace por el PingPlan (duration y continuous).
+// Límites del ping continuo (Review Focus 2): el tope de seguridad vale para todo ping.
 var (
 	pingMaxRun  = 24 * time.Hour
 	pingMaxSent = int64(86400)
-	pingLimits  = func(Request) (duration time.Duration) { return 0 }
 )
+
+// pingLimits es la duración total pedida (option duration del PingPlan); 0 = sin ella. Build ya la validó.
+func pingLimits(r Request) time.Duration {
+	p, err := Plan(r)
+	if err != nil {
+		return 0
+	}
+	return time.Duration(p.Duration) * time.Second
+}
 
 // goos es el sistema en el que corre Run; las pruebas lo cambian para ejercitar el comportamiento de Windows.
 var goos = runtime.GOOS
