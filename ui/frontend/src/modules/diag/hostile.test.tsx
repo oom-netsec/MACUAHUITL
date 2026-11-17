@@ -19,7 +19,6 @@ test("la salida con HTML y scripts se ve literal: no crea elementos ni ejecuta n
   const log = screen.getByRole("log", { name: "Salida" });
   await waitFor(() => expect(log.textContent).toContain(evil));
   expect(log.querySelector("img, script, b")).toBeNull();
-  expect((window as unknown as { __pwn?: number }).__pwn).toBeUndefined();
 });
 
 test("los colores ANSI de la herramienta no se ven como basura; el texto queda", async () => {

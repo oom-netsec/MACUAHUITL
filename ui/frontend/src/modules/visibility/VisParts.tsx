@@ -1,4 +1,5 @@
 import { useId, useMemo } from "react";
+import { showHidden } from "../../lib/safeText";
 import { CopyButton, SeverityBadge } from "../../components/Data";
 import { DataTable, type Column } from "../../components/DataTable";
 import { formatBytes } from "../../components/Files";
@@ -95,7 +96,7 @@ export function TrapsTable({ rows }: { rows: TrapRow[] }) {
     { id: "sev", header: t("visibility.traps.col.sev"), value: (r) => trapSeverity(r), width: 180, minWidth: 170, render: (r) => <SeverityBadge sev={trapSeverity(r)} /> },
     { id: "from", header: t("visibility.traps.col.from"), value: (r) => host(r.From), width: 170, mono: true, render: (r) => <>{host(r.From)}{r.From && <CopyButton value={host(r.From)} label={t("visibility.copyIp", { ip: host(r.From) })} />}</> },
     { id: "name", header: t("visibility.traps.col.trap"), value: (r) => r.Name ?? "", width: 150 },
-    { id: "summary", header: t("visibility.traps.col.summary"), value: (r) => trapSummary(r, t, lang), mono: true },
+    { id: "summary", header: t("visibility.traps.col.summary"), value: (r) => trapSummary(r, t, lang), render: (r) => showHidden(trapSummary(r, t, lang)), mono: true },
   ], [t, lang]);
   // Lo más reciente arriba.
   const newest = useMemo(() => [...rows].reverse(), [rows]);

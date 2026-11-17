@@ -199,7 +199,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
                         <td>{showHidden(i.host.name)}</td>
                         <td className="mono">{i.key}</td>
                         <td><Badge tone={i.state === "conflicto" ? "warn" : i.state === "nuevo" ? "ok" : ""}>{stateOf(i)}</Badge></td>
-                        <td>{i.host.credentialLabel || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
+                        <td>{showHidden(i.host.credentialLabel) || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
                         <td>{i.hasStartCommand ? <><Badge tone="warn">{t("hosts.data.import.startMark")}</Badge> <code>{i.host.startCommand}</code></> : "—"}</td>
                         <td>
                           {i.state === "conflicto" ? (

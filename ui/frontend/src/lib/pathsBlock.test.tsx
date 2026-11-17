@@ -8,6 +8,7 @@ import { CoreContext } from "../app/activity";
 import { I18nProvider } from "./i18n";
 import { fakeCore } from "./fake";
 import { setOSForTests } from "./platform";
+import type { CorePrefsState } from "../modules/settings/api";
 
 // Una ruta de Windows rechazada no solo se pinta: bloquea el envío al núcleo.
 beforeEach(() => { localStorage.clear(); setOSForTests("windows"); });
@@ -15,7 +16,7 @@ afterEach(() => setOSForTests(undefined));
 const BAD = "\\\\srv\\share\\x";
 
 test("Ajustes → Almacenamiento: con una ruta rechazada, Guardar queda apagado y no se llama al núcleo", async () => {
-  const prefs = { outputsDir: "", rotateMb: 0, rotateMin: 0, maxFiles: 0, format: "", outputsDirEffective: sampleOutputsDefault, outputsDirDefault: sampleOutputsDefault, note: "" };
+  const prefs: CorePrefsState = { outputsDir: "", rotateMb: 0, rotateMin: 0, maxFiles: 0, format: "", outputsDirEffective: sampleOutputsDefault, outputsDirDefault: sampleOutputsDefault, note: "" };
   const core = fakeCore({ getCorePrefs: vi.fn(async () => prefs) });
   render(<I18nProvider><CoreContext.Provider value={core}><StorageSection core={core} /></CoreContext.Provider></I18nProvider>);
   const input = await screen.findByRole("textbox", { name: "Carpeta de salidas" });

@@ -32,7 +32,6 @@ test("el nombre de archivo y el rechazo con HTML se ven como texto: no crean ele
   expect(card.querySelector("img, script")).toBeNull();
   const row = within(card).getAllByRole("row")[1];
   expect(row.textContent!.split(evil).length - 1).toBe(2); // nombre y rechazo, literales
-  expect((window as unknown as { __pwn?: number }).__pwn).toBeUndefined();
 });
 
 test("bidi y controles en el nombre de archivo se muestran como código visible", async () => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { showHidden } from "../../lib/safeText";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { CoreAPI, ServeEvent } from "../../lib/core";
 import { Check, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
@@ -83,7 +84,7 @@ function ServePanel({ core }: { core: CoreAPI }) {
           <Terminal as="ul" aria-live={serverId ? undefined : "polite"} aria-label={t("field.transfers")}>
             {xfers.map((x, i) => (
               <li key={i} data-sev={x.Result === "ok" ? undefined : 3}>
-                <Hl text={t("field.xfer", { client: x.Client ?? "", file: x.File ?? "", bytes: x.Bytes ?? 0, secs: ((x.Duration ?? 0) / 1e9).toFixed(1), result: x.Result === "ok" ? t("transfer.log.ok") : x.Result === undefined ? "" : t("transfer.log.error"), error: x.Error ? ` ${x.Error}` : "" })} />
+                <Hl text={t("field.xfer", { client: x.Client ?? "", file: showHidden(x.File ?? ""), bytes: x.Bytes ?? 0, secs: ((x.Duration ?? 0) / 1e9).toFixed(1), result: x.Result === "ok" ? t("transfer.log.ok") : x.Result === undefined ? "" : t("transfer.log.error"), error: x.Error ? ` ${showHidden(x.Error)}` : "" })} />
               </li>
             ))}
           </Terminal>

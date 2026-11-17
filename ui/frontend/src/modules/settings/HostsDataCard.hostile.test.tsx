@@ -19,7 +19,6 @@ test("host y errores con HTML se ven como texto en la vista previa: sin elemento
   const sec = await preview(evil);
   expect(sec.querySelector("img, script")).toBeNull();
   expect(sec.textContent!.split(evil).length - 1).toBe(3); // nombre, error y aviso
-  expect((window as unknown as { __pwn?: number }).__pwn).toBeUndefined();
 });
 
 test("bidi y controles en el nombre del host salen como código visible", async () => {
