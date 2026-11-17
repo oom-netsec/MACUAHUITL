@@ -5,7 +5,7 @@ import { Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import { useVaultVersion } from "../../lib/vaultSignal";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 
 function useCreds(core: CoreAPI) {
   const t = useT();

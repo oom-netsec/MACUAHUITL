@@ -3,7 +3,7 @@ import { Field, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { kbd, list, Outcome } from "./shared";
 import { algorithms, type Pem } from "./pki";
 

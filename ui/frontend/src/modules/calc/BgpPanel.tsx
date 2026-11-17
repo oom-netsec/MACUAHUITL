@@ -2,7 +2,7 @@ import type { CoreAPI } from "../../lib/core";
 import { Check, Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { kbd, num, useCalc } from "./shared";
 
 interface RouteForm {

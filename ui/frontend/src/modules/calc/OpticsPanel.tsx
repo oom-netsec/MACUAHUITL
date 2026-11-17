@@ -2,7 +2,7 @@ import type { CoreAPI } from "../../lib/core";
 import { Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { kbd, useCalc } from "./shared";
 
 const fibers = (t: ReturnType<typeof useT>): [string, string][] => [["smf-1310", t("calc.fiber.smf1310")], ["smf-1550", t("calc.fiber.smf1550")], ["mmf-850", t("calc.fiber.mmf850")], ["mmf-1300", t("calc.fiber.mmf1300")]];

@@ -1,7 +1,7 @@
 import type { CoreAPI } from "../../lib/core";
 import { Field } from "../../components/Field";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { kbd, useCalc } from "./shared";
 
 interface TcpForm { bw: string; rtt: string; win: string; loss: string; mss: string }

@@ -4,7 +4,7 @@ import { Field, Notice, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { Outcome } from "./shared";
 import { algorithms, type Pem } from "./pki";
 
@@ -20,8 +20,7 @@ export function CaCard({ core }: { core: CoreAPI }) {
   const sign = useResult<Pem>();
   useEffect(() => {
     if (init.data) { set("caCert")(init.data.pem); set("caKey")(init.data.key); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- set es estable por contenido: solo importa el resultado nuevo
-  }, [init.data]);
+  }, [init.data, set]);
   return (
     <>
       <Section title={t("security.ca.title")}>

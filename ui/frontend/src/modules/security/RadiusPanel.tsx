@@ -3,7 +3,7 @@ import { Check, Field, Select } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { RadiusReportData } from "./api";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 import { ResultCards } from "./SecCards";
 import { kbd, Outcome, probe, Raw, type Probe } from "./shared";
 import { useSecrets } from "./useSecrets";

@@ -2,7 +2,7 @@ import type { CoreAPI } from "../../lib/core";
 import { Check, Field, Notice, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
-import { useForm } from "./form";
+import { useForm } from "../../lib/useForm";
 
 interface ExportForm {
   format: string; cert: string; chain: string; sealedKey: string; keyPassword: string; exportPassword: string; plainKey: boolean; path: string;
