@@ -17,12 +17,12 @@ type querier interface {
 	Exec(string, ...any) (sql.Result, error)
 }
 
-const columnas = `id, name, address, port, platform, folder, tags_json, credential_id, notes, created_at, updated_at`
+const columnas = `id, name, address, port, platform, folder, tags_json, credential_id, notes, created_at, updated_at, startup_command`
 
 func scan(r interface{ Scan(...any) error }) (devices.Host, error) {
 	var h devices.Host
 	var tags, created, updated string
-	if err := r.Scan(&h.ID, &h.Name, &h.Address, &h.Port, &h.Platform, &h.Folder, &tags, &h.CredentialID, &h.Notes, &created, &updated); err != nil {
+	if err := r.Scan(&h.ID, &h.Name, &h.Address, &h.Port, &h.Platform, &h.Folder, &tags, &h.CredentialID, &h.Notes, &created, &updated, &h.StartupCommand); err != nil {
 		return h, err
 	}
 	if err := json.Unmarshal([]byte(tags), &h.Tags); err != nil {
@@ -57,11 +57,11 @@ func getHost(q querier, id string) (devices.Host, error) {
 // putHost inserta o reemplaza por ID.
 func putHost(q querier, h devices.Host) error {
 	tags, _ := json.Marshal(append([]string{}, h.Tags...))
-	_, err := q.Exec(`INSERT INTO hosts(`+columnas+`) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+	_, err := q.Exec(`INSERT INTO hosts(`+columnas+`) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET name=excluded.name, address=excluded.address, port=excluded.port, platform=excluded.platform,
 		folder=excluded.folder, tags_json=excluded.tags_json, credential_id=excluded.credential_id, notes=excluded.notes,
-		created_at=excluded.created_at, updated_at=excluded.updated_at`,
+		created_at=excluded.created_at, updated_at=excluded.updated_at, startup_command=excluded.startup_command`,
 		h.ID, h.Name, h.Address, h.Port, h.Platform, h.Folder, string(tags), h.CredentialID, h.Notes,
-		h.CreatedAt.UTC().Format(fechaFmt), h.UpdatedAt.UTC().Format(fechaFmt))
+		h.CreatedAt.UTC().Format(fechaFmt), h.UpdatedAt.UTC().Format(fechaFmt), h.StartupCommand)
 	return err
 }

@@ -98,6 +98,7 @@ func (s *svc) credsFor(hosts []devices.Host) []vault.Info {
 // hostPB pone en k los datos propios de un host de la libreta.
 func hostPB(k *v1.Device, h devices.Host, infos []vault.Info) {
 	k.Id, k.Name, k.Profile, k.Folder, k.Tags, k.Notes = h.ID, h.Name, portPB(h), h.Folder, h.Tags, h.Notes
+	k.StartupCommand = h.StartupCommand
 	k.CredentialId, k.CredentialLabel = h.CredentialID, labelOf(infos, h.CredentialID)
 }
 

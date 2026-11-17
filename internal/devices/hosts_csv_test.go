@@ -7,7 +7,10 @@ import (
 	"testing"
 )
 
-const cabecera = "name,address,port,platform,folder,tags,credential_label,notes"
+const cabecera = "name,address,port,platform,folder,tags,credential_label,notes,startup_command"
+
+// cabeceraVieja es el encabezado de antes de la fase 44, sin startup_command: sigue entrando.
+const cabeceraVieja = "name,address,port,platform,folder,tags,credential_label,notes"
 
 func TestCSVIdaYVuelta(t *testing.T) {
 	hs := []FileHost{
@@ -40,7 +43,7 @@ func TestCSVEncabezado(t *testing.T) {
 	fila := "\nsw1,10.0.0.1,22,ios,,,,"
 	ok := map[string]string{
 		"mayúsculas y espacios": " Name , ADDRESS,Port,platform ,folder,tags,credential_label,NOTES" + fila,
-		"con BOM":               "\xef\xbb\xbf" + cabecera + fila,
+		"con BOM":               "\xef\xbb\xbf" + cabeceraVieja + fila,
 	}
 	for n, c := range ok {
 		if got, err := ParseHostsCSV([]byte(c)); err != nil || len(got.Hosts) != 1 || len(got.Errors) != 0 {
@@ -53,9 +56,9 @@ func TestCSVEncabezado(t *testing.T) {
 		"sobra una":         cabecera + ",extra" + fila,
 		"otro orden":        "address,name,port,platform,folder,tags,credential_label,notes" + fila,
 		"otro nombre":       "name,address,port,platform,folder,tags,credential,notes" + fila,
-		"no es UTF-8":       cabecera + "\nsw\xff,10.0.0.1,22,,,,,",
-		"pasa de 5 MB":      cabecera + fila + strings.Repeat(" ", MaxImportBytes),
-		"pasa de las filas": cabecera + strings.Repeat(fila, MaxImportHosts+1),
+		"no es UTF-8":       cabeceraVieja + "\nsw\xff,10.0.0.1,22,,,,,",
+		"pasa de 5 MB":      cabeceraVieja + fila + strings.Repeat(" ", MaxImportBytes),
+		"pasa de las filas": cabeceraVieja + strings.Repeat(fila, MaxImportHosts+1),
 	}
 	for n, c := range mal {
 		if _, err := ParseHostsCSV([]byte(c)); err == nil {
@@ -68,13 +71,13 @@ func TestCSVEncabezado(t *testing.T) {
 		t.Fatalf("mensaje = %v", err)
 	}
 	// justo en el tope de filas sí
-	if got, err := ParseHostsCSV([]byte(cabecera + strings.Repeat("\nx,10.0.0.1,22,,,,,", MaxImportHosts))); err != nil || len(got.Hosts)+len(got.Errors) != MaxImportHosts {
+	if got, err := ParseHostsCSV([]byte(cabeceraVieja + strings.Repeat("\nx,10.0.0.1,22,,,,,", MaxImportHosts))); err != nil || len(got.Hosts)+len(got.Errors) != MaxImportHosts {
 		t.Fatalf("en el tope: %v", err)
 	}
 }
 
 func TestCSVErroresPorLinea(t *testing.T) {
-	csv := cabecera + "\n" +
+	csv := cabeceraVieja + "\n" +
 		"ok1,10.0.0.1,22,ios,,,,\n" + // 2
 		"mal,admin@10.0.0.2,22,ios,,,,\n" + // 3 address
 		"\n" + // 4 en blanco: se salta
@@ -109,11 +112,11 @@ func TestCSVErroresPorLinea(t *testing.T) {
 		t.Errorf("último = %+v", last)
 	}
 	// una comilla suelta en medio del archivo no ignora nada: es solo el error de su línea
-	got, _ = ParseHostsCSV([]byte(cabecera + "\nmal,10.0.0.1,22,,,,,a\"b\nbien,10.0.0.2,22,,,,,\n"))
+	got, _ = ParseHostsCSV([]byte(cabeceraVieja + "\nmal,10.0.0.1,22,,,,,a\"b\nbien,10.0.0.2,22,,,,,\n"))
 	if len(got.Hosts) != 1 || len(got.Errors) != 1 || got.Errors[0].Line != 2 || strings.Contains(got.Errors[0].Reason, "resto del archivo") {
 		t.Errorf("comilla suelta: %+v", got)
 	}
-	got, _ = ParseHostsCSV([]byte(cabecera + "\n\"mal\"x,10.0.0.1,22,,,,,\nbien,10.0.0.2,22,,,,,\n"))
+	got, _ = ParseHostsCSV([]byte(cabeceraVieja + "\n\"mal\"x,10.0.0.1,22,,,,,\nbien,10.0.0.2,22,,,,,\n"))
 	if len(got.Hosts) != 1 || len(got.Errors) != 1 || got.Errors[0].Line != 2 || strings.Contains(got.Errors[0].Reason, "resto del archivo") {
 		t.Errorf("comilla sobrante en medio: %+v", got)
 	}
@@ -164,7 +167,7 @@ func TestCSVProtegeContraFormulas(t *testing.T) {
 		}
 	}
 	// una comilla suelta que no precede a un carácter de fórmula se queda
-	got, _ = ParseHostsCSV([]byte(cabecera + "\nx,10.0.0.1,22,,,,,'hola\nx2,10.0.0.2,22,,,,,'=1"))
+	got, _ = ParseHostsCSV([]byte(cabeceraVieja + "\nx,10.0.0.1,22,,,,,'hola\nx2,10.0.0.2,22,,,,,'=1"))
 	if got.Hosts[0].Notes != "'hola" || got.Hosts[1].Notes != "=1" {
 		t.Fatalf("comillas: %+v", got.Hosts)
 	}

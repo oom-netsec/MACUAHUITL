@@ -248,6 +248,14 @@ func (s *assistSvc) vault(ctx context.Context) error {
 	return nil
 }
 
+// rejectGeneric: un host linux/windows de la libreta o una credencial de solo llave no entran al cambio asistido.
+func (s *assistSvc) rejectGeneric(ctx context.Context, host string, port uint16, cred string) error {
+	if err := service.CheckNotGenericHost(ctx, s.d.DB(), host, int(port)); err != nil {
+		return err
+	}
+	return service.CheckNoKeyCredential(ctx, s.d.Vault(), cred)
+}
+
 func checkTarget(ctx context.Context, t *v1.AssistTarget) error {
 	if t == nil || t.Address == "" || t.CredentialId == "" {
 		return service.Err(ctx, codes.InvalidArgument, "assist.svc.indica_el_equipo_direccion_y", nil)
@@ -298,6 +306,9 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	port := uint16(t.Port)
 	if port == 0 {
 		port = 22
+	}
+	if err := s.rejectGeneric(ctx, t.Address, port, t.CredentialId); err != nil {
+		return "", assist.Plan{}, err
 	}
 	label := t.Name
 	if label == "" {
@@ -584,6 +595,9 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 // (una reversa pendiente); origin es la ejecución original cuya reversa se aplica.
 func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, keys []string, origin string) (string, error) {
 	if err := s.vault(ctx); err != nil {
+		return "", err
+	}
+	if err := s.rejectGeneric(ctx, rec.t.host, rec.t.port, rec.t.cred); err != nil {
 		return "", err
 	}
 	runID := service.NewID()

@@ -64,7 +64,7 @@ func labelOf(infos []vault.Info, id string) string {
 
 func hostFromPB(p *v1.Device) devices.Host {
 	h := devices.Host{Name: p.Name, Address: p.GetTarget().GetAddress(), Port: int(p.GetProfile().GetPort()), Platform: p.Platform, Folder: p.Folder,
-		Tags: append([]string{}, p.Tags...), CredentialID: p.CredentialId, Notes: p.Notes}
+		Tags: append([]string{}, p.Tags...), CredentialID: p.CredentialId, Notes: p.Notes, StartupCommand: p.StartupCommand}
 	return h
 }
 
@@ -72,7 +72,28 @@ func portPB(h devices.Host) *v1.DeviceProfile { return &v1.DeviceProfile{Port: u
 
 // auditHost anota sin notas ni credencial: solo quién es y adónde apunta.
 func (s *svc) auditHost(action string, h devices.Host) {
-	s.d.Audit(action, h.ID, fmt.Sprintf("%s %s:%s", h.Name, h.Address, strconv.Itoa(h.Port)))
+	d := fmt.Sprintf("%s %s:%s", h.Name, h.Address, strconv.Itoa(h.Port))
+	if h.Platform != "" {
+		d += " platform=" + h.Platform
+	}
+	if h.StartupCommand != "" { // no es un secreto (la UI avisa que no lleve): queda para saber qué corre el clic
+		d += fmt.Sprintf(" startup=%q", h.StartupCommand)
+	}
+	s.d.Audit(action, h.ID, d)
+}
+
+// keyOnNonGeneric dice si h usa una credencial de solo llave (regla 7b) en un host que no es linux ni windows. Con
+// la bóveda cerrada (infos nil) no se sabe el tipo y no rechaza: lo detienen las capas siguientes.
+func keyOnNonGeneric(infos []vault.Info, h devices.Host) bool {
+	if h.CredentialID == "" || devices.IsGeneric(h.Platform) {
+		return false
+	}
+	for _, i := range infos {
+		if i.ID == h.CredentialID {
+			return i.IsKey()
+		}
+	}
+	return false
 }
 
 // PutDevice crea (id vacío) o edita un host de la libreta. El nombre y el destino (dirección y puerto) no se repiten.
@@ -93,6 +114,8 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 			out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.vault_closed", nil))
 		case labelOf(infos, h.CredentialID) == "":
 			return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.no_credential", nil)
+		case keyOnNonGeneric(infos, h):
+			return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.key_credential_platform", nil)
 		}
 	}
 	now := s.clock().UTC().Truncate(time.Second)

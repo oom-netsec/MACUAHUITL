@@ -49,6 +49,8 @@ func init() {
 		"patrol.svc.no_vault_create":        e("no hay bóveda; créala primero", "there is no vault; create it first"),
 		"patrol.svc.vault_exists":           e("la bóveda ya existe", "the vault already exists"),
 		"patrol.svc.reserved_label":         e("la etiqueta {label:q} está reservada para el sistema", "the label {label:q} is reserved for the system", "label"),
+		"patrol.svc.generic_host":           e("{name} es un host {platform}: solo se abre en el terminal SSH", "{name} is a {platform} host: it only opens in the SSH terminal", "name", "platform"),
+		"patrol.svc.key_credential":         e("la credencial {label:q} es de solo llave: solo sirve para el terminal de hosts linux y windows", "the credential {label:q} is key-only: it only works for the terminal of linux and windows hosts", "label"),
 		"patrol.svc.no_vault":               e("no hay bóveda", "there is no vault"),
 		"patrol.svc.bad_kind":               e("tipo de trabajo {kind:q} no válido (patrol, adhoc, backup o change)", "job type {kind:q} is not valid (patrol, adhoc, backup or change)", "kind"),
 		"patrol.svc.login_after_arm":        e("el trabajo está {state}; el Login Test solo aplica antes de armar", "the job is {state}; the Login Test only applies before arming", "state"),

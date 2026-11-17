@@ -110,15 +110,16 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO pack_removed VALUES('ios-xe/x','oom/ios-xe')`); err != nil {
 				t.Fatalf("sin pack_removed: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t')`); err != nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t','')`); err != nil {
 				t.Fatalf("sin hosts: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t')`); err == nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t','')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
-			want := 9 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados, ocultos de paquetes, índice de auditoría
+			files, _ := migrations.ReadDir("migrations")
+			want := len(files) // una por archivo: no se cuenta a mano para que una migración nueva no obligue a tocar esto
 			if applied != nil && applied[1] == "0002_job_history.sql" {
-				want = 10 // además queda la fila con el nombre viejo
+				want++ // además queda la fila con el nombre viejo
 			}
 			if n != want {
 				t.Fatalf("migraciones registradas = %d, want %d", n, want)
@@ -301,5 +302,30 @@ func TestIndiceAuditAt(t *testing.T) {
 	var n int
 	if err := db.QueryRow(`SELECT count(*) FROM pragma_index_list('audit_log') WHERE name='idx_audit_log_at'`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("falta idx_audit_log_at: n=%d err=%v", n, err)
+	}
+}
+
+// Fase 44c1: la columna startup_command nace vacía para los hosts que ya existían.
+func TestMigracionOrdenDeInicio(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.db")
+	seed(t, p, []string{"0001_init.sql", "0002_preferences.sql", "0003_job_history.sql", "0004_scripts.sql",
+		"0005_script_collections.sql", "0006_hosts.sql", "0007_pack_removed.sql", "0008_pack_hidden.sql"})
+	old, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,created_at,updated_at)
+		VALUES('a','n','10.0.0.1',22,'ios','','[]','','','t','t')`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	db, err := Open(p) // aplica 0010 sobre el host que ya existía
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var s string
+	if err := db.QueryRow(`SELECT startup_command FROM hosts WHERE id='a'`).Scan(&s); err != nil || s != "" {
+		t.Fatalf("startup_command = %q %v", s, err)
 	}
 }

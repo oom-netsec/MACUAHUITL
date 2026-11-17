@@ -258,6 +258,19 @@ func (s *patrolSvc) validate(ctx context.Context, p *v1.JobSpec) (patrol.Spec, e
 	if !slices.Contains(jobKinds, spec.Kind) {
 		return spec, service.Err(ctx, codes.InvalidArgument, "patrol.svc.bad_kind", i18n.A("kind", spec.Kind))
 	}
+	// Los hosts linux/windows y las credenciales de solo llave solo sirven para el terminal (regla 7b, ADR 0013).
+	creds := []string{spec.DefaultCredentialID}
+	for _, o := range spec.Overrides {
+		creds = append(creds, o.CredentialID, o.FallbackCredentialID)
+	}
+	if err := service.CheckNoKeyCredential(ctx, v, creds...); err != nil {
+		return spec, err
+	}
+	for _, t := range spec.Targets {
+		if err := service.CheckNotGenericHost(ctx, s.c.db, t.Address, int(t.Port)); err != nil {
+			return spec, err
+		}
+	}
 	// Un output_dir explícito pasa por la validación de Ajustes → Almacenamiento; vacío = la carpeta vigente.
 	if spec.OutputDir == "" {
 		spec.OutputDir = s.c.settings.Outputs()

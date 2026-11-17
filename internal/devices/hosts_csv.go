@@ -78,6 +78,7 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 	if err := checkHeader(head); err != nil {
 		return out, err
 	}
+	cols := len(head) // el encabezado de antes de la fase 44 no trae la última columna (startup_command)
 	var rows []row
 	var malas []LineError
 	for n := 1; ; n++ {
@@ -105,9 +106,12 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 			return out, err
 		}
 		line, _ := r.FieldPos(0)
-		if len(rec) != len(HostFields) {
-			malas = append(malas, lineErr(line, "", i18n.New("hostfile.columns", i18n.A("got", len(rec), "want", len(HostFields)))))
+		if len(rec) != cols {
+			malas = append(malas, lineErr(line, "", i18n.New("hostfile.columns", i18n.A("got", len(rec), "want", cols))))
 			continue
+		}
+		for len(rec) < len(HostFields) {
+			rec = append(rec, "")
 		}
 		for i := range rec {
 			rec[i] = desprotege(rec[i])
@@ -146,7 +150,7 @@ func checkHeader(got []string) error {
 		norm[i] = strings.ToLower(strings.TrimSpace(g))
 		have[norm[i]] = true
 	}
-	if strings.Join(norm, ",") == strings.Join(want, ",") {
+	if j := strings.Join(norm, ","); j == strings.Join(want, ",") || j == strings.Join(want[:len(want)-1], ",") {
 		return nil
 	}
 	var faltan, sobran []string
