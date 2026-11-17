@@ -152,8 +152,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if err != nil {
 			return s.refuse(label, service.ErrFrom(st.Context(), codes.Internal, err), i18n.English(err))
 		}
-		if o.Name == "" {
-			label = h.Name
+		label = h.Name                                                // el nombre de la libreta, no el que mande el cliente
+		if h.StartupCommand != "" && !devices.IsGeneric(h.Platform) { // Clean no lo permite: datos alterados o viejos
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup on a non-generic host")
 		}
 		if h.CredentialID == "" {
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.host_no_credential", nil), "saved host has no credential")
@@ -182,7 +183,11 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
 	}
 	// Una credencial de solo llave solo se usa por host_id de un host linux o windows; se rechaza antes de Guard.Allow (sin DNS) y de conectar.
-	if infos, err := v.List(); err == nil {
+	infos, err := v.List()
+	if err != nil { // la bóveda se cerró entre medio: sin saber el tipo no se sigue
+		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
+	}
+	{
 		for _, i := range infos {
 			if i.ID == credID && i.IsKey() && !generic {
 				return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.key_credential", nil), "key credential")
@@ -289,7 +294,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if o.HostId != "" {
 		start := "none"
 		if startup != "" {
-			rec.Mark("orden de inicio: " + startup)
+			rec.Mark("orden de inicio: " + strconv.Quote(startup))
 			start = strconv.Quote(startup)
 		}
 		detail += " host=" + o.HostId + " startup=" + start

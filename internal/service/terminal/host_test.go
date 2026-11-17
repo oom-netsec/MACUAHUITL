@@ -24,6 +24,9 @@ import (
 
 const startup = "cmd /c echo macuahuitl-ok"
 
+// pwSecreto no puede aparecer por azar en una huella base64 de la auditoría (con «pw» pasaba ~1 % de las veces).
+const pwSecreto = "s3creto-no-sale"
+
 // hrig es un host linux/windows simulado que solo acepta publickey y contesta exec.
 type hrig struct {
 	*rig
@@ -46,7 +49,7 @@ func newHRig(t *testing.T) *hrig {
 		t.Fatal(err)
 	}
 	h.keyID = id
-	if h.pwID, err = r.d.V.Put(vault.Credential{Label: "clave", Username: "admin", Password: secret.New([]byte("pw"))}); err != nil {
+	if h.pwID, err = r.d.V.Put(vault.Credential{Label: "clave", Username: "admin", Password: secret.New([]byte(pwSecreto))}); err != nil {
 		t.Fatal(err)
 	}
 	_, f, _, _ := runtime.Caller(0)
@@ -132,14 +135,14 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	if !strings.Contains(a, `host=h1`) || !strings.Contains(a, `startup=\"cmd /c echo macuahuitl-ok\"`) {
 		t.Fatalf("falta host=/startup= en la auditoría:\n%s", a)
 	}
-	for _, s := range []string{"PRIVATE KEY", "pw"} {
+	for _, s := range []string{"PRIVATE KEY", pwSecreto} {
 		if strings.Contains(a, s) {
 			t.Fatalf("la auditoría trae %q:\n%s", s, a)
 		}
 	}
 	_, rec := h.cerrada("terminal.close", "the device closed the session")
 	b, err := os.ReadFile(rec)
-	if err != nil || !strings.Contains(string(b), "orden de inicio: "+startup) {
+	if err != nil || !strings.Contains(string(b), "orden de inicio: "+strconv.Quote(startup)) {
 		t.Fatalf("la grabación no marca la orden (%v):\n%s", err, b)
 	}
 }
@@ -207,11 +210,12 @@ func TestHostIDEsExclusivo(t *testing.T) {
 		"port":          {HostId: "h1", Port: 22},
 		"credential_id": {HostId: "h1", CredentialId: h.keyID},
 	} {
-		_, done, cancel := h.session(o)
-		err := wait(t, done)
-		cancel()
-		h.nada(err, codes.InvalidArgument, "terminal.err.host_and_address")
-		_ = nombre
+		t.Run(nombre, func(t *testing.T) {
+			_, done, cancel := h.session(o)
+			err := wait(t, done)
+			cancel()
+			h.nada(err, codes.InvalidArgument, "terminal.err.host_and_address")
+		})
 	}
 }
 
@@ -266,4 +270,47 @@ func TestHostSinCredencialOInexistente(t *testing.T) {
 	err = wait(t, done)
 	cancel()
 	h.nada(err, codes.NotFound, "terminal.err.host_not_found")
+}
+
+// Un Cisco con contraseña, por host_id o con la dirección a mano, sigue como hoy: shell con vt100 y sin exec.
+func TestCiscoConPasswordShellVt100(t *testing.T) {
+	var mu sync.Mutex
+	var terms []string
+	rec := &simulator.Recorder{}
+	r := newRig(t, simulator.Config{Recorder: rec, OnPty: func(term string) { mu.Lock(); terms = append(terms, term); mu.Unlock() }})
+	if _, err := r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at)
+		VALUES('c1','c1',?,?,'ios-xe','','[]',?,'','','t','t')`, r.host, r.port, r.open.CredentialId); err != nil {
+		t.Fatal(err)
+	}
+	for nombre, o := range map[string]*v1.TerminalOpen{
+		"host_id":   {HostId: "c1", AcceptedHostKeyFingerprints: r.open.AcceptedHostKeyFingerprints},
+		"dirección": r.open,
+	} {
+		st, done, cancel := r.session(o)
+		st.waitFor(t, "SW1")
+		cancel()
+		wait(t, done)
+		mu.Lock()
+		got := append([]string(nil), terms...)
+		terms = nil
+		mu.Unlock()
+		if len(got) != 1 || got[0] != "vt100" {
+			t.Fatalf("%s: term %v", nombre, got)
+		}
+		for _, l := range rec.Lines() {
+			if strings.HasPrefix(l, "!exec") {
+				t.Fatalf("%s: corrió exec: %v", nombre, rec.Lines())
+			}
+		}
+	}
+}
+
+// Una orden guardada en un host que no es linux/windows (Clean no lo deja: base alterada o vieja) no se anota ni se abre.
+func TestOrdenEnHostNoGenericoSeRechaza(t *testing.T) {
+	h := newHRig(t)
+	h.addHost("c2", "ios-xe", "no-existe.invalid", h.pwID, "show version")
+	_, done, cancel := h.session(h.open("c2", "show version", true))
+	err := wait(t, done)
+	cancel()
+	h.nada(err, codes.FailedPrecondition, "terminal.err.startup_changed")
 }
