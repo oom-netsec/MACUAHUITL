@@ -32,6 +32,8 @@ test("alto contraste de Windows: casilla, radio, punto del radio y segmented usa
   const s = forced(shell);
   expect(s).toContain('.nav-item[aria-current="page"]');
   expect(s).toContain('.palette-item[aria-selected="true"]');
+  // El punto de la barra de estado es solo fondo: sin forced-color-adjust el sistema lo borra.
+  expect(s).toMatch(/\.status-item \.dot \{ forced-color-adjust: none; background: CanvasText;/);
   // forced-color-adjust: none se hereda: el texto secundario del ítem elegido también va en HighlightText.
   expect(s).toMatch(/:is\(small, kbd\) \{ color: HighlightText;/);
   // Los deshabilitados (más específicos fuera del bloque) también se redefinen dentro.
