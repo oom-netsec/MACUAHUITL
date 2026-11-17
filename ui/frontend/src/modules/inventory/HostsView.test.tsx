@@ -277,10 +277,24 @@ test("borrar una carpeta con hosts pide confirmar diciendo cuántos pasan a «Si
   expect(inv.deleteFolder).not.toHaveBeenCalled();
   const ok = screen.getByRole("button", { name: "Confirmar: 2 hosts pasan a «Sin carpeta»" });
   await userEvent.click(ok);
-  expect(inv.deleteFolder).toHaveBeenCalledWith("Lab");
+  expect(inv.deleteFolder).toHaveBeenCalledWith("Lab", true); // confirmó con la cuenta conocida: confirm=true
   expect(await screen.findByText("Sin carpeta (2)")).toBeVisible();
   expect(inv.deleteHost).not.toHaveBeenCalled();
   expect(screen.getByText("LAB-CORE")).toBeVisible();
+});
+
+test("borrar con la cuenta desactualizada: FailedPrecondition muestra la cuenta del núcleo y reintenta con confirm=true solo tras confirmar de nuevo", async () => {
+  const inv0 = fakeInventory();
+  setup({ ...inv0, listFolders: vi.fn(async () => [{ name: "Lab", count: 0 }, { name: "Oficina", count: 1 }]) }); // la lista de carpetas dice 0 hosts en Lab
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Eliminar carpeta Lab" }));
+  await userEvent.click(screen.getByRole("button", { name: /^Confirmar/ }));
+  expect(inv0.deleteFolder).toHaveBeenNthCalledWith(1, "Lab", false); // no sabía de hosts: sin confirm
+  expect(await screen.findByText(/ya tiene 2 hosts/)).toBeVisible();
+  expect(inv0.deleteFolder).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("button", { name: "Borrar la carpeta y dejar sus hosts sin carpeta" }));
+  expect(inv0.deleteFolder).toHaveBeenNthCalledWith(2, "Lab", true);
+  expect(await screen.findByText("Sin carpeta (2)")).toBeVisible();
 });
 
 const grip = (name: string) => screen.getByRole("button", { name: new RegExp(`^Arrastrar ${name} `) });

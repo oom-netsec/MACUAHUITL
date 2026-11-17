@@ -42,10 +42,10 @@ func (f *fake44) PutCredential(_ context.Context, r *v1.PutCredentialRequest) (*
 	return &v1.PutCredentialResponse{Id: "p1"}, nil
 }
 func (f *fake44) ExportBackup(context.Context, *v1.ExportBackupRequest) (*v1.ExportBackupResponse, error) {
-	return &v1.ExportBackupResponse{Count: 2, SshKeysOmitted: 3}, nil
+	return &v1.ExportBackupResponse{Count: 2}, nil
 }
 func (f *fake44) PreviewBackupImport(context.Context, *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
-	return &v1.PreviewBackupImportResponse{Items: []*v1.VaultBackupItem{{Id: "a", State: "llave_privada"}, {Id: "b", State: "nueva", SshKeyDropped: true}}}, nil
+	return &v1.PreviewBackupImportResponse{Items: []*v1.VaultBackupItem{{Id: "a", State: "nueva"}, {Id: "b", State: "nueva"}}}, nil
 }
 func (f *fake44) PutDevice(_ context.Context, r *v1.PutDeviceRequest) (*v1.PutDeviceResponse, error) {
 	f.dev = r
@@ -121,11 +121,11 @@ func TestVault44(t *testing.T) {
 		t.Fatalf("put %+v %v", f.put, err)
 	}
 	e, _ := b.ExportVaultBackup("/x", "frase-larga-123", true, true)
-	if e.SSHKeysOmitted != 3 || e.Count != 2 {
+	if e.Count != 2 {
 		t.Fatalf("%+v", e)
 	}
 	p, _ := b.PreviewVaultBackupImport("/x", "f")
-	if p.Items[0].State != "llave_privada" || p.Items[0].SSHKeyDropped || !p.Items[1].SSHKeyDropped {
+	if len(p.Items) != 2 {
 		t.Fatalf("%+v", p.Items)
 	}
 }

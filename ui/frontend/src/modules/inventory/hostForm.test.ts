@@ -108,7 +108,7 @@ test("la orden de inicio rechaza tab, U+2028 y caracteres invisibles (Trojan Sou
 });
 
 test("un error del núcleo de la orden de inicio cae en su campo", () => {
-  expect(coreErrorField(bridge("hosts.invalid_start_command", { field: "startCommand" }))).toBe("startCommand");
+  expect(coreErrorField(bridge("hosts.invalid_startup_command", { field: "startup_command" }, "texto con nombre y credencial"))).toBe("startCommand");
   expect(coreErrorField(new Error("orden de inicio inválida: lleva un salto de línea"))).toBe("startCommand");
 });
 

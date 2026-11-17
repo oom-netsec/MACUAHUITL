@@ -36,10 +36,10 @@ export const sampleHostsImport: HostsImportPreview = {
   warnings: ["1 host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial"],
   errors: [{ line: 14, field: "address", reason: "dirección \"admin@10.0.0.9\": use una IP o un nombre DNS" }, { line: 15, field: "", reason: "tiene 3 columnas; se esperaban 8" }],
   items: [
-    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1", platform: "linux", startCommand: "tmux attach" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false },
-    { host: host({ id: "", name: "OFI-SW", address: "10.8.0.1", platform: "", folder: "Oficina", tags: ["acceso", "dc-1"] }), key: "10.8.0.1:22", state: "igual", reason: "", conflictsWith: "d".repeat(32), credentialMissing: false },
-    { host: host({ id: "", name: "OTRO-NOMBRE", address: "10.9.0.1", credentialLabel: "admin lab" }), key: "10.9.0.1:22", state: "conflicto", reason: "direccion", conflictsWith: "a".repeat(32), credentialMissing: false },
-    { host: host({ id: "", name: "LAB-AP", address: "ap2.lab", credentialLabel: "no existe" }), key: "ap2.lab:22", state: "conflicto", reason: "nombre", conflictsWith: "b".repeat(32), credentialMissing: true },
+    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1", platform: "linux", startCommand: "tmux attach" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false, hasStartCommand: true },
+    { host: host({ id: "", name: "OFI-SW", address: "10.8.0.1", platform: "", folder: "Oficina", tags: ["acceso", "dc-1"] }), key: "10.8.0.1:22", state: "igual", reason: "", conflictsWith: "d".repeat(32), credentialMissing: false, hasStartCommand: false },
+    { host: host({ id: "", name: "OTRO-NOMBRE", address: "10.9.0.1", credentialLabel: "admin lab" }), key: "10.9.0.1:22", state: "conflicto", reason: "direccion", conflictsWith: "a".repeat(32), credentialMissing: false, hasStartCommand: false },
+    { host: host({ id: "", name: "LAB-AP", address: "ap2.lab", credentialLabel: "no existe" }), key: "ap2.lab:22", state: "conflicto", reason: "nombre", conflictsWith: "b".repeat(32), credentialMissing: true, hasStartCommand: false },
   ],
 };
 
@@ -53,7 +53,7 @@ export const sampleHostFields: HostField[] = [
   { name: "tags", type: "lista", required: false, example: "core;dc-1", description: "Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo." },
   { name: "credential_label", type: "texto", required: false, example: "admin lab", description: "Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña)." },
   { name: "notes", type: "texto", required: false, example: "Piso 2", description: "Notas libres, hasta 2000 caracteres." },
-  { name: "start_command", type: "texto", required: false, example: "tmux attach", description: "Orden de inicio, solo con linux o windows: una línea de hasta 256 caracteres, sin caracteres de control ni invisibles. Se ejecuta en el equipo al conectar." },
+  { name: "startup_command", type: "texto", required: false, example: "tmux attach", description: "Orden de inicio, solo con linux o windows: una línea de hasta 256 caracteres, sin caracteres de control ni invisibles. Se ejecuta en el equipo al conectar." },
 ];
 export const sampleHostsFormat: HostsFormat = { fields: sampleHostFields, maxRows: 1000, maxBytes: 5 << 20 };
 
@@ -119,10 +119,13 @@ export function fakeInventory(initial: Host[] = sampleHosts) {
       folderNames = folderNames.map((f) => (f === o ? nn : f));
       hosts = hosts.map((h) => (h.folder === o ? { ...h, folder: nn } : h));
     }),
-    deleteFolder: vi.fn(async (name: string) => {
+    deleteFolder: vi.fn(async (name: string, confirm = true) => {
       if (!hasFolder(name)) throw new Error(`no hay una carpeta "${name}"`);
+      const n = hosts.filter((h) => h.folder === name).length;
+      if (n > 0 && !confirm) throw Object.assign(new Error(`la carpeta tiene ${n} hosts`), { cause: { code: "FailedPrecondition", reason: "hosts.folder_not_empty", metadata: { count: String(n) } } });
       folderNames = folderNames.filter((f) => f !== name);
       hosts = hosts.map((h) => (h.folder === name ? { ...h, folder: "" } : h));
+      return n;
     }),
     moveHosts: vi.fn(async (ids: string[], folder: string) => {
       if (folder && !folderNames.includes(folder)) throw new Error(`no hay una carpeta "${folder}"`);
@@ -142,7 +145,7 @@ export function fakeInventory(initial: Host[] = sampleHosts) {
       if (decisions.some((d) => d.action === "renombrar" && conflicts.find((i) => i.key === d.key)?.reason === "direccion")) throw new Error("un conflicto de dirección solo se puede reemplazar u omitir");
       const by = (a: string) => decisions.filter((d) => d.action === a).length;
       const invalid = sampleHostsImport.errors.length;
-      return { created: 1, replaced: by("reemplazar"), renamed: by("renombrar"), skipped: by("omitir") + 1 + invalid, invalid }; // el «igual» y las filas inválidas se omiten solos
+      return { created: 1, replaced: by("reemplazar"), renamed: by("renombrar"), skipped: by("omitir") + 1 + invalid, invalid, foldersCreated: 0 }; // el «igual» y las filas inválidas se omiten solos
     }),
   };
 }

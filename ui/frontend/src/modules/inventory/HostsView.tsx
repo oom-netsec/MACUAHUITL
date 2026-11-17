@@ -7,7 +7,7 @@ import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import type { Host, KnownDevice } from "./api";
-import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
+import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
 import { hostsChanged, useHostsVersion } from "./signal";
 import { addrPort } from "./HostPicker";
 import "./hosts.css";
@@ -27,6 +27,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   const [vaultOpen, setVaultOpen] = useState(false); // la última lista de credenciales se pudo leer: la bóveda está abierta
   const [folderList, setFolderList] = useState<{ name: string; count: number }[]>([]);
   const [fedit, setFedit] = useState<{ old?: string; name: string; err: string } | null>(null); // alta o renombrado de carpeta
+  const [stale, setStale] = useState<{ name: string; n: string } | null>(null); // borrado de carpeta que el núcleo exige reconfirmar
   const [moving, setMoving] = useState(""); // id del host cuyo «Mover a…» está abierto
   const [over, setOver] = useState<string | null>(null); // carpeta bajo el arrastre ("" = sin carpeta)
   const drag = useRef("");
@@ -161,9 +162,12 @@ export function HostsView({ core }: { core: CoreAPI }) {
       closeFolder(name, true); hostsChanged();
     } catch (e) { setFedit((cur) => (cur ? { ...cur, err: errorText(e) } : cur)); } // sin pisar lo que se tecleó mientras esperaba
   };
-  const delFolder = async (name: string) => {
-    setErr(""); setMsg("");
-    try { await core.deleteFolder(name); if (folder === name) setFolder(""); setMsg(t("hosts.folder.deleted", { name })); hostsChanged(); } catch (e) { setErr(errorText(e)); }
+  // known = hosts que la persona vio al confirmar: con 0 no hay nada que confirmar y va confirm=false; si el núcleo dice que sí hay (cuenta
+  // desactualizada) se pide otra confirmación con SU cuenta y solo entonces se reintenta con confirm=true.
+  const delFolder = async (name: string, known: number, confirm = known > 0) => {
+    setErr(""); setMsg(""); setStale(null);
+    try { await core.deleteFolder(name, confirm); if (folder === name) setFolder(""); setMsg(t("hosts.folder.deleted", { name })); hostsChanged(); }
+    catch (e) { const ne = !confirm && folderNotEmpty(e); if (ne) setStale({ name, n: ne.n }); else setErr(errorText(e)); }
   };
   const f = editing?.form;
   // Con la bóveda cerrada la credencial guardada no está en la lista: se conserva como opción para no perderla al guardar.
@@ -233,6 +237,13 @@ export function HostsView({ core }: { core: CoreAPI }) {
       {msg && <Notice kind="ok">{msg}</Notice>}
       {warns.length > 0 && <Notice kind="warn">{warns.join(" ")}</Notice>}
       {err && <Notice kind="error">{err}</Notice>}
+      {stale && (
+        <Notice kind="warn">
+          <p>{t(stale.n ? "hosts.folder.stale" : "hosts.folder.stale.unknown", { name: stale.name, n: stale.n })}</p>
+          <button type="button" className="danger" onClick={() => void delFolder(stale.name, 0, true)}>{t("hosts.folder.stale.confirm")}</button>
+          <button type="button" onClick={() => setStale(null)}>{t("hosts.cancel")}</button>
+        </Notice>
+      )}
       {form}
       <Section title={t("hosts.table")}>
         <div className="field-row hosts-filters">
@@ -268,7 +279,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
                       <td colSpan={2} className="hosts-actions">
                         {name && <>
                           <button type="button" className="quiet" aria-label={t("hosts.folder.rename.aria", { name })} data-rename-folder={name} onClick={() => openFolder({ old: name, name })}>{t("hosts.folder.rename")}</button>
-                          <ConfirmButton label={t("hosts.folder.delete.aria", { name })} confirmLabel={list.length ? t("hosts.folder.delete.confirm", { n: folderList.find((x) => x.name === name)?.count ?? list.length }) : t("common.confirmDelete")} onConfirm={() => void delFolder(name)}>{t("hosts.delete")}</ConfirmButton>
+                          <ConfirmButton label={t("hosts.folder.delete.aria", { name })} confirmLabel={list.length ? t("hosts.folder.delete.confirm", { n: folderList.find((x) => x.name === name)?.count ?? list.length }) : t("common.confirmDelete")} onConfirm={() => void delFolder(name, folderList.find((x) => x.name === name)?.count ?? list.length)}>{t("hosts.delete")}</ConfirmButton>
                         </>}
                       </td>
                     </tr>
