@@ -11,6 +11,8 @@ const oldHighPort: Record<string, number> = { tftp: 6969, ftp: 2121, scp: 2222, 
 export function nftLeftoverCmd(proto: string, host: string, port: number): string {
   const fam = host.includes(":") && !/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(host) ? "ip6" : "ip";
   const protos = proto === "scp" || proto === "sftp" ? ["scp", "sftp"] : [proto];
+  // El nombre de la tabla nunca se arma con algo que no sea [a-z0-9]: un «;» o un espacio sacarían otra orden. Sin orden segura, vacío.
+  if (!protos.every((p) => /^[a-z0-9]+$/.test(p)) || !Number.isInteger(port)) return "";
   return protos.map((p) => `sudo nft delete table ${fam} macuahuitl_${p}_${oldHighPort[p] ?? port}`).join("\n");
 }
 

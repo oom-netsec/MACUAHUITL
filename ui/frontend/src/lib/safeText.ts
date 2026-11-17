@@ -25,3 +25,6 @@ export const showHidden = (s: string): string =>
 // Nombre sugerido en el diálogo de guardar: sin carpetas, controles ni invisibles, y sin empezar con punto.
 export const safeFileName = (name: string): string =>
   name.replace(new RegExp(`[/\\\\\\t\\n${CONTROL}${INVISIBLE}]`, "gu"), "_").replace(/^\.+/, "_");
+
+// Secuencias ANSI (CSI y OSC) de la salida de una herramienta: en un <pre> se verían como basura («ESC[31m»). El texto queda igual.
+export const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, "");

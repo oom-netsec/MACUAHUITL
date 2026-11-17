@@ -12,6 +12,7 @@ import { iosCommands, splitListen } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import { isWindows } from "../../lib/platform";
 import { useBatch } from "../../lib/useBatch";
+import { showHidden } from "../../lib/safeText";
 
 const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
 import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
@@ -32,7 +33,7 @@ function Log({ lines }: { lines: TransferLine[] }) {
         {lines.map((l, i) => (
           <tr key={i}>
             <td>{l.Client}</td>
-            <td>{l.File} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
+            <td>{showHidden(l.File)} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
             <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {l.Error}</td>
@@ -80,7 +81,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
         </>
       )}
-      {hint && !hint.nftables && !isWindows() && !s.done && (
+      {hint && !hint.nftables && !isWindows() && !s.done && nftLeftoverCmd(r.protocol, host, port) && (
         /* Sin privilegios no se puede ver si quedó una tabla nft vieja que se lleve el tráfico del puerto estándar: se explica y se da la orden. */
         <>
           <p className="hint">{t("transfer.nftLeftover")}</p>

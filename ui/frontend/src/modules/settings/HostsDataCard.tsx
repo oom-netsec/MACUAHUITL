@@ -6,6 +6,7 @@ import { Badge } from "../../components/Page";
 import { Icon } from "../../components/Icon";
 import { DetailsButton } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
+import { showHidden } from "../../lib/safeText";
 import { useAction } from "../../lib/useAction";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import type { Key } from "../../lib/i18n/es";
@@ -195,14 +196,14 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
                   <tbody>
                     {prev.items.map((i) => (
                       <tr key={i.key}>
-                        <td>{i.host.name}</td>
+                        <td>{showHidden(i.host.name)}</td>
                         <td className="mono">{i.key}</td>
                         <td><Badge tone={i.state === "conflicto" ? "warn" : i.state === "nuevo" ? "ok" : ""}>{stateOf(i)}</Badge></td>
                         <td>{i.host.credentialLabel || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
                         <td>{i.hasStartCommand ? <><Badge tone="warn">{t("hosts.data.import.startMark")}</Badge> <code>{i.host.startCommand}</code></> : "—"}</td>
                         <td>
                           {i.state === "conflicto" ? (
-                            <Select label={t("hosts.data.import.action.aria", { name: i.host.name })} value={acts[i.key] ?? "omitir"} onChange={(v) => setActs((a) => ({ ...a, [i.key]: v }))}
+                            <Select label={t("hosts.data.import.action.aria", { name: showHidden(i.host.name) })} value={acts[i.key] ?? "omitir"} onChange={(v) => setActs((a) => ({ ...a, [i.key]: v }))}
                               options={(["omitir", "reemplazar", ...(i.reason === "nombre" ? ["renombrar"] : [])] as HostImportAction[]).map((a) => [a, t(`hosts.data.import.action.${a}`)] as [HostImportAction, string])} />
                           ) : <span className="hint">{t("hosts.data.import.auto")}</span>}
                         </td>
