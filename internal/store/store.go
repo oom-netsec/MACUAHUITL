@@ -39,6 +39,9 @@ func Open(path string) (*sql.DB, error) {
 	// Una sola conexión: el bloqueo de escritura de SQLite no es justo (en Windows un escritor insistente deja sin turno al que sondea) y el núcleo es el único proceso que abre la base, así que se serializa aquí en vez de competir.
 	// Con una sola conexión, no se usa db mientras una tx o unas rows abiertas la tengan tomada: se interbloquea.
 	db.SetMaxOpenConns(1)
+	if startWatch != nil { // solo con -tags storewatch (pruebas): ver store_watch.go
+		startWatch(db)
+	}
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, err
@@ -107,3 +110,6 @@ func migrate(db *sql.DB) error {
 	}
 	return nil
 }
+
+// startWatch lo fija store_watch.go solo con el build tag storewatch; el binario publicado no lo trae.
+var startWatch func(db *sql.DB)

@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 if [[ "${1:-}" == "test" ]]; then
-  go test -race ./...
+  go test -race -tags=storewatch ./...  # storewatch: vigía de interbloqueos de la base (internal/store/store_watch.go)
   go test -count=1 ./internal/mask/... ./internal/terminal/...  # el corpus completo de mask (con -race usa una muestra con semilla; MACUAHUITL_CORPUS=full la quita)
   go run ./tools/noegress/cmd/noegress ./...
   # ui/main.go solo se compila con la etiqueta wails y embebe frontend/dist: se revisa aparte, como en CI.
