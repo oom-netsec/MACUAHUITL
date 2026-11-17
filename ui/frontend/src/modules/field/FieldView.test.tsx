@@ -25,12 +25,15 @@ test("el servidor publica las rutas indicadas y muestra transferencias en vivo",
 });
 
 test("con serverId en el primer evento muestra el panel en vivo y al terminar deja de encuestar", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true }); // reloj falso: sin esperas reales que fallen con la máquina cargada
+  onTestFinished(() => { vi.useRealTimers(); });
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   const transferSessions = vi.fn(async () => ({ sessions: [], rejections: sampleRejections(Date.now()) }));
   const core = fakeCore({ serveStart: vi.fn(async () => "s1"), transferSessions });
   render(<FieldView core={core} />);
-  await userEvent.type(screen.getByLabelText("IP de escucha (la de la interfaz hacia el equipo)"), "10.0.0.5");
-  await userEvent.type(screen.getByLabelText(/Archivos/), "/img/c9300.bin");
-  await userEvent.click(screen.getByRole("button", { name: "Servir" }));
+  await user.type(screen.getByLabelText("IP de escucha (la de la interfaz hacia el equipo)"), "10.0.0.5");
+  await user.type(screen.getByLabelText(/Archivos/), "/img/c9300.bin");
+  await user.click(screen.getByRole("button", { name: "Servir" }));
   act(() => core.emitServe({ runId: "s1", serverId: "sv1", listening: "10.0.0.5:6969" }));
   expect(await screen.findByRole("heading", { name: "Rechazos" })).toBeInTheDocument();
   expect(transferSessions).toHaveBeenCalledWith("sv1");
@@ -38,7 +41,7 @@ test("con serverId en el primer evento muestra el panel en vivo y al terminar de
   act(() => core.emitServe({ runId: "s1", done: true }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeDisabled());
   const n = transferSessions.mock.calls.length;
-  await new Promise((r) => setTimeout(r, 2200));
+  await act(async () => { await vi.advanceTimersByTimeAsync(2200); });
   expect(transferSessions).toHaveBeenCalledTimes(n); // detenido: no sigue encuestando
   expect(screen.getByRole("heading", { name: "Rechazos" })).toBeInTheDocument(); // la última lectura se queda
 });
