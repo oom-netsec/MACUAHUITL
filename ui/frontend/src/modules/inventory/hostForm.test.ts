@@ -104,7 +104,7 @@ test("la orden de inicio: una línea, sin caracteres de control, hasta 256", () 
 });
 
 test("la orden de inicio rechaza tab, U+2028 y caracteres invisibles (Trojan Source) y cuenta caracteres astrales como uno", () => {
-  for (const bad of ["a\tb", "a\u2028b", "a\u202Eb", "a\u2066b", "a\u200Bb", "\uFEFFa"]) expect(validateHost({ ...ok, platform: "linux", startCommand: bad })).toEqual({ startCommand: "hosts.v.startCommand" });
+  for (const bad of ["a\tb", "a\u2028b", "a\u2029b", "a\u202Eb", "a\u2066b", "a\u200Bb", "\uFEFFa"]) expect(validateHost({ ...ok, platform: "linux", startCommand: bad })).toEqual({ startCommand: "hosts.v.startCommand" });
   expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(256) })).toEqual({}); // 256 caracteres, 512 unidades UTF-16
   expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
 });
