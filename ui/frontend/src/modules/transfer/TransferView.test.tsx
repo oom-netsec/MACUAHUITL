@@ -354,7 +354,7 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
   setOSForTests("windows");
   try {
     const rule = 'New-NetFirewallRule -DisplayName "MACUAHUITL UDP 69" -Direction Inbound -Program "C:\\m\\macuahuitld.exe" -LocalAddress 192.0.2.10 -Protocol UDP -LocalPort 69 -Action Allow';
-    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, setcap: "", remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
     expect(screen.getByLabelText("Puerto")).toHaveValue(69);
     expect(screen.getByLabelText("Puerto")).toHaveAccessibleDescription(/De 1 a 65535/);
     await openServer(core);
@@ -373,7 +373,7 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
 test("Windows: con un puerto distinto del estándar el texto dice que IOS necesita abrirlo en el estándar", async () => {
   setOSForTests("windows");
   try {
-    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", setcap: "", remove: "Remove-NetFirewallRule x" })) });
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", remove: "Remove-NetFirewallRule x" })) });
     await openServer(core);
     act(() => core.emitTransfer({ runId: "r1", ready: ready() }));
     const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
