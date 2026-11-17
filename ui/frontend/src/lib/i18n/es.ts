@@ -2819,6 +2819,28 @@ export const es = {
   // Redirección nft vieja (fase 45): no se puede detectar sin privilegios.
   "transfer.nftLeftover": "Si dejaste una redirección nft de antes (tabla macuahuitl_<protocolo>_<puerto>), el tráfico del puerto estándar se va a ese puerto y no llega a este servidor. Quítala con esta orden (cambia protocolo y puerto si usaste otros):",
   "transfer.nftLeftover.cmd": "Quitar una redirección nft vieja",
+  "transfer.live.title": "En vivo",
+  "transfer.live.busy": "Transfiriendo",
+  "transfer.live.idle": "En espera",
+  "transfer.live.clients": "Clientes conectados",
+  "transfer.live.noClients": "ninguno",
+  "transfer.live.recent": "Recientes",
+  "transfer.live.in": "Recibe",
+  "transfer.live.out": "Envía",
+  "transfer.live.state.active": "Activa",
+  "transfer.live.state.done": "Completa",
+  "transfer.live.state.failed": "Fallida",
+  "transfer.live.err.unknown": "Causa desconocida",
+  "transfer.live.rej.title": "Rechazos",
+  "transfer.live.rej.not_found": "Archivo no publicado o inexistente",
+  "transfer.live.rej.origin_denied": "Origen fuera de los permitidos",
+  "transfer.live.rej.write_disabled": "Escritura deshabilitada",
+  "transfer.live.rej.read_disabled": "Lectura deshabilitada",
+  "transfer.live.rej.method": "Método no permitido",
+  "transfer.live.rej.busy": "Servidor ocupado",
+  "transfer.live.rej.from": "llegó desde",
+  "transfer.live.rej.tftpNote": "En TFTP el origen es UDP y puede estar falsificado: confirma la IP en el equipo.",
+  "transfer.live.rej.announce": "Rechazos nuevos: {n}",
 };
 
 export type Key = keyof typeof es;

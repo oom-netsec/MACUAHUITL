@@ -1,4 +1,6 @@
 // Base component gallery to review the design system in the preview (?gallery=1). Not part of the app build.
+import { LivePanel } from "../modules/transfer/LivePanel";
+import { sampleRejections, sampleSessions } from "../modules/transfer/fake";
 import { I18nProvider } from "../lib/i18n";
 import { CoreContext } from "../app/activity";
 import type { CoreAPI } from "../lib/core";
@@ -61,6 +63,9 @@ export function Gallery({ core }: { core: CoreAPI }) {
               <TransferProgress file="running-SW1.cfg" bytes={18_204} total={18_204} rateBps={0} etaSeconds={0} done verified />
               <ExportMenu name="findings" formats={[{ fmt: "csv", data: () => "" }, { fmt: "md", data: () => "" }, { fmt: "json", data: () => "" }]} />
               <ErrorState title="Could not load the fleet" action={<button className="sm">Retry</button>}>The core did not respond in time.</ErrorState>
+            </Section>
+            <Section title="Live transfers">
+              <LivePanel serverId="s1" open fetchSessions={async () => ({ sessions: sampleSessions(), rejections: sampleRejections() })} />
             </Section>
             <Section title="Differences">
               <DiffView before={before} after={after} label="SW1 running-config" />
