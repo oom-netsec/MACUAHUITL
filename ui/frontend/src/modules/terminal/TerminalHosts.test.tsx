@@ -120,7 +120,8 @@ test("la huella de la primera vez muestra host:puerto, tipo de llave y la orden 
   expect(screen.getByText("ssh-keygen -lf C:\\ProgramData\\ssh\\ssh_host_ecdsa_key.pub")).toBeVisible();
 });
 
-// Así responde el núcleo real por hostId: la apertura misma se rechaza (FailedPrecondition), sin pestaña ni stream.
+// Defensa: si la apertura misma se rechaza por la llave de host (sin pestaña ni stream), el aviso igual ofrece aceptarla.
+// El núcleo de hoy lo manda por el stream (terminal:done, cubierto arriba); esto cubre un puente o núcleo que lo rechace antes.
 test.each([
   ["nueva", "unknown", "Aceptar esta huella y reintentar"],
   ["cambiada", "changed", "Aceptar esta huella y reintentar"],

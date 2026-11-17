@@ -66,7 +66,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const [device, setDevice] = useState("");
   const [accept, setAccept] = useState("");
   const [err, setErr] = useState("");
-  // Llave de host rechazada en la apertura misma (por hostId el núcleo la verifica antes de devolver la sesión): sin pestaña, el aviso va arriba.
+  // Llave de host rechazada en la apertura misma (sin pestaña): el aviso va arriba. Hoy el núcleo lo manda por el stream de la pestaña.
   const [openHk, setOpenHk] = useState<{ hk: HostKeyInfo; dev: string; cred: string; hostId?: string; startup: string } | null>(null);
   const [note, setNote] = useState<"" | "nosession" | "noconfig">(""); // aviso de un script que no se pudo insertar
   const [pins, setPins] = useState<ScriptItem[]>([]); // scripts fijados (hasta 5, en su orden), junto a los comandos rápidos
@@ -178,7 +178,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
   const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "") => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
-    if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setErr(t("ssh.logInUse")); return; }
+    if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setOpenHk(null); setErr(t("ssh.logInUse")); return; }
     setErr(""); setOpenHk(null); setBusy(true);
     try {
       const label = dev.trim();

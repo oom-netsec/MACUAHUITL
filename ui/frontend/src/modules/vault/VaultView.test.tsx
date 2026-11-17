@@ -471,5 +471,5 @@ test("regenerar una llave: armado muestra un texto corto y conserva la etiqueta 
   const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "k1", label: "Raspberry", username: "pi", kind: "key" as const, hasEnable: false, hasSshKey: true }]) });
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /^Regenerar la llave de Raspberry|^Regenerar llave/ }));
-  expect(screen.getByRole("button", { name: "Confirmar: regenerar la llave de Raspberry" })).toHaveTextContent(/^Confirmar regenerar$/);
+  expect(screen.getByRole("button", { name: "Confirmar: regenerar la llave de Raspberry" })).toHaveTextContent(/^Confirmar: regenerar$/);
 });
