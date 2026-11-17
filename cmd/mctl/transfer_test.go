@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -132,5 +133,27 @@ func TestTransferLs(t *testing.T) {
 	}
 	if _, err := mctl(t, "", "transfer", "ls"); err == nil {
 		t.Fatal("sin URL debe fallar")
+	}
+}
+
+func TestTransferStatusJSONYErrores(t *testing.T) {
+	startCore(t)
+	var m map[string]any
+	if err := json.Unmarshal([]byte(must(t, "", "transfer", "status", "--json")), &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"sessions", "rejections"} {
+		if _, ok := m[k]; !ok {
+			t.Errorf("falta %q en %v", k, m)
+		}
+	}
+	if out := must(t, "", "transfer", "status"); !strings.Contains(out, "no hay sesiones") {
+		t.Fatalf("status: %q", out)
+	}
+	if _, err := mctl(t, "", "transfer", "status", "no-existe"); err == nil {
+		t.Fatal("ID inexistente aceptado")
+	}
+	if _, err := mctl(t, "", "transfer", "status", "a", "b"); err == nil || !strings.Contains(err.Error(), "uso: mctl transfer status") {
+		t.Fatalf("uso: %v", err)
 	}
 }

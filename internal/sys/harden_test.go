@@ -28,8 +28,16 @@ func TestPagefileWarnings(t *testing.T) {
 		t.Fatalf("entradas vacías no cuentan: %v", w)
 	}
 	w := pagefileWarnings([]string{`?:\pagefile.sys`, ""}, nil)
-	if len(w) != 1 || !strings.Contains(w[0].In("en"), `?:\pagefile.sys`) || !strings.Contains(w[0].In("en"), "BitLocker") {
-		t.Fatalf("pagefile activo debe avisar con la ruta y BitLocker: %v", w)
+	if len(w) != 1 || !strings.Contains(w[0].In("en"), `the system drive (\pagefile.sys)`) || strings.Contains(w[0].In("en"), "?:") || !strings.Contains(w[0].In("es"), `la unidad del sistema (\pagefile.sys)`) || !strings.Contains(w[0].In("en"), "BitLocker") {
+		t.Fatalf("?: debe leerse como la unidad del sistema, con BitLocker: %q %q", w[0].In("en"), w[0].In("es"))
+	}
+	w = pagefileWarnings([]string{`C:\pagefile.sys`}, nil)
+	if len(w) != 1 || !strings.Contains(w[0].In("en"), `paging file is on (C:\pagefile.sys)`) {
+		t.Fatalf("una letra de unidad sale tal cual: %v", w)
+	}
+	w = pagefileWarnings([]string{`C:\pagefile.sys 0 0`}, nil)
+	if len(w) != 1 || !strings.Contains(w[0].In("en"), `(C:\pagefile.sys)`) {
+		t.Fatalf("solo la ruta, sin tamaños: %q", w[0].In("en"))
 	}
 	w = pagefileWarnings(nil, errors.New("sin clave"))
 	if len(w) != 1 || !strings.Contains(w[0].In("es"), "no se pudo comprobar") {

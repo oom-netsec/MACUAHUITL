@@ -142,6 +142,8 @@ uso: mctl <comando>
         (lista una carpeta remota: ftp (MLSD o LIST), sftp, scp (si el servidor tiene SFTP) y http(s) (índice HTML); tftp no lista)
   transfer stop ID | transfer list | transfer hint tftp|ftp|scp|sftp PUERTO [IP]
         (cierra un servidor, los lista, o explica la redirección nftables a los puertos 69, 21 y 22)
+  transfer status [ID] [--json]
+        (una lectura de las sesiones en curso y recientes de los servidores y de los rechazos agrupados; serve imprime el avance cada 5 s)
   job metrics TRABAJO|CARPETA [--device EQ] [--iface I]... [--top N] [--max-points N] [--csv|--json]
         (CPU, memoria por pool y tráfico/errores por interfaz, ronda por ronda; lo que el playbook no recolectó viene con aviso. Playbook: ios-xe/metricas)
   ports status TRABAJO|CARPETA [--device EQ] [--json]  |  ports status --device HOST[:PUERTO] --cred ID [--accept-host-key SHA256:...] [--legacy-ssh] [--json]

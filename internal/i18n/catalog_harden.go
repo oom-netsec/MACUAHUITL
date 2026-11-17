@@ -21,6 +21,7 @@ func init() {
 		"harden.hibernation_win":     e("hibernación activada (HibernateEnabled=1): hiberfil.sys guarda la memoria en disco; activa BitLocker", "hibernation is on (HibernateEnabled=1): hiberfil.sys writes memory to disk; turn on BitLocker"),
 		"harden.hibernation_unknown": e("no se pudo comprobar si la hibernación está activada (usa BitLocker de todos modos): {cause}", "could not check whether hibernation is on (use BitLocker anyway): {cause}", "cause"),
 		"harden.pagefile":            e("archivo de paginación activo ({files}): la memoria podría escribirse en disco sin cifrar; activa BitLocker", "paging file is on ({files}): memory could be written to disk unencrypted; turn on BitLocker", "files"),
+		"harden.pagefile_sysdrive":   e("la unidad del sistema ({path})", "the system drive ({path})", "path"),
 		"harden.pagefile_unknown":    e("no se pudo comprobar el archivo de paginación (usa BitLocker de todos modos): {cause}", "could not check the paging file (use BitLocker anyway): {cause}", "cause"),
 		"ipc.err.pipe_other_user":    e("el canal del núcleo lo tiene otro usuario (el pipe ya existe y no se puede abrir)", "the core channel is held by another user (the pipe already exists and cannot be opened)"),
 		"harden.prefix":              e("aviso:", "warning:"),
