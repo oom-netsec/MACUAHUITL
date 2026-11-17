@@ -4,6 +4,7 @@ package i18n
 // los textos del sistema que cita el mensaje son datos y no se traducen.
 func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	key := func(en entry, k string) entry { en.Meta = map[string]string{"key": k}; return en } // el campo que la UI marca
 	add(map[string]entry{
 		"diag.err.target_bad":        e("destino {target:q} inválido", "invalid target {target:q}", "target"),
 		"diag.err.no_cidr":           e("{target} no acepta rangos CIDR", "{target} does not accept CIDR ranges", "target"),
@@ -29,11 +30,17 @@ func init() {
 		"diag.err.no_run":            e("no existe esa ejecución o ya terminó", "no such run, or it already finished"),
 		"diag.err.opt_windows":       e("la opción {key:q} no existe en Windows para esta herramienta", "option {key:q} does not exist on Windows for this tool", "key"),
 		"diag.err.syn_windows":       e("el escaneo SYN de nmap no está disponible en Windows (necesita Npcap); usa connect", "the nmap SYN scan is not available on Windows (it needs Npcap); use connect"),
-		"diag.err.combo":             e("{a} y {b} no van juntos", "{a} and {b} cannot be used together", "a", "b"),
-		"diag.err.sweep_all":         e("el barrido necesita sweep_start, sweep_end y sweep_step", "the sweep needs sweep_start, sweep_end and sweep_step"),
-		"diag.err.sweep_max":         e("el barrido admite como máximo 100 tamaños", "the sweep allows at most 100 sizes"),
-		"diag.err.source_bad":        e("source {value:q} debe ser una IP sin zona o una interfaz local existente", "source {value:q} must be an IP without a zone or an existing local interface", "value"),
-		"diag.err.source_family":     e("source {value:q} no es de la misma familia que family o el destino", "source {value:q} is not of the same family as family or the target", "value"),
-		"diag.err.wrap":              e("diag: {cause}", "diag: {cause}", "cause"),
+		"diag.err.combo": func() entry {
+			c := e("{a} y {b} no van juntos", "{a} and {b} cannot be used together", "a", "b")
+			c.Extra = []string{"key"}
+			return c
+		}(),
+		"diag.err.not_ping":      e("el plan solo existe para ping", "a plan only exists for ping"),
+		"diag.err.sweep_pending": e("el barrido de tamaños todavía no está disponible", "the size sweep is not available yet"),
+		"diag.err.sweep_all":     key(e("el barrido necesita sweep_start, sweep_end y sweep_step", "the sweep needs sweep_start, sweep_end and sweep_step"), "sweep_start"),
+		"diag.err.sweep_max":     key(e("el barrido admite como máximo 100 tamaños", "the sweep allows at most 100 sizes"), "sweep_start"),
+		"diag.err.source_bad":    key(e("source {value:q} debe ser una IP sin zona o una interfaz local existente", "source {value:q} must be an IP without a zone or an existing local interface", "value"), "source"),
+		"diag.err.source_family": key(e("source {value:q} no es de la misma familia que family o el destino", "source {value:q} is not of the same family as family or the target", "value"), "source"),
+		"diag.err.wrap":          e("diag: {cause}", "diag: {cause}", "cause"),
 	})
 }

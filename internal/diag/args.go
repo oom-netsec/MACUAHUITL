@@ -159,7 +159,6 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 }
 
 func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, err error) {
-	planOut := &plan
 	o := &opts{m: r.Options, used: map[string]bool{}}
 	switch r.Tool {
 	case Ping:
@@ -167,12 +166,8 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 		if err != nil {
 			return "", nil, PingPlan{}, err
 		}
-		plan, pargv, err := pingArgs(o, host, win)
-		if err != nil {
-			return "", nil, PingPlan{}, err
-		}
-		bin, argv = "ping", pargv
-		*planOut = plan
+		bin = "ping"
+		plan, argv = pingArgs(o, host, win)
 	case Traceroute:
 		host, err := one(r, false)
 		if err != nil {
@@ -297,16 +292,17 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 	if err := o.done(); err != nil {
 		return "", nil, PingPlan{}, err
 	}
-	if err := checkFlagLike(argv, win); err != nil {
+	if err := checkFlagLike(bin, argv, win); err != nil {
 		return "", nil, PingPlan{}, err
 	}
 	return bin, argv, plan, nil
 }
 
 // checkFlagLike es la defensa final: ningún valor que venga del usuario puede parecer una bandera (en Windows, tampoco «/x»).
-func checkFlagLike(argv []string, win bool) error {
+// Lo que sigue a «-f» (el filtro de captura) se exime solo en dumpcap.
+func checkFlagLike(bin string, argv []string, win bool) error {
 	for i, a := range argv {
-		if (strings.HasPrefix(a, "-") && !literalFlags[a] || win && strings.HasPrefix(a, "/")) && !(i > 0 && argv[i-1] == "-f") {
+		if (strings.HasPrefix(a, "-") && !literalFlags[a] || win && strings.HasPrefix(a, "/")) && !(bin == "dumpcap" && i > 0 && argv[i-1] == "-f") {
 			return i18n.New("diag.err.flag_like", i18n.A("value", a))
 		}
 	}

@@ -10,6 +10,8 @@ import (
 )
 
 // PingPlan es lo que Build valida de ping pero no vuelve bandera: lo aplica el núcleo (200-3 continuo y duración, 200-4 barrido).
+// Con barrido (200-4) el argv de Build va sin -s/-l: el núcleo inserta el tamaño antes del host, y ese argv aumentado
+// tiene que volver a pasar por checkFlagLike.
 type PingPlan struct {
 	Continuous bool
 	Duration   int    // segundos en total; 0 = sin tope propio
@@ -30,7 +32,7 @@ func (s Sweep) Sizes() (out []int) {
 // Plan devuelve el plan de un ping, con las mismas validaciones que Build para el sistema actual.
 func Plan(r Request) (PingPlan, error) {
 	if r.Tool != Ping {
-		return PingPlan{}, i18n.New("diag.err.tool_unknown", i18n.A("tool", string(r.Tool)))
+		return PingPlan{}, i18n.New("diag.err.not_ping", nil)
 	}
 	_, _, p, err := buildPlan(r, runtime.GOOS == "windows")
 	return p, err
@@ -47,9 +49,12 @@ func realIfaceNames() (out []string) {
 	return out
 }
 
+// norm quita ceros a la izquierda para que «007» no llegue a ping como posible octal.
+func norm(s string) string { return strconv.Itoa(atoi(s)) }
+
 func atoi(s string) int { n, _ := strconv.Atoi(s); return n } // solo tras o.num: ya son dígitos
 
-func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err error) {
+func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string) {
 	winOnly := func(key string) {
 		o.used[key] = true
 		o.fail(i18n.New("diag.err.opt_windows", i18n.A("key", key)))
@@ -89,22 +94,28 @@ func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err er
 			count = "1"
 		}
 	}
+	count = norm(count)
 	p.Count = atoi(count)
 	p.Continuous = o.boolean("continuous")
 	if d, ok := o.num("duration", 1, 3600); ok {
 		p.Duration = atoi(d)
 	}
 	size, hasSize := o.num("size", 0, 65500)
+	size = norm(size)
 	if p.Sweep != nil && p.Continuous {
-		o.fail(i18n.New("diag.err.combo", i18n.A("a", "continuous", "b", "sweep")))
+		o.fail(i18n.New("diag.err.combo", i18n.A("a", "continuous", "b", "sweep", "key", "continuous")))
 	}
 	if p.Sweep != nil && hasSize {
-		o.fail(i18n.New("diag.err.combo", i18n.A("a", "size", "b", "sweep")))
+		o.fail(i18n.New("diag.err.combo", i18n.A("a", "size", "b", "sweep", "key", "size")))
 	}
 
 	family, _ := o.str("family", "4", "6")
+	if hostAddr.IsValid() && family != "" && family != map[bool]string{false: "4", true: "6"}[hostAddr.Is6()] {
+		o.fail(i18n.New("diag.err.combo", i18n.A("a", "family", "b", "target", "key", "family")))
+	}
 	ttl, hasTTL := o.num("ttl", 1, 255)
 	timeout, hasTimeout := o.num("timeout", 1, 60)
+	ttl, timeout = norm(ttl), norm(timeout)
 	df := o.boolean("df")
 
 	var src string
@@ -113,7 +124,7 @@ func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err er
 		o.used["source"] = true
 		a, err := netip.ParseAddr(v)
 		switch {
-		case err == nil && a.Zone() == "":
+		case err == nil && a.Zone() == "" && !a.Is4In6() && !a.IsLinkLocalUnicast() && isLocalIP(a):
 			src, srcAddr = v, a
 		case err != nil && ifaceRe.MatchString(v) && hasName(v):
 			if win {
@@ -124,13 +135,14 @@ func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err er
 			o.fail(i18n.New("diag.err.source_bad", i18n.A("value", v)))
 		}
 		if srcAddr.IsValid() {
-			fam := map[bool]string{false: "4", true: "6"}[srcAddr.Is6() && !srcAddr.Is4In6()]
+			fam := map[bool]string{false: "4", true: "6"}[srcAddr.Is6()]
 			if (family != "" && family != fam) || (hostAddr.IsValid() && hostAddr.Is6() != srcAddr.Is6()) {
 				o.fail(i18n.New("diag.err.source_family", i18n.A("value", v)))
 			}
 		}
 	}
 	tos, hasTos := o.num("tos", 0, 255)
+	tos = norm(tos)
 
 	if win { // Windows: -n cuenta (o -t), -l tamaño, -S origen, -f DF, -i TTL, -w espera en ms; sin intervalo ni ToS
 		if _, ok := o.m["interval"]; ok {
@@ -165,7 +177,7 @@ func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err er
 		if hasTimeout {
 			wait = timeout + "000"
 		}
-		return p, append(argv, "-w", wait, host), nil
+		return p, append(argv, "-w", wait, host)
 	}
 	argv = []string{"-n"}
 	if !p.Continuous {
@@ -195,7 +207,7 @@ func pingArgs(o *opts, host string, win bool) (p PingPlan, argv []string, err er
 	if family != "" {
 		argv = append(argv, "-"+family)
 	}
-	return p, append(argv, host), nil
+	return p, append(argv, host)
 }
 
 func hasName(n string) bool {

@@ -81,6 +81,10 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
+	// Hasta el bloque 200-4 un barrido correría un solo ping y saldría como éxito.
+	if p, _ := diag.Plan(req); tool == diag.Ping && p.Sweep != nil {
+		return service.Err(st.Context(), codes.InvalidArgument, "diag.err.sweep_pending", nil)
+	}
 	if factory { // la de fábrica la crea el núcleo (0700), ya con la petición válida
 		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
 			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("ingest.err.out_dir", err, nil))
