@@ -233,6 +233,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 		}
 		return res, err
 	}
+	sys.MarkOfTheWeb(dst) // Windows: Zone.Identifier sobre la ruta interna; si falla (FAT) el archivo queda igual
 	res = Result{Path: dst, Bytes: sk.n, MD5: hex.EncodeToString(sk.md5.Sum(nil)), SHA256: hex.EncodeToString(sk.sha.Sum(nil)), Duration: time.Since(start)}
 	if r.WantSHA256 != "" || r.WantMD5 != "" {
 		res.Verified = "ok"
