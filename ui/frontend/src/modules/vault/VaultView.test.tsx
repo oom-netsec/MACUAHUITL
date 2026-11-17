@@ -470,6 +470,15 @@ test("regenerar una llave: armado muestra un texto corto y conserva la etiqueta 
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /^Regenerar la llave de Raspberry|^Regenerar llave/ }));
   expect(screen.getByRole("button", { name: "Confirmar: regenerar la llave de Raspberry" })).toHaveTextContent(/^Confirmar: regenerar$/);
+});
+
+test("regenerar una llave importada: armado el texto visible sigue corto (cabe en la celda) y el nombre accesible avisa que se destruye", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "k1", label: "Raspberry", username: "pi", kind: "key" as const, hasEnable: false, hasSshKey: true, origin: "imported" as const }]) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /^Regenerar la llave de Raspberry|^Regenerar llave/ }));
+  expect(screen.getByRole("button", { name: "Confirmar: reemplazar y destruir la privada importada de Raspberry" })).toHaveTextContent(/^Confirmar: reemplazar$/);
+});
+
 // Fase 47: importar llave existente.
 async function openImport(over = {}) {
   const core = fakeCore(over);
@@ -584,7 +593,7 @@ test("regenerar una importada: la confirmación avisa antes; el aviso sale de pr
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /Regenerar la llave de/ }));
   const conf = await screen.findByRole("button", { name: /destruir la privada importada/ });
-  expect(conf).toHaveTextContent(/destruir la privada importada/); // WCAG 2.5.3: lo visible está en el nombre accesible
+  expect(conf).toHaveTextContent(/^Confirmar: reemplazar$/); // visible corto (cabe en la celda) y contenido en el nombre accesible (WCAG 2.5.3)
   const n = list.mock.calls.length;
   await userEvent.click(conf);
   expect(await screen.findByText(/importada se reemplazó/)).toBeInTheDocument();
