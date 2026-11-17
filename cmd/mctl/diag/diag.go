@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -55,12 +57,14 @@ func diag(tool string) func(*cli.Env, []string) error {
 					select {
 					case <-sigs:
 						id, _ := runID.Load().(string)
-						if n++; n > 1 || id == "" {
+						if n++; n > 1 || id == "" { // el segundo (o uno sin run_id que detener) sale sin esperar al núcleo
+							fmt.Fprintln(c.Out, cli.T("mctl.run.ctrlc2"))
 							cancel()
+							cli.Exit(130)
 							return
 						}
 						fmt.Fprintln(c.Out, cli.T("mctl.diag.ctrlc1"))
-						go cl.StopRun(context.Background(), &v1.StopRunRequest{RunId: id})
+						go cl.StopRun(ctx, &v1.StopRunRequest{RunId: id})
 					case <-done:
 						return
 					}
@@ -86,7 +90,10 @@ func diag(tool string) func(*cli.Env, []string) error {
 				continue
 			}
 			if r.Done {
-				if mtu := estimateMTU(sweep, v6(req)); mtu > 0 {
+				hdr := ipHeader(req)
+				if mtu, frag := estimateMTU(sweep, hdr); frag && hdr == 0 {
+					fmt.Fprintln(c.Out, cli.T("mctl.diag.sweep_mtu_unknown"))
+				} else if frag {
 					fmt.Fprintln(c.Out, cli.T("mctl.diag.sweep_mtu", "mtu", mtu))
 				}
 				if s := r.PingSummary; s != nil {
@@ -103,38 +110,51 @@ func diag(tool string) func(*cli.Env, []string) error {
 	}
 }
 
+func round2(x float64) string { return strconv.FormatFloat(math.Round(x*100)/100, 'f', -1, 64) }
+
 func summaryLine(s *v1.PingSummary) string {
-	l := cli.T("mctl.diag.ping_summary", "sent", s.Sent, "recv", s.Received, "loss", strconv.FormatFloat(s.LossPct, 'f', -1, 64))
+	l := cli.T("mctl.diag.ping_summary", "sent", s.Sent, "recv", s.Received, "loss", round2(s.LossPct))
 	if s.Received == 0 {
 		return l
 	}
-	f := func(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
-	return l + cli.T("mctl.diag.ping_times", "times", f(s.MinMs)+"/"+f(s.AvgMs)+"/"+f(s.MaxMs)+"/"+f(s.MdevMs))
+	return l + cli.T("mctl.diag.ping_times", "times", round2(s.MinMs)+"/"+round2(s.AvgMs)+"/"+round2(s.MaxMs)+"/"+round2(s.MdevMs))
 }
 
-// v6 dice si el ping va por IPv6: family=6 o un destino con dos puntos.
-func v6(req *v1.RunRequest) bool {
-	return req.Options["family"] == "6" || len(req.Targets) > 0 && strings.Contains(req.Targets[0].Address, ":")
+// ipHeader da las cabeceras IP+ICMP (28 en IPv4, 48 en IPv6): family si viene; si no, la IP literal del destino;
+// 0 si el destino es un nombre (no se adivina a qué versión resuelve).
+func ipHeader(req *v1.RunRequest) int {
+	switch req.Options["family"] {
+	case "4":
+		return 28
+	case "6":
+		return 48
+	}
+	if len(req.Targets) > 0 {
+		if a, err := netip.ParseAddr(req.Targets[0].Address); err == nil {
+			if a.Is4() || a.Is4In6() {
+				return 28
+			}
+			return 48
+		}
+	}
+	return 0
 }
 
-// estimateMTU: el mayor tamaño ok antes del primer frag, más las cabeceras (28 en IPv4, 48 en IPv6); 0 si no hubo frag.
-func estimateMTU(pts []*v1.SweepPoint, ipv6 bool) int {
+// estimateMTU: el mayor tamaño ok antes del primer frag, más hdr; frag es false si no hubo frag o ningún ok antes.
+func estimateMTU(pts []*v1.SweepPoint, hdr int) (mtu int, frag bool) {
 	best := -1
 	for _, p := range pts {
 		if p.Result == "frag" {
 			if best < 0 {
-				return 0
+				return 0, false
 			}
-			if ipv6 {
-				return best + 48
-			}
-			return best + 28
+			return best + hdr, true
 		}
 		if p.Result == "ok" {
 			best = int(p.Size)
 		}
 	}
-	return 0
+	return 0, false
 }
 
 func interfaces(c *cli.Env, args []string) error {
@@ -159,7 +179,8 @@ func interfaces(c *cli.Env, args []string) error {
 const help = `  diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
         --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento
         interfaces   (interfaces locales, sin tráfico de red)
-        ping -o: count, continuous, duration, timeout, ttl, df, tos, source, family, size, sweep_start, sweep_end, sweep_step
+        ping -o: count (1-100; 1-5 con barrido), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255), df, source,
+        family (4|6), interval (0.2-60, solo Linux), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, máximo 100 tamaños)
         (continuous corre hasta Ctrl-C, que detiene y muestra el resumen; otro Ctrl-C corta ya. Barrido con tabla y MTU estimado:
          mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)`
 

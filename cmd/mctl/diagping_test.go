@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
@@ -19,16 +20,16 @@ type fakeDiag struct {
 	events  []*v1.RunResponse
 	final   *v1.RunResponse
 	wait    bool
+	noID    bool // no manda el run_id
 	stopped chan string
-	started chan struct{} // se cierra al mandar el run_id
 	stops   atomic.Int32
 }
 
 func (f *fakeDiag) Run(_ *v1.RunRequest, st v1.DiagService_RunServer) error {
-	st.Send(&v1.RunResponse{RunId: "run-1"})
-	if f.started != nil {
-		close(f.started)
+	if !f.noID {
+		st.Send(&v1.RunResponse{RunId: "run-1"})
 	}
+	st.Send(&v1.RunResponse{OutputLine: "tick"}) // llega después del run_id: la prueba espera esta línea en vez de dormir
 	for _, e := range f.events {
 		st.Send(e)
 	}
@@ -91,12 +92,11 @@ func TestDiagPingSinRespuestasNoTraeTiempos(t *testing.T) {
 }
 
 func TestDiagPingCtrlCLlamaStopRun(t *testing.T) {
-	f := &fakeDiag{wait: true, started: make(chan struct{}), stopped: make(chan string), final: &v1.RunResponse{Done: true, OutputPath: "/x", PingSummary: summary()}}
+	f := &fakeDiag{wait: true, stopped: make(chan string), final: &v1.RunResponse{Done: true, OutputPath: "/x", PingSummary: summary()}}
 	startFakeDiag(t, f)
 	sigs := fakeInterrupt(t)
 	out, done := mctlAsync(strings.NewReader(""), "diag", "ping", "192.0.2.1", "-o", "continuous=true")
-	<-f.started
-	time.Sleep(100 * time.Millisecond) // que mctl ya haya leído el run_id
+	waitOut(t, out, "tick", 1)
 	sigs <- os.Interrupt
 	if err := waitErr(t, done); err != nil {
 		t.Fatal(err)
@@ -107,16 +107,53 @@ func TestDiagPingCtrlCLlamaStopRun(t *testing.T) {
 }
 
 func TestDiagPingSegundoCtrlCCorta(t *testing.T) {
-	f := &fakeDiag{wait: true, stopped: nil, final: &v1.RunResponse{Done: true}}
+	f := &fakeDiag{wait: true, final: &v1.RunResponse{Done: true}}
 	startFakeDiag(t, f)
 	sigs := fakeInterrupt(t)
-	_, done := mctlAsync(strings.NewReader(""), "diag", "ping", "192.0.2.1", "-o", "continuous=true")
-	time.Sleep(300 * time.Millisecond)
+	code := make(chan int, 2)
+	old := cli.Exit
+	cli.Exit = func(c int) { code <- c }
+	t.Cleanup(func() { cli.Exit = old })
+	out, done := mctlAsync(strings.NewReader(""), "diag", "ping", "192.0.2.1", "-o", "continuous=true")
+	waitOut(t, out, "tick", 1)
 	sigs <- os.Interrupt
-	time.Sleep(100 * time.Millisecond)
+	for end := time.Now().Add(5 * time.Second); f.stops.Load() == 0 && time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+	}
+	if f.stops.Load() != 1 || !strings.Contains(out.String(), "deteniendo el ping") {
+		t.Fatalf("el primer Ctrl-C debe llamar a StopRun: stops=%d out=%q", f.stops.Load(), out.String())
+	}
 	sigs <- os.Interrupt
 	if err := waitErr(t, done); err == nil {
 		t.Fatal("el segundo Ctrl-C debe cortar con error")
+	}
+	if c := waitCode(t, code); c != 130 || !strings.Contains(out.String(), "Segundo Ctrl-C") || strings.Contains(out.String(), "rpc error") {
+		t.Fatalf("exit=%d out=%q", c, out.String())
+	}
+}
+
+// Ctrl-C antes de que llegue el run_id no hay a quién detener: sale igual, con el mensaje del catálogo.
+func TestDiagPingCtrlCSinRunID(t *testing.T) {
+	f := &fakeDiag{wait: true, final: &v1.RunResponse{Done: true}, noID: true}
+	startFakeDiag(t, f)
+	sigs := fakeInterrupt(t)
+	code := make(chan int, 1)
+	old := cli.Exit
+	cli.Exit = func(c int) { code <- c }
+	t.Cleanup(func() { cli.Exit = old })
+	out, done := mctlAsync(strings.NewReader(""), "diag", "ping", "192.0.2.1")
+	waitOut(t, out, "tick", 1)
+	sigs <- os.Interrupt
+	waitErr(t, done)
+	if c := waitCode(t, code); c != 130 || f.stops.Load() != 0 {
+		t.Fatalf("exit=%d stops=%d", c, f.stops.Load())
+	}
+}
+
+func TestDiagPingResumenRedondeado(t *testing.T) {
+	startFakeDiag(t, &fakeDiag{final: &v1.RunResponse{Done: true, PingSummary: &v1.PingSummary{Sent: 3, Received: 2, LossPct: 100.0 / 3, MinMs: 1.234, AvgMs: 2.005, MaxMs: 3, MdevMs: 0.4999}}})
+	out := must(t, "", "diag", "ping", "192.0.2.1")
+	if !strings.Contains(out, "33.33 %") || strings.Contains(out, "33.333") || !strings.Contains(out, "= 1.23/2.01/3/0.5 ms") {
+		t.Fatalf("out = %q", out)
 	}
 }
 
@@ -138,8 +175,26 @@ func TestDiagPingBarridoTablaYMTU(t *testing.T) {
 	if !strings.Contains(out, "estimated MTU: 1520") {
 		t.Fatalf("v6:\n%s", out)
 	}
+	// Destino por nombre sin family: no se adivina la versión de IP.
+	if out = must(t, "", "diag", "ping", "host.example"); !strings.Contains(out, "MTU sin estimar") || strings.Contains(out, "MTU estimado") {
+		t.Fatalf("nombre:\n%s", out)
+	}
+	if out = must(t, "", "diag", "ping", "host.example", "-o", "family=6"); !strings.Contains(out, "MTU estimado: 1520") {
+		t.Fatalf("nombre con family=6:\n%s", out)
+	}
 	f.events = []*v1.RunResponse{sp(1000, 2, 2, "ok"), sp(1472, 2, 2, "ok")}
 	if out = must(t, "", "diag", "ping", "192.0.2.1"); strings.Contains(out, "MTU") {
 		t.Fatalf("sin frag no hay MTU:\n%s", out)
+	}
+}
+
+func waitCode(t *testing.T, ch <-chan int) int {
+	t.Helper()
+	select {
+	case c := <-ch:
+		return c
+	case <-time.After(10 * time.Second):
+		t.Fatal("mctl no llamó a Exit")
+		return 0
 	}
 }
