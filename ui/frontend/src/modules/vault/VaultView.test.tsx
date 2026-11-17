@@ -327,7 +327,7 @@ test("crear credencial con llave pide solo etiqueta y usuario, y muestra la púb
   expect(await navigator.clipboard.readText()).toBe(PUB);
   expect(screen.getByText(/~\/\.ssh\/authorized_keys/)).toBeInTheDocument();
   expect(screen.getByText(/si el usuario es administrador: C:\\ProgramData\\ssh\\administrators_authorized_keys/)).toBeInTheDocument();
-  expect(screen.getByText(/icacls C:\\ProgramData\\ssh\\administrators_authorized_keys \/inheritance:r \/grant "Administrators:F" \/grant "SYSTEM:F"/)).toBeInTheDocument();
+  expect(screen.getByText(/icacls C:\\ProgramData\\ssh\\administrators_authorized_keys \/inheritance:r \/grant "\*S-1-5-32-544:F" \/grant "\*S-1-5-18:F"/)).toBeInTheDocument();
   expect(screen.getByText(/%USERPROFILE%\\\.ssh\\authorized_keys \(normalmente C:\\Users/)).toBeInTheDocument();
   expect(screen.getByText(/700.*600.*StrictModes/)).toBeInTheDocument();
   // El foco pasa a la pública recién creada y su título dice de qué credencial es.
@@ -401,6 +401,38 @@ test("regenerar la llave pide confirmar, manda confirm=true y muestra la públic
   expect(await screen.findByText(NEW)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Copiar/ })).toBeInTheDocument();
   expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
+});
+
+test("si mientras regenera se abre la pública de otra credencial, la respuesta tardía no la pisa y queda el aviso de éxito", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const key2 = { ...keyCred, id: "k2", label: "llave dos" };
+  let done: (v: string) => void = () => {};
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => [keyCred, key2]), credentialPublicKey: vi.fn(async () => PUB),
+    regenerateKeyCredential: vi.fn(() => new Promise<string>((r) => { done = r; })),
+  });
+  render(<VaultView core={core} />);
+  await screen.findByText("llave lab");
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: /Ver llave pública.*llave dos/ }));
+  expect(await screen.findByText(PUB)).toBeInTheDocument();
+  await act(async () => { done(NEW); });
+  expect(screen.getByText(PUB)).toBeInTheDocument();
+  expect(screen.queryByText(NEW)).not.toBeInTheDocument();
+  expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
+});
+
+test("regenerar la misma credencial con la pública a la vista remonta el cuadro y le devuelve el foco", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => PUB), regenerateKeyCredential: vi.fn(async () => NEW) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Ver llave pública/ }));
+  await screen.findByText(PUB);
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await screen.findByText(NEW);
+  expect(screen.getByRole("region", { name: "Llave pública de llave lab" })).toHaveFocus();
 });
 
 test("exportar avisa antes cuántas credenciales llevan llave privada y después cuántas entraron al archivo", async () => {

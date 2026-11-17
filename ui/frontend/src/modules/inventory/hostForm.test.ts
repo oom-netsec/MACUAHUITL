@@ -98,6 +98,8 @@ test("la orden de inicio: una línea, sin caracteres de control, hasta 256", () 
   expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(256) })).toEqual({});
   expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
   expect(validateHost({ ...ok, platform: "windows", startCommand: "a\nb" })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "linux", startCommand: " tmux" })).toEqual({ startCommand: "hosts.v.startCommand" }); // espacios en los extremos
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "tmux " })).toEqual({ startCommand: "hosts.v.startCommand" });
   expect(validateHost({ ...ok, platform: "windows", startCommand: "a\u0007b" })).toEqual({ startCommand: "hosts.v.startCommand" });
 });
 

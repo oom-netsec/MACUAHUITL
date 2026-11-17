@@ -47,7 +47,7 @@ export function validateHost(f: HostForm): Partial<Record<HostField, Key>> {
   const tags = parseTags(f.tags);
   if (tags.length > 10 || new Set(tags).size !== tags.length || !tags.every((t) => TAG.test(t))) e.tags = "hosts.v.tags";
   if ([...f.notes].length > 2000) e.notes = "hosts.v.notes";
-  if (hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
+  if (hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || f.startCommand !== f.startCommand.trim() || /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
   return e;
 }
 
