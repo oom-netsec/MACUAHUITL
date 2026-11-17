@@ -72,7 +72,9 @@
 }
 .search-trigger span { flex: 1; text-align: left; }
 .titlebar-end { display: flex; justify-content: flex-end; align-items: center; gap: var(--s-2); }
-.content { flex: 1; overflow: auto; padding: var(--s-6) var(--s-6) var(--s-10); }
+/* position: relative ancla aquí lo absoluto de las vistas (p. ej. las regiones .sr de los paneles en vivo): si no, en WebKitGTK
+   estiraban el documento y el scroll se llevaba la app hacia arriba (#197). overscroll-behavior: la rueda no pasa al documento. */
+.content { position: relative; flex: 1; overflow: auto; overscroll-behavior: contain; padding: var(--s-6) var(--s-6) var(--s-10); }
 main { max-width: 1440px; }
 .window-controls { display: flex; gap: 2px; }
 .window-controls button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; box-shadow: none; color: var(--text-3); }
