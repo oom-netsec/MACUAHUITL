@@ -21,7 +21,7 @@ func vaultConDatos(t *testing.T) *Vault {
 	for _, c := range []Credential{
 		cred("core", "PW-CORE", "EN-CORE"),
 		cred("borde", "PW-BORDE", ""),
-		{Label: "llave", Username: "ops", Password: secret.New(pw("")), SSHKey: secret.New(pw("-----KEY-----"))},
+		{Label: "llave", Username: "ops", Password: secret.New(pw("")), SSHKey: secret.New(bytes.Clone(llaveDePrueba))},
 		{Label: ReservedPrefix + "llave-de-respaldos", Username: "hmac", Password: secret.New(pw("HMAC-SECRETO"))},
 	} {
 		if _, err := v.Put(c); err != nil {
@@ -59,7 +59,7 @@ func TestWriteBackupIdaYVuelta(t *testing.T) {
 		if i.Label == "core" && (string(c.Password.Bytes()) != "PW-CORE" || string(c.Enable.Bytes()) != "EN-CORE" || c.Username != "admin") {
 			t.Fatalf("core distinta: %+v", c)
 		}
-		if i.Label == "llave" && string(c.SSHKey.Bytes()) != "-----KEY-----" {
+		if i.Label == "llave" && !bytes.Equal(c.SSHKey.Bytes(), llaveDePrueba) {
 			t.Fatal("llave SSH distinta")
 		}
 	}
@@ -346,10 +346,9 @@ func TestOpenBackupTopeDeEntradas(t *testing.T) {
 	if _, err := OpenBackup(con(MaxBackupEntries+1), pw(frase)); !errors.Is(err, ErrTooManyEntries) {
 		t.Fatalf("pasado del tope: %v", err)
 	}
-	if b, err := OpenBackup(con(MaxBackupEntries), pw(frase)); err != nil {
+	// En el tope de cuenta sí abre (aquí las entradas son basura: descifrar falla, no «demasiadas»).
+	if _, err := OpenBackup(con(MaxBackupEntries), pw(frase)); errors.Is(err, ErrTooManyEntries) {
 		t.Fatalf("en el tope: %v", err)
-	} else {
-		b.LockAll()
 	}
 }
 

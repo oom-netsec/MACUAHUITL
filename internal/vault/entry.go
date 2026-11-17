@@ -10,6 +10,15 @@ import (
 // etiqueta, usuario, contraseña, enable, llave SSH, reservado.
 const plainFields = 6
 
+// MaxFieldBytes acota cada campo de una credencial que viene de fuera: un respaldo abierto con OpenBackup y la frontera del usuario
+// (Put, PutBatch, PutUnlessKey y la importación). Cada secreto vive en memoria bloqueada (RLIMIT_MEMLOCK suele ser de pocos MiB) y
+// memguard entra en pánico si no puede bloquearla. No aplica a la bóveda propia ni a las entradas reservadas (la reversa pendiente del
+// asistente guarda el running-config entero): esas solo tienen el tope de cordura maxOwnFieldBytes.
+const MaxFieldBytes = 64 << 10
+
+// maxOwnFieldBytes es el tope de cordura de la bóveda propia (como ipc.MaxMsg): evita reservar memoria por un largo absurdo.
+const maxOwnFieldBytes = 4 << 20
+
 func encodePlain(c Credential) []byte {
 	fields := [plainFields][]byte{[]byte(c.Label), []byte(c.Username), c.Password.Bytes(), c.Enable.Bytes(), c.SSHKey.Bytes(), nil}
 	n := 0
@@ -26,7 +35,8 @@ func encodePlain(c Credential) []byte {
 }
 
 // decodePlain copia los secretos a memoria bloqueada y pone b en ceros.
-func decodePlain(b []byte) (Credential, error) {
+// max es el tope por campo; un campo mayor da ErrFieldTooLong y uno que no cabe en el texto, ErrCorrupt.
+func decodePlain(b []byte, max uint32) (Credential, error) {
 	defer wipe(b)
 	var f [plainFields][]byte
 	rest := b
@@ -38,6 +48,9 @@ func decodePlain(b []byte) (Credential, error) {
 		rest = rest[4:]
 		if uint64(l) > uint64(len(rest)) {
 			return Credential{}, corrupt("campo %d excede el texto en claro", i)
+		}
+		if l > max {
+			return Credential{}, ErrFieldTooLong
 		}
 		f[i], rest = rest[:l], rest[l:]
 	}

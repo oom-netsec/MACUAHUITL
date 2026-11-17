@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -105,26 +106,6 @@ func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (int
 	if err != nil {
 		return 0, 0, false, err
 	}
-	creds := make([]Credential, 0, len(infos))
-	keys := 0
-	defer func() {
-		for _, c := range creds {
-			c.Password.Destroy()
-			c.Enable.Destroy()
-			c.SSHKey.Destroy()
-		}
-	}()
-	for _, i := range infos {
-		c, err := src.Get(i.ID)
-		if err != nil {
-			return 0, 0, false, err
-		}
-		c.ID = "" // el respaldo asigna IDs propios
-		if !c.SSHKey.Empty() {
-			keys++
-		}
-		creds = append(creds, c)
-	}
 	dir, err := os.MkdirTemp(filepath.Dir(dst), ".respaldo-*") // 0700; se lleva también el .bak de la bóveda temporal
 	if err != nil {
 		return 0, 0, false, fmt.Errorf("vault: %w", err)
@@ -136,13 +117,57 @@ func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (int
 		return 0, 0, false, err
 	}
 	defer b.LockAll()
-	if _, err := b.PutBatch(creds); err != nil {
-		return 0, 0, false, err
+	// De a trozos de exportHeld bytes bloqueados: retener todas las credenciales descifradas a la vez agota la memoria bloqueada
+	// (memguard entra en pánico).
+	keys := 0
+	for len(infos) > 0 {
+		var creds []Credential
+		var held int64
+		for len(infos) > 0 && held < exportHeld {
+			c, err := src.Get(infos[0].ID)
+			if err != nil {
+				destroyAll(creds)
+				return 0, 0, false, err
+			}
+			infos = infos[1:]
+			c.ID = "" // el respaldo asigna IDs propios
+			if !c.SSHKey.Empty() {
+				keys++
+			}
+			held += lockedSize(c)
+			creds = append(creds, c)
+		}
+		_, err := b.putBatch(creds, false, true) // frontera estricta: lo que el import no aceptaría falla al EXPORTAR, no al restaurar
+		destroyAll(creds)
+		if err != nil {
+			return 0, 0, false, err
+		}
 	}
 	if err := place(tmp, dst, overwrite); err != nil {
 		return 0, 0, false, err
 	}
-	return len(creds), keys, b.noPerms, nil
+	return len(b.entries), keys, b.noPerms, nil
+}
+
+const exportHeld = 1 << 20 // memoria bloqueada que retiene a la vez el export
+
+// lockedSize es la cota de memoria bloqueada de los secretos de c: cada uno redondeado a páginas más dos de guarda.
+func lockedSize(c Credential) (n int64) {
+	pg := int64(os.Getpagesize())
+	for _, s := range []*secret.Secret{c.Password, c.Enable, c.SSHKey} {
+		if !s.Empty() {
+			n += (int64(len(s.Bytes()))+pg-1)/pg*pg + 2*pg
+		}
+	}
+	return n
+}
+
+func destroyAll(cs []Credential) {
+	for _, c := range cs {
+		c.Password.Destroy()
+		c.Enable.Destroy()
+		c.SSHKey.Destroy()
+	}
 }
 
 // place mueve tmp a dst. Sin overwrite reserva dst con O_EXCL|O_NOFOLLOW (no pisa nada ni sigue enlaces) y lo reemplaza con rename; con overwrite solo reemplaza un archivo regular (o un enlace, no su destino).
@@ -182,6 +207,9 @@ func OpenBackup(path string, phrase []byte) (*Vault, error) {
 		return nil, fmt.Errorf("vault: %w", err)
 	}
 	defer f.Close()
+	if fi, err := f.Stat(); err == nil && fi.Size() > maxBackupBytes { // sin leer un archivo enorme
+		return nil, ErrNotBackup
+	}
 	raw, err := io.ReadAll(io.LimitReader(f, maxBackupBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("vault: %w", err)
@@ -194,11 +222,11 @@ func OpenBackup(path string, phrase []byte) (*Vault, error) {
 	if err != nil || !backupParamsOK(h.Params) {
 		return nil, ErrNotBackup
 	}
-	// Y las entradas, antes de descifrar ninguna: cada una pide memoria bloqueada.
+	// Y las entradas, antes de descifrar ninguna. Quien lo use descifra de a una: no hay cota de memoria bloqueada.
 	if len(entries) > MaxBackupEntries {
 		return nil, ErrTooManyEntries
 	}
-	v := &Vault{hdr: h, entries: entries, now: time.Now, windows: map[string]Window{}} // sin path: no se escribe de vuelta
+	v := &Vault{hdr: h, entries: entries, now: time.Now, windows: map[string]Window{}, fieldMax: MaxFieldBytes} // sin path: no se escribe de vuelta
 	if err := v.Unlock(phrase); err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@
 package noegress
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -58,9 +59,14 @@ var allowed = []string{
 	"tools",
 }
 
+// allowedExact se permiten sin subpaquetes: un paquete nuevo bajo ellos tendría que pedir su propio permiso.
+var allowedExact = []string{
+	"internal/sshkey", // solo ssh.ParsePrivateKey: valida llaves sin que vault ni core importen x/crypto/ssh
+}
+
 var Analyzer = &analysis.Analyzer{
 	Name: "noegress",
-	Doc:  "prohíbe imports de red fuera de internal/transport, internal/diag e internal/ipc",
+	Doc:  "prohíbe imports de red fuera de internal/transport, internal/diag, internal/ipc e internal/sshkey (esta última solo x/crypto/ssh)",
 	Run:  run,
 }
 
@@ -87,6 +93,9 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func isAllowed(rel string) bool {
+	if slices.Contains(allowedExact, rel) {
+		return true
+	}
 	for _, a := range allowed {
 		if rel == a || strings.HasPrefix(rel, a+"/") {
 			return true

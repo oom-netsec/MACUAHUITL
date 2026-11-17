@@ -185,7 +185,7 @@ func parseOpenSSH(t *testing.T, pemBytes []byte) (pub ed25519.PublicKey, priv ed
 
 func TestPublicKeyDeLlaveAjenaNoSoportada(t *testing.T) {
 	v, _ := newVault(t)
-	id, _ := v.Put(Credential{Label: "x", Username: "u", SSHKey: secret.New([]byte("-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"))})
+	id, _ := v.Put(Credential{Label: "x", Username: "u", SSHKey: secret.New(llaveECDSAPEM(t))})
 	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
 		t.Fatalf("quería ErrKeyUnsupported, vino %v", err)
 	}
@@ -193,8 +193,7 @@ func TestPublicKeyDeLlaveAjenaNoSoportada(t *testing.T) {
 
 func TestRegenerateKeyReemplazaLlaveAnteriorALaFase44(t *testing.T) {
 	v, p := newVault(t)
-	rsa := "-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"
-	id, _ := v.Put(Credential{Label: "vieja", Username: "u", SSHKey: secret.New([]byte(rsa))})
+	id, _ := v.Put(Credential{Label: "vieja", Username: "u", SSHKey: secret.New(llaveECDSAPEM(t))})
 	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
 		t.Fatalf("PublicKey: %v", err)
 	}
