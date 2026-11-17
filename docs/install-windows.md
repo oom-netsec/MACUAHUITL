@@ -55,16 +55,16 @@ If the installer is started as administrator, it warns you: run it again without
 
 ## Content packs
 
-Playbooks come in content packs (`.mpack`), published with each release. Install the ones you need in **Settings → Packs → Install pack…**, or with `mctl`. `cmd.exe` does not expand `*`, so give the full file name (with the version of the file you downloaded):
+Playbooks come in content packs (`.mpack`), published with each release. Install the ones you need in **Settings → Packs → Install pack…**, or with `mctl`. The installer does not add `mctl` to `PATH`, so call it by its path. `cmd.exe` does not expand `*`, so give the full file name (with the version of the file you downloaded):
 
 ```bat
-mctl pack install oom-ios-xe-1.1.0.mpack
+"%LOCALAPPDATA%\Programs\MACUAHUITL\mctl.exe" pack install oom-ios-xe-1.1.0.mpack
 ```
 
 In PowerShell, to install every official pack in the current folder:
 
 ```powershell
-Get-ChildItem oom-*.mpack | ForEach-Object { mctl pack install $_.FullName }
+Get-ChildItem oom-*.mpack | ForEach-Object { & "$env:LOCALAPPDATA\Programs\MACUAHUITL\mctl.exe" pack install $_.FullName }
 ```
 
 ## Firewall and ports
