@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import { useBatch } from "../../lib/useBatch";
 import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "../../lib/core";
 import { Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
@@ -70,10 +71,13 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const binds = localIPs(ifaces);
   const bindIP = binds.includes(bind) ? bind : binds[0] ?? "";
   const portOk = (isWindows() ? /^[1-9]\d{0,4}$/ : /^[1-9]\d{3,4}$/).test(port) && Number(port) <= 65535; // sin ceros a la izquierda: el núcleo los rechaza
+  // Las líneas pasan a pantalla una vez cada FLUSH_MS; al terminar se vacía el lote antes de mostrar el resultado.
+  const batch = useBatch<string>((b) => setLines((l) => { const all = l.concat(b); return all.length > 5000 ? all.slice(-4000) : all; }));
   const apply = (e: DiagEvent) => {
     if (e.pingSummary) setSummary(e.pingSummary);
     if (e.sweepPoint) setSweep((l) => [...l.filter((p) => p.size !== e.sweepPoint!.size), e.sweepPoint!]);
     if (e.done) {
+      batch.flush();
       setStoppable(false);
       setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
         ? { ok: false, text: t("diag.error", { msg: errorText(new Error(e.error)) }) }
@@ -81,7 +85,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       runRef.current = "";
       setRunId("");
     } else if (e.line !== undefined) {
-      setLines((l) => (l.length > 5000 ? [...l.slice(-4000), e.line!] : [...l, e.line!]));
+      batch.push(e.line);
     }
   };
   const applyRef = useRef(apply); // el suscriptor se crea una vez: sin esto se quedaría con el t del primer render
@@ -102,7 +106,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     if (starting.current) return; // doble clic o clic más Ctrl+Enter: un solo arranque
     starting.current = true; setLaunching(true); // antes del await: si no, el segundo disparo pasa
     if (server && !localIPs(await loadIfaces()).includes(bindIP)) { starting.current = false; setLaunching(false); return setErr(t("diag.bind.gone", { ip: bindIP })); } // la IP ya no está (DHCP, VPN)
-    setErr(""); setLines([]); setResult(null); setSummary(null); setSweep([]); setT0(Math.floor(Date.now() / 1000));
+    batch.reset(); setErr(""); setLines([]); setResult(null); setSummary(null); setSweep([]); setT0(Math.floor(Date.now() / 1000));
     const options: Record<string, string> = {};
     let targets: string[] = [];
     switch (tool) {

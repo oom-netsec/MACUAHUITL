@@ -9,8 +9,18 @@ export function cleanTerminal(prev: string, chunk: string, max = 200000): string
     .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
     .replace(/\x1b./g, "")
     .replace(/[\x00-\x07\x0b-\x1f\x7f]/g, "");
-  let out = prev;
-  for (const ch of s) out = ch === "\b" ? out.slice(0, -1) : out + ch;
+  let out: string;
+  // Una pasada: se parte por retrocesos y los tramos se apilan en un arreglo (sin out + ch por carácter).
+  if (!s.includes("\b")) out = prev + s;
+  else {
+    const stack: string[] = [];
+    let back = 0; // retrocesos que pasan del chunk y borran el final de prev
+    s.split("\b").forEach((part, i) => {
+      if (i > 0) { if (stack.length) { const top = stack.pop()!.slice(0, -1); if (top) stack.push(top); } else back++; }
+      if (part) stack.push(part);
+    });
+    out = prev.slice(0, Math.max(0, prev.length - back)) + stack.join("");
+  }
   return out.length > max ? out.slice(-Math.floor(max * 0.75)) : out;
 }
 

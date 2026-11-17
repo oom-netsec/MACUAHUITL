@@ -1,39 +1,10 @@
 // Estado compartido de los receptores (syslog, traps, flujos): formulario de opciones con sus errores, archivo y descartes, y el juntado de eventos.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { SyslogDrops } from "../../modules/tools/api";
 import { useT } from "../../lib/i18n";
 import { optErrorText, type OptMessages } from "./IngestOptions";
 import type { ErrInfo } from "../../lib/coreError";
 import { buildOpts, coreFieldError, emptyForm, mapStartError, perSourceTemplate, validateOpts, type IngestKind, type OptForm, type OptKey } from "./ingestOpts";
-
-export const MAX_LIVE = 5000; // filas que se conservan en pantalla; los archivos guardan todo
-export const FLUSH_MS = 100;
-
-/** Junta los eventos y los entrega a `apply` una vez cada `ms`: bajo inundación no hay un render por evento. Si pasan de 2x `keep`, descarta los más viejos (cuenta todos en `count`). */
-export function useBatch<T>(apply: (batch: T[], count: number) => void, keep = MAX_LIVE, ms = FLUSH_MS) {
-  const b = useRef<{ q: T[]; n: number; timer?: number }>({ q: [], n: 0 });
-  const applyRef = useRef(apply);
-  applyRef.current = apply;
-  const reset = useCallback(() => { window.clearTimeout(b.current.timer); b.current = { q: [], n: 0 }; }, []);
-  const flush = useCallback(() => {
-    const cur = b.current;
-    window.clearTimeout(cur.timer);
-    cur.timer = undefined;
-    if (!cur.n) return;
-    const { q, n } = cur;
-    cur.q = []; cur.n = 0;
-    applyRef.current(q, n);
-  }, []);
-  const push = useCallback((x: T) => {
-    const cur = b.current;
-    cur.q.push(x);
-    cur.n++;
-    if (cur.q.length > 2 * keep) cur.q.splice(0, cur.q.length - keep);
-    cur.timer ??= window.setTimeout(flush, ms);
-  }, [flush, keep, ms]);
-  useEffect(() => () => window.clearTimeout(b.current.timer), []);
-  return { push, flush, reset };
-}
 
 /** Lo que se pidió al iniciar: la línea de estado y el aviso de tope dependen de eso y no de lo que se edite después. */
 export interface IngestRun { save: boolean; perSource: boolean; maxFiles: number }
