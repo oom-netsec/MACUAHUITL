@@ -5,6 +5,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"embed"
@@ -133,8 +134,10 @@ func allStacks() []byte {
 	}
 }
 
-// watch usa WaitCount (sube al empezar una espera) y WaitDuration (sube al terminarla). Mientras WaitDuration no cambie, las esperas nuevas siguen pendientes.
-// shortcut: si en un mismo muestreo empiezan y terminan esperas no se sabe cuántas quedan, se da por ninguna; un interbloqueo así se ve en la siguiente espera nueva.
+// watch usa WaitCount (sube al empezar una espera), WaitDuration (sube al terminarla) e InUse (0 = nadie tiene la
+// conexión, luego nadie espera). Las estadísticas no distinguen al dueño que trabaja del que espera y pueden contar de
+// más (esperas que empiezan y terminan en un muestreo, o que miden 0 con el reloj grueso de Windows): antes de disparar
+// se confirma en los stacks que alguien espera en este DB.
 func watch(db *sql.DB, limit, every time.Duration, stuck func([]byte)) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -144,22 +147,28 @@ func watch(db *sql.DB, limit, every time.Duration, stuck func([]byte)) {
 	defer tk.Stop()
 	for range tk.C {
 		// Con el contexto cancelado, Ping no espera la conexión (no cuenta como espera) y solo falla distinto si el DB se cerró.
+		// database/sql no exporta errDBClosed: su texto es la única señal pública (estable desde Go 1.0).
 		if err := db.PingContext(canceled); err != nil && err.Error() == "sql: database is closed" {
 			return
 		}
 		st := db.Stats()
 		wc, wd := st.WaitCount, int64(st.WaitDuration)
-		if wd != lastWD { // terminó una espera: reinicia el reloj
+		switch {
+		case st.InUse == 0: // nadie tiene la conexión: nadie espera
 			pending, since = 0, time.Time{}
-		} else {
+		case wd != lastWD: // terminó alguna espera; las que empezaron en este muestreo quizá sigan
+			pending, since = wc-lastWC, time.Time{}
+		default:
 			pending += wc - lastWC
-			if pending > 0 && since.IsZero() {
-				since = time.Now()
-			}
+		}
+		if pending > 0 && since.IsZero() {
+			since = time.Now()
 		}
 		lastWC, lastWD = wc, wd
 		if pending > 0 && time.Since(since) > limit {
-			stuck(allStacks())
+			if s := allStacks(); bytes.Contains(s, fmt.Appendf(nil, "database/sql.(*DB).conn(%p,", db)) {
+				stuck(s)
+			}
 			pending, since = 0, time.Time{}
 		}
 	}

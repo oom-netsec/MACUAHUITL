@@ -210,15 +210,16 @@ func (l *Log) Export(ctx context.Context, w io.Writer, from, to time.Time) error
 	enc := json.NewEncoder(w)
 	var werr error
 	f, t := from.UTC().Format(tsFormat), to.UTC().Format(tsFormat)
-	// Con seq > ? el plan recorre por seq y no usa idx_audit_log_at: se arranca en el primer registro del rango (min(seq) con at acotado, que sí usa el índice; exacto aunque el reloj retroceda).
-	var first sql.NullInt64
-	if err := l.db.QueryRowContext(ctx, `SELECT min(seq) FROM audit_log WHERE at >= ? AND at < ?`, f, t).Scan(&first); err != nil {
+	// Con seq > ? el plan recorre por seq y no usa idx_audit_log_at: el recorrido se acota al primer y al último registro
+	// del rango (min y max de seq con at acotado, que sí usan el índice; exacto aunque el reloj retroceda).
+	var first, last sql.NullInt64
+	if err := l.db.QueryRowContext(ctx, `SELECT min(seq), max(seq) FROM audit_log WHERE at >= ? AND at < ?`, f, t).Scan(&first, &last); err != nil {
 		return fmt.Errorf("audit: %w", err)
 	}
 	if !first.Valid {
 		return nil
 	}
-	err := l.scan(ctx, uint64(first.Int64)-1, "at >= ? AND at < ?", []any{f, t}, func(r Record, _ string) bool {
+	err := l.scan(ctx, uint64(first.Int64)-1, "seq <= ? AND at >= ? AND at < ?", []any{last.Int64, f, t}, func(r Record, _ string) bool {
 		werr = enc.Encode(r)
 		return werr == nil
 	})
