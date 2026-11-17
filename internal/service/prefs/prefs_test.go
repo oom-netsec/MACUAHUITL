@@ -532,3 +532,14 @@ func TestCarpetaDeSalidasEnElIdioma(t *testing.T) {
 		t.Fatalf("aviso es: %q", r.State.Note)
 	}
 }
+
+// Ajustes → Almacenamiento: una UNC o una ruta de dispositivo en Windows se rechaza antes de tocarla (2.4).
+func TestOutputsUNCSeRechazaEnWindows(t *testing.T) {
+	old := service.OutputsGOOS
+	service.OutputsGOOS = "windows"
+	t.Cleanup(func() { service.OutputsGOOS = old })
+	s, _, _ := montar(t)
+	for _, dir := range []string{`\\10.0.0.9\x\out`, `\\?\C:\x`, `\\.\pipe\x`} {
+		quiero(t, fija(s, dir), "sin_unidad")
+	}
+}

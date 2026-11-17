@@ -22,6 +22,8 @@ var (
 	// AncestorInfo da el modo y el dueño de un ancestro de la carpeta (sin seguir enlaces).
 	AncestorInfo = RealAncestorInfo
 	CreateTemp   = os.CreateTemp
+	// OutputsGOOS es el sistema para la regla «solo X:\\» (en Linux una ruta con \\ es solo un nombre raro): las pruebas simulan Windows.
+	OutputsGOOS = runtime.GOOS
 )
 
 // safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
@@ -36,6 +38,9 @@ func driveRoot(p string) bool {
 // safeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^,
 // $ ni comillas invertidas ni caracteres de formato (bidi).
 var safeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
+
+// sidRe es la forma de un SID en texto: lo único que puede ir dentro de las comillas de la orden icacls.
+var sidRe = regexp.MustCompile(`^S-1-\d+(-\d+)*$`)
 
 // outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
 func outputsErr(code string, kv ...any) error {
@@ -59,6 +64,10 @@ func resolve(p string) string {
 func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if dir == "" {
 		return "", nil
+	}
+	// Antes de IsAbs, EvalSymlinks o Stat: una UNC (\\host\share) es absoluta para Windows y tocarla abre SMB y filtra el hash NTLM.
+	if OutputsGOOS == "windows" && sys.NoDriveLetter(dir) {
+		return "", outputsErr("prefs.outputs.sin_unidad", "dir", dir)
 	}
 	if !filepath.IsAbs(dir) {
 		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
@@ -169,11 +178,11 @@ func windowsOutputsErr(real string, err error) error {
 		}
 		var rm []string
 		for _, sid := range pe.SIDs {
-			if strings.HasPrefix(sid, "S-1-") { // «enlace» o «tipo-ace-N» no son SID: no hay nada que quitar con icacls
+			if sidRe.MatchString(sid) { // «enlace» o «tipo-ace-N» no son SID: no hay nada que quitar con icacls
 				rm = append(rm, `/remove "*`+sid+`"`)
 			}
 		}
-		if len(rm) == 0 || !strings.HasPrefix(pe.User, "S-1-") {
+		if len(rm) == 0 || !sidRe.MatchString(pe.User) {
 			code = "prefs.outputs.permisos" // sin orden: una junction o un tipo de ACE raro no se arreglan con icacls
 		}
 		return outputsErr(code+"_win", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "), "user", pe.User)

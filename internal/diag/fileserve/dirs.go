@@ -33,9 +33,7 @@ var exigeUnidad = runtime.GOOS == "windows"
 
 // sinLetraDeUnidad dice si p no empieza con «X:» (letra de unidad): \\?\C:\, \\.\, \??\ y las UNC saltarían la
 // lista de Windows porque ni Clean ni EvalSymlinks les quitan el prefijo. Pura: se prueba en cualquier sistema.
-func sinLetraDeUnidad(p string) bool {
-	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
-}
+func sinLetraDeUnidad(p string) bool { return sys.NoDriveLetter(p) }
 
 // finalPath es la ruta real de un handle abierto (sys.FinalPath); variable para simularla en pruebas.
 var finalPath = sys.FinalPath
