@@ -38,13 +38,19 @@ try {
   Must ((Get-Content -Raw (Join-Path $inst 'macuahuitld.exe')) -eq $core) 'y no reemplazó el núcleo'
 } finally { Stop-Process -Id $app.Id -Force; $app.WaitForExit() }
 
-# Una instalación anterior en otra carpeta: se detiene sin tocar nada y pide desinstalarla (código 3).
+# Una instalación anterior en otra carpeta que existe: se detiene sin tocar nada y pide desinstalarla (código 3).
 $prev = (Get-ItemProperty $unKey).InstallLocation
-Set-ItemProperty $unKey InstallLocation 'C:\Tools\MACUAHUITL'
+$old = Join-Path $env:SystemDrive 'MacuOldInstall'
+New-Item -ItemType Directory -Force $old | Out-Null
+Set-ItemProperty $unKey InstallLocation $old
 try {
   Must ((RunWait $Installer '/S') -eq 3) 'con una instalación en otra carpeta, se detiene'
-  Must ((Get-ItemProperty $unKey).InstallLocation -eq 'C:\Tools\MACUAHUITL') 'y no tocó la clave de desinstalación'
-} finally { Set-ItemProperty $unKey InstallLocation $prev }
+  Must ((Get-ItemProperty $unKey).InstallLocation -eq $old) 'y no tocó la clave de desinstalación'
+  # Clave huérfana (la carpeta ya no existe): no hay núcleo viejo, se instala y la clave vuelve a la carpeta fija.
+  Remove-Item -Recurse -Force $old
+  Must ((RunWait $Installer '/S') -eq 0) 'con una clave huérfana, instala'
+  Must ((Get-ItemProperty $unKey).InstallLocation -eq $inst) 'y la clave apunta a la carpeta fija'
+} finally { Set-ItemProperty $unKey InstallLocation $prev; Remove-Item -Recurse -Force $old -ErrorAction SilentlyContinue }
 
 # Datos de una instalación en uso: /S nunca los borra.
 New-Item -ItemType Directory -Force (Join-Path $data 'data') | Out-Null

@@ -156,9 +156,11 @@ Function .onInit
   StrCpy $INSTDIR "${FIXED_DIR}" ; pisa un /D= de la línea de comandos
   ReadRegStr $PrevInstall HKCU "${UNINST_KEY}" "InstallLocation"
   ; Una instalación anterior en otra carpeta (cuando se podía elegir): su núcleo seguiría corriendo allá y su entrada Run
-  ; quedaría pisada. Se pide desinstalarla antes; no se cambió nada.
+  ; quedaría pisada. Se pide desinstalarla antes; no se cambió nada. Si esa carpeta ya no existe (borrada a mano, perfil
+  ; movido) no hay núcleo viejo: se sigue, y esta instalación reescribe Run y la clave de desinstalación.
   ${If} $PrevInstall != ""
   ${AndIf} $PrevInstall != "${FIXED_DIR}"
+  ${AndIf} ${FileExists} "$PrevInstall\*.*"
     MessageBox MB_OK|MB_ICONEXCLAMATION "$(OtherDir)" /SD IDOK
     SetErrorLevel 3
     Quit
