@@ -24,26 +24,26 @@ async function openServer(core: ReturnType<typeof setup>) {
   return core;
 }
 
-test("el formulario inválido no abre nada y el válido usa el puerto alto por omisión", async () => {
+test("el formulario inválido no abre nada y el válido usa el puerto estándar por omisión", async () => {
   const core = setup();
   expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeDisabled(); // sin IP ni carpeta o archivos
   expect(core.transferServe).not.toHaveBeenCalled();
   await openServer(core);
   expect(core.transferServe).toHaveBeenCalledWith({
-    protocol: "tftp", listen: "192.0.2.10:6969", allowAny: false, files: [], fromDir: "/srv/img", write: false, recvDir: "", allow: [], seconds: 1800, legacySsh: false,
+    protocol: "tftp", listen: "192.0.2.10:69", allowAny: false, files: [], fromDir: "/srv/img", write: false, recvDir: "", allow: [], seconds: 1800, legacySsh: false,
   });
 });
 
-test("el puerto cambia con el protocolo y uno privilegiado se rechaza", async () => {
+test("el puerto cambia con el protocolo y uno fuera de rango se rechaza", async () => {
   const core = setup();
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "scp");
-  expect(screen.getByLabelText("Puerto")).toHaveValue(2222);
+  expect(screen.getByLabelText("Puerto")).toHaveValue(22);
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
   await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
   await userEvent.clear(screen.getByLabelText("Puerto"));
-  await userEvent.type(screen.getByLabelText("Puerto"), "22");
+  await userEvent.type(screen.getByLabelText("Puerto"), "0");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("entre 1024 y 65535");
+  expect(await screen.findByRole("alert")).toHaveTextContent("entre 1 y 65535");
   expect(core.transferServe).not.toHaveBeenCalled();
 });
 
@@ -119,6 +119,65 @@ test("un servidor que no llega a abrir muestra el error del núcleo", async () =
   const core = await openServer(setup());
   act(() => core.emitTransfer({ runId: "r1", done: true, error: "rpc error: code = InvalidArgument desc = carpeta sensible" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("carpeta sensible");
+});
+
+test("el puerto estándar negado por el sistema muestra la orden de sysctl para copiar, sin aplicarla", async () => {
+  const cmd = "echo 'net.ipv4.ip_unprivileged_port_start=21' | sudo tee /etc/sysctl.d/60-macuahuitl.conf && sudo sysctl --system";
+  const denied = Object.assign(new Error("rpc error: code = FailedPrecondition desc = Linux no deja abrir el puerto 69"), {
+    cause: { code: "FailedPrecondition", reason: "fileserve.err.port_denied", metadata: { port: "69", min_port: "21", cmd } },
+  });
+  const core = await openServer(setup({ transferServe: vi.fn(async () => { throw denied; }) }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Linux no deja abrir el puerto 69");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Copiar/ }));
+  expect(core.copyText).toHaveBeenCalledWith(cmd);
+  expect(screen.getByLabelText("Puerto")).not.toBeDisabled(); // se puede elegir otro puerto en lugar de aplicar la orden
+  // Un intento siguiente que falla por otra causa no deja la orden vieja a la vista.
+  vi.mocked(core.transferServe).mockRejectedValueOnce(new Error("puerto en uso"));
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  await waitFor(() => expect(screen.queryByText(cmd)).toBeNull());
+});
+
+test("el bind negado llega por el evento de cierre (StartServer es un stream) y también muestra la orden", async () => {
+  const cmd = "echo 'net.ipv4.ip_unprivileged_port_start=69' | sudo tee /etc/sysctl.d/60-macuahuitl.conf && sudo sysctl --system";
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", done: true, error: "rpc error: code = FailedPrecondition desc = Linux no deja abrir el puerto 69",
+    errorInfo: { code: "FailedPrecondition", reason: "fileserve.err.port_denied", metadata: { port: "69", min_port: "69", cmd } } }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Linux no deja abrir el puerto 69");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  // Solo el error de puerto negado trae orden para copiar: otro motivo con metadata.cmd no la muestra.
+  act(() => core.emitTransfer({ runId: "r2", done: true, error: "otra cosa", errorInfo: { code: "Internal", reason: "fileserve.err.otro", metadata: { cmd: "rm -rf /" } } }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("otra cosa"));
+  expect(screen.queryByText("rm -rf /")).toBeNull();
+  expect(screen.queryByText(cmd)).toBeNull();
+});
+
+test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
+  await waitFor(() => expect(core.transferHint).toHaveBeenCalled());
+  await act(async () => {});
+  expect(within(card).queryByRole("log", { name: "Regla de redirección (nftables)" })).toBeNull();
+  expect(within(card).queryByText(/Firewall de Windows/)).toBeNull();
+});
+
+test("en Linux, en el puerto estándar avisa de una redirección nft vieja con la orden para quitarla (no se puede detectar sin privilegios)", async () => {
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
+  expect(await within(card).findByRole("log", { name: /redirección nft/i })).toHaveTextContent("sudo nft delete table ip macuahuitl_tftp_6969");
+  setOSForTests("windows");
+  try {
+    act(() => core.emitTransfer({ runId: "r2", ready: ready({ serverId: "s2", listening: "192.0.2.10:69" }) }));
+    const win = (await screen.findAllByRole("group", { name: "TFTP 192.0.2.10:69" }))[1];
+    await waitFor(() => expect(core.transferHint).toHaveBeenCalledTimes(2)); // la pista de r2 ya llegó
+    await act(async () => {});
+    expect(within(win).queryByRole("log", { name: /redirección nft/i })).toBeNull();
+  } finally { setOSForTests(undefined); }
+  // Con el servidor cerrado ya no hay tráfico que perder: la ayuda se va.
+  act(() => core.emitTransfer({ runId: "r1", done: true }));
+  await waitFor(() => expect(within(card).queryByRole("log", { name: /redirección nft/i })).toBeNull());
 });
 
 const client = async (core: ReturnType<typeof setup>, url: string) => {
@@ -204,7 +263,7 @@ test("0.0.0.0 no se ofrece en la lista; «todas las interfaces» es una opción 
   expect(core.transferServe).not.toHaveBeenCalled();
   await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.1");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
-  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:6969", allowAny: true, allow: ["192.0.2.1"] }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:69", allowAny: true, allow: ["192.0.2.1"] }));
 });
 
 test("recibir por TFTP exige la lista de IP y avisa que en UDP no autentica", async () => {
@@ -313,7 +372,7 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
   setOSForTests("windows");
   try {
     const rule = 'New-NetFirewallRule -DisplayName "MACUAHUITL UDP 69" -Direction Inbound -Program "C:\\m\\macuahuitld.exe" -LocalAddress 192.0.2.10 -Protocol UDP -LocalPort 69 -Action Allow';
-    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, setcap: "", remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
     expect(screen.getByLabelText("Puerto")).toHaveValue(69);
     expect(screen.getByLabelText("Puerto")).toHaveAccessibleDescription(/De 1 a 65535/);
     await openServer(core);
@@ -332,7 +391,7 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
 test("Windows: con un puerto distinto del estándar el texto dice que IOS necesita abrirlo en el estándar", async () => {
   setOSForTests("windows");
   try {
-    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", setcap: "", remove: "Remove-NetFirewallRule x" })) });
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", remove: "Remove-NetFirewallRule x" })) });
     await openServer(core);
     act(() => core.emitTransfer({ runId: "r1", ready: ready() }));
     const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });

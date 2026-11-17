@@ -46,7 +46,7 @@ func (fakeTransfer) Put(_ context.Context, r *v1.PutRequest) (*v1.PutResponse, e
 	return &v1.PutResponse{Result: &v1.TransferResult{Path: r.FromDir + "/" + r.Name, Bytes: 7, Report: rep}}, nil
 }
 func (fakeTransfer) RedirectHint(_ context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
-	return &v1.RedirectHintResponse{StandardPort: 22, Nftables: "nft", Setcap: "setcap", Remove: "rm"}, nil
+	return &v1.RedirectHintResponse{StandardPort: 22, Nftables: "nft", Remove: "rm"}, nil
 }
 
 func TestTransferBridge(t *testing.T) {

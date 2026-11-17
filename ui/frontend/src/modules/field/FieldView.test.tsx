@@ -13,10 +13,10 @@ test("el servidor publica las rutas indicadas y muestra transferencias en vivo",
   await userEvent.click(screen.getByRole("button", { name: "Servir" }));
   expect(core.serveStart).toHaveBeenCalledWith({ protocol: "tftp", addr: "10.0.0.5", files: ["/img/c9300.bin", "/cfg/r1.cfg"], allowAny: false, seconds: 3600 });
   act(() => {
-    core.emitServe({ runId: "s1", listening: "10.0.0.5:6969", hint: "copy tftp://10.0.0.5/c9300.bin flash:" });
+    core.emitServe({ runId: "s1", listening: "10.0.0.5:69", hint: "copy tftp://10.0.0.5/c9300.bin flash:" });
     core.emitServe({ runId: "s1", transfer: JSON.stringify({ Client: "10.0.0.9:50000", File: "c9300.bin", Bytes: 1024, Duration: 2e9, Result: "ok" }) });
   });
-  expect(await screen.findByText(/sirviendo en 10.0.0.5:6969/)).toBeInTheDocument();
+  expect(await screen.findByText(/sirviendo en 10.0.0.5:69/)).toBeInTheDocument();
   expect(screen.getByText(termText(/copy tftp:\/\/10.0.0.5\/c9300.bin/))).toBeInTheDocument();
   expect(screen.getByText(termText(/10.0.0.9:50000.*c9300.bin.*1024 bytes.*correcta/))).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Detener" }));

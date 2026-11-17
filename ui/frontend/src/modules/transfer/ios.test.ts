@@ -1,5 +1,5 @@
 import { iosCommands } from "./ios";
-import { expectedHash, hostKeyFromError, parseURL, portFor, serveProblem } from "./validate";
+import { expectedHash, hostKeyFromError, nftLeftoverCmd, parseURL, portFor, serveProblem } from "./validate";
 import { setOSForTests } from "../../lib/platform";
 
 const ph = { ip: "IP-X", file: "ARCH" };
@@ -25,7 +25,7 @@ const form = { proto: "tftp" as const, any: false, listen: "192.0.2.10", port: "
 test("validación del servidor", () => {
   expect(serveProblem(form)).toBeNull();
   expect(serveProblem({ ...form, listen: "" })).toBe("transfer.err.listen");
-  expect(serveProblem({ ...form, port: "69" })).toBe("transfer.err.port");
+  expect(serveProblem({ ...form, port: "0" })).toBe("transfer.err.port");
   expect(serveProblem({ ...form, fromDir: "" })).toBe("transfer.err.nothing");
   expect(serveProblem({ ...form, fromDir: "", write: true, proto: "scp" })).toBeNull();
   expect(serveProblem({ ...form, fromDir: "", write: true })).toBe("transfer.err.tftpAllow"); // en UDP el origen se falsifica: la lista es obligatoria
@@ -50,16 +50,27 @@ test("URL, hash esperado y llave de host", () => {
   expect(hostKeyFromError("timeout")).toBeNull();
 });
 
-// ADR 0012 (h): en Windows no hay puertos privilegiados; en Linux el 22 sigue rechazado.
-test("serveProblem: 1-65535 en Windows y de 1024 en adelante en Linux; puertos por omisión del estándar en Windows", () => {
+// Puertos estándar por omisión en los dos sistemas: el núcleo intenta el bind y explica si el sistema lo niega.
+test("serveProblem: 1-65535 y puertos por omisión del estándar en Linux y en Windows", () => {
   const f = { proto: "tftp" as const, any: false, listen: "10.0.0.5", port: "69", write: false, recvDir: "", fromDir: "/x", files: "", allow: "", minutes: "30" };
-  expect(serveProblem(f)).toBe("transfer.err.port");
-  expect(portFor("tftp")).toBe("6969");
-  setOSForTests("windows");
-  try {
-    expect(serveProblem(f)).toBeNull();
-    expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
-    expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");
-    expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("http")]).toEqual(["69", "21", "22", "8080"]);
-  } finally { setOSForTests(undefined); }
+  for (const os of [undefined, "windows"] as const) {
+    setOSForTests(os);
+    try {
+      expect(serveProblem(f)).toBeNull();
+      expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
+      expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");
+      expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("sftp"), portFor("http")]).toEqual(["69", "21", "22", "22", "80"]);
+    } finally { setOSForTests(undefined); }
+  }
+});
+
+test("nftLeftoverCmd: tabla del puerto alto de antes, ip6 con IPv6", () => {
+  expect(nftLeftoverCmd("tftp", "192.0.2.10", 69)).toBe("sudo nft delete table ip macuahuitl_tftp_6969");
+  expect(nftLeftoverCmd("ftp", "2001:db8::1", 21)).toBe("sudo nft delete table ip6 macuahuitl_ftp_2121");
+  expect(nftLeftoverCmd("tftp", "fe80::1%eth0", 69)).toBe("sudo nft delete table ip6 macuahuitl_tftp_6969");
+  expect(nftLeftoverCmd("tftp", "::ffff:192.0.2.10", 69)).toBe("sudo nft delete table ip macuahuitl_tftp_6969"); // el núcleo la desmapea a IPv4
+  // SCP y SFTP comparten el 22: la tabla vieja pudo ser de cualquiera de los dos.
+  expect(nftLeftoverCmd("sftp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
+  expect(nftLeftoverCmd("scp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
+  expect(nftLeftoverCmd("raro", "192.0.2.10", 99)).toBe("sudo nft delete table ip macuahuitl_raro_99");
 });
