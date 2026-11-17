@@ -78,7 +78,7 @@ test("nftLeftoverCmd: tabla del puerto alto de antes, ip6 con IPv6", () => {
 
 test("un archivo con controles o caracteres de formato en el nombre no genera orden (no se pega una línea de más)", () => {
   const files = ["ok.bin", "a\nreload", "b\rc", "c\u001b[2J", "d‮e.bin", "e​f", "g h", "i\u0085j", "k\tl", "m\u0000n"];
-  const r = { ...base, protocol: "tftp", listening: "192.0.2.10:69", files };
+  const r = { ...base, protocol: "tftp" as const, listening: "192.0.2.10:69", files };
   expect(iosCommands(r, false, ph)).toEqual(["copy tftp://192.0.2.10/ok.bin flash:"]);
   expect(iosCommands({ ...r, files: files.slice(1) }, false, ph)).toEqual([]); // todas inseguras: ni siquiera el marcador
   expect(unsafeName("normal con espacios y ñ.bin")).toBe(false);
