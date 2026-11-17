@@ -3,6 +3,7 @@ package fleet
 import (
 	"encoding/json"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -110,6 +111,9 @@ func TestEscenariosCubrenTodasLasClavesDeFlota(t *testing.T) {
 		"fleet.reason.rec_no_nexthop": "una ruta sin siguiente salto ni interfaz no sale del parser",
 		"fleet.warn.rejected_many":    "lo cubre TestRechazosSeAgrupanPorComando (los escenarios solo rechazan en un equipo)",
 		"fleet.warn.dir_unreadable":   "exige un usuario sin privilegios (se omite si corre como root)",
+	}
+	if runtime.GOOS == "windows" { // el escenario x-load-unreadable (chmod 0) se omite en Windows
+		sinDatos["fleet.warn.system"] = "un archivo ilegible exige chmod 0, que en Windows no quita el acceso"
 	}
 	for _, prefix := range []string{"fleet.warn.", "fleet.reason.", "fleet.note.", "fleet.value.", "fleet.detail.", "fleet.evidence."} {
 		for _, k := range i18n.Codes() {

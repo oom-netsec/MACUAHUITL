@@ -3,8 +3,11 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func TestPrefsShowYSet(t *testing.T) {
@@ -15,12 +18,19 @@ func TestPrefsShowYSet(t *testing.T) {
 	}
 	// el núcleo de la prueba tiene HOME y carpetas reales: la carpeta nueva va en un temporal 0700
 	// junto a las pruebas: /tmp es de todos y la validación no lo acepta como ancestro
-	nueva, err := os.MkdirTemp(".", "salidas-")
+	base := "." // en Windows el checkout lo escribe Users (ancestro inseguro): se usa el temporal del usuario
+	if runtime.GOOS == "windows" {
+		base = t.TempDir()
+	}
+	nueva, err := os.MkdirTemp(base, "salidas-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(nueva) })
 	nueva, _ = filepath.Abs(nueva)
+	if err := sys.MkdirPrivate(nueva); err != nil { // la carpeta hereda ACL de más (CREATOR OWNER, Users): se le da la privada
+		t.Fatal(err)
+	}
 	out, err = mctl(t, "", "prefs", "set", "--outputs", nueva, "--rotate-mb", "10", "--format", "jsonl")
 	if err != nil || !strings.Contains(out, "carpeta de salidas: "+nueva) || !strings.Contains(out, "rotar_mb: 10") || !strings.Contains(out, "no se mueven") {
 		t.Fatalf("set = %q %v", out, err)
@@ -30,7 +40,7 @@ func TestPrefsShowYSet(t *testing.T) {
 	if err != nil || !strings.Contains(out, "carpeta de salidas: "+nueva) || !strings.Contains(out, "formato: jsonl") || !strings.Contains(out, "max_archivos: 5") || strings.Contains(out, "no se mueven") {
 		t.Fatalf("set parcial = %q %v", out, err)
 	}
-	if out, err = mctl(t, "", "prefs", "show", "--json"); err != nil || !strings.Contains(out, `"outputs_dir_effective"`) || !strings.Contains(out, nueva) {
+	if out, err = mctl(t, "", "prefs", "show", "--json"); err != nil || !strings.Contains(out, `"outputs_dir_effective"`) || !strings.Contains(out, strings.ReplaceAll(nueva, `\`, `\\`)) { // el JSON escapa las barras invertidas
 		t.Fatalf("json = %q %v", out, err)
 	}
 	// --outputs "" vuelve a la de fábrica

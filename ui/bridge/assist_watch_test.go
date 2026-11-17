@@ -3,13 +3,13 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // vivoAssist repite el historial desde el evento 0 y deja el stream abierto hasta que se cancela.
@@ -51,7 +51,7 @@ func espera(t *testing.T, msg string, cond func() bool) {
 func TestAssistWatchUnoPorRunIdPorReemplazo(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
@@ -84,7 +84,7 @@ func puenteAssist(t *testing.T, f *vivoAssist) (*Bridge, *recorder) {
 	t.Helper()
 	d, _ := os.MkdirTemp("", "brg")
 	t.Cleanup(func() { os.RemoveAll(d) })
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, stop := context.WithCancel(context.Background())
 	t.Cleanup(stop)

@@ -4,11 +4,16 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
+
+// noSuchFile es el texto del sistema para una ruta que no existe.
+var noSuchFile = map[bool]string{false: "no such file", true: "cannot find the path"}[runtime.GOOS == "windows"]
 
 func TestWriteFile(t *testing.T) {
 	b := New(nil, nil)
@@ -20,7 +25,7 @@ func TestWriteFile(t *testing.T) {
 	if got, _ := os.ReadFile(p); string(got) != "hora,cpu\n" {
 		t.Fatalf("contenido: %q", got)
 	}
-	if fi, _ := os.Stat(p); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(p); !testperm.PrivateStrict(p, 0o600) {
 		t.Fatalf("permisos: %v", fi.Mode().Perm())
 	}
 	png := filepath.Join(dir, "g.png")
@@ -50,7 +55,7 @@ func TestWriteFile(t *testing.T) {
 		{"relativa.txt", "x", "utf8", "absoluta"},
 		{filepath.Join(dir, "a.txt"), "x", "latin1", "codificación"},
 		{filepath.Join(dir, "b.png"), "%%%", "base64", "base64"},
-		{filepath.Join(dir, "no", "existe.txt"), "x", "utf8", "no such file"},
+		{filepath.Join(dir, "no", "existe.txt"), "x", "utf8", noSuchFile},
 		{filepath.Join(dir, "grande.txt"), strings.Repeat("x", maxSaveBytes+1), "utf8", "64 MiB"},
 	} {
 		if err := b.WriteFile(c.path, c.data, c.enc, false); err == nil || !strings.Contains(err.Error(), c.want) {

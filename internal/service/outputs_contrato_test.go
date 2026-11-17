@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestRechazosDeSalidasConReasonCodeYPath(t *testing.T) {
 	old := AncestorInfo
 	AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	t.Cleanup(func() { AncestorInfo = old })
-	d := t.TempDir()
+	d, _ := filepath.EvalSymlinks(t.TempDir()) // en Windows TEMP viene en formato corto (RUNNER~1) y CheckOutputs lo expande
 	abierta := filepath.Join(d, "abierta")
 	os.Mkdir(abierta, 0o700)
 	os.Chmod(abierta, 0o755)
@@ -30,12 +31,15 @@ func TestRechazosDeSalidasConReasonCodeYPath(t *testing.T) {
 	os.Chmod(conEspacio, 0o755)
 	archivo := filepath.Join(d, "f")
 	os.WriteFile(archivo, nil, 0o600)
+	win := runtime.GOOS == "windows"
 	cases := []struct{ name, dir, code, path string }{
 		{"relativa", "rel/x", "relativa", "rel/x"},
 		{"no existe", filepath.Join(d, "nada"), "no_existe", filepath.Join(d, "nada")},
 		{"no es carpeta", archivo, "no_directorio", archivo},
-		{"permisos con orden", abierta, "permisos", abierta},
-		{"permisos sin orden", conEspacio, "permisos", conEspacio},
+	}
+	if !win { // los modos POSIX no existen en Windows: ahí el rechazo es el de la ACL (TestWindowsOutputsErr)
+		cases = append(cases, struct{ name, dir, code, path string }{"permisos con orden", abierta, "permisos", abierta},
+			struct{ name, dir, code, path string }{"permisos sin orden", conEspacio, "permisos", conEspacio})
 	}
 	for _, loc := range []string{"es", "en"} {
 		ctx := i18n.WithLocale(context.Background(), loc)
@@ -54,6 +58,9 @@ func TestRechazosDeSalidasConReasonCodeYPath(t *testing.T) {
 			if info == nil || info.Reason != "prefs.outputs."+c.code || info.Metadata["code"] != c.code || info.Metadata["path"] != c.path {
 				t.Errorf("%s/%s: %+v", loc, c.name, info)
 			}
+		}
+		if win {
+			continue
 		}
 		_, err := CheckOutputs(abierta, st, false)
 		msg := status.Convert(ErrFrom(ctx, codes.InvalidArgument, err)).Message()

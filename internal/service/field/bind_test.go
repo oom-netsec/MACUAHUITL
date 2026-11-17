@@ -38,3 +38,17 @@ func TestServeFilesPuertoOcupadoEsErrorDelRPC(t *testing.T) {
 	}
 	t.Fatalf("sin ErrorInfo: %v", e)
 }
+
+// Un archivo dentro de la carpeta de datos de la app no se publica.
+func TestServeFilesRechazaCarpetaDeLaApp(t *testing.T) {
+	d := servicetest.New(t)
+	datos := t.TempDir()
+	d.Deny = []string{datos}
+	f := filepath.Join(datos, "vault.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	s := &fieldSvc{d: d}
+	e := s.ServeFiles(&v1.ServeFilesRequest{Protocol: "http", Addr: "127.0.0.1:0", Files: []string{f}, DurationSeconds: 5}, &fakeServe{ctx: context.Background()})
+	if status.Code(e) != codes.InvalidArgument {
+		t.Fatalf("err = %v", e)
+	}
+}

@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/netip"
 	"net/textproto"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -83,11 +85,11 @@ func (f *ftpC) pasv() net.Conn {
 }
 
 func TestFTPServer(t *testing.T) {
-	pub := t.TempDir()
+	pub := realTemp(t)
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("contenido A"), 0o600)
 	os.Mkdir(filepath.Join(pub, "sub"), 0o700)
 	os.Symlink("/etc/hostname", filepath.Join(pub, "enlace"))
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "ftp", FromDir: pub, Write: true, RecvDir: recv, MaxFile: 1000, MaxTotal: 1500})
 	f := ftpDial(t, s.addr)
 	// Sin sesión no se hace nada.
@@ -252,8 +254,17 @@ func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
 func parLibre(t *testing.T) uint16 {
 	t.Helper()
 	for range 50 {
-		a, err := net.Listen("tcp", "127.0.0.1:0")
+		// En Windows los puertos efímeros (49152+) se reparten de seguido a las conexiones del cliente de la prueba y se
+		// comerían el segundo: se busca fuera de ese rango.
+		dir := "127.0.0.1:0"
+		if runtime.GOOS == "windows" {
+			dir = fmt.Sprintf("127.0.0.1:%d", 20000+rand.IntN(10000))
+		}
+		a, err := net.Listen("tcp", dir)
 		if err != nil {
+			if runtime.GOOS == "windows" {
+				continue // el puerto al azar pudo estar ocupado
+			}
 			t.Fatal(err)
 		}
 		lo := a.Addr().(*net.TCPAddr).Port
@@ -307,7 +318,7 @@ func TestFTPReadWriteSeparate(t *testing.T) {
 	f := ftpDial(t, s.addr)
 	f.login(r)
 	f.cmd(550, "STOR x")
-	s2, r2 := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: t.TempDir()})
+	s2, r2 := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: realTemp(t)})
 	f2 := ftpDial(t, s2.addr)
 	f2.login(r2)
 	f2.cmd(550, "RETR a.bin")
@@ -352,6 +363,7 @@ func FuzzParseFTP(f *testing.F) {
 }
 
 func TestHints(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	r := Ready{Addr: "10.0.0.5:2121", User: "mac", Pass: "pw123", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}}
 	for _, tc := range []struct {
 		proto string
@@ -385,7 +397,7 @@ func TestHints(t *testing.T) {
 // Detener el servidor corta la transferencia en curso: Serve vuelve rápido, el archivo
 // parcial se borra y queda auditado como fallido (no espera a los 30 s de inactividad).
 func TestFTPStopCutsTransferInFlight(t *testing.T) {
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: recv})
 	f := ftpDial(t, s.addr)
 	f.login(r)
@@ -413,7 +425,7 @@ func TestFTPStopCutsTransferInFlight(t *testing.T) {
 
 // Lo mismo mientras el servidor espera la conexión de datos (STOR sin abrirla).
 func TestFTPStopWhileWaitingForDataConn(t *testing.T) {
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: recv})
 	f := ftpDial(t, s.addr)
 	f.login(r)

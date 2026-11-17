@@ -47,7 +47,7 @@ func phaseLine(p *v1.JobPhase) string {
 	if p.Round > 0 {
 		s += fmt.Sprintf(" r%d", p.Round)
 	}
-	if p.Detail != "" && !strings.HasPrefix(p.Detail, "/") {
+	if p.Detail != "" && !filepath.IsAbs(p.Detail) {
 		s += " " + p.Detail
 	}
 	return s

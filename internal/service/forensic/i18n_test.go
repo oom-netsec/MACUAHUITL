@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -22,9 +23,7 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 	var dirs []string // las carpetas temporales cambian en cada corrida: se normalizan
 	defer func() {
 		for k, v := range out {
-			for _, d := range dirs {
-				v = strings.ReplaceAll(v, d, "<dir>")
-			}
+			v = i18ntest.Dirs(v, dirs)
 			out[k] = v
 		}
 	}()
@@ -134,7 +133,8 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de forense devuelve lo mismo que antes del catálogo.
 func TestForenseRegresionEs(t *testing.T) {
-	i18ntest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, i18n.WithLocale(context.Background(), "es")))
+	i18ntest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, i18n.WithLocale(context.Background(), "es")),
+		"fuga_dir_malo", "crash_err_no_existe") // rutas «/no/existe» de Linux: en Windows no son absolutas y el error del sistema es otro
 	for _, loc := range []string{"es", "es-MX"} {
 		got := forenseCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc))
 		base := forenseCasos(t, i18n.WithLocale(context.Background(), "es"))
@@ -147,7 +147,7 @@ func TestForenseRegresionEs(t *testing.T) {
 }
 
 func tmp(dirs *[]string, t *testing.T) string {
-	d := t.TempDir()
+	d := i18ntest.TempDir(t)
 	*dirs = append(*dirs, d)
 	return d
 }
@@ -158,6 +158,9 @@ func TestForenseEnSinEspanol(t *testing.T) {
 	got := forenseCasos(t, i18n.WithLocale(context.Background(), "en"))
 	base := forenseCasos(t, i18n.WithLocale(context.Background(), "es"))
 	for k, v := range got {
+		if runtime.GOOS == "windows" && (k == "fuga_dir_malo" || k == "crash_err_no_existe") { // entradas «/no/existe» de Linux
+			continue
+		}
 		if k == "crash_err_directorio" || k == "patrones_sin_patrol" { // el texto viene de internal/sys (fuera del bloque D)
 			continue
 		}

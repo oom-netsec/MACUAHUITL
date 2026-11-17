@@ -2,8 +2,10 @@ package core
 
 import (
 	"context"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +56,11 @@ func TestPreferenciasDelNucleoPersistenYRigen(t *testing.T) {
 // carpetaSegura crea una carpeta 0700 junto a las pruebas: /tmp es de todos y la validación no la acepta como ancestro.
 func carpetaSegura(t *testing.T) string {
 	t.Helper()
-	d, err := os.MkdirTemp(".", "salidas-")
+	base := "." // en Windows el checkout lo escribe Users (ancestro inseguro): se usa el temporal del usuario
+	if runtime.GOOS == "windows" {
+		base = t.TempDir()
+	}
+	d, err := os.MkdirTemp(base, "salidas-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,12 +69,18 @@ func carpetaSegura(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := sys.MkdirPrivate(abs); err != nil { // en Windows hereda la ACL del checkout (CREATOR OWNER, Users)
+		t.Fatal(err)
+	}
 	return abs
 }
 
 // Al arrancar se revalida la carpeta guardada: si dejó de ser 0700 rige la de fábrica, queda una entrada prefs.core
 // con el motivo y GetCorePrefs lo avisa en note; los defaults de ingest guardados siguen.
 func TestArranqueRevalidaLaCarpetaGuardada(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la carpeta se vuelve «laxa» con chmod 0755 (modelo POSIX); en Windows el chequeo es por ACL")
+	}
 	h := newHarness(t, nil)
 	nueva := carpetaSegura(t)
 	if _, err := v1.NewPrefsServiceClient(h.conn).SetCorePrefs(context.Background(), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: nueva, IngestDefaults: &v1.IngestDefaults{MaxFiles: 12}}}); err != nil {

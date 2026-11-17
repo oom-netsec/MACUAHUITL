@@ -21,15 +21,13 @@ func metricasCasos(t *testing.T, ctx context.Context) map[string]string {
 	out := map[string]string{}
 	var dirs []string
 	tmp := func() string {
-		d := t.TempDir()
+		d := i18ntest.TempDir(t)
 		dirs = append(dirs, d)
 		return d
 	}
 	defer func() {
 		for k, v := range out {
-			for _, d := range dirs {
-				v = strings.ReplaceAll(v, d, "<dir>")
-			}
+			v = i18ntest.Dirs(v, dirs)
 			out[k] = v
 		}
 	}()
@@ -102,7 +100,8 @@ func metricasCasos(t *testing.T, ctx context.Context) map[string]string {
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de métricas devuelve lo mismo que antes del catálogo.
 func TestMetricasRegresionEs(t *testing.T) {
 	base := metricasCasos(t, i18n.WithLocale(context.Background(), "es"))
-	i18ntest.Golden(t, "testdata/metricas_es.golden.json", base)
+	// el texto de «no existe» es del sistema operativo (Linux: «no such file or directory»)
+	i18ntest.Golden(t, "testdata/metricas_es.golden.json", base, "metricas_err_no_existe")
 	for _, loc := range []string{"es", "es-MX"} {
 		for k, v := range metricasCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {

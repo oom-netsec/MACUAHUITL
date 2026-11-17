@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -13,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeIfaces struct {
@@ -31,7 +31,7 @@ func startServices(t *testing.T, reg func(ipc.Registrar)) (*Bridge, *recorder) {
 	t.Helper()
 	d, _ := os.MkdirTemp("", "brg")
 	t.Cleanup(func() { os.RemoveAll(d) })
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

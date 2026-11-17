@@ -42,12 +42,12 @@ func mustDial(t *testing.T, addr string, r Ready) *ssh.Client {
 }
 
 func TestSFTPServer(t *testing.T) {
-	pub := t.TempDir()
+	pub := realTemp(t)
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("contenido A"), 0o600)
 	os.Mkdir(filepath.Join(pub, "sub"), 0o700)
 	os.WriteFile(filepath.Join(pub, "sub", "x"), []byte("x"), 0o600)
 	os.Symlink("/etc/hostname", filepath.Join(pub, "enlace"))
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "sftp", FromDir: pub, Write: true, RecvDir: recv})
 	if r.User == "" || len(r.Pass) < 12 || len(r.Fingerprints) != 2 || !strings.HasPrefix(r.Fingerprints[0], "SHA256:") {
 		t.Fatalf("ready = %+v", r)
@@ -145,7 +145,7 @@ func TestSFTPServer(t *testing.T) {
 }
 
 func TestSFTPCapsAndSeparateModes(t *testing.T) {
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "sftp", Write: true, RecvDir: recv, MaxFile: 100, MaxTotal: 150})
 	cl, _ := sftp.NewClient(mustDial(t, s.addr, r))
 	defer cl.Close()
@@ -213,7 +213,7 @@ func newSession(t *testing.T, c *ssh.Client) *ssh.Session {
 func TestSSHRejectsShellExecAndForwarding(t *testing.T) {
 	p, _ := image(t, "a.bin", 10)
 	for _, proto := range []string{"scp", "sftp"} {
-		s, r := startCfg(t, Config{Proto: proto, Files: []string{p}, Write: true, RecvDir: t.TempDir()})
+		s, r := startCfg(t, Config{Proto: proto, Files: []string{p}, Write: true, RecvDir: realTemp(t)})
 		c := mustDial(t, s.addr, r)
 		sess := newSession(t, c)
 		if err := sess.Shell(); err == nil {
@@ -406,9 +406,9 @@ func scpDownload(c *ssh.Client, path string) ([]byte, error) {
 }
 
 func TestSCPServer(t *testing.T) {
-	pub := t.TempDir()
+	pub := realTemp(t)
 	os.WriteFile(filepath.Join(pub, "img.bin"), []byte("imagen"), 0o600)
-	recv := t.TempDir()
+	recv := realTemp(t)
 	s, r := startCfg(t, Config{Proto: "scp", FromDir: pub, Write: true, RecvDir: recv, MaxFile: 1000, MaxTotal: 1500})
 	c := mustDial(t, s.addr, r)
 	got, err := scpDownload(c, "img.bin")
@@ -457,7 +457,7 @@ func TestSCPServer(t *testing.T) {
 		t.Error("quedó un archivo sobre el tope total")
 	}
 	// Modos por separado.
-	sw, rw := startCfg(t, Config{Proto: "scp", Write: true, RecvDir: t.TempDir()})
+	sw, rw := startCfg(t, Config{Proto: "scp", Write: true, RecvDir: realTemp(t)})
 	if _, err := scpDownload(mustDial(t, sw.addr, rw), "img.bin"); err == nil {
 		t.Error("lectura habilitada sin pedirla")
 	}
@@ -520,7 +520,7 @@ var _ = net.IPv4
 func TestSFTPPartialUploadDiscarded(t *testing.T) {
 	for _, how := range []string{"cliente cae", "servidor se detiene"} {
 		t.Run(how, func(t *testing.T) {
-			recv := t.TempDir()
+			recv := realTemp(t)
 			s, r := startCfg(t, Config{Proto: "sftp", Write: true, RecvDir: recv})
 			ssh1 := mustDial(t, s.addr, r)
 			cl, err := sftp.NewClient(ssh1)

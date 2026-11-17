@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // headerEvents imita al núcleo: valida, se suscribe al bus (lento) y solo entonces manda los encabezados.
@@ -53,7 +53,7 @@ func headerBridge(t *testing.T, f *headerEvents) *Bridge {
 	t.Helper()
 	d, _ := os.MkdirTemp("", "brg")
 	t.Cleanup(func() { os.RemoveAll(d) })
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

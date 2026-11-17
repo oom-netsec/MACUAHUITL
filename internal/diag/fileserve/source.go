@@ -22,6 +22,7 @@ type source struct {
 	infos map[string]os.FileInfo // lo que eran al publicarlos: si luego son otro archivo, no se sirven
 	dir   string                 // ruta real ya validada; vacía = sin carpeta
 	root  *os.Root               // la carpeta abierta una vez: toda la lectura va por aquí
+	deny  []string               // carpetas extra negadas (DenyDirs): se aplican a la ruta real de cada archivo abierto
 	rcv   *receiver              // si recibe en la misma carpeta, lo que aún se escribe no se entrega
 }
 
@@ -103,6 +104,10 @@ func (s *source) open(name string) (*os.File, os.FileInfo, error) {
 		f.Close()
 		return nil, nil, errNotPublished
 	}
+	if err := checkFinal(f, s.deny); err != nil { // junctions que EvalSymlinks no ve: manda la ruta real del handle
+		f.Close()
+		return nil, nil, err
+	}
 	// Decide el handle ya abierto (en Windows un FileInfo no trae la cuenta de enlaces); si no se puede saber, se rechaza.
 	if hl, err := sys.HardLinkedFile(f); err != nil || hl {
 		f.Close()
@@ -159,7 +164,7 @@ func OpenFrom(dir, name string, deny ...string) (*os.File, os.FileInfo, error) {
 		return nil, nil, err
 	}
 	defer root.Close() // el archivo abierto sigue siendo válido
-	f, fi, err := (&source{dir: real, root: root}).open(name)
+	f, fi, err := (&source{dir: real, root: root, deny: deny}).open(name)
 	if err != nil {
 		return nil, nil, i18n.New("fileserve.err.not_regular_in", i18n.A("name", name, "dir", real))
 	}

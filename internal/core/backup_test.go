@@ -8,6 +8,8 @@ import (
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 // backupRun arma un respaldo (primero sin armar para ver la huella de la llave de host).
@@ -68,7 +70,7 @@ func TestRespaldoDeExtremoAExtremo(t *testing.T) {
 		}
 	}
 	fi, err := os.Stat(filepath.Join(h.out, "respaldos", id+".cfg"))
-	if err != nil || fi.Mode().Perm() != 0o600 {
+	if err != nil || !testperm.Private(filepath.Join(h.out, "respaldos", id+".cfg"), 0o600) {
 		t.Errorf("archivo: %v %v", fi, err)
 	}
 	// La carpeta de Patrol se limpió: lo único en respaldos/ es la del equipo y .trabajos vacío.

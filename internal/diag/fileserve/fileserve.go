@@ -292,6 +292,9 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if !filepath.IsAbs(f) {
 			return nil, nil, i18n.New("fileserve.err.path_relative", i18n.A("path", f))
 		}
+		if exigeUnidad && sinLetraDeUnidad(filepath.Clean(f)) { // antes de tocar la ruta: una UNC abriría SMB y filtraría NTLM
+			return nil, nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", f))
+		}
 		// Se resuelve el enlace una sola vez y se publica la ruta real: lo que se comprueba es lo que se sirve
 		// (un enlace que cambie después no desvía); si no se puede resolver, se rechaza.
 		real, err := evalSymlinks(filepath.Clean(f))
@@ -314,6 +317,18 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		}
 		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
+		}
+		// shortcut: decide por sistema y no por finalPath; si otro sistema llega a devolver la ruta del handle, cambiar a esa condición.
+		if goos == "windows" { // en otros sistemas finalPath no devuelve nada: abrir de más no sirve
+			h, err := sys.OpenRegular(real) // la ruta real del handle: una junction intermedia no la ve EvalSymlinks
+			if err != nil {
+				return nil, nil, fmt.Errorf("fileserve: %w", err)
+			}
+			err = checkFinal(h, extraDeny)
+			h.Close()
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		// Rechazo temprano con el FileInfo (en Windows no ve enlaces); al servir, source.open vuelve a decidir con
 		// HardLinkedFile sobre el archivo abierto.
@@ -349,7 +364,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 			return nil, nil, i18n.New("fileserve.err.passive_range", i18n.A("lo", lo, "hi", hi))
 		}
 	}
-	src = &source{}
+	src = &source{deny: c.DenyDirs}
 	defer func() {
 		if err != nil {
 			closeAll(src, rcv)

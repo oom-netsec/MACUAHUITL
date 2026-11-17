@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"io"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +34,7 @@ type Deps struct {
 	Look    func(string) (string, error)
 	H       *transport.KnownHosts
 	S       *service.CoreSettings
+	Deny    []string // lo que devuelve DenyDirs (carpetas de datos y configuración de la app)
 	db      *sql.DB
 	clock   func() time.Time
 	closers []func()
@@ -43,6 +46,9 @@ func New(t *testing.T) *Deps {
 	t.Helper()
 	vault.MinMemoryKiB = 8192 // las pruebas bajan el piso del KDF, como las del núcleo
 	root := t.TempDir()
+	if r, err := filepath.EvalSymlinks(root); err == nil { // en Windows TEMP viene en formato corto: los textos traen la ruta larga
+		root = r
+	}
 	db, err := store.Open(filepath.Join(root, "macuahuitl.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +83,9 @@ func (d *Deps) AuditText() string {
 	if err := d.ExportAudit(context.Background(), &b, time.Time{}, time.Now().Add(24*time.Hour)); err != nil {
 		d.T.Fatal(err)
 	}
+	if runtime.GOOS == "windows" { // JSON duplica las barras invertidas de las rutas: así las pruebas las buscan tal cual
+		return strings.ReplaceAll(b.String(), `\\`, `\`)
+	}
 	return b.String()
 }
 
@@ -103,6 +112,7 @@ func (d *Deps) DB() *sql.DB                                { return d.db }
 func (d *Deps) Outputs() string                            { return d.S.Outputs() }
 func (d *Deps) Settings() *service.CoreSettings            { return d.S }
 func (d *Deps) DiagLookPath() func(string) (string, error) { return d.Look }
+func (d *Deps) DenyDirs() []string                         { return d.Deny }
 func (d *Deps) Hosts() *transport.KnownHosts               { return d.H }
 func (d *Deps) OnClose(f func())                           { d.closers = append(d.closers, f) }
 

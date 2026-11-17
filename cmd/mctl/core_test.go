@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"os"
 	"strings"
 	"testing"
@@ -33,13 +34,19 @@ func coreStopEnv(t *testing.T, shutdown func() error) *bytes.Buffer {
 	rt, _ := os.MkdirTemp("", "mctl")
 	t.Cleanup(func() { os.RemoveAll(rt) })
 	t.Setenv("XDG_RUNTIME_DIR", rt)
+	ipctest.Isolate(t)
 	var stderr bytes.Buffer
 	pid, wait, errOut := corecmd.ServerPID, corecmd.WaitExit, corecmd.Stderr
 	corecmd.Stderr = &stderr
 	t.Cleanup(func() { corecmd.ServerPID, corecmd.WaitExit, corecmd.Stderr = pid, wait, errOut })
 	if shutdown != nil {
 		sock, _ := ipc.SocketPath()
+		// El pipe de Windows tarda en liberarse tras el Stop de la prueba anterior: se reintenta un momento.
 		l, err := ipc.Listen(sock)
+		for end := time.Now().Add(3 * time.Second); err != nil && time.Now().Before(end); {
+			time.Sleep(50 * time.Millisecond)
+			l, err = ipc.Listen(sock)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

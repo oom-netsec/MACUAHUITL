@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -11,7 +12,10 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/radiustest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tacacstest"
 	"github.com/oom-netsec/MACUAHUITL/internal/ikedec"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
+
+var slashRun = regexp.MustCompile(`\\+`)
 
 func TestSecurityCommands(t *testing.T) {
 	_, f, _, _ := runtime.Caller(0)
@@ -50,7 +54,7 @@ func TestSecurityCommands(t *testing.T) {
 	must(t, "capw\ncapw\n", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
 	must(t, "kpw\nkpw\n", "pki", "csr", "--cn", "ise01.lab", "--dns", "ise01.lab", "--ip", "10.0.0.10", "-o", "ise01")
 	for _, f := range []string{"ca/ca.crt.pem", "ca/ca.key.pem", "ise01.csr.pem", "ise01.key.pem"} {
-		if st, err := os.Stat(f); err != nil || st.Mode().Perm() != 0o600 {
+		if st, err := os.Stat(f); err != nil || !testperm.PrivateStrict(f, 0o600) {
 			t.Fatalf("%s: %v %v", f, st, err)
 		}
 	}
@@ -66,7 +70,7 @@ func TestSecurityCommands(t *testing.T) {
 		t.Fatal("p12 vacío")
 	}
 	// La auditoría registra la ruta absoluta del export aunque -o sea relativa: el núcleo no conoce la carpeta de mctl.
-	if abs, _ := filepath.Abs("ise01.p12"); !strings.Contains(must(t, "", "audit", "export"), abs) {
+	if abs, _ := filepath.Abs("ise01.p12"); !strings.Contains(slashRun.ReplaceAllString(must(t, "", "audit", "export"), `\`), abs) { // dest=%q y el JSON duplican las barras invertidas de Windows
 		t.Fatalf("la auditoría no trae la ruta absoluta %s", abs)
 	}
 	must(t, "kpw\nkpw\n", "pki", "key", "--alg", "p384", "-o", "otra.key.pem")

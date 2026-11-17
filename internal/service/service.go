@@ -58,6 +58,8 @@ type Deps interface {
 	// Patrol y ValidateJob dejan a la ventana de cambio crear y armar trabajos como cualquier cliente.
 	Patrol() v1.PatrolServiceServer
 	ValidateJob(context.Context, *v1.JobSpec) error
+	// DenyDirs son las carpetas de datos y configuración de la app: ni se publica ni se recibe en ellas (bóveda, base).
+	DenyDirs() []string
 	// Hosts son las llaves de host conocidas (para los servicios que abren SSH por su cuenta).
 	Hosts() *transport.KnownHosts
 	// OnClose registra f para que el núcleo la corra al cerrarse, antes de cerrar la base de datos

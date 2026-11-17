@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -38,6 +39,7 @@ func startFake(t *testing.T) *fakeCore {
 	rt, _ := os.MkdirTemp("", "mctl")
 	t.Cleanup(func() { os.RemoveAll(rt) })
 	t.Setenv("XDG_RUNTIME_DIR", rt)
+	ipctest.Isolate(t)
 	sock, _ := ipc.SocketPath()
 	l, err := ipc.Listen(sock)
 	if err != nil {

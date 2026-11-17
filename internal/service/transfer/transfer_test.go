@@ -23,6 +23,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -109,10 +110,10 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 	if !strings.HasPrefix(rd.RecvDir, filepath.Join(d.Out, "recibidos")) {
 		t.Fatalf("recv_dir = %q", rd.RecvDir)
 	}
-	if st, err := os.Stat(rd.RecvDir); err != nil || st.Mode().Perm() != 0o700 {
+	if st, err := os.Stat(rd.RecvDir); err != nil || !testperm.Private(rd.RecvDir, 0o700) {
 		t.Fatalf("carpeta de recepción: %v %v", st, err)
 	}
-	if !strings.Contains(rd.Hint, "copy running-config tftp://127.0.0.1/") || !strings.Contains(rd.Hint, "udp dport 69 redirect to :") {
+	if !strings.Contains(rd.Hint, "copy running-config tftp://127.0.0.1/") || (runtime.GOOS != "windows" && !strings.Contains(rd.Hint, "udp dport 69 redirect to :")) { // en Windows la pista es la regla del firewall
 		t.Fatalf("hint = %s", rd.Hint)
 	}
 	// Con el cliente propio: subir y bajar.
@@ -156,7 +157,11 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 			closed = c
 		}
 	}
-	if closed == nil || closed.Cleanup != "sudo nft delete table ip macuahuitl_tftp_"+port {
+	cleanup := "sudo nft delete table ip macuahuitl_tftp_" + port
+	if runtime.GOOS == "windows" { // en Windows se quita la regla del firewall
+		cleanup = "Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 127.0.0.1 " + port + "'"
+	}
+	if closed == nil || closed.Cleanup != cleanup {
 		t.Fatalf("evento de cierre = %+v", closed)
 	}
 	if r, _ := s.StopServer(context.Background(), &v1.StopServerRequest{ServerId: rd.ServerId}); r.Stopped {
@@ -399,6 +404,9 @@ func TestGetDefaultsToReceiveFolderAndSha512(t *testing.T) {
 }
 
 func TestRedirectHintRPC(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la pista es la regla nft de Linux; en Windows es New-NetFirewallRule (firewall_test.go)")
+	}
 	s, _ := newTest(t)
 	r, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
 	if err != nil || r.StandardPort != 21 || !strings.Contains(r.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") ||
@@ -449,6 +457,9 @@ func TestAuditDropsURLQuery(t *testing.T) {
 
 // Fase 30d: RedirectHint sale en el idioma pedido; los comandos no cambian y con es el texto es el de siempre.
 func TestRedirectHintRPCEn(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la pista es la regla nft de Linux; en Windows es New-NetFirewallRule (firewall_test.go)")
+	}
 	s, _ := newTest(t)
 	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
 	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)
@@ -479,5 +490,41 @@ func TestRedirectHintRechazaZona(t *testing.T) {
 		if _, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "tftp", Port: 6969, Ip: ip}); err == nil {
 			t.Errorf("%q aceptada", ip)
 		}
+	}
+}
+
+// Las carpetas de datos y configuración de la app (bóveda, base) no se publican ni se reciben en ellas, en ningún sistema.
+func TestCarpetasDeLaAppSeRechazan(t *testing.T) {
+	s, d := newTest(t)
+	datos := t.TempDir()
+	d.Deny = []string{datos}
+	st := &fakeStream{ctx: context.Background(), out: make(chan *v1.StartServerResponse, 4)}
+	for name, req := range map[string]*v1.StartServerRequest{
+		"publica": {Protocol: "tftp", Listen: "127.0.0.1", FromDir: datos},
+		"recibe":  {Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: datos},
+	} {
+		if err := s.StartServer(req, st); code(err) != codes.InvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "http://127.0.0.1/a", DestDir: datos}); code(err) != codes.InvalidArgument {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := s.Put(context.Background(), &v1.PutRequest{Url: "http://127.0.0.1/a", FromDir: datos, Name: "x"}); code(err) != codes.InvalidArgument {
+		t.Errorf("put: %v", err)
+	}
+}
+
+// Put con un archivo que sí existe en una carpeta negada se rechaza por la lista, no por falta de archivo.
+func TestPutDesdeCarpetaNegadaConArchivoReal(t *testing.T) {
+	s, d := newTest(t)
+	datos := t.TempDir()
+	if err := os.WriteFile(filepath.Join(datos, "x"), []byte("secreto"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.Deny = []string{datos}
+	_, err := s.Put(context.Background(), &v1.PutRequest{Url: "http://127.0.0.1/a", FromDir: datos, Name: "x"})
+	if code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), datos) {
+		t.Errorf("put: %v", err)
 	}
 }

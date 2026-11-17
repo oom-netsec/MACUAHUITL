@@ -27,6 +27,7 @@ func hintsEs() map[string]string {
 }
 
 func TestHintsEspanolRegresion(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	got := hintsEs()
 	const file = "testdata/hints_es.golden.json"
 	if os.Getenv("UPDATE_GOLDEN") != "" {

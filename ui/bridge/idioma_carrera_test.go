@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -10,6 +9,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // lentoCore lee ui.language con el valor viejo y lo entrega solo cuando se le libera.
@@ -48,7 +48,7 @@ func (f *lentoCore) get() string { f.mu.Lock(); defer f.mu.Unlock(); return f.la
 
 func servir(t *testing.T, f *lentoCore) string {
 	t.Helper()
-	sock := filepath.Join(t.TempDir(), "core.sock")
+	sock := ipctest.Addr(t.TempDir())
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

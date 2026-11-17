@@ -10,11 +10,15 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeMetrics struct {
 	v1.UnimplementedMetricsServiceServer
 }
+
+// trabajoAbs es una ruta absoluta en todos los sistemas (en Windows «/tmp/trabajo» no lo es y viajaría como ID de trabajo).
+var trabajoAbs, _ = filepath.Abs("/tmp/trabajo")
 
 func (fakeMetrics) GetJobMetrics(_ context.Context, r *v1.GetJobMetricsRequest) (*v1.GetJobMetricsResponse, error) {
 	return &v1.GetJobMetricsResponse{Warnings: []string{"job=" + r.JobId + " dir=" + r.Dir}, Devices: []*v1.DeviceMetrics{{
@@ -39,7 +43,7 @@ func (fakeMetrics) GetPortStatus(_ context.Context, r *v1.GetPortStatusRequest) 
 func TestMetricsBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,7 +59,7 @@ func TestMetricsBridge(t *testing.T) {
 		t.Fatalf("respuesta = %+v", r)
 	}
 	// una ruta absoluta viaja como carpeta
-	if r, _ = b.JobMetrics(MetricsQueryDTO{Job: "/tmp/trabajo"}); r.Warnings[0] != "job= dir=/tmp/trabajo" {
+	if r, _ = b.JobMetrics(MetricsQueryDTO{Job: trabajoAbs}); r.Warnings[0] != "job= dir="+trabajoAbs {
 		t.Fatalf("dir = %v", r.Warnings)
 	}
 	// las listas vacías viajan como [] y no como null
@@ -68,7 +72,7 @@ func TestMetricsBridge(t *testing.T) {
 func TestPortStatusBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -85,7 +89,7 @@ func TestPortStatusBridge(t *testing.T) {
 	if r, _ = b.PortStatus(PortStatusQueryDTO{Job: "abc"}); r.Source != "job" || r.Warnings[0] != "cred= job=abc dir=" {
 		t.Fatalf("trabajo: %+v", r)
 	}
-	if r, _ = b.PortStatus(PortStatusQueryDTO{Job: "/tmp/trabajo"}); r.Warnings[0] != "cred= job= dir=/tmp/trabajo" {
+	if r, _ = b.PortStatus(PortStatusQueryDTO{Job: trabajoAbs}); r.Warnings[0] != "cred= job= dir="+trabajoAbs {
 		t.Fatalf("carpeta: %+v", r)
 	}
 }

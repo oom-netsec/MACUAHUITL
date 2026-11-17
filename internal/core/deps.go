@@ -28,6 +28,7 @@ func (d coreDeps) DB() *sql.DB                                { return d.c.db }
 func (d coreDeps) Outputs() string                            { return d.c.settings.Outputs() }
 func (d coreDeps) Settings() *service.CoreSettings            { return d.c.settings }
 func (d coreDeps) DiagLookPath() func(string) (string, error) { return d.c.o.DiagLookPath }
+func (d coreDeps) DenyDirs() []string                         { return []string{d.c.p.Data, d.c.p.Config, d.c.p.State} }
 func (d coreDeps) Hosts() *transport.KnownHosts               { return d.c.hosts }
 func (d coreDeps) OnClose(f func()) {
 	d.c.mu.Lock()

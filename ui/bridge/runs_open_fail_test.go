@@ -2,17 +2,17 @@ package bridge
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // Si abrir el stream falla, DiagRun y SyslogStart no dejan su id en b.runs (nadie lo cancelaría ni lo borraría).
 func TestRunsSeBorranSiFallaAbrirElStream(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	defer startFake(t, sock)()
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	c, err := b.client()

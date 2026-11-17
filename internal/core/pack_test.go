@@ -15,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func writeMpack(t *testing.T, b []byte) string {
@@ -774,8 +775,11 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 	pk := v1.NewPackServiceClient(h.conn)
 	dir := filepath.Join(h.p.Data, "packs")
 	os.MkdirAll(dir, 0o700)
-	os.Chmod(dir, 0o500) // el extract no puede crear su carpeta temporal
-	t.Cleanup(func() { os.Chmod(dir, 0o700) })
+	restore, err := sys.ReadOnlyDir(dir) // 0500 en Linux; en Windows una DACL sin escritura: el extract no puede crear su carpeta temporal
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(restore)
 	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})); err == nil {
 		t.Fatal("el extract debía fallar")
 	}
@@ -784,7 +788,7 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("quedaron %d elecciones guardadas de una instalación fallida", n)
 	}
-	os.Chmod(dir, 0o700)
+	restore()
 	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)

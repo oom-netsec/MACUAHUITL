@@ -3,12 +3,12 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeVis struct {
@@ -42,7 +42,7 @@ func (fakeVis) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityService_SnmpTra
 func TestVisibilityBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -52,11 +52,11 @@ func TestVisibilityBridge(t *testing.T) {
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
 	Start(ctx, b)
 
-	r, err := b.TopoBuild("/tmp/trabajo", "")
+	r, err := b.TopoBuild(trabajoAbs, "")
 	if err != nil || r.Svg != "<svg/>" || r.Text != "topo" || r.Json == "" {
 		t.Fatalf("%+v %v", r, err)
 	}
-	if q := <-fv.topo; q.Dir != "/tmp/trabajo" || q.JobId != "" {
+	if q := <-fv.topo; q.Dir != trabajoAbs || q.JobId != "" {
 		t.Fatalf("request = %+v", q)
 	}
 	b.TopoBuild("abc123", "/tmp/c.pcap")

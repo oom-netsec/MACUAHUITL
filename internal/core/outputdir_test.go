@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -32,20 +33,25 @@ func TestCreateJobValidaOutputDirComoAjustes(t *testing.T) {
 			t.Fatalf("esperaba InvalidArgument prefs.outputs.%s, salió: %v", codigo, err)
 		}
 	}
-	_, err := crear("/tmp")
-	quiero(err, "reservada")
-	_, err = crear("/tmp/no-existe-fase31")
-	quiero(err, "no_existe")
+	var err error
+	if runtime.GOOS != "windows" { // «/tmp» no es ruta absoluta en Windows
+		_, err = crear("/tmp")
+		quiero(err, "reservada")
+		_, err = crear("/tmp/no-existe-fase31")
+		quiero(err, "no_existe")
+	}
 	_, err = crear("relativa")
 	quiero(err, "relativa")
 
-	laxa := filepath.Join(h.out, "laxa")
-	os.Mkdir(laxa, 0o700)
-	os.Chmod(laxa, 0o755)
-	_, err = crear(laxa)
-	quiero(err, "permisos")
-	if !strings.Contains(err.Error(), "chmod 700 "+laxa) {
-		t.Fatalf("falta el chmod sugerido: %v", err)
+	if runtime.GOOS != "windows" { // la carpeta «laxa» se fabrica con chmod 0755; en Windows la ACL la cubre internal/sys
+		laxa := filepath.Join(h.out, "laxa")
+		os.Mkdir(laxa, 0o700)
+		os.Chmod(laxa, 0o755)
+		_, err = crear(laxa)
+		quiero(err, "permisos")
+		if !strings.Contains(err.Error(), "chmod 700 "+laxa) {
+			t.Fatalf("falta el chmod sugerido: %v", err)
+		}
 	}
 
 	propia := filepath.Join(h.out, "propia")

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -309,8 +310,13 @@ func TestIdioma30eTransfer(t *testing.T) {
 	errHas(t, "put en", err, "LOCAL must be a file, not a folder")
 	_, err = mctl(t, "", "transfer", "put", "tftp://127.0.0.1/x", t.TempDir())
 	errHas(t, "put es", err, "LOCAL debe ser un archivo, no una carpeta")
-	has(t, "hint en", enMust(t, "", "transfer", "hint", "scp", "2222"), "The device uses port 22; the app listens on 2222.", "Redirect (you run it):", "To remove it when done:")
-	has(t, "hint es", must(t, "", "transfer", "hint", "scp", "2222"), "El equipo usa el puerto 22; la app escucha en el 2222.", "Redirección (la ejecutas tú):")
+	if runtime.GOOS == "windows" { // en Windows no hay redirección: la pista es la regla del firewall
+		has(t, "hint en", enMust(t, "", "transfer", "hint", "scp", "2222"), "The device uses port 22; the app listens on 2222.", "Windows has no redirection", "To remove it when done:")
+		has(t, "hint es", must(t, "", "transfer", "hint", "scp", "2222"), "El equipo usa el puerto 22; la app escucha en el 2222.", "En Windows no hay redirección")
+	} else {
+		has(t, "hint en", enMust(t, "", "transfer", "hint", "scp", "2222"), "The device uses port 22; the app listens on 2222.", "Redirect (you run it):", "To remove it when done:")
+		has(t, "hint es", must(t, "", "transfer", "hint", "scp", "2222"), "El equipo usa el puerto 22; la app escucha en el 2222.", "Redirección (la ejecutas tú):")
+	}
 	has(t, "list en", enMust(t, "", "transfer", "list"), "no servers are open")
 	has(t, "list es", must(t, "", "transfer", "list"), "no hay servidores abiertos")
 	_, err = en(t, "", "transfer", "stop", "no-existe")

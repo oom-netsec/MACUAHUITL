@@ -3,12 +3,12 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeAnalysis struct {
@@ -32,7 +32,7 @@ func (f fakeAnalysis) Timeline(_ context.Context, r *v1.TimelineRequest) (*v1.Ti
 func TestAnalysisBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

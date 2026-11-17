@@ -3,12 +3,25 @@ package main
 import (
 	"os"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 )
+
+// readHelp lee el golden; en Windows el texto en español cambia las dos líneas de los puertos estándar (field.helpFor y
+// transfer.helpFor: no hay sysctl ni puertos privilegiados), así que se les aplica el mismo cambio al golden de Linux.
+func readHelp(file string) ([]byte, error) {
+	b, err := os.ReadFile(file)
+	if err != nil || runtime.GOOS != "windows" {
+		return b, err
+	}
+	s := strings.Replace(string(b), "(TFTP en el 69 y HTTP en el 80; si el kernel no deja abrirlos, el error trae la orden de sysctl)", "(TFTP en el 69 y HTTP en el 80: Windows no tiene puertos privilegiados, falta la regla del firewall)", 1)
+	s = strings.Replace(s, " (si el kernel no deja abrirlos, el error trae la orden de sysctl)", " (sin puertos privilegiados; la regla del firewall la corres tú)", 1)
+	return []byte(s), nil
+}
 
 // La ayuda es contrato: testdata/help.golden (inglés, el canónico) y help_es.golden (--lang es) son el texto de --help
 // (con salto final).
@@ -17,7 +30,7 @@ func TestHelpGolden(t *testing.T) {
 		file string
 		pre  []string
 	}{{"testdata/help.golden", nil}, {"testdata/help_es.golden", []string{"--lang", "es"}}} {
-		want, err := os.ReadFile(c.file)
+		want, err := readHelp(c.file)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -43,8 +56,8 @@ func TestHelpGolden(t *testing.T) {
 // La ayuda en inglés y la de --lang es dicen lo mismo línea por línea: el mismo comando (sus primeras palabras) y las
 // mismas banderas --x; solo cambia la prosa.
 func TestHelpMismasLineas(t *testing.T) {
-	en, _ := os.ReadFile("testdata/help.golden")
-	es, _ := os.ReadFile("testdata/help_es.golden")
+	en, _ := readHelp("testdata/help.golden")
+	es, _ := readHelp("testdata/help_es.golden")
 	le, ls := strings.Split(string(en), "\n"), strings.Split(string(es), "\n")
 	if len(le) != len(ls) {
 		t.Fatalf("en tiene %d líneas y es %d", len(le), len(ls))
@@ -88,8 +101,8 @@ func TestAreasTable(t *testing.T) {
 
 // Con la bandera de idioma delante, --help, -h, help y --version siguen siendo ayuda y versión, no un error de uso.
 func TestAyudaConLang(t *testing.T) {
-	en, _ := os.ReadFile("testdata/help.golden")
-	es, _ := os.ReadFile("testdata/help_es.golden")
+	en, _ := readHelp("testdata/help.golden")
+	es, _ := readHelp("testdata/help_es.golden")
 	for _, pre := range [][]string{{"--lang", "en"}, {"--lang=es"}, {"--no-color", "--lang", "en"}, {"--no-color", "--lang=es"}} {
 		want := en
 		if strings.Contains(strings.Join(pre, " "), "es") {

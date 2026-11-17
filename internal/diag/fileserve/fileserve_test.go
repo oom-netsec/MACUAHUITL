@@ -71,7 +71,7 @@ func image(t *testing.T, name string, size int) (string, []byte) {
 	t.Helper()
 	b := make([]byte, size)
 	rand.Read(b)
-	p := filepath.Join(t.TempDir(), name)
+	p := filepath.Join(realTemp(t), name)
 	os.WriteFile(p, b, 0o600)
 	return p, b
 }
@@ -87,7 +87,7 @@ func TestValidate(t *testing.T) {
 			t.Errorf("%+v aceptado", c)
 		}
 	}
-	d := t.TempDir()
+	d := realTemp(t)
 	a, _ := image(t, "c3560.bin", 1)
 	b := filepath.Join(d, "c3560.bin")
 	os.WriteFile(b, nil, 0o600)
@@ -379,6 +379,7 @@ func TestHTTPServesOnlyPublishedWithRange(t *testing.T) {
 }
 
 func TestRedirectHint(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	h := TFTPRedirectHint("10.0.0.5", 6969)
 	if !strings.Contains(h, "udp dport 69 redirect to :6969") {
 		t.Fatal(h)
@@ -400,6 +401,7 @@ func TestRedirectHint(t *testing.T) {
 // La regla de nftables es estrecha (solo la IP de escucha), vive en una tabla propia de ese
 // servidor y trae el comando exacto para quitarla.
 func TestRedirectHintIsNarrow(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	h := RedirectHint("tftp", "10.0.0.5", 6969)
 	for _, w := range []string{"nft add table ip macuahuitl_tftp_6969", "ip daddr 10.0.0.5 udp dport 69 redirect to :6969"} {
 		if !strings.Contains(h, w) {
@@ -439,7 +441,7 @@ func TestFTPHintWarnsCleartext(t *testing.T) {
 
 // El rango de datos pasivos: el bind decide los puertos bajos; solo se rechaza el 0 y MIN > MAX.
 func TestFTPPassiveRangeMin(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	for _, r := range [][2]uint16{{0, 5000}, {2000, 1500}} {
 		if err := Check(Config{Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: dir, PassivePorts: r}); err == nil {
 			t.Errorf("rango %v aceptado", r)

@@ -3,11 +3,11 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // fakeVisOpts guarda lo que pidió la interfaz y devuelve un archivo nuevo y descartes.
@@ -42,7 +42,7 @@ const dropsJSON = `"drops":{"total":7,"porOrigen":5,"global":1,"colaLlena":1,"si
 func TestTrapsAndFlowsBridgeOptionsAndEvents(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

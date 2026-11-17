@@ -98,7 +98,7 @@ func (r *Request) tftpOpen(ctx context.Context) (*tftpConn, string, func(), erro
 		return nil, "", nil, err
 	}
 	stop := closeOnDone(ctx, pc)
-	return &tftpConn{pc: pc, srv: srv, buf: make([]byte, 4+65464+1)}, file, func() { stop(); pc.Close() }, nil
+	return &tftpConn{pc: pc, srv: srv, buf: make([]byte, 65535)}, file /* máximo UDP: con menos, Windows falla la lectura (WSAEMSGSIZE) */, func() { stop(); pc.Close() }, nil
 }
 
 // oackOpts lee las opciones de un OACK en minúsculas.

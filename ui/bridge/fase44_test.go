@@ -3,11 +3,11 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // Doble de la bóveda y del inventario de la fase 44: guarda lo último que recibió.
@@ -93,7 +93,7 @@ func (f *fake44) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 func new44(t *testing.T) (*Bridge, *fake44) {
 	d, _ := os.MkdirTemp("", "brg")
 	t.Cleanup(func() { os.RemoveAll(d) })
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

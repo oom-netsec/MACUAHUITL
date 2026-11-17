@@ -19,15 +19,13 @@ func motivosEs(t *testing.T) map[string]string {
 	out := map[string]string{}
 	var dirs []string
 	tmp := func() string {
-		d := t.TempDir()
+		d := realTemp(t)
 		dirs = append(dirs, d)
 		return d
 	}
 	defer func() {
 		for k, v := range out {
-			for _, d := range dirs {
-				v = strings.ReplaceAll(v, d, "<dir>")
-			}
+			v = i18ntest.Dirs(v, dirs)
 			out[k] = v
 		}
 	}()
@@ -87,7 +85,8 @@ func motivosEs(t *testing.T) map[string]string {
 }
 
 func TestMotivosEsRegresion(t *testing.T) {
-	i18ntest.Golden(t, "testdata/fileserve_es.golden.json", motivosEs(t))
+	// En Windows no hay /etc ni «/» absoluta y el texto de un error del sistema es otro; lo cubre TestValidateDir.
+	i18ntest.Golden(t, "testdata/fileserve_es.golden.json", motivosEs(t), "dir_sensible", "dir_raiz", "dir_no_existe")
 }
 
 // Todo motivo fijo que el código usa (lit("…")) y toda clave con argumentos (why("clave", …)) está en el catálogo, y la

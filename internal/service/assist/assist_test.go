@@ -99,6 +99,9 @@ func (r *rig) state(run string) *v1.AssistRunState {
 // espera es el plazo de las esperas de estado: 5 s, y el triple con -race, que en CI va hasta 2,3 veces más lento
 // (un paso aplicado contra el simulador no alcanzó 5 s en un runner cargado).
 func espera() time.Duration {
+	if runtime.GOOS == "windows" { // el handshake SSH en el runner de Windows tarda varios segundos
+		return 40 * time.Second
+	}
 	if raceActivo {
 		return 15 * time.Second
 	}

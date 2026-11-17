@@ -15,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -130,7 +131,7 @@ func sinSecretos(t *testing.T, texto string, prohibidos ...string) {
 
 func TestRespaldoIdaYVuelta(t *testing.T) {
 	h, path := bovedaConRespaldo(t, nil)
-	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(path); err != nil || !testperm.PrivateStrict(path, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
 	// Bóveda vacía distinta: importa las 3.
@@ -174,7 +175,7 @@ func TestRespaldoIdaYVuelta(t *testing.T) {
 		a := hh.auditText(t)
 		sinSecretos(t, a, "MARKER", "PW-CORE", "PW-BORDE", "EN-", "USR-", fraseResp, "otra-maestra", "HMAC")
 	}
-	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, path) || !strings.Contains(a, "3 credentials") {
+	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, strings.ReplaceAll(path, `\`, `\\`)) || !strings.Contains(a, "3 credentials") {
 		t.Fatalf("audit export:\n%s", a)
 	}
 	if a := o.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.importar"`) || !strings.Contains(a, "3 new") {

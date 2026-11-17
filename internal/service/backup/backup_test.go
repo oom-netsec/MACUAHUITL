@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +72,7 @@ func TestCollectGuardaConPermisosYEsIdempotente(t *testing.T) {
 		t.Fatalf("archivos: %v", ents)
 	}
 	for _, e := range ents {
-		if fi, _ := e.Info(); fi.Mode().Perm() != 0o600 {
+		if fi, _ := e.Info(); !testperm.Private(filepath.Join(root, e.Name()), 0o600) {
 			t.Errorf("%s = %v", e.Name(), fi.Mode().Perm())
 		}
 	}

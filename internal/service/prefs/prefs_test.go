@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,6 +30,15 @@ func montar(t *testing.T) (*prefsSvc, *servicetest.Deps, string) {
 	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	t.Cleanup(func() { service.AncestorInfo = old })
 	return &prefsSvc{d: d}, d, root
+}
+
+// soloPosix salta pruebas que fabrican la carpeta «laxa» o el dueño ajeno con chmod/uid: en Windows el modelo es la ACL
+// (sys.PrivateDir, ADR 0012), que cubren internal/sys y outputs_windows_msg_test.go.
+func soloPosix(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("modelo POSIX (modo, uid, ancestros); en Windows el chequeo es por ACL")
+	}
 }
 
 func carpeta(t *testing.T, ruta string, modo os.FileMode) string {
@@ -63,12 +73,15 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 	carpeta(t, filepath.Join(datos, "sub"), 0o700)
 	carpeta(t, filepath.Join(root, "config"), 0o700)
 	laxa := carpeta(t, filepath.Join(root, "laxa"), 0o755)
+	sep, raiz := string(filepath.Separator), "/"
+	if runtime.GOOS == "windows" {
+		raiz = filepath.VolumeName(root) + `\`
+	}
 	cases := []struct{ name, dir, code string }{
 		{"relativa", "salidas", "relativa"},
-		{"con punto punto", root + "/laxa/../x", "punto_punto"},
+		{"con punto punto", root + sep + "laxa" + sep + ".." + sep + "x", "punto_punto"},
 		{"inexistente", filepath.Join(root, "no-existe"), "no_existe"},
 		{"un archivo", archivo, "no_directorio"},
-		{"modo 0755", laxa, "permisos"},
 		{"carpeta de datos", datos, "reservada"},
 		{"dentro de la de datos", filepath.Join(datos, "sub"), "reservada"},
 		{"carpeta de configuración", filepath.Join(root, "config"), "reservada"},
@@ -78,8 +91,11 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 		{"dentro de .ssh", carpeta(t, filepath.Join(root, ".ssh", "x"), 0o700), "reservada"},
 		{"HOME", root, "reservada"},
 		{"un ancestro de HOME", filepath.Dir(root), "reservada"},
-		{"raíz", "/", "reservada"},
-		{"/tmp", "/tmp", "reservada"},
+		{"raíz", raiz, "reservada"},
+	}
+	if runtime.GOOS != "windows" {
+		// Sin modos POSIX ni /tmp en Windows: ahí el rechazo por permisos es el de la ACL (TestWindowsOutputsErr en internal/service).
+		cases = append(cases, struct{ name, dir, code string }{"modo 0755", laxa, "permisos"}, struct{ name, dir, code string }{"/tmp", "/tmp", "reservada"})
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -89,12 +105,15 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 			}
 		})
 	}
-	if err := fija(s, laxa); !strings.Contains(err.Error(), "chmod 700 "+laxa) {
-		t.Fatalf("el rechazo por permisos debe sugerir la orden: %v", err)
+	if runtime.GOOS != "windows" {
+		if err := fija(s, laxa); !strings.Contains(err.Error(), "chmod 700 "+laxa) {
+			t.Fatalf("el rechazo por permisos debe sugerir la orden: %v", err)
+		}
 	}
 }
 
 func TestOutputsOtroDuenoSeRechaza(t *testing.T) {
+	soloPosix(t)
 	s, _, root := montar(t)
 	ok := carpeta(t, filepath.Join(root, "ok"), 0o700)
 	old := service.FileOwner
@@ -141,6 +160,7 @@ func TestOutputsAceptaYResuelveSymlinks(t *testing.T) {
 }
 
 func TestOutputsSymlinkAUnaCarpetaLaxaSeRechaza(t *testing.T) {
+	soloPosix(t)
 	s, _, root := montar(t)
 	laxa := carpeta(t, filepath.Join(root, "laxa"), 0o755)
 	enlace := filepath.Join(root, "enlace")
@@ -235,6 +255,7 @@ func TestSetCorePrefsPersisteAuditaYAvisa(t *testing.T) {
 
 // Un ancestro que otros pueden escribir deja que alguien reemplace la ruta (o la cree 0777 tras una limpieza de tmpfiles).
 func TestOutputsAncestroEscribiblePorOtrosSeRechaza(t *testing.T) {
+	soloPosix(t)
 	yo := uint32(os.Getuid())
 	cases := []struct {
 		name string
@@ -292,6 +313,7 @@ func TestOutputsBajoTmpCompartidoSeRechazaDeVerdad(t *testing.T) {
 // Al arrancar se revalida la carpeta guardada (dueño, 0700 y ancestros): si ya no vale, rige la de fábrica y
 // queda dicho el motivo.
 func TestCargarRevalidaLaCarpetaGuardada(t *testing.T) {
+	soloPosix(t)
 	_, d, root := montar(t)
 	dir := carpeta(t, filepath.Join(root, "guardada"), 0o700)
 	if err := service.SaveCoreSettings(d.DB(), d.Now(), dir, service.IngestDefaults{MaxFiles: 4}); err != nil {
@@ -326,6 +348,7 @@ func TestCargarRevalidaLaCarpetaGuardada(t *testing.T) {
 // Si la carpeta guardada ya no es válida y la persona cambia solo los defaults de ingest, el cambio se aplica y
 // el estado avisa del problema de la carpeta; al corregirla vuelve a regir.
 func TestCambiarSoloIngestConLaCarpetaGuardadaInvalidaAvisa(t *testing.T) {
+	soloPosix(t)
 	s, d, root := montar(t)
 	dir := carpeta(t, filepath.Join(root, "salidas"), 0o700)
 	if err := fija(s, dir); err != nil {
@@ -390,6 +413,7 @@ func TestUiLanguageSoloEsOEn(t *testing.T) {
 // El aviso de carpeta inválida se actualiza aunque nada más cambie, y la auditoría dice la carpeta y el motivo
 // (el código prefs.outputs.X) en inglés.
 func TestAvisoDeCarpetaInvalidaCambiaDeMotivoYSeAudita(t *testing.T) {
+	soloPosix(t)
 	s, d, root := montar(t)
 	dir := carpeta(t, filepath.Join(root, "salidas"), 0o700)
 	if err := fija(s, dir); err != nil {
@@ -469,6 +493,7 @@ func TestPreferenciasRechazosEsYEn(t *testing.T) {
 // Fase 30e: los errores de la carpeta de salidas, el aviso y la nota de cambio salen en el idioma pedido, con el
 // prefijo prefs.outputs.<motivo>: intacto; es es el texto de siempre.
 func TestCarpetaDeSalidasEnElIdioma(t *testing.T) {
+	soloPosix(t)
 	s, _, root := montar(t)
 	laxa := carpeta(t, filepath.Join(root, "laxa"), 0o755)
 	set := func(loc, dir string) (*v1.SetCorePrefsResponse, error) {

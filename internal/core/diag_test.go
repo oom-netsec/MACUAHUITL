@@ -22,6 +22,15 @@ func fakeDiagBin() string {
 	return filepath.Join(filepath.Dir(f), "..", "diag", "testdata", "bin")
 }
 
+// soloLinuxDiag salta pruebas que esperan el argv de Linux (ping -n -c, tracepath) con dobles de shell: en Windows
+// las herramientas son otras (tracert, ping -n) y el doble sería un script; ese argv lo cubren internal/diag/windows_test.go.
+func soloLinuxDiag(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("argv y dobles de herramientas de Linux")
+	}
+}
+
 func withFakeTools(o *Options) {
 	o.DiagLookPath = func(name string) (string, error) {
 		p := filepath.Join(fakeDiagBin(), name)
@@ -33,6 +42,7 @@ func withFakeTools(o *Options) {
 }
 
 func TestDiagRunStreamsAndAudits(t *testing.T) {
+	soloLinuxDiag(t)
 	h := newHarness(t, withFakeTools)
 	d := v1.NewDiagServiceClient(h.conn)
 	st, err := d.Run(ctx(t), &v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: "192.0.2.1"}}, Options: map[string]string{"count": "2"}})
@@ -105,6 +115,7 @@ func TestDiagCancelOnDisconnect(t *testing.T) {
 }
 
 func TestDiagAuditsRealBinaryAndArgv(t *testing.T) {
+	soloLinuxDiag(t)
 	h := newHarness(t, func(o *Options) {
 		o.DiagLookPath = func(name string) (string, error) {
 			if name == "traceroute" {
@@ -157,6 +168,7 @@ func TestListInterfacesSortedWithLoopback(t *testing.T) {
 
 // El output_dir de una herramienta de diagnóstico se valida como el de Ajustes: 0755 se rechaza; 0700 propia sirve.
 func TestDiagValidaOutputDirComoAjustes(t *testing.T) {
+	soloLinuxDiag(t)
 	h := newHarness(t, withFakeTools)
 	d := v1.NewDiagServiceClient(h.conn)
 	correr := func(dir string) error {

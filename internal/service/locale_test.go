@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -14,6 +13,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -32,7 +32,7 @@ func (fakePrefs) Flows(_ *v1.FlowsRequest, s v1.VisibilityService_FlowsServer) e
 
 func conn(t *testing.T) *ipc.ClientConn {
 	t.Helper()
-	sock := filepath.Join(t.TempDir(), "s.sock")
+	sock := ipctest.Addr(t.TempDir())
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

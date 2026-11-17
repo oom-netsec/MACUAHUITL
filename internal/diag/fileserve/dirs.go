@@ -5,9 +5,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // sensitiveDirs son carpetas donde ni se publica ni se recibe nada: ni ellas ni lo que
@@ -23,6 +25,29 @@ var sensitiveHome = []string{".ssh", ".gnupg", ".aws", ".kube", ".docker", ".con
 	".cargo", ".rustup", "go/bin", ".nvm", ".pyenv", ".rbenv", ".npm-global",
 	".bashrc.d", ".profile.d", ".bash_completion.d", ".zshrc.d", ".mozilla", ".pki"}
 
+// goos es variable para que las pruebas simulen la rama de Windows en cualquier sistema.
+var goos = runtime.GOOS
+
+// exigeUnidad: en Windows de verdad (no en la simulación, que usa rutas del anfitrión) la ruta debe empezar con letra de unidad.
+var exigeUnidad = runtime.GOOS == "windows"
+
+// sinLetraDeUnidad dice si p no empieza con «X:» (letra de unidad): \\?\C:\, \\.\, \??\ y las UNC saltarían la
+// lista de Windows porque ni Clean ni EvalSymlinks les quitan el prefijo. Pura: se prueba en cualquier sistema.
+func sinLetraDeUnidad(p string) bool {
+	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
+}
+
+// finalPath es la ruta real de un handle abierto (sys.FinalPath); variable para simularla en pruebas.
+var finalPath = sys.FinalPath
+
+// accountHome es la carpeta de perfil de la cuenta (en Windows sale del token, no del entorno); "" si no se sabe.
+var accountHome = func() string {
+	if u, err := user.Current(); err == nil && filepath.IsAbs(u.HomeDir) {
+		return u.HomeDir
+	}
+	return ""
+}
+
 // evalSymlinks y homeDir son variables para que las pruebas simulen su fallo.
 var evalSymlinks = filepath.EvalSymlinks
 
@@ -37,16 +62,33 @@ var homeDir = func() (string, error) {
 	return "", i18n.New("fileserve.err.no_home", nil)
 }
 
+// windowsSensitiveDirs son las carpetas del sistema de Windows (donde se carga y ejecuta lo que haya) según el entorno:
+// ni se publica ni se recibe en ellas ni en lo que cuelga de ellas. Vacías si la variable no está.
+func windowsSensitiveDirs() []string {
+	var out []string
+	for _, env := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "APPDATA", "LOCALAPPDATA"} {
+		if v := os.Getenv(env); filepath.IsAbs(v) {
+			out = append(out, v)
+			if r, err := evalSymlinks(v); err == nil && r != v { // la ruta real también (C:\WINDOWS, enlaces, nombres cortos)
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
-	if home, err := homeDir(); err == nil {
-		homes := []string{home}
-		if r, err := evalSymlinks(home); err == nil && r != home { // $HOME bajo un enlace: la ruta real es la que se elige
-			homes = append(homes, r)
-		}
-		for _, hm := range homes {
+	if goos == "windows" {
+		out = append(out, windowsSensitiveDirs()...)
+	}
+	if _, err := homeDir(); err == nil {
+		for _, hm := range homesOf() { // $HOME (y en Windows el perfil real) tal cual y resuelto: la ruta real es la que se elige
 			for _, h := range sensitiveHome {
 				out = append(out, filepath.Join(hm, h))
+			}
+			if goos == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
+				out = append(out, filepath.Join(hm, "AppData"))
 			}
 		}
 	}
@@ -63,7 +105,13 @@ func denyList(extra []string) []string {
 	if v := os.Getenv("XDG_STATE_HOME"); filepath.IsAbs(v) {
 		out = append(out, filepath.Join(v, "macuahuitl"))
 	}
-	return append(out, extra...)
+	for _, e := range extra {
+		out = append(out, e)
+		if r, err := evalSymlinks(e); err == nil && r != e { // como las XDG: la ruta real también
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // ValidateDir valida una carpeta elegida por el usuario y devuelve su ruta real, que es la
@@ -72,8 +120,12 @@ func denyList(extra []string) []string {
 // así lo que se muestra y se audita es lo que se usa). Los enlaces en los componentes
 // anteriores se resuelven antes de compararla con las carpetas sensibles y extra.
 func ValidateDir(dir string, extraDeny ...string) (string, error) {
-	real, _, err := validateDir(dir, extraDeny)
-	return real, err
+	r, real, err := OpenDir(dir, extraDeny...) // abre y cierra: así también aplica la ruta final del handle
+	if err != nil {
+		return "", err
+	}
+	r.Close()
+	return real, nil
 }
 
 // OpenDir valida la carpeta (ValidateDir) y la abre una sola vez con os.Root; toda la E/S
@@ -93,6 +145,15 @@ func OpenDir(dir string, extraDeny ...string) (*os.Root, string, error) {
 		root.Close()
 		return nil, "", i18n.New("fileserve.err.dir_changed", i18n.A("dir", real))
 	}
+	d, err := root.Open(".")
+	if err == nil {
+		err = checkFinal(d, extraDeny)
+		d.Close()
+	}
+	if err != nil {
+		root.Close()
+		return nil, "", err
+	}
 	return root, real, nil
 }
 
@@ -102,6 +163,9 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 		return "", nil, i18n.New("fileserve.err.dir_relative", i18n.A("dir", dir))
 	}
 	clean := filepath.Clean(dir)
+	if exigeUnidad && sinLetraDeUnidad(clean) {
+		return "", nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", clean))
+	}
 	st, err := os.Lstat(clean)
 	if err != nil {
 		return "", nil, i18n.Wrap("fileserve.err.dir_unreadable", err, nil)
@@ -116,13 +180,16 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("fileserve: %w", err)
 	}
+	if exigeUnidad && sinLetraDeUnidad(real) {
+		return "", nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", real))
+	}
 	home, err := homeDir()
 	if err != nil {
 		return "", nil, err
 	}
 	for _, d := range denyList(extraDeny) {
 		for _, p := range []string{clean, real} {
-			if inside(p, d) {
+			if denied(p, d) {
 				return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
 			}
 		}
@@ -132,22 +199,91 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 			return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", h))
 		}
 	}
-	if real == "/" || clean == "/" {
+	if filepath.Dir(real) == real || filepath.Dir(clean) == clean { // «/» o la raíz de una unidad (C:\)
 		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
-	hr, err := evalSymlinks(home)
-	if err != nil { // sin $HOME real no se puede descartar que la carpeta pedida sea $HOME por otro camino: se rechaza
+	if _, err := evalSymlinks(home); err != nil { // sin $HOME real no se puede descartar que la carpeta pedida sea $HOME por otro camino: se rechaza
 		return "", nil, fmt.Errorf("fileserve: %w", err)
 	}
-	if clean == filepath.Clean(home) || real == hr {
-		return "", nil, i18n.New("fileserve.err.dir_home", nil)
+	for _, h := range homesOf() { // $HOME y, en Windows, el perfil real, tal cual y resuelto
+		for _, p := range []string{clean, real} {
+			if p == h || goos == "windows" && strings.EqualFold(p, h) {
+				return "", nil, i18n.New("fileserve.err.dir_home", nil)
+			}
+		}
 	}
 	return real, st, nil
 }
 
-// inside dice si p es d o cuelga de d.
+// denied dice si p cae en la carpeta sensible d. Excepción: <home>\AppData\Local\Temp (la carpeta temporal del
+// usuario en Windows, equivalente de /tmp) y lo que cuelga de ella; no depende de TMP/TEMP, que el usuario puede
+// apuntar a AppData. El resto de AppData sigue bloqueado: quien pasa un enlace desde Temp hacia Roaming también
+// entrega su ruta real (validateDir/checkPathsDeny prueban ambas), y esa sí cae en Roaming.
+func denied(p, d string) bool {
+	if !inside(p, d) {
+		return false
+	}
+	if goos == "windows" {
+		for _, hm := range homesOf() {
+			if t := filepath.Join(hm, "AppData", "Local", "Temp"); inside(t, d) && inside(p, t) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// homesOf es $HOME tal cual y resuelto; en Windows también el perfil de la cuenta (HOME lo definen Git for Windows,
+// Emacs y otros y no manda sobre el perfil real), igualmente tal cual y resuelto.
+func homesOf() []string {
+	var cands []string
+	if home, err := homeDir(); err == nil {
+		cands = append(cands, home)
+	}
+	if goos == "windows" {
+		if a := accountHome(); a != "" {
+			cands = append(cands, a)
+		}
+	}
+	var out []string
+	add := func(p string) {
+		p = filepath.Clean(p)
+		for _, o := range out {
+			if o == p || goos == "windows" && strings.EqualFold(o, p) {
+				return
+			}
+		}
+		out = append(out, p)
+	}
+	for _, c := range cands {
+		add(c)
+		if r, err := evalSymlinks(c); err == nil {
+			add(r)
+		}
+	}
+	return out
+}
+
+// checkFinal aplica la lista negada a la ruta real del handle ya abierto (f): en Windows una junction, un subst o una
+// unidad de red en un tramo intermedio no los resuelve EvalSymlinks, y esta ruta es la de lo que de verdad se abrió.
+// En Linux finalPath no devuelve nada y no se hace nada.
+func checkFinal(f *os.File, extra []string) error {
+	p, err := finalPath(f)
+	if err != nil {
+		return fmt.Errorf("fileserve: %w", err)
+	}
+	if p == "" {
+		return nil
+	}
+	return checkPathsDeny(extra, p)
+}
+
+// inside dice si p es d o cuelga de d (en Windows sin distinguir mayúsculas).
 func inside(p, d string) bool {
 	d = filepath.Clean(d)
+	if goos == "windows" {
+		return len(p) >= len(d) && strings.EqualFold(p[:len(d)], d) && (len(p) == len(d) || p[len(d)] == filepath.Separator)
+	}
 	return p == d || strings.HasPrefix(p, d+string(filepath.Separator))
 }
 
@@ -157,9 +293,14 @@ func checkPathsDeny(extra []string, paths ...string) error {
 	if _, err := homeDir(); err != nil {
 		return err
 	}
+	for _, p := range paths {
+		if exigeUnidad && sinLetraDeUnidad(p) {
+			return i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", p))
+		}
+	}
 	for _, d := range denyList(extra) {
 		for _, p := range paths {
-			if inside(p, d) {
+			if denied(p, d) {
 				return i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
 			}
 		}
@@ -175,15 +316,7 @@ func checkPathsDeny(extra []string, paths ...string) error {
 // hiddenUnderHome devuelve la ruta oculta (~/.password-store, ~/.cache/x…) si algún componente de p bajo $HOME
 // empieza con «.»; ~/c9300.bin y ~/Descargas/x no lo son. Se prueba con $HOME tal cual y resuelto.
 func hiddenUnderHome(p string) string {
-	home, err := homeDir()
-	if err != nil {
-		return ""
-	}
-	homes := []string{filepath.Clean(home)}
-	if hr, err := evalSymlinks(home); err == nil {
-		homes = append(homes, hr)
-	}
-	for _, h := range homes {
+	for _, h := range homesOf() {
 		rel, err := filepath.Rel(h, p)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			continue

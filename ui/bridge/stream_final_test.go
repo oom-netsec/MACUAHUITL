@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -11,6 +10,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // finalEvents manda un estado y se queda abierto hasta que el cliente cierra el stream.
@@ -43,7 +43,7 @@ func TestStreamSeCierraAlEstadoFinal(t *testing.T) {
 		state := strings.Join(states, "+")
 		d, _ := os.MkdirTemp("", "brg")
 		defer os.RemoveAll(d)
-		sock := filepath.Join(d, "core.sock")
+		sock := ipctest.Addr(d)
 		l, err := ipc.Listen(sock)
 		if err != nil {
 			t.Fatal(err)
@@ -100,7 +100,7 @@ func TestStreamSeCierraAlEstadoFinal(t *testing.T) {
 func TestSubscribeNoCorreConMarkDead(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

@@ -36,7 +36,7 @@ func SocketPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("ipc: %w", err)
 	}
-	return `\\.\pipe\macuahuitl-` + sid, nil
+	return `\\.\pipe\macuahuitl-` + sid + TestPipeSuffix, nil
 }
 
 // pipeSDDL fija el dueño del pipe (con un token elevado el dueño por omisión sería Administradores) y una DACL protegida

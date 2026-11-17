@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
 )
@@ -85,4 +86,40 @@ var ErrNoAtomicRename error = windows.ERROR_NOT_SUPPORTED
 // NoAtomicRename dice si err es que el sistema de archivos no sabe renombrar sin sobrescribir.
 func NoAtomicRename(err error) bool {
 	return errors.Is(err, windows.ERROR_NOT_SUPPORTED) || errors.Is(err, windows.ERROR_INVALID_FUNCTION)
+}
+
+// FinalPath devuelve la ruta real del archivo o carpeta abiertos (GetFinalPathNameByHandle, normalizada, volumen DOS).
+// Resuelve junctions, subst y unidades de red, que EvalSymlinks ya no sigue. Quita «\\?\» de una ruta con letra de
+// unidad; una UNC (\\?\UNC\…) se devuelve tal cual, sin letra, para que quien llama la rechace.
+func FinalPath(f *os.File) (string, error) {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return "", err
+	}
+	var out string
+	var ierr error
+	if err := rc.Control(func(fd uintptr) {
+		buf := make([]uint16, windows.MAX_PATH)
+		for {
+			n, e := windows.GetFinalPathNameByHandle(windows.Handle(fd), &buf[0], uint32(len(buf)), 0) // NORMALIZED | VOLUME_NAME_DOS
+			if e != nil {
+				ierr = e
+				return
+			}
+			if int(n) <= len(buf) {
+				out = windows.UTF16ToString(buf[:n])
+				return
+			}
+			buf = make([]uint16, n+1)
+		}
+	}); err != nil {
+		return "", err
+	}
+	if ierr != nil {
+		return "", ierr
+	}
+	if p := strings.TrimPrefix(out, `\\?\`); p != out && !strings.HasPrefix(p, `UNC\`) {
+		out = p
+	}
+	return out, nil
 }
