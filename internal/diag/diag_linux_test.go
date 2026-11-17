@@ -34,14 +34,6 @@ func runner(t *testing.T, missing ...string) Runner {
 	}}
 }
 
-func req(tool Tool, target string, opts map[string]string, dir string) Request {
-	r := Request{Tool: tool, Options: opts, OutputDir: dir}
-	if target != "" {
-		r.Targets = []string{target}
-	}
-	return r
-}
-
 func TestBuildArgv(t *testing.T) {
 	localTest(t)
 	cases := []struct {
@@ -188,5 +180,13 @@ func TestPcapWritesBinaryNotStream(t *testing.T) {
 	}
 	if !strings.Contains(joined, "Packets captured") {
 		t.Fatal("stderr progress not streamed")
+	}
+}
+
+// En Linux la captura sin seconds no lleva -a (solo en Windows se agrega un tope por omisión).
+func TestBuildPcapSinSecondsLinux(t *testing.T) {
+	_, argv, err := Build(req(Pcap, "", map[string]string{"interface": "eth0"}, "/out"))
+	if got := strings.Join(argv, " "); err != nil || got != "-i eth0" {
+		t.Errorf("%q %v", got, err)
 	}
 }

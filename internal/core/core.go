@@ -50,7 +50,7 @@ type Options struct {
 	HardenWarnings []string
 	Actor          string                       // usuario de Linux; vacío = el actual
 	RetryBackoff   []time.Duration              // nil = 1 s, 2 s, 4 s
-	DiagLookPath   func(string) (string, error) // nil = exec.LookPath; las pruebas apuntan a dobles
+	DiagLookPath   func(string) (string, error) // nil = exec.LookPath en Linux, winLook en Windows; las pruebas apuntan a dobles
 	ErrOut         io.Writer                    // dónde avisar una entrada de auditoría perdida; nil = os.Stderr
 	PackKeys       []ed25519.PublicKey          // llaves de la firma oficial de paquetes; nil = la compilada (pack.OfficialKeys)
 	CoreVersion    string                       // versión para min_core de los paquetes; vacía = version.Version

@@ -28,6 +28,10 @@ func erroresDiag() map[string]error {
 	b("pcap-carpeta", Request{Tool: Pcap})
 	b("pcap-iface", Request{Tool: Pcap, OutputDir: "/tmp"})
 	b("herramienta", Request{Tool: "x"})
+	bw := func(n string, r Request) { _, _, out[n] = buildWindows(r) }
+	bw("win-interval", Request{Tool: Ping, Targets: []string{"1.1.1.1"}, Options: map[string]string{"interval": "1"}})
+	bw("win-syn", Request{Tool: Nmap, Targets: []string{"1.1.1.1"}, Options: map[string]string{"scan": "syn"}})
+	out["win-instala-nmap"], out["win-instala-iperf"], out["win-instala-ping"] = installErr("windows", "nmap"), installErr("windows", "iperf3"), installErr("windows", "ping")
 	_, out["run-build"] = Runner{}.Run(context.Background(), Request{Tool: Ping}, nil)
 	_, out["no-instalado"] = Runner{LookPath: func(string) (string, error) { return "", os.ErrNotExist }}.Run(context.Background(), Request{Tool: Ping, Targets: []string{"1.1.1.1"}}, nil)
 	return out

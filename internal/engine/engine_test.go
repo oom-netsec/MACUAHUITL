@@ -189,7 +189,9 @@ func TestRoundsLimit(t *testing.T) {
 	ch, cancel := b.Subscribe(nil)
 	defer cancel()
 	var runs atomic.Int32
-	err := s.Arm("j", Schedule{Interval: 20 * time.Millisecond, Rounds: 3}, time.Now().Add(time.Minute), []string{"x"}, func(context.Context, int, string) error {
+	// 100 ms y no menos: en Windows el temporizador avanza a saltos de hasta 15.6 ms y con 20 ms una ronda caía encima de
+	// la anterior (se salta por solapada) y salían 2.
+	err := s.Arm("j", Schedule{Interval: 100 * time.Millisecond, Rounds: 3}, time.Now().Add(time.Minute), []string{"x"}, func(context.Context, int, string) error {
 		runs.Add(1)
 		return nil
 	})

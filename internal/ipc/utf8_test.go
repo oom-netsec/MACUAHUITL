@@ -172,3 +172,11 @@ func TestUTF8MapaClavesQueChocan(t *testing.T) {
 		t.Fatalf("se perdió un valor: %q", out.Args)
 	}
 }
+
+// La salida de ping/tracert en Windows en español sale en CP850 (0x82 = é, 0xA1 = í): el saneo del borde la deja válida.
+func TestUTF8SalidaCP850DeDiag(t *testing.T) {
+	got := validUTF8(&v1.RunResponse{OutputLine: "Estad\x82sticas M\xa1nimo"}).(*v1.RunResponse).OutputLine
+	if got != "Estad�sticas M�nimo" || !utf8.ValidString(got) {
+		t.Fatalf("%q", got)
+	}
+}

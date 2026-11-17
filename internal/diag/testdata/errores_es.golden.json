@@ -14,5 +14,10 @@
  "prefijo": "prefijo \"a/b\" inválido",
  "run-build": "diag: se necesita exactamente un destino",
  "un-destino": "se necesita exactamente un destino",
- "uno-de": "scan debe ser uno de connect|syn|udp|ping"
+ "uno-de": "scan debe ser uno de connect|syn|udp|ping",
+ "win-instala-iperf": "diag: herramienta no instalada: iperf3 no tiene versión oficial para Windows; descarga una compilación de confianza y ponla en %ProgramFiles%\\iperf3\\iperf3.exe o en tools\\iperf3.exe junto a macuahuitld.exe",
+ "win-instala-nmap": "diag: herramienta no instalada: nmap (descárgalo de https://nmap.org/download)",
+ "win-instala-ping": "diag: herramienta no instalada: ping (debería estar en %SystemRoot%\\System32)",
+ "win-interval": "la opción \"interval\" no existe en Windows para esta herramienta",
+ "win-syn": "el escaneo SYN de nmap no está disponible en Windows (necesita Npcap); usa connect"
 }

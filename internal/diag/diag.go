@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +37,17 @@ type Result struct {
 // iperfServerMax es el tope de vida del servidor de iperf3 (-s -1 espera un cliente indefinidamente).
 var iperfServerMax = 10 * time.Minute
 
-// Runner ejecuta herramientas. LookPath nil usa exec.LookPath.
+// discard cierra el .txt y lo borra (en Windows no se borra un archivo abierto).
+func discard(out *os.File, path string) {
+	if out != nil {
+		out.Close()
+	}
+	if path != "" {
+		os.Remove(path)
+	}
+}
+
+// Runner ejecuta herramientas. LookPath nil usa exec.LookPath en Linux y winLook (rutas absolutas conocidas) en Windows.
 type Runner struct {
 	LookPath func(string) (string, error)
 	extraEnv []string // solo pruebas
@@ -45,7 +56,7 @@ type Runner struct {
 func (r Runner) look(name string) (string, error) {
 	lp := r.LookPath
 	if lp == nil {
-		lp = exec.LookPath
+		lp = lookPath // Linux: PATH del sistema; Windows: rutas absolutas conocidas (ADR 0012, f)
 	}
 	return lp(name)
 }
@@ -57,14 +68,14 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	if err != nil {
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
-	if bin == "traceroute" {
+	if bin == "traceroute" { // en Windows Build ya devolvió tracert
 		if _, err := r.look("traceroute"); err != nil {
 			bin = "tracepath" // sin privilegios, siempre presente; acepta las mismas banderas -n -m
 		}
 	}
 	path, err := r.look(bin)
 	if err != nil {
-		return Result{}, i18n.Wrap("diag.err.install", ErrNotInstalled, i18n.A("bin", bin, "pkg", packages[bin]))
+		return Result{}, installErr(runtime.GOOS, bin)
 	}
 	stamp := time.Now().Format("20060102-150405")
 	var out *os.File
@@ -99,9 +110,14 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	}
 
 	cmd := exec.CommandContext(ctx, path, argv...)
-	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C"}, r.extraEnv...)
-	setupKill(cmd)
-	cmd.WaitDelay = 3 * time.Second // tras la señal, muerte forzosa y cierre de tuberías
+	cmd.Env = append(childEnv(path), r.extraEnv...)
+	// El hijo y sus nietos se cancelan juntos (grupo de procesos en Linux, Job Object en Windows).
+	started, done, err := confine(cmd)
+	if err != nil {
+		discard(out, res.OutputPath)
+		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
+	}
+	defer done()
 	var mu sync.Mutex
 	emit := func(line string) {
 		mu.Lock()
@@ -117,9 +133,12 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	so, se := &lineWriter{emit: emit}, &lineWriter{emit: emit}
 	cmd.Stdout, cmd.Stderr = so, se
 	if err := cmd.Start(); err != nil {
-		if res.OutputPath != "" {
-			os.Remove(res.OutputPath)
-		}
+		discard(out, res.OutputPath)
+		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
+	}
+	if err := started(); err != nil {
+		cmd.Wait()
+		discard(out, res.OutputPath)
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	err = cmd.Wait()
