@@ -148,7 +148,7 @@ Reparto: Backend lleva el núcleo, el proto y mctl (44a–44f). Front lleva la U
     - Tope de 1000 carpetas (`hosts.err.folders_full`).
 18. **Comportamiento.**
     - `RenameHostFolder` mueve sus hosts. Si el nombre nuevo es otra carpeta → AlreadyExists: no se fusiona; para eso está `MoveHosts`. Cambiar solo mayúsculas está permitido.
-    - `DeleteHostFolder` deja los hosts sin carpeta y nunca borra un host. Con hosts y sin `confirm` → FailedPrecondition con la cuenta. Front lo pedía sin `confirm`; se agrega por el mismo motivo que `ExportBackupRequest.confirm`: el núcleo no confía en que el cliente preguntó.
+    - `DeleteHostFolder` deja los hosts sin carpeta y nunca borra un host. Con hosts y sin `confirm` → FailedPrecondition `hosts.err.folder_not_empty` con `metadata.host_count` (la cuenta) y `metadata.name`. Front lo pedía sin `confirm`; se agrega por el mismo motivo que `ExportBackupRequest.confirm`: el núcleo no confía en que el cliente preguntó.
     - `MoveHosts` admite de 1 a 5000 ids y es todo o nada. Un id que no existe → NotFound. Si el destino no existe se crea; vacío = sin carpeta.
     - `PutDevice`, `MoveHosts` y el import **crean la carpeta que falte**. Si ya existe con otras mayúsculas, el host toma el nombre guardado. Así `hosts edit --folder X` y la UI de hoy siguen funcionando igual.
     - El export no lleva carpetas vacías, porque exporta hosts.
