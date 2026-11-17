@@ -32,13 +32,12 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
   const [forDevice, setForDevice] = useState("");
   useInbox("console", (d) => { if (/^(\/dev\/|COM\d)/.test(d)) { setPort(d); setForDevice(""); } else setForDevice(d); });
 
-  const readPorts = (live = () => true) => core.fieldPorts().then((p) => {
+  const readPorts = (live: () => boolean) => core.fieldPorts().then((p) => {
     if (!live()) return;
     setPorts(p ?? []);
     setPort((cur) => cur || (p?.[0] ?? ""));
   });
-  const scan = () => readPorts().catch((e) => setErr(errorText(e)));
-  const [loadErr] = useCoreLoad(readPorts, [core]);
+  const [loadErr, clearLoadErr, scan] = useCoreLoad(readPorts, [core]); // «Buscar puertos» repite la misma carga
   useEffect(() => { out.current?.scrollTo?.(0, out.current.scrollHeight); }, [text]);
 
   const s = useStream<ConsoleEvent>(core.onConsole, (e) => {
@@ -56,7 +55,7 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
   });
   s.onUnmount(core.consoleClose);
   const open = async () => {
-    setErr(""); setText(""); setStatus(null); setStarting(true);
+    setErr(""); clearLoadErr(); setText(""); setStatus(null); setStarting(true);
     try {
       setRunId(await s.start(() => core.consoleOpen({ port, baud: Number(baud), dataBits: Number(dataBits), parity, stopBits: Number(stopBits), flow })));
     } catch (e) {

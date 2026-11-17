@@ -1,5 +1,5 @@
 import { cleanOnFail } from "../../lib/cleanOnFail";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Check, Notice, Select } from "../../components/Field";
 import { Badge } from "../../components/Page";
@@ -51,6 +51,8 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   }, [core, scope, hv]);
 
   const { busy } = action;
+  // Una lectura que falla deja atrás el error de la acción anterior: al resolverse no vuelve a verse.
+  useEffect(() => { if (fmtErr || bookErr) action.clearError(); }, [fmtErr, bookErr, action.clearError]);
   const err = fmtErr || bookErr || action.error; // una lectura que falla después tapa el error de la acción anterior; una acción nueva borra los de lectura
   const run = (f: () => Promise<void>) => { clearFmtErr(); clearBookErr(); setMsg(""); setWarn(""); return action.run(f); };
 

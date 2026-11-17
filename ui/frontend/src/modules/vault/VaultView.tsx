@@ -25,9 +25,11 @@ export function VaultView({ core }: { core: CoreAPI }) {
   const lastView = useRef(""); // último «Ver» pedido: una respuesta tardía de otra credencial se descarta
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   const previewOpen = useRef(false); // hay una vista previa de un respaldo con credenciales descifradas en el núcleo
+  const reloadErr = useRef<Msg>(null); // el aviso que dejó la última recarga fallida
   const load = useCallback(async (live: () => boolean = () => true) => {
     const s = await core.vaultStatus();
     if (!live()) return;
+    setMsg((m) => (m === reloadErr.current ? null : m)); // el núcleo respondió: el error de una recarga anterior ya no vale (los de acciones se quedan)
     if (s.state !== "unlocked" && previewOpen.current) { // el núcleo la descartó al cerrarse la bóveda
       previewOpen.current = false;
       setMsg({ kind: "error", text: t("vault.backup.discarded") });
@@ -36,7 +38,7 @@ export function VaultView({ core }: { core: CoreAPI }) {
     const l = s.state === "unlocked" ? await core.listCredentials() : [];
     if (live()) setCreds(l);
   }, [core, t]);
-  const refresh = useCallback(() => load().catch(fail), [load]);
+  const refresh = useCallback(() => load().catch((e) => { reloadErr.current = { kind: "error", text: errorText(e) }; setMsg(reloadErr.current); }), [load]);
   // Cerrada desde la paleta o por tiempo, o núcleo reconectado: la vista se pone al día y el error de carga se va al reintentar.
   const [loadErr] = useCoreLoad(load, [load]);
   const onPreview = useCallback((open: boolean) => { previewOpen.current = open; }, []);

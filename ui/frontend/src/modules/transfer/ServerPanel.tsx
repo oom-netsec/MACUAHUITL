@@ -122,7 +122,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
-  const [loadErr] = useCoreLoad((live) => core.listInterfaces().then((l) => { if (live()) setIfaces(l ?? []); }), [core]);
+  const [loadErr, clearLoadErr] = useCoreLoad((live) => core.listInterfaces().then((l) => { if (live()) setIfaces(l ?? []); }), [core]);
   const ips = ifaces.filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as const));
 
   // Las líneas de todos los servidores pasan a pantalla una vez cada FLUSH_MS, en orden y con tope de 500 por servidor.
@@ -154,7 +154,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const start = async () => {
     const p = serveProblem(form);
     if (p) { setErr(t(p)); return; }
-    setErr("");
+    setErr(""); clearLoadErr();
     const host = any ? "0.0.0.0" : listen;
     legacyNext.current = ssh && legacy;
     setStarting(true);
