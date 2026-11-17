@@ -76,7 +76,9 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 				code = "fileserve.hint.win_std_port_ok"
 			}
 			b.WriteString(t(code, "std", s.port, "proto", c.Proto, "port", p) + "\n")
-			b.WriteString("  " + t("fileserve.hint.win_redirect", "cmd", firewallRule(loc, c.Proto, host, p, exePath(), c.PassivePorts)) + "\n")
+			if rule := firewallRule(loc, c.Proto, host, p, exePath(), c.PassivePorts); rule != "" {
+				b.WriteString("  " + t("fileserve.hint.win_redirect", "cmd", rule) + "\n")
+			}
 		} else if p == s.port {
 			b.WriteString(t("fileserve.hint.std_port_ok", "std", s.port, "proto", c.Proto) + "\n")
 		} else { // puerto propio: la redirección es la alternativa a abrir el estándar
