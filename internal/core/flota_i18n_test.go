@@ -245,7 +245,7 @@ func errStr(err error) string {
 
 // Regresión: sin accept-language, o con es, cada RPC de flota, análisis, ACL, cambios y deriva da lo de antes de la fase.
 func TestFlotaRegresionEs(t *testing.T) {
-	h := newHarness(t, nil)
+	h := harnessFlota(t) // reloj fijo: «hace N d» no cambia entre «es» y «es-MX» si la prueba cruza la hora de una fixture
 	fx := newFlotaFx(t)
 	base := flotaCases(t, h, "es", fx)
 	for _, lang := range []string{"es", "es-MX"} {
@@ -276,7 +276,7 @@ func TestFlotaRegresionEs(t *testing.T) {
 		names = append(names, n)
 	}
 	slices.Sort(names)
-	age := regexp.MustCompile(`hace \d+ d`) // la antigüedad sale del reloj real: el golden no puede fijarla
+	age := regexp.MustCompile(`hace \d+ d`) // el golden se grabó con el reloj real: su antigüedad no se compara
 	for _, n := range names {
 		b, w := base[n], want[n]
 		b.Text, w.Text = age.ReplaceAllString(b.Text, "hace N d"), age.ReplaceAllString(w.Text, "hace N d")
