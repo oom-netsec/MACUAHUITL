@@ -103,17 +103,17 @@ func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 			return fmt.Errorf("fileserve: %w", err)
 		}
 		ip := hostOf(nc.RemoteAddr())
-		reject := func(why string) {
+		reject := func(cause, why string) {
 			nc.Close()
-			c.OnTransfer(Transfer{Proto: c.Proto, Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true})
+			c.OnTransfer(Transfer{Proto: c.Proto, Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true, Cause: cause})
 		}
 		if !c.permitsAddr(nc.RemoteAddr()) {
-			reject("origen no permitido")
+			reject(CauseOriginDenied, "origen no permitido")
 			continue
 		}
 		release, ok := lim.acquire(ip)
 		if !ok {
-			reject("demasiadas conexiones o contraseñas erróneas desde este origen")
+			reject(CauseBusy, "demasiadas conexiones o contraseñas erróneas desde este origen")
 			continue
 		}
 		wg.Add(1)
@@ -168,7 +168,7 @@ func (s *sshConn) serve(nc net.Conn) {
 	defer wg.Wait()
 	for nch := range chans {
 		if nch.ChannelType() != "session" { // direct-tcpip, forwarded-tcpip, x11, streamlocal…
-			s.reject(client, why("channel_rejected", "type", nch.ChannelType())) // se registra antes de responder: el cliente ve la respuesta con la bitácora ya escrita
+			s.reject(client, CauseOther, why("channel_rejected", "type", nch.ChannelType())) // se registra antes de responder: el cliente ve la respuesta con la bitácora ya escrita
 			nch.Reject(ssh.Prohibited, "solo sesiones scp o sftp")
 			continue
 		}
@@ -191,8 +191,8 @@ func (s *sshConn) serve(nc net.Conn) {
 	}
 }
 
-func (s *sshConn) reject(client string, x i18n.Text) {
-	s.c.OnTransfer(Transfer{Proto: s.c.Proto, Client: client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true})
+func (s *sshConn) reject(client, cause string, x i18n.Text) {
+	s.c.OnTransfer(Transfer{Proto: s.c.Proto, Client: client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true, Cause: cause})
 }
 
 // session atiende las peticiones de un canal: solo `subsystem sftp` (proto sftp) o
@@ -209,7 +209,7 @@ func (s *sshConn) session(ch ssh.Channel, reqs <-chan *ssh.Request, client strin
 		case r.Type == "exec" && s.c.Proto == "scp":
 			mode, path, err := parseSCP(payloadString(r.Payload))
 			if err != nil {
-				s.reject(client, why("exec_rejected", "reason", err.Error(), "reason_en", i18n.English(err)))
+				s.reject(client, CauseOther, why("exec_rejected", "reason", err.Error(), "reason_en", i18n.English(err)))
 				r.Reply(false, nil)
 				continue
 			}
@@ -224,7 +224,7 @@ func (s *sshConn) session(ch ssh.Channel, reqs <-chan *ssh.Request, client strin
 		case r.Type == "env" || r.Type == "window-change" || r.Type == "signal":
 			r.Reply(false, nil)
 		default: // shell, pty-req, exec ajeno, subsystem ajeno, x11-req, auth-agent-req…
-			s.reject(client, why("request_rejected", "type", r.Type))
+			s.reject(client, CauseOther, why("request_rejected", "type", r.Type))
 			r.Reply(false, nil)
 		}
 	}
@@ -326,7 +326,7 @@ func readScpLine(br *bufio.Reader) (string, error) {
 func (s *sshConn) scpSink(ch ssh.Channel, target, client string) error {
 	if s.rcv == nil {
 		scpFail(ch, "escritura deshabilitada")
-		s.reject(client, lit("escritura deshabilitada"))
+		s.reject(client, CauseWriteDisabled, lit("escritura deshabilitada"))
 		return errors.New("escritura deshabilitada")
 	}
 	ch.Write([]byte{0})
@@ -350,7 +350,7 @@ func (s *sshConn) scpSink(ch ssh.Channel, target, client string) error {
 		case 'C':
 		default: // D (directorios) y E: no se aceptan
 			scpFail(ch, "solo archivos")
-			s.reject(client, lit("scp: directorios no soportados"))
+			s.reject(client, CauseOther, lit("scp: directorios no soportados"))
 			return errors.New("solo archivos")
 		}
 		parts := strings.SplitN(line[1:], " ", 3)
@@ -377,6 +377,8 @@ func (s *sshConn) scpSink(ch ssh.Channel, target, client string) error {
 			return err
 		}
 		t.File = rf.name
+		t.Live = s.c.start(t, size)
+		rf.live = t.Live
 		ch.Write([]byte{0})
 		_, err = io.CopyN(rf, br, size)
 		if err == nil {
@@ -424,24 +426,25 @@ func (s *sshConn) scpSource(ch ssh.Channel, path, client string) error {
 	t := Transfer{Proto: "scp", Dir: "lectura", Client: client, File: name, Result: "error"}
 	if !s.src.enabled() {
 		scpFail(ch, "lectura deshabilitada")
-		s.reject(client, lit("lectura deshabilitada"))
+		s.reject(client, CauseReadDisabled, lit("lectura deshabilitada"))
 		return i18n.New("fileserve.reason.read_disabled", nil)
 	}
 	f, fi, err := s.src.open(name)
 	if err != nil {
 		scpFail(ch, "archivo no publicado")
-		t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
+		t.Error, t.ReasonT, t.Rejected, t.Cause = "archivo no publicado", lit("archivo no publicado"), true, CauseNotFound
 		s.c.OnTransfer(t)
 		return err
 	}
 	defer f.Close()
 	t.Path = f.Name()
 	start := time.Now()
+	t.Live = s.c.start(t, fi.Size())
 	defer func() { t.Duration = time.Since(start); s.c.OnTransfer(t) }()
 	if _, err = fmt.Fprintf(ch, "C0644 %d %s\n", fi.Size(), name); err == nil {
 		if err = ack(); err == nil {
 			var n int64
-			n, err = io.CopyN(ch, f, fi.Size())
+			n, err = io.CopyN(liveWriter{ch, t.Live}, f, fi.Size())
 			t.Bytes = n
 			if err == nil {
 				ch.Write([]byte{0})
@@ -513,12 +516,12 @@ func (h *sftpHandler) abortOpen() {
 
 func (h *sftpHandler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 	if !h.s.src.enabled() {
-		h.s.reject(h.client, lit("lectura deshabilitada"))
+		h.s.reject(h.client, CauseReadDisabled, lit("lectura deshabilitada"))
 		return nil, sftp.ErrSSHFxPermissionDenied
 	}
 	f, fi, err := h.s.src.open(r.Filepath)
 	if err != nil {
-		h.s.c.OnTransfer(Transfer{Proto: "sftp", Dir: "lectura", Client: h.client, File: r.Filepath, Result: "error", Error: "archivo no publicado", ReasonT: lit("archivo no publicado"), Rejected: true})
+		h.s.c.OnTransfer(Transfer{Proto: "sftp", Dir: "lectura", Client: h.client, File: r.Filepath, Result: "error", Error: "archivo no publicado", ReasonT: lit("archivo no publicado"), Rejected: true, Cause: CauseNotFound})
 		return nil, os.ErrNotExist
 	}
 	rd := &sftpReader{File: f, h: h, t: Transfer{Proto: "sftp", Dir: "lectura", Client: h.client, File: fi.Name(), Path: f.Name(), Result: "error"}, start: time.Now()}
@@ -526,6 +529,7 @@ func (h *sftpHandler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 		f.Close()
 		return nil, err
 	}
+	rd.t.Live = h.s.c.start(rd.t, fi.Size()) // desde aquí, Close siempre da OnTransfer (lo cierra pkg/sftp o abortOpen)
 	return rd, nil
 }
 
@@ -554,6 +558,7 @@ func (r *sftpReader) ReadAt(p []byte, off int64) (int, error) {
 			break
 		}
 	}
+	r.t.Live.atLeast(r.max.Load())
 	return n, err
 }
 
@@ -573,7 +578,7 @@ func (r *sftpReader) Close() error {
 
 func (h *sftpHandler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 	if h.s.rcv == nil {
-		h.s.reject(h.client, lit("escritura deshabilitada"))
+		h.s.reject(h.client, CauseWriteDisabled, lit("escritura deshabilitada"))
 		return nil, sftp.ErrSSHFxPermissionDenied
 	}
 	t := Transfer{Proto: "sftp", Dir: "escritura", Client: h.client, File: r.Filepath, Result: "error"}
@@ -592,6 +597,8 @@ func (h *sftpHandler) Filewrite(r *sftp.Request) (io.WriterAt, error) {
 		rf.abort()
 		return nil, err
 	}
+	w.t.Live = h.s.c.start(w.t, 0) // SFTP no anuncia tamaño; Close siempre da OnTransfer
+	rf.live = w.t.Live
 	return w, nil
 }
 
@@ -656,7 +663,7 @@ func (h *sftpHandler) Filecmd(r *sftp.Request) error {
 	if r.Method == "Setstat" {
 		return nil
 	}
-	h.s.reject(h.client, why("sftp_rejected", "method", r.Method))
+	h.s.reject(h.client, CauseOther, why("sftp_rejected", "method", r.Method))
 	return sftp.ErrSSHFxPermissionDenied
 }
 

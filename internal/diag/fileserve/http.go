@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,12 +21,20 @@ type countingWriter struct {
 	n      int64
 	status int
 	err    error
+	live   *Live
 }
 
-func (w *countingWriter) WriteHeader(s int) { w.status = s; w.ResponseWriter.WriteHeader(s) }
+func (w *countingWriter) WriteHeader(s int) {
+	w.status = s
+	if cl, err := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64); err == nil && s < 300 {
+		w.live.setTotal(cl) // ServeContent ya fijó el tamaño del tramo (o del archivo)
+	}
+	w.ResponseWriter.WriteHeader(s)
+}
 func (w *countingWriter) Write(b []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(b)
 	w.n += int64(n)
+	w.live.add(int64(n))
 	if err != nil && w.err == nil {
 		w.err = err
 	}
@@ -60,18 +69,18 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		defer func() { t.Duration = time.Since(start); c.OnTransfer(t) }()
 		if ap, err := netip.ParseAddrPort(r.RemoteAddr); err != nil || !c.permits(ap.Addr()) {
 			http.Error(w, "origen no permitido", http.StatusForbidden)
-			t.Error, t.ReasonT, t.Rejected = "origen no permitido", lit("origen no permitido"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "origen no permitido", lit("origen no permitido"), true, CauseOriginDenied
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "solo GET", http.StatusMethodNotAllowed)
-			t.Error, t.ReasonT, t.Rejected = "método "+r.Method, why("method", "method", r.Method), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "método "+r.Method, why("method", "method", r.Method), true, CauseMethod
 			return
 		}
 		if !src.exists(name) {
 			http.NotFound(w, r) // sin listado ni pistas de qué hay publicado
-			t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "archivo no publicado", lit("archivo no publicado"), true, CauseNotFound
 			return
 		}
 		select {
@@ -79,7 +88,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 			defer func() { <-sem }()
 		default:
 			http.Error(w, "ocupado", http.StatusServiceUnavailable)
-			t.Error, t.ReasonT, t.Rejected = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true, CauseBusy
 			return
 		}
 		f, st, err := src.open(name)
@@ -90,7 +99,8 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		}
 		defer f.Close()
 		t.Path = f.Name()
-		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK}
+		t.Live = c.start(t, 0) // el total lo fija WriteHeader
+		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK, live: t.Live}
 		http.ServeContent(cw, r, name, st.ModTime(), f) // atiende Range e If-Modified-Since
 		t.Bytes = cw.n
 		switch {

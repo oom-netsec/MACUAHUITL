@@ -115,17 +115,17 @@ func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 			return fmt.Errorf("fileserve: %w", err)
 		}
 		ip := hostOf(nc.RemoteAddr())
-		reject := func(why string) {
+		reject := func(cause, why string) {
 			nc.Close()
-			c.OnTransfer(Transfer{Proto: "ftp", Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true})
+			c.OnTransfer(Transfer{Proto: "ftp", Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true, Cause: cause})
 		}
 		if !c.permitsAddr(nc.RemoteAddr()) {
-			reject("origen no permitido")
+			reject(CauseOriginDenied, "origen no permitido")
 			continue
 		}
 		release, ok := lim.acquire(ip)
 		if !ok {
-			reject("demasiadas conexiones o contraseñas erróneas desde este origen")
+			reject(CauseBusy, "demasiadas conexiones o contraseñas erróneas desde este origen")
 			continue
 		}
 		wg.Add(1)
@@ -156,7 +156,7 @@ func (s *ftpSession) reply(code int, msg string) {
 }
 
 func (s *ftpSession) rejected(x i18n.Text) {
-	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true})
+	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true, Cause: CauseOther})
 }
 
 func (s *ftpSession) run() {
@@ -395,14 +395,14 @@ func (s *ftpSession) retr(name string) {
 	t := Transfer{Proto: "ftp", Dir: "lectura", Client: s.client, File: name, Result: "error"}
 	if !s.src.enabled() {
 		s.reply(550, "lectura deshabilitada")
-		t.Error, t.ReasonT, t.Rejected = "lectura deshabilitada", lit("lectura deshabilitada"), true
+		t.Error, t.ReasonT, t.Rejected, t.Cause = "lectura deshabilitada", lit("lectura deshabilitada"), true, CauseReadDisabled
 		s.c.OnTransfer(t)
 		return
 	}
-	f, _, err := s.src.open(name)
+	f, fi, err := s.src.open(name)
 	if err != nil {
 		s.reply(550, "archivo no publicado")
-		t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
+		t.Error, t.ReasonT, t.Rejected, t.Cause = "archivo no publicado", lit("archivo no publicado"), true, CauseNotFound
 		s.c.OnTransfer(t)
 		return
 	}
@@ -421,7 +421,8 @@ func (s *ftpSession) retr(name string) {
 		s.c.OnTransfer(t)
 		return
 	}
-	n, err := io.Copy(dc, f)
+	t.Live = s.c.start(t, fi.Size()) // la conexión de datos ya está aceptada
+	n, err := io.Copy(liveWriter{dc, t.Live}, f)
 	dc.Close()
 	t.Bytes, t.Duration = n, time.Since(start)
 	if err != nil {
@@ -436,13 +437,13 @@ func (s *ftpSession) retr(name string) {
 
 func (s *ftpSession) stor(name string) {
 	t := Transfer{Proto: "ftp", Dir: "escritura", Client: s.client, File: name, Result: "error"}
-	fail := func(code int, msg string) {
+	fail := func(code int, cause, msg string) {
 		s.reply(code, msg)
-		t.Error, t.ReasonT, t.Rejected = msg, lit(msg), true
+		t.Error, t.ReasonT, t.Rejected, t.Cause = msg, lit(msg), true, cause
 		s.c.OnTransfer(t)
 	}
 	if s.rcv == nil {
-		fail(550, "escritura deshabilitada")
+		fail(550, CauseWriteDisabled, "escritura deshabilitada")
 		return
 	}
 	if s.pasv == nil {
@@ -452,13 +453,13 @@ func (s *ftpSession) stor(name string) {
 	rf, err := s.rcv.create(name, 0)
 	switch {
 	case errors.Is(err, errExists):
-		fail(550, errExists.Error())
+		fail(550, CauseOther, errExists.Error())
 		return
 	case errors.Is(err, errTooBig), errors.Is(err, errTotal), errors.Is(err, errTooMany):
-		fail(552, err.Error())
+		fail(552, CauseOther, err.Error())
 		return
 	case err != nil:
-		fail(553, "nombre no permitido")
+		fail(553, CauseOther, "nombre no permitido")
 		return
 	}
 	t.File = rf.name
@@ -470,6 +471,8 @@ func (s *ftpSession) stor(name string) {
 		s.reply(425, "sin conexión de datos")
 		return
 	}
+	t.Live = s.c.start(t, 0) // STOR no anuncia tamaño
+	rf.live = t.Live
 	_, err = io.Copy(rf, dc)
 	dc.Close()
 	t.Duration = time.Since(start)
