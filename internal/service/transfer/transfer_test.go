@@ -158,8 +158,8 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 		}
 	}
 	cleanup := "sudo nft delete table ip macuahuitl_tftp_" + port
-	if runtime.GOOS == "windows" { // en Windows se quita la regla del firewall
-		cleanup = "Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 127.0.0.1 " + port + "'"
+	if runtime.GOOS == "windows" { // en Windows, con loopback no se ofreció regla de firewall: nada que quitar
+		cleanup = ""
 	}
 	if closed == nil || closed.Cleanup != cleanup {
 		t.Fatalf("evento de cierre = %+v", closed)
