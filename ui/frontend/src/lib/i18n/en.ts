@@ -2832,7 +2832,6 @@ export const en: Record<Key, string> = {
   "transfer.live.state.done": "Complete",
   "transfer.live.state.failed": "Failed",
   "transfer.live.err.unknown": "Unknown cause",
-  "transfer.live.err.timeout": "Timed out",
   "transfer.live.rej.title": "Rejections",
   "transfer.live.rej.not_found": "File not published or missing",
   "transfer.live.rej.origin_denied": "Origin not allowed",
@@ -2842,5 +2841,5 @@ export const en: Record<Key, string> = {
   "transfer.live.rej.busy": "Server busy",
   "transfer.live.rej.from": "arrived from",
   "transfer.live.rej.tftpNote": "TFTP uses UDP, so the source address may be spoofed: confirm the IP on the device.",
-  "transfer.live.rej.announce": "Rejections: {n} in total",
+  "transfer.live.rej.announce": "New rejections: {n}",
 };

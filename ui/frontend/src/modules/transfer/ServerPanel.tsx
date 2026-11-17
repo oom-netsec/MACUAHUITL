@@ -92,7 +92,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           <Console label={t("transfer.redirect.remove")} text={s.cleanup} copy={core.copyText} />
         </>
       )}
-      <LivePanel serverId={r.serverId} open={!s.done} fetchSessions={core.transferSessions} />
+      <LivePanel serverId={r.serverId} open={!s.done} label={`${label} ${r.listening}`} fetchSessions={core.transferSessions} />
       <Log lines={s.lines} />
     </ResultPanel>
     </div>

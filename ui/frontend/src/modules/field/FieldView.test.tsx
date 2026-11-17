@@ -24,7 +24,7 @@ test("el servidor publica las rutas indicadas y muestra transferencias en vivo",
   expect(core.diagCancel).toHaveBeenCalledWith("s1");
 });
 
-test("con serverId en el primer evento muestra el panel en vivo y lo oculta al terminar", async () => {
+test("con serverId en el primer evento muestra el panel en vivo y al terminar deja de encuestar", async () => {
   const transferSessions = vi.fn(async () => ({ sessions: [], rejections: sampleRejections(Date.now()) }));
   const core = fakeCore({ serveStart: vi.fn(async () => "s1"), transferSessions });
   render(<FieldView core={core} />);
@@ -34,8 +34,13 @@ test("con serverId en el primer evento muestra el panel en vivo y lo oculta al t
   act(() => core.emitServe({ runId: "s1", serverId: "sv1", listening: "10.0.0.5:6969" }));
   expect(await screen.findByRole("heading", { name: "Rechazos" })).toBeInTheDocument();
   expect(transferSessions).toHaveBeenCalledWith("sv1");
+  expect(screen.getByRole("list", { name: "Transferencias" })).not.toHaveAttribute("aria-live"); // el panel ya anuncia
   act(() => core.emitServe({ runId: "s1", done: true }));
-  await waitFor(() => expect(screen.queryByRole("heading", { name: "Rechazos" })).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeDisabled());
+  const n = transferSessions.mock.calls.length;
+  await new Promise((r) => setTimeout(r, 2200));
+  expect(transferSessions).toHaveBeenCalledTimes(n); // detenido: no sigue encuestando
+  expect(screen.getByRole("heading", { name: "Rechazos" })).toBeInTheDocument(); // la última lectura se queda
 });
 
 test("sin serverId no hay panel en vivo", async () => {

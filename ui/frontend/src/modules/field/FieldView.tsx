@@ -32,7 +32,6 @@ function ServePanel({ core }: { core: CoreAPI }) {
   const s = useStream<ServeEvent>(core.onServe, (e) => {
     if (e.serverId) setServerId(e.serverId);
     if (e.done) {
-      setServerId("");
       if (e.error) setErr(errorText(new Error(e.error)));
       setStatus({ k: "field.stopped" });
       setRunId("");
@@ -79,9 +78,9 @@ function ServePanel({ core }: { core: CoreAPI }) {
       {!badge && !xfers.length && <EmptyState icon="tools" title={t("field.empty.title")}>{t("field.empty")}</EmptyState>}
       {(badge || xfers.length > 0) && (
         <div className="field-out"><ResultPanel title={t("field.transfers")} status={badge}>
-          {serverId && <LivePanel serverId={serverId} open={!!runId} fetchSessions={core.transferSessions} />}
+          {serverId && <LivePanel serverId={serverId} open={!!runId} label={`${proto.toUpperCase()} ${addr}`} fetchSessions={core.transferSessions} />}
           {hint && <Terminal text={hint} aria-label={t("field.hint")} />}
-          <Terminal as="ul" aria-live="polite" aria-label={t("field.transfers")}>
+          <Terminal as="ul" aria-live={serverId ? undefined : "polite"} aria-label={t("field.transfers")}>
             {xfers.map((x, i) => (
               <li key={i} data-sev={x.Result === "ok" ? undefined : 3}>
                 <Hl text={t("field.xfer", { client: x.Client ?? "", file: x.File ?? "", bytes: x.Bytes ?? 0, secs: ((x.Duration ?? 0) / 1e9).toFixed(1), result: x.Result === "ok" ? t("transfer.log.ok") : x.Result === undefined ? "" : t("transfer.log.error"), error: x.Error ? ` ${x.Error}` : "" })} />

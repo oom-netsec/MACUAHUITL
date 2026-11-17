@@ -35,6 +35,18 @@ test("sin sesiones activas dice En espera y total desconocido no lleva aria-valu
   expect(screen.getByRole("progressbar", { name: /backup\.cfg/ })).not.toHaveAttribute("aria-valuenow");
 });
 
+test("al cerrarse deja de encuestar pero conserva la última lectura", async () => {
+  const fn = vi.fn(async () => ({ sessions: sampleSessions(Date.now()).slice(1, 2), rejections: sampleRejections(Date.now()) }));
+  const { rerender } = mountFull(fn);
+  await tick();
+  const n = fn.mock.calls.length;
+  rerender(<LivePanel serverId="s1" open={false} fetchSessions={fn} />);
+  await tick(2000);
+  expect(fn).toHaveBeenCalledTimes(n);
+  expect(screen.getByText(/running-SW1\.cfg/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Rechazos" })).toBeInTheDocument();
+});
+
 test("encuesta cada segundo, no con la pestaña oculta ni cerrado, y limpia al desmontar", async () => {
   const fn = vi.fn(async () => []);
   const { unmount } = mount(fn);
@@ -76,12 +88,20 @@ test("en pantalla se muestran a lo más 20 recientes", async () => {
   expect(screen.getAllByRole("progressbar")).toHaveLength(20);
 });
 
-test("errorCode con clave i18n se localiza; sin clave se muestra error", async () => {
-  const f = { ...sampleSessions(Date.now())[2], errorCode: "timeout" };
-  mount(async () => [f, { ...f, id: "x", name: "otro.cfg", errorCode: "inexistente", error: "causa cruda" }]);
+test("la causa de una fallida es el error ya traducido; sin él, causa desconocida", async () => {
+  const f = { ...sampleSessions(Date.now())[2], errorCode: "fileserve.reason.no_reply", error: "el equipo no respondió" };
+  mount(async () => [f, { ...f, id: "x", name: "otro.cfg", error: "" }]);
   await tick();
-  expect(screen.getByText("Se agotó el tiempo de espera")).toBeInTheDocument();
-  expect(screen.getByText("causa cruda")).toBeInTheDocument();
+  expect(screen.getByText("el equipo no respondió")).toBeInTheDocument();
+  expect(screen.getByText("Causa desconocida")).toBeInTheDocument();
+});
+
+test("un estado desconocido se trata como fallida, sin clave cruda", async () => {
+  const f = { ...sampleSessions(Date.now())[2], state: "raro" as never };
+  mount(async () => [f]);
+  await tick();
+  expect(screen.getByText("Fallida")).toBeInTheDocument();
+  expect(screen.queryByText(/transfer\.live/)).toBeNull();
 });
 
 test("no lanza otra llamada mientras la anterior sigue pendiente", async () => {
@@ -142,7 +162,7 @@ test("causa other o desconocida muestra el reason del núcleo", async () => {
   expect(screen.getByText(/causa nueva/)).toBeInTheDocument();
 });
 
-test("sin rechazos no hay sección y el anuncio solo cambia cuando cambia el total", async () => {
+test("sin rechazos no hay sección; solo un grupo nuevo se anuncia, no cada rechazo", async () => {
   let rej: TransferRejection[] = [];
   mountFull(async () => ({ sessions: [], rejections: rej }));
   await tick();
@@ -150,9 +170,44 @@ test("sin rechazos no hay sección y el anuncio solo cambia cuando cambia el tot
   const live = screen.getByRole("status");
   rej = sampleRejections(Date.now());
   await tick();
-  const first = live.textContent;
-  expect(first).toMatch(/5/);
-  rej = rej.map((r) => ({ ...r, last: r.last + 1000 })); // mismo total, otra hora
+  expect(live.textContent).toBe("Rechazos nuevos: 2");
+  rej = rej.map((r) => ({ ...r, count: r.count + 50 })); // flood: sube el total, mismo grupo
   await tick();
-  expect(live.textContent).toBe(first);
+  expect(live.textContent).toBe("Rechazos nuevos: 2");
+  rej = [...rej, { ...rej[0], ip: "192.0.2.99" }];
+  await tick();
+  expect(live.textContent).toBe("Rechazos nuevos: 1");
+});
+
+test("estados y rechazos nuevos en la misma lectura se anuncian juntos", async () => {
+  let d = { sessions: sampleSessions(Date.now()), rejections: [] as TransferRejection[] };
+  mountFull(async () => d);
+  await tick();
+  d = { sessions: d.sessions.map((x) => (x.id === "t1" ? { ...x, state: "done" as const, ended: Date.now() } : x)), rejections: sampleRejections(Date.now()) };
+  await tick();
+  expect(screen.getByRole("status").textContent).toMatch(/c9300.*Completa\. Rechazos nuevos: 2/);
+});
+
+test("causa fuera del conjunto conocido muestra reason, aunque exista una clave parecida", async () => {
+  const [a] = sampleRejections(Date.now());
+  mountFull(async () => ({ sessions: [], rejections: [{ ...a, cause: "tftpNote", reason: "motivo crudo" }] }));
+  await tick();
+  expect(screen.getByText(/motivo crudo/)).toBeInTheDocument();
+});
+
+test("con NotFound deja de encuestar", async () => {
+  const fn = vi.fn(async () => { throw new Error("rpc error: code = NotFound desc = no such server"); });
+  mountFull(fn);
+  await tick(5000);
+  expect(fn).toHaveBeenCalledTimes(1);
+});
+
+test("la sección lleva un nombre único por servidor y la hora sale en el idioma de la app", async () => {
+  render(<LivePanel serverId="s1" open label="TFTP 10.0.0.5:69" fetchSessions={async () => ({ sessions: [], rejections: sampleRejections(Date.now()) })} />);
+  await tick();
+  expect(screen.getByRole("region", { name: "En vivo · TFTP 10.0.0.5:69" })).toBeInTheDocument();
+  const spy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+  await tick();
+  expect(spy).toHaveBeenCalledWith("es");
+  spy.mockRestore();
 });
