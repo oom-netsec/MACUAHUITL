@@ -25,9 +25,9 @@ export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; cr
           const ok = creds.some((c) => c.id === h.credentialId);
           return (
             <li key={h.id}>
-              <button type="button" disabled={busy || !ok} aria-describedby={ok ? undefined : `${id}-${h.id}`} aria-label={t("ssh.connectHost", { name: h.name })} onClick={() => onConnect(h)}>{h.name}</button>
+              <button type="button" disabled={busy || !ok} aria-describedby={[h.startCommand ? `${id}-${h.id}-run` : "", ok ? "" : `${id}-${h.id}`].filter(Boolean).join(" ") || undefined} aria-label={t("ssh.connectHost", { name: h.name })} onClick={() => onConnect(h)}>{h.name}</button>
               <span className="meta mono"> {h.address}</span>
-              {h.startCommand && <span className="meta"> {t("ssh.saved.runs")} <code className="mono">{h.startCommand}</code></span>}
+              {h.startCommand && <span id={`${id}-${h.id}-run`} className="meta"> {t("ssh.saved.runs")} <code className="mono">{h.startCommand}</code></span>}
               {!ok && <span id={`${id}-${h.id}`} className="hint"> {t("ssh.saved.noCred")}</span>}
             </li>
           );

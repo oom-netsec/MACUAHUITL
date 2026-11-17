@@ -21,6 +21,8 @@ import type { FindReq } from "./XTermPane";
 import { xtermTheme } from "./termTheme";
 import "./terminal.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
+import { hostsChanged } from "../inventory/signal";
+import { passwordCreds } from "../vault/api";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
 import { SavedHosts } from "./SavedHosts";
 import { hostKeyFromError, keygenCommands, parseFingerprints } from "../../lib/hostkeys";
@@ -103,13 +105,14 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     core.listPinnedScripts().then((l) => { if (live) setPins(l.filter((x) => scriptText(x.commands))); }, () => { if (live) setPins([]); });
     return () => { live = false; };
   }, [core, sv]);
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
+  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); const pw = passwordCreds(l); setCred((c) => (pw.some((x) => x.id === c) ? c : pw[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const patch = (runId: string, f: (t: Tab) => Tab) => setTabs((ts) => ts.map((t) => (t.runId === runId ? f(t) : t)));
   const apply = (e: TerminalEvent) => {
     if (e.done) {
       writers.current.get(e.runId)?.flush();
       saveLog(e.runId);
+      if (e.errorInfo?.reason === "terminal.err.startup_changed") hostsChanged(); // volver a leer los hosts: reintentar usa la orden nueva
       patch(e.runId, (t) => ({ ...t, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err, errInfo: e.error ? errInfo({ cause: e.errorInfo }) : t.errInfo }));
     } else if (e.opened) {
       patch(e.runId, (t) => ({ ...t, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
@@ -317,9 +320,9 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const form = (
     <>
       <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand); }} />
-      <HostPicker core={core} onPick={(h) => { const ok = creds.some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
+      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
+        <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
         <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
       </div>

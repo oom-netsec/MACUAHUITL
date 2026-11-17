@@ -68,11 +68,42 @@ test("junto al botón se ve la orden de inicio y viaja como expectedStartupComma
   expect(calls()[1][0]).toMatchObject({ expectedStartupCommand: "tmux attach -t main", accept: [`SHA256:${fp}`] }); // la misma orden que se mostró
 });
 
-test("si el núcleo no conecta porque la orden cambió, lo dice claro", async () => {
-  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), terminalOpen: vi.fn(async () => { throw Object.assign(new Error("terminal: la orden de inicio cambió"), { cause: { code: "FailedPrecondition", reason: "terminal.err.startup_changed", metadata: {} } }); }) });
+test("si el núcleo no conecta porque la orden cambió, lo dice claro y recarga los hosts guardados", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
   render(<TerminalView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
-  expect(await screen.findByText(/terminal: la orden de inicio cambió/)).toBeVisible();
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const lists = (core.listHosts as ReturnType<typeof vi.fn>).mock.calls.length;
+  act(() => { core.emitTerminal({ runId: "t1", done: true, error: "terminal: la orden de inicio cambió", errorInfo: { code: "FailedPrecondition", reason: "terminal.err.startup_changed", metadata: {} } }); });
+  expect(await screen.findByText(/La orden de inicio cambió desde que la viste/)).toBeVisible();
+  await waitFor(() => expect((core.listHosts as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(lists));
+});
+
+const keyCred = { id: "k".repeat(32), label: "llave lab", username: "netops", kind: "key" as const, hasEnable: false, hasSshKey: true };
+
+test("la conexión manual no ofrece credenciales de llave ni las deja por omisión", async () => {
+  render(<TerminalView core={fakeCore({ listCredentials: vi.fn(async () => [keyCred, cred]) })} />);
+  const sel = await screen.findByLabelText("Credencial");
+  await waitFor(() => expect(sel).toHaveValue(cred.id));
+  expect(screen.queryByRole("option", { name: /llave lab/ })).toBeNull();
+});
+
+test("un host con credencial de llave elegido en la libreta se abre por hostId", async () => {
+  const hosts = sampleHosts.map((h, i) => (i === 0 ? { ...h, credentialId: keyCred.id } : h));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred, cred]), listHosts: vi.fn(async () => hosts) });
+  render(<TerminalView core={core} />);
+  await screen.findByRole("button", { name: "Conectar a LAB-CORE" });
+  await userEvent.selectOptions(screen.getByLabelText(/Host de la libreta/i), hosts[0].id);
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).toMatchObject({ hostId: hosts[0].id });
+  expect(req).not.toHaveProperty("credentialId");
+});
+
+test("el botón del host anuncia su orden de inicio", async () => {
+  const hosts = sampleHosts.map((h, i) => (i === 0 ? { ...h, startCommand: "tmux attach -t main" } : h));
+  render(<TerminalView core={fakeCore({ listCredentials: vi.fn(async () => [cred]), listHosts: vi.fn(async () => hosts) })} />);
+  expect(await screen.findByRole("button", { name: "Conectar a LAB-CORE" })).toHaveAccessibleDescription(/tmux attach -t main/);
 });
 
 test("la huella de la primera vez muestra host:puerto, tipo de llave y la orden ssh-keygen para Linux y Windows", async () => {

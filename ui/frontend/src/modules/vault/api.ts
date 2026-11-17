@@ -3,6 +3,8 @@ export type VaultState = "absent" | "locked" | "unlocked";
 export interface VaultStatus { state: VaultState; armedJobs: string[] | null }
 export interface Credential { id: string; label: string; username: string; kind?: "password" | "key"; hasEnable: boolean; hasSshKey: boolean }
 
+// Las credenciales de llave solo valen para hosts linux/windows abiertos por host_id: los selectores de credencial sueltos no las ofrecen.
+export const passwordCreds = (l: Credential[]): Credential[] => l.filter((c) => c.kind !== "key");
 
 // Respaldo cifrado (fase 29d): archivo de bóveda con frase propia; el import va en dos pasos con un token de 10 minutos.
 export type VaultBackupState = "nueva" | "igual" | "conflicto_etiqueta" | "reservada"; // «reservada» (del sistema) se omite sola
