@@ -19,19 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VaultService_Status_FullMethodName                 = "/macuahuitl.v1.VaultService/Status"
-	VaultService_Create_FullMethodName                 = "/macuahuitl.v1.VaultService/Create"
-	VaultService_Unlock_FullMethodName                 = "/macuahuitl.v1.VaultService/Unlock"
-	VaultService_Lock_FullMethodName                   = "/macuahuitl.v1.VaultService/Lock"
-	VaultService_ChangeMasterPassword_FullMethodName   = "/macuahuitl.v1.VaultService/ChangeMasterPassword"
-	VaultService_ListCredentials_FullMethodName        = "/macuahuitl.v1.VaultService/ListCredentials"
-	VaultService_PutCredential_FullMethodName          = "/macuahuitl.v1.VaultService/PutCredential"
-	VaultService_DeleteCredential_FullMethodName       = "/macuahuitl.v1.VaultService/DeleteCredential"
-	VaultService_ExportBackup_FullMethodName           = "/macuahuitl.v1.VaultService/ExportBackup"
-	VaultService_PreviewBackupImport_FullMethodName    = "/macuahuitl.v1.VaultService/PreviewBackupImport"
-	VaultService_ApplyBackupImport_FullMethodName      = "/macuahuitl.v1.VaultService/ApplyBackupImport"
-	VaultService_GenerateKeyCredential_FullMethodName  = "/macuahuitl.v1.VaultService/GenerateKeyCredential"
-	VaultService_GetCredentialPublicKey_FullMethodName = "/macuahuitl.v1.VaultService/GetCredentialPublicKey"
+	VaultService_Status_FullMethodName                  = "/macuahuitl.v1.VaultService/Status"
+	VaultService_Create_FullMethodName                  = "/macuahuitl.v1.VaultService/Create"
+	VaultService_Unlock_FullMethodName                  = "/macuahuitl.v1.VaultService/Unlock"
+	VaultService_Lock_FullMethodName                    = "/macuahuitl.v1.VaultService/Lock"
+	VaultService_ChangeMasterPassword_FullMethodName    = "/macuahuitl.v1.VaultService/ChangeMasterPassword"
+	VaultService_ListCredentials_FullMethodName         = "/macuahuitl.v1.VaultService/ListCredentials"
+	VaultService_PutCredential_FullMethodName           = "/macuahuitl.v1.VaultService/PutCredential"
+	VaultService_DeleteCredential_FullMethodName        = "/macuahuitl.v1.VaultService/DeleteCredential"
+	VaultService_ExportBackup_FullMethodName            = "/macuahuitl.v1.VaultService/ExportBackup"
+	VaultService_PreviewBackupImport_FullMethodName     = "/macuahuitl.v1.VaultService/PreviewBackupImport"
+	VaultService_ApplyBackupImport_FullMethodName       = "/macuahuitl.v1.VaultService/ApplyBackupImport"
+	VaultService_GenerateKeyCredential_FullMethodName   = "/macuahuitl.v1.VaultService/GenerateKeyCredential"
+	VaultService_GetCredentialPublicKey_FullMethodName  = "/macuahuitl.v1.VaultService/GetCredentialPublicKey"
+	VaultService_RegenerateKeyCredential_FullMethodName = "/macuahuitl.v1.VaultService/RegenerateKeyCredential"
 )
 
 // VaultServiceClient is the client API for VaultService service.
@@ -52,10 +53,13 @@ type VaultServiceClient interface {
 	ExportBackup(ctx context.Context, in *ExportBackupRequest, opts ...grpc.CallOption) (*ExportBackupResponse, error)
 	PreviewBackupImport(ctx context.Context, in *PreviewBackupImportRequest, opts ...grpc.CallOption) (*PreviewBackupImportResponse, error)
 	ApplyBackupImport(ctx context.Context, in *ApplyBackupImportRequest, opts ...grpc.CallOption) (*ApplyBackupImportResponse, error)
-	// Fase 44 (ADR 0013): llave SSH ed25519 generada en el núcleo con crypto/rand. La privada vive solo en la bóveda:
-	// ninguna RPC, export ni respaldo la saca, y no hay forma de importar una. Solo sale la pública.
+	// Fase 44 (ADR 0013): llave SSH ed25519 generada en el núcleo con crypto/rand. La privada vive en la bóveda y solo
+	// viaja dentro del respaldo cifrado (.mcvault); ninguna RPC la devuelve y no se importa una de fuera. Solo sale la
+	// pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
 	GenerateKeyCredential(ctx context.Context, in *GenerateKeyCredentialRequest, opts ...grpc.CallOption) (*GenerateKeyCredentialResponse, error)
 	GetCredentialPublicKey(ctx context.Context, in *GetCredentialPublicKeyRequest, opts ...grpc.CallOption) (*GetCredentialPublicKeyResponse, error)
+	// Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
+	RegenerateKeyCredential(ctx context.Context, in *RegenerateKeyCredentialRequest, opts ...grpc.CallOption) (*RegenerateKeyCredentialResponse, error)
 }
 
 type vaultServiceClient struct {
@@ -196,6 +200,16 @@ func (c *vaultServiceClient) GetCredentialPublicKey(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *vaultServiceClient) RegenerateKeyCredential(ctx context.Context, in *RegenerateKeyCredentialRequest, opts ...grpc.CallOption) (*RegenerateKeyCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegenerateKeyCredentialResponse)
+	err := c.cc.Invoke(ctx, VaultService_RegenerateKeyCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VaultServiceServer is the server API for VaultService service.
 // All implementations must embed UnimplementedVaultServiceServer
 // for forward compatibility.
@@ -214,10 +228,13 @@ type VaultServiceServer interface {
 	ExportBackup(context.Context, *ExportBackupRequest) (*ExportBackupResponse, error)
 	PreviewBackupImport(context.Context, *PreviewBackupImportRequest) (*PreviewBackupImportResponse, error)
 	ApplyBackupImport(context.Context, *ApplyBackupImportRequest) (*ApplyBackupImportResponse, error)
-	// Fase 44 (ADR 0013): llave SSH ed25519 generada en el núcleo con crypto/rand. La privada vive solo en la bóveda:
-	// ninguna RPC, export ni respaldo la saca, y no hay forma de importar una. Solo sale la pública.
+	// Fase 44 (ADR 0013): llave SSH ed25519 generada en el núcleo con crypto/rand. La privada vive en la bóveda y solo
+	// viaja dentro del respaldo cifrado (.mcvault); ninguna RPC la devuelve y no se importa una de fuera. Solo sale la
+	// pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
 	GenerateKeyCredential(context.Context, *GenerateKeyCredentialRequest) (*GenerateKeyCredentialResponse, error)
 	GetCredentialPublicKey(context.Context, *GetCredentialPublicKeyRequest) (*GetCredentialPublicKeyResponse, error)
+	// Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
+	RegenerateKeyCredential(context.Context, *RegenerateKeyCredentialRequest) (*RegenerateKeyCredentialResponse, error)
 	mustEmbedUnimplementedVaultServiceServer()
 }
 
@@ -266,6 +283,9 @@ func (UnimplementedVaultServiceServer) GenerateKeyCredential(context.Context, *G
 }
 func (UnimplementedVaultServiceServer) GetCredentialPublicKey(context.Context, *GetCredentialPublicKeyRequest) (*GetCredentialPublicKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCredentialPublicKey not implemented")
+}
+func (UnimplementedVaultServiceServer) RegenerateKeyCredential(context.Context, *RegenerateKeyCredentialRequest) (*RegenerateKeyCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegenerateKeyCredential not implemented")
 }
 func (UnimplementedVaultServiceServer) mustEmbedUnimplementedVaultServiceServer() {}
 func (UnimplementedVaultServiceServer) testEmbeddedByValue()                      {}
@@ -522,6 +542,24 @@ func _VaultService_GetCredentialPublicKey_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VaultService_RegenerateKeyCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegenerateKeyCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VaultServiceServer).RegenerateKeyCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VaultService_RegenerateKeyCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VaultServiceServer).RegenerateKeyCredential(ctx, req.(*RegenerateKeyCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VaultService_ServiceDesc is the grpc.ServiceDesc for VaultService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -580,6 +618,10 @@ var VaultService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCredentialPublicKey",
 			Handler:    _VaultService_GetCredentialPublicKey_Handler,
+		},
+		{
+			MethodName: "RegenerateKeyCredential",
+			Handler:    _VaultService_RegenerateKeyCredential_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

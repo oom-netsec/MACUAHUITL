@@ -93,12 +93,13 @@ type Device struct {
 	Sources    []string       `protobuf:"bytes,7,rep,name=sources,proto3" json:"sources,omitempty"`                            // ListDevices: patrol (objetivo de un trabajo), flota (tiene evidencia), respaldos y/o manual (libreta)
 	// Fase 29b, libreta de hosts. Solo los hosts manuales los traen (en ListDevices, id = el id del host manual
 	// en vez de la dirección; el puerto va en profile.port y el nombre también en hostname).
-	Name            string   `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
-	Folder          string   `protobuf:"bytes,9,opt,name=folder,proto3" json:"folder,omitempty"` // un solo nivel; vacío = sin carpeta
-	Tags            []string `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
-	CredentialId    string   `protobuf:"bytes,11,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
-	CredentialLabel string   `protobuf:"bytes,12,opt,name=credential_label,json=credentialLabel,proto3" json:"credential_label,omitempty"` // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
-	Notes           string   `protobuf:"bytes,13,opt,name=notes,proto3" json:"notes,omitempty"`
+	Name         string   `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
+	Folder       string   `protobuf:"bytes,9,opt,name=folder,proto3" json:"folder,omitempty"` // un solo nivel; vacío = sin carpeta
+	Tags         []string `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
+	CredentialId string   `protobuf:"bytes,11,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"` // referencia a la bóveda; jamás un secreto. Vacío = sin credencial. Fase 44: una credencial
+	// "key" solo en hosts linux o windows (InvalidArgument, metadata.field = "credential_id")
+	CredentialLabel string `protobuf:"bytes,12,opt,name=credential_label,json=credentialLabel,proto3" json:"credential_label,omitempty"` // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
+	Notes           string `protobuf:"bytes,13,opt,name=notes,proto3" json:"notes,omitempty"`
 	// Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,
 	// sin espacios en los extremos, sin controles \p{Cc} (tab y saltos incluidos) ni caracteres de formato \p{Cf} (bidi
 	// U+202A–202E y U+2066–2069, U+200B–200F, U+FEFF); vacía = el shell de siempre. El terminal la manda como exec con PTY

@@ -55,7 +55,8 @@ message Device {
   string name = 8;
   string folder = 9;                  // un solo nivel; vacío = sin carpeta
   repeated string tags = 10;
-  string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
+  string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial. Fase 44: una credencial
+                                      // "key" solo en hosts linux o windows (InvalidArgument, metadata.field = "credential_id")
   string credential_label = 12;       // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
   string notes = 13;
   // Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,

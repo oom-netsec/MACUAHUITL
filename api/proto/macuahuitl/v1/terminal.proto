@@ -28,7 +28,8 @@ message TerminalOpen {
   // InvalidArgument (terminal.err.host_and_address), sin conectar: no se combina un host guardado con otra dirección u
   // otra credencial. Si el host
   // tiene orden de inicio, se manda como exec con PTY en vez del shell y la sesión termina cuando esa orden termina.
-  // CheckDenied no aplica: es el terminal manual.
+  // CheckDenied no aplica: es el terminal manual. Una credencial "key" solo se usa por host_id de un host linux o windows:
+  // con dirección a mano o con un host Cisco se rechaza (FailedPrecondition, terminal.err.key_credential).
   string host_id = 8;
   // La orden de inicio que la UI le mostró al usuario antes de conectar. Si no es igual a la guardada, el núcleo no
   // conecta (FailedPrecondition): lo que corre es lo que se vio. Vacío = el host no debe tener orden de inicio.
