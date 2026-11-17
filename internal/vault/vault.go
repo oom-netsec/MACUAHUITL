@@ -22,6 +22,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sshkey"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -31,7 +32,8 @@ var (
 	ErrLocked        = i18n.New("vault.err.locked", nil)
 	ErrNotFound      = i18n.New("vault.err.not_found", nil)
 	ErrCorrupt       = i18n.New("vault.err.corrupt", nil)
-	ErrFieldTooLong  = i18n.New("vault.err.field_too_long", nil)
+	ErrFieldTooLong  = i18n.New("vault.err.field_too_long", i18n.A("max", fmt.Sprintf("%d KiB", MaxFieldBytes>>10)))
+	ErrKeyInvalid    = i18n.New("vault.err.key_invalid", nil)
 	ErrExists        = i18n.New("vault.err.exists", nil)
 	ErrWeakParams    = i18n.New("vault.err.weak_params", nil)
 	ErrReserved      = i18n.New("vault.err.reserved", nil)
@@ -105,7 +107,8 @@ type Vault struct {
 	onLock   []func() // se llaman al cerrarse de forma interactiva, ya sin v.mu
 	// Solo los respaldos: toleran un sistema de archivos sin permisos (vfat) y anotan que no se pudo poner 0600.
 	lenient, noPerms bool
-	bakSynced        bool // el .bak ya se puso al día en este arranque (syncOldBak)
+	fieldMax         uint32 // tope por campo al descifrar; 0 = maxOwnFieldBytes (solo OpenBackup lo baja a MaxFieldBytes)
+	bakSynced        bool   // el .bak ya se puso al día en este arranque (syncOldBak)
 }
 
 // Create crea una bóveda nueva en path y la deja desbloqueada.
@@ -292,7 +295,11 @@ func (v *Vault) decrypt(e rawEntry) (Credential, error) {
 	if err != nil {
 		return Credential{}, corrupt("entrada %x no autentica", e.ID)
 	}
-	c, err := decodePlain(plain)
+	max := v.fieldMax
+	if max == 0 {
+		max = maxOwnFieldBytes
+	}
+	c, err := decodePlain(plain, max)
 	c.ID = hex.EncodeToString(e.ID[:])
 	return c, err
 }
@@ -354,7 +361,7 @@ func (v *Vault) PutUnlessKey(c Credential) (string, error) {
 			return "", ErrKeyCredential
 		}
 	}
-	ids, err := v.putBatchLocked([]Credential{c}, false)
+	ids, err := v.putBatchLocked([]Credential{c}, false, true)
 	if err != nil {
 		return "", err
 	}
@@ -362,7 +369,7 @@ func (v *Vault) PutUnlessKey(c Credential) (string, error) {
 }
 
 // PutBatch es Put para varias credenciales con una sola escritura: o quedan todas o no queda ninguna.
-func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false) }
+func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false, true) }
 
 // PutReserved crea o reemplaza (por etiqueta) una entrada reservada del sistema; la etiqueta debe ser reservada. Ignora c.ID: la entrada
 // a reemplazar sale solo de la etiqueta, y la búsqueda y la escritura van en la misma sección crítica (dos llamadas no la duplican).
@@ -389,25 +396,35 @@ func (v *Vault) PutReserved(c Credential) error {
 			break
 		}
 	}
-	_, err := v.putBatchLocked([]Credential{c}, true)
+	_, err := v.putBatchLocked([]Credential{c}, true, false)
 	return err
 }
 
-func (v *Vault) putBatch(cs []Credential, reserved bool) ([]string, error) {
+func (v *Vault) putBatch(cs []Credential, reserved, strict bool) ([]string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	return v.putBatchLocked(cs, reserved)
+	return v.putBatchLocked(cs, reserved, strict)
 }
 
-// putBatchLocked es PutBatch con v.mu ya tomado; reserved deja reemplazar una entrada reservada.
-func (v *Vault) putBatchLocked(cs []Credential, reserved bool) ([]string, error) {
+// putBatchLocked es PutBatch con v.mu ya tomado; reserved deja reemplazar una entrada reservada. strict es la frontera de entrada: tope
+// de MaxFieldBytes por campo y llave SSH validada (sin strict, solo el tope de cordura: lo reservado y el export de lo ya guardado).
+func (v *Vault) putBatchLocked(cs []Credential, reserved, strict bool) ([]string, error) {
 	if err := v.requireFull(); err != nil {
 		return nil, err
 	}
+	max := maxOwnFieldBytes // lo reservado (la reversa pendiente del asistente guarda un running-config entero) no lleva el tope estricto
+	if strict {
+		max = MaxFieldBytes
+	}
 	for _, c := range cs {
-		if len(c.Label) > MaxFieldBytes || len(c.Username) > MaxFieldBytes || len(c.Password.Bytes()) > MaxFieldBytes ||
-			len(c.Enable.Bytes()) > MaxFieldBytes || len(c.SSHKey.Bytes()) > MaxFieldBytes {
+		if len(c.Label) > max || len(c.Username) > max || len(c.Password.Bytes()) > max ||
+			len(c.Enable.Bytes()) > max || len(c.SSHKey.Bytes()) > max {
 			return nil, ErrFieldTooLong
+		}
+		if strict {
+			if err := ValidateKey(c.Label, c.SSHKey); err != nil {
+				return nil, err
+			}
 		}
 	}
 	next := append([]rawEntry(nil), v.entries...)
@@ -656,6 +673,18 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	}
 	if err := sys.SyncDir(dir); err != nil { // en Windows no hace nada: ver sys.SyncDir
 		return fmt.Errorf("vault: %w", err)
+	}
+	return nil
+}
+
+// ValidateKey rechaza una llave privada SSH que x/crypto/ssh no parsea (igual que transport.OpenSSH: una con frase tampoco sirve allí).
+// Una llave vacía es válida (la credencial no lleva). No hay pública guardada con qué cotejar: la entrada solo guarda la privada.
+func ValidateKey(label string, key *secret.Secret) error {
+	if key.Empty() {
+		return nil
+	}
+	if err := sshkey.Parse(key.Bytes()); err != nil {
+		return i18n.Wrap("vault.err.key_invalid", ErrKeyInvalid, i18n.A("label", label)) // errors.Is(ErrKeyInvalid) por la causa
 	}
 	return nil
 }

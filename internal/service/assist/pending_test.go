@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/assist"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
@@ -702,5 +703,20 @@ func TestStartPendingRollbackDuringDiscardIsRefused(t *testing.T) {
 	}
 	if code(startErr) != codes.FailedPrecondition {
 		t.Fatalf("Start en la ventana de Descartar debía rechazarse: %v", startErr)
+	}
+}
+
+// La reversa de un equipo con un running-config de más de 64 KiB (el JSON entero va en una entrada reservada de la bóveda) se guarda
+// y se lee: el tope por campo de las credenciales no aplica a lo reservado.
+func TestPendingRollbackWithHugeRunningConfigIsSaved(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	rec := pendingRec{RunID: "grande", Kind: "restore", Host: "10.0.0.1", Leftover: assist.Leftover{Function: "restore",
+		Devices: []assist.LeftDevice{{Device: "10.0.0.1", Rollback: []string{strings.Repeat("snmp-server community x RO\n", 8<<10)}}}}}
+	if err := r.svc.savePending(rec); err != nil {
+		t.Fatalf("savePending: %v", err)
+	}
+	got, err := r.svc.loadPending(pendingPrefix + "grande")
+	if err != nil || len(got.Leftover.Devices) != 1 || len(got.Leftover.Devices[0].Rollback[0]) < 200<<10 {
+		t.Fatalf("loadPending: %v", err)
 	}
 }

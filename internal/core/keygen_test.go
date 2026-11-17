@@ -3,9 +3,14 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"net/netip"
 	"os"
@@ -278,7 +283,7 @@ func TestRespaldoLlevaLaLlave(t *testing.T) {
 func TestRegenerarLlaveAnteriorALaFase44(t *testing.T) {
 	h := newHarness(t, nil)
 	h.ready(t)
-	id, err := h.core.vault.Put(vault.Credential{Label: "vieja", Username: "u", SSHKey: secret.New([]byte("-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"))})
+	id, err := h.core.vault.Put(vault.Credential{Label: "vieja", Username: "u", SSHKey: secret.New(llaveECDSAPEM(t))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,4 +374,18 @@ func TestLlaveRestauradaDelRespaldoAutentica(t *testing.T) {
 		}
 	}
 	t.Fatal("no se restauró la credencial pi")
+}
+
+// llaveECDSAPEM es una llave privada válida que no es ed25519 OpenSSH (como las de antes de la fase 44).
+func llaveECDSAPEM(t *testing.T) []byte {
+	t.Helper()
+	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.MarshalECPrivateKey(k)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
 }

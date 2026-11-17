@@ -2,10 +2,14 @@ package core
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -30,10 +34,19 @@ func estadoBoveda(t *testing.T, h *harness) (string, []string) {
 	return string(b), nombres
 }
 
+// headerLen es el largo de la cabecera de un .mcvault (internal/vault/format.go) hasta el contador de entradas.
+const headerLen = 111
+
+func mismosNombres(a, b []string) bool {
+	slices.Sort(a)
+	slices.Sort(b)
+	return slices.Equal(a, b)
+}
+
 func mismoEstado(t *testing.T, h *harness, b0 string, n0 []string, ctxto string) {
 	t.Helper()
 	b, n := estadoBoveda(t, h)
-	if b != b0 || len(n) != len(n0) {
+	if b != b0 || !mismosNombres(n, n0) {
 		t.Fatalf("%s: la bóveda cambió (archivos %v -> %v)", ctxto, n0, n)
 	}
 	if p, _ := h.pendientes(); p != 0 {
@@ -69,34 +82,85 @@ func TestRespaldoHostilNoTocaLaBoveda(t *testing.T) {
 		return b
 	}
 	prueba("versión", mut(func(b []byte) { binary.BigEndian.PutUint16(b[4:6], 2) }))
-	prueba("n gigante", mut(func(b []byte) { binary.BigEndian.PutUint32(b[107:111], 0xFFFFFFFF) }))
-	prueba("l gigante", mut(func(b []byte) { binary.BigEndian.PutUint32(b[139:143], 0xFFFFFFFF) }))
+	prueba("n gigante", mut(func(b []byte) { binary.BigEndian.PutUint32(b[headerLen-4:headerLen], 0xFFFFFFFF) }))
+	prueba("l gigante", mut(func(b []byte) { binary.BigEndian.PutUint32(b[headerLen+28:headerLen+32], 0xFFFFFFFF) }))
 	prueba("cola", append(append([]byte(nil), raw...), 1, 2, 3))
 }
 
-// Una llave SSH inválida dentro del respaldo no se valida ni al exportar ni al importar (solo transport/ssh.go:69 la parsea al
-// conectar): entra tal cual y la importación sigue siendo todo o nada. Documenta el estado actual.
-func TestRespaldoHostilLlaveSSHInvalidaEntraSinValidar(t *testing.T) {
-	h := newHarness(t, nil)
-	h.ready(t)
-	mala := []byte("-----BEGIN OPENSSH PRIVATE KEY-----\ntruncada")
-	if _, err := h.core.vault.Put(vault.Credential{Label: "k", Username: "u", SSHKey: secret.New(append([]byte(nil), mala...))}); err != nil {
+// Un respaldo con una llave SSH que no parsea (testdata/llave-invalida.mcvault: «buena» con contraseña y «rota» con una llave
+// truncada, armado antes de la validación) falla la vista previa ENTERA con la etiqueta culpable y no deja nada a medias.
+func TestRespaldoHostilLlaveSSHInvalidaRechazaElImport(t *testing.T) {
+	o := newHarness(t, nil)
+	if _, err := o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")}); err != nil {
 		t.Fatal(err)
 	}
+	b0, n0 := estadoBoveda(t, o)
+	fix, _ := filepath.Abs(filepath.Join("testdata", "llave-invalida.mcvault"))
+	_, err := o.preview(t, fix)
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), `"rota"`) {
+		t.Fatalf("preview: %v", err)
+	}
+	mismoEstado(t, o, b0, n0, "llave inválida")
+}
+
+// Una llave inválida tampoco entra por PutCredential (gRPC): no se importan llaves por ahí.
+func TestPutCredentialSigueSinAceptarLlaves(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	_, err := h.vault.PutCredential(ctx(t), &v1.PutCredentialRequest{Label: "k", Username: "u", SshPrivateKey: []byte("x")})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// Muchas entradas chicas: la vista previa las rechaza antes de descifrar (cada secreto pide páginas bloqueadas y memguard entraba en
+// pánico con unas 700), sin dejar vista previa ni tocar la bóveda; y exportarlas no entra en pánico.
+func TestRespaldoHostilMuchasEntradasChicasRechazaSinPanico(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	for i := 0; i < 700; i += 50 {
+		var cs []vault.Credential
+		for j := i; j < i+50; j++ {
+			cs = append(cs, vault.Credential{Label: fmt.Sprintf("c%04d", j), Username: "u", Password: secret.New([]byte("p"))})
+		}
+		_, err := h.core.vault.PutBatch(cs)
+		for _, c := range cs {
+			c.Password.Destroy()
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	path := filepath.Join(t.TempDir(), "r.mcvault")
-	if r, err := h.export(t, path, true); err != nil || r.Count != 2 {
+	if r, err := h.export(t, path, true); err != nil || r.Count != 701 {
 		t.Fatalf("export: %+v %v", r, err)
 	}
 	o := newHarness(t, nil)
 	if _, err := o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")}); err != nil {
 		t.Fatal(err)
 	}
-	pr, err := o.preview(t, path)
-	if err != nil {
+	b0, n0 := estadoBoveda(t, o)
+	if _, err := o.preview(t, path); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("preview: %v", err)
+	}
+	mismoEstado(t, o, b0, n0, "demasiadas")
+}
+
+// Las vistas previas pendientes comparten un presupuesto de memoria bloqueada: al pedir más de lo que cabe, la más vieja cede.
+func TestRespaldoStoreReservaCedeLasViejas(t *testing.T) {
+	h, path := bovedaConRespaldo(t, nil)
+	now := time.Now()
+	st := &h.core.respaldos
+	if _, err := h.preview(t, path); err != nil {
 		t.Fatal(err)
 	}
-	if ap, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token}); err != nil || ap.Created != 2 {
-		t.Fatalf("apply: %+v %v", ap, err)
+	if n, _ := h.pendientes(); n != 1 {
+		t.Fatalf("pendientes = %d", n)
+	}
+	st.reserve(respaldoBudget, now)
+	defer st.release(respaldoBudget)
+	if n, _ := h.pendientes(); n != 0 {
+		t.Fatalf("la vista previa no cedió: %d", n)
 	}
 }
 
@@ -125,7 +189,7 @@ func TestRespaldoHostilEscrituraFallidaDejaLaBovedaIgual(t *testing.T) {
 	}
 	os.Chmod(dir, 0o700)
 	b, n := estadoBoveda(t, o)
-	if b != b0 || len(n) != len(n0) {
+	if b != b0 || !mismosNombres(n, n0) {
 		t.Fatalf("la bóveda cambió: %v -> %v", n0, n)
 	}
 	if l := o.labels(t); len(l) != 0 {

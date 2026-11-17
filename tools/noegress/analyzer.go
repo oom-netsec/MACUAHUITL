@@ -52,7 +52,8 @@ var allowed = []string{
 	"internal/transport",
 	"internal/diag",
 	"internal/ipc",
-	"internal/sys", // endurecimiento: prctl, setrlimit, mlockall
+	"internal/sys",    // endurecimiento: prctl, setrlimit, mlockall
+	"internal/sshkey", // solo ssh.ParsePrivateKey: valida llaves sin que vault ni core importen x/crypto/ssh
 	"gen",
 	"test/simulator",
 	"tools",

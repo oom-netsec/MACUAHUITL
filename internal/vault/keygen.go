@@ -269,7 +269,7 @@ func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, err error) {
 	}
 	oldKey := c.SSHKey
 	c.SSHKey = k
-	_, err = v.putBatchLocked([]Credential{c}, false)
+	_, err = v.putBatchLocked([]Credential{c}, false, true)
 	k.Destroy()
 	oldKey.Destroy()
 	if afterRekey != nil {

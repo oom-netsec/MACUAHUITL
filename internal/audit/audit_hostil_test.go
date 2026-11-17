@@ -18,7 +18,7 @@ func verificar(t *testing.T, l *Log, nombre string, first uint64) {
 func TestVerifyDetectaEdicionDeCadaCampo(t *testing.T) {
 	for _, set := range []string{
 		"at='2000-01-01T00:00:00.000000000Z'", "at='no es fecha'", "at=12345", "actor='x'", "action='x'", "target='x'", "detail='x'",
-		"prev='" + Genesis + "'", "hash='" + Genesis + "'", "detail=X'ff00fe'", "detail='" + strings.Repeat("é", 1<<20) + "'",
+		"prev='" + Genesis + "'", "hash='" + Genesis + "'", "detail=X'ff00fe'", "detail='" + strings.Repeat("é", 32<<10) + "'",
 	} {
 		l, exec := newLog(t)
 		appendN(t, l, 5)
@@ -76,7 +76,8 @@ func TestVerifyDetectaFilaDuplicadaYReordenada(t *testing.T) {
 
 // LÍMITE CONOCIDO, no un defecto que este paquete pueda arreglar: Verify valida una cadena contigua desde 1 y no sabe cuántas
 // filas debía haber. Quitar las últimas N filas deja una cadena válida y Intact=true. Solo se nota comparando Head con un
-// valor anclado fuera de la base (por ejemplo el de una exportación anterior). No existe tal ancla en el producto.
+// valor anclado fuera de la base (por ejemplo el de una exportación anterior). Nada la compara automáticamente (manifest.audit_head
+// existe, pero quien audita tiene que cotejarlo a mano).
 func TestVerifyNoDetectaTruncadoDeCola(t *testing.T) {
 	l, exec := newLog(t)
 	rs := appendN(t, l, 5)

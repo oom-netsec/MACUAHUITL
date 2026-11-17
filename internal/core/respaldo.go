@@ -25,13 +25,17 @@ import (
 const (
 	respaldoTTL     = 10 * time.Minute
 	respaldoMaxPend = 4 // cada vista previa guarda credenciales descifradas: pocas y de corta vida
+	// respaldoBudget es la memoria bloqueada (cota de vault.LockedBound) que pueden retener juntas las vistas previas: de los 8 MiB
+	// de RLIMIT_MEMLOCK deja 2 a la bóveda viva y al resto del núcleo. Una sola puede pedir hasta vault.MaxBackupLockedBytes (5 MiB).
+	respaldoBudget = 6 << 20
 )
 
 // respaldoPend es una vista previa de import: las credenciales descifradas del respaldo (secretos en memoria protegida) hasta que se
 // aplique, venza el token o se cierre la bóveda. Cada credencial lleva por ID el que tiene dentro del respaldo.
 type respaldoPend struct {
 	creds    []vault.Credential
-	reserved int // entradas del sistema del respaldo: se omiten y no se descifran
+	bound    int64 // cota de memoria bloqueada que retiene (vault.LockedBound)
+	reserved int   // entradas del sistema del respaldo: se omiten y no se descifran
 	path     string
 	expires  time.Time
 }
@@ -46,8 +50,44 @@ func (p respaldoPend) destroy() {
 
 // respaldoStore guarda las vistas previas por token. Su valor cero sirve.
 type respaldoStore struct {
-	mu   sync.Mutex
-	pend map[string]respaldoPend
+	mu       sync.Mutex
+	pend     map[string]respaldoPend
+	inflight int64 // cota de las vistas previas que se están descifrando y aún no se guardan
+}
+
+// reserve hace lugar para una vista previa de bound bytes (cede las pendientes más viejas) y la cuenta como en curso hasta release.
+func (st *respaldoStore) reserve(bound int64, now time.Time) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	st.sweepLocked(now)
+	for len(st.pend) > 0 && st.pendBoundLocked()+st.inflight+bound > respaldoBudget {
+		st.evictOldestLocked()
+	}
+	st.inflight += bound
+}
+
+func (st *respaldoStore) release(bound int64) {
+	st.mu.Lock()
+	st.inflight -= bound
+	st.mu.Unlock()
+}
+
+func (st *respaldoStore) pendBoundLocked() (n int64) {
+	for _, q := range st.pend {
+		n += q.bound
+	}
+	return n
+}
+
+func (st *respaldoStore) evictOldestLocked() {
+	oldest := ""
+	for k, q := range st.pend {
+		if oldest == "" || q.expires.Before(st.pend[oldest].expires) {
+			oldest = k
+		}
+	}
+	st.pend[oldest].destroy()
+	delete(st.pend, oldest)
 }
 
 // stash guarda la vista previa y da su token. Con la bóveda ya cerrada la descarta (ok=false): quien la cerró ya pasó por wipeAll. Los
@@ -62,14 +102,7 @@ func (st *respaldoStore) stash(v *vault.Vault, now time.Time, p respaldoPend) (s
 	p.expires = now.Add(respaldoTTL)
 	st.sweepLocked(now)
 	for len(st.pend) >= respaldoMaxPend {
-		oldest := ""
-		for k, q := range st.pend {
-			if oldest == "" || q.expires.Before(st.pend[oldest].expires) {
-				oldest = k
-			}
-		}
-		st.pend[oldest].destroy()
-		delete(st.pend, oldest)
+		st.evictOldestLocked()
 	}
 	b := make([]byte, 16)
 	rand.Read(b)
@@ -279,11 +312,14 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 		return nil, respaldoErr(ctx, err)
 	}
 	defer b.LockAll()
+	bound := b.LockedBound()
+	s.c.respaldos.reserve(bound, s.c.o.Now())
+	defer s.c.respaldos.release(bound)
 	infos, err := b.ListAll()
 	if err != nil {
 		return nil, respaldoErr(ctx, err)
 	}
-	p := respaldoPend{path: path}
+	p := respaldoPend{path: path, bound: bound}
 	stored := false
 	defer func() {
 		if !stored {
@@ -301,7 +337,10 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 			if err != nil {
 				return nil, respaldoErr(ctx, err)
 			}
-			p.creds = append(p.creds, c)
+			p.creds = append(p.creds, c) // antes de validar: destroy() la borra si falla
+			if err := vault.ValidateKey(c.Label, c.SSHKey); err != nil {
+				return nil, service.VaultErr(ctx, err) // todo el import falla, con la etiqueta culpable
+			}
 		}
 		items = append(items, it)
 	}
