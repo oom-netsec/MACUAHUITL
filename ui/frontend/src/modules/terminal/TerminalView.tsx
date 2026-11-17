@@ -25,7 +25,7 @@ import { hostsChanged } from "../inventory/signal";
 import { passwordCreds } from "../vault/api";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
 import { SavedHosts } from "./SavedHosts";
-import { hostKeyFromError, keygenCommands, parseFingerprints } from "../../lib/hostkeys";
+import { hostKeyFromError, keygenCommands, parseFingerprints, type HostKeyInfo } from "../../lib/hostkeys";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
 import { useScriptsVersion } from "../scripts/signal";
@@ -66,6 +66,8 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const [device, setDevice] = useState("");
   const [accept, setAccept] = useState("");
   const [err, setErr] = useState("");
+  // Llave de host rechazada en la apertura misma (por hostId el núcleo la verifica antes de devolver la sesión): sin pestaña, el aviso va arriba.
+  const [openHk, setOpenHk] = useState<{ hk: HostKeyInfo; dev: string; cred: string; hostId?: string; startup: string } | null>(null);
   const [note, setNote] = useState<"" | "nosession" | "noconfig">(""); // aviso de un script que no se pudo insertar
   const [pins, setPins] = useState<ScriptItem[]>([]); // scripts fijados (hasta 5, en su orden), junto a los comandos rápidos
   const sv = useScriptsVersion(); // los scripts cambiaron: volver a listar los fijados
@@ -177,7 +179,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "") => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setErr(t("ssh.logInUse")); return; }
-    setErr(""); setBusy(true);
+    setErr(""); setOpenHk(null); setBusy(true);
     try {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
@@ -195,7 +197,11 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       early.current.delete(runId);
       pending.forEach((e) => applyRef.current(e)); // las actualizaciones se encolan después de agregar la pestaña
       if (newRef.current) newRef.current.open = false;
-    } catch (e) { setErr(errorText(e)); } finally { setBusy(false); }
+    } catch (e) {
+      const hk = hostKeyFromError(errorText(e), errInfo(e));
+      if (hk) setOpenHk({ hk, dev, cred: credId, hostId, startup });
+      else setErr(errorText(e));
+    } finally { setBusy(false); }
   };
   // Las llamadas del puente no garantizan orden de llegada: por sesión hay un solo envío en vuelo y lo que se teclea mientras
   // tanto se junta y sale en una sola llamada al terminar el anterior.
@@ -278,32 +284,35 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   };
   useInbox("terminal-insert", (data) => { const ins = decodeInsert(data); if (ins) void insert(tool, ins); }); // «Enviar a la terminal» de Scripts
 
+  // Huella nueva o cambiada: se muestra con la orden para compararla y se acepta explícitamente (agrega la huella al campo y reintenta).
+  const hostKeyNotice = (hk: HostKeyInfo, device: string, retry: (accepted: string) => void) => {
+    const kg = hk.keyType ? keygenCommands(hk.keyType) : null;
+    return (
+      <Notice kind="warn">
+        <p>{t(hk.changed ? "transfer.hostKey.changed" : "transfer.hostKey.new")}</p>
+        <p><span className="mono">{hk.host ?? device}</span>{hk.keyType && <> · <span className="mono">{hk.keyType}</span></>}</p>
+        <p><code>{hk.fp}</code></p>
+        {kg && (
+          <>
+            <p>{t("ssh.hostKey.compare")}</p>
+            <p>{t("ssh.hostKey.onLinux")} <code className="mono">{kg.linux}</code></p>
+            <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
+          </>
+        )}
+        <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); retry(next); }}>{t("transfer.hostKey.accept")}</button>
+      </Notice>
+    );
+  };
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {
     const hk = tab.err ? hostKeyFromError(tab.err, tab.errInfo) : null;
-    const kg = hk?.keyType ? keygenCommands(hk.keyType) : null;
     const changedStartup = tab.errInfo?.reason === "terminal.err.startup_changed"; // el host se editó (o un import cambió la orden) tras mostrarla
     return (
       <>
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
         {tab.err && <Notice kind="error">{tab.err}</Notice>}
         {changedStartup && <Notice kind="warn">{t("ssh.startupChanged")}</Notice>}
-        {hk && (
-          <Notice kind="warn">
-            <p>{t(hk.changed ? "transfer.hostKey.changed" : "transfer.hostKey.new")}</p>
-            <p><span className="mono">{hk.host ?? tab.device}</span>{hk.keyType && <> · <span className="mono">{hk.keyType}</span></>}</p>
-            <p><code>{hk.fp}</code></p>
-            {kg && (
-              <>
-                <p>{t("ssh.hostKey.compare")}</p>
-                <p>{t("ssh.hostKey.onLinux")} <code className="mono">{kg.linux}</code></p>
-                <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
-              </>
-            )}
-            {/* Aceptar es explícito: agrega la huella al campo del formulario y abre otra pestaña con ella. */}
-            <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); void open(next, tab.device, tab.cred, tab.hostId, tab.startup); }}>{t("transfer.hostKey.accept")}</button>
-          </Notice>
-        )}
+        {hk && hostKeyNotice(hk, tab.device, (next) => void open(next, tab.device, tab.cred, tab.hostId, tab.startup))}
       </>
     );
   };
@@ -348,6 +357,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {/* Sin sesiones, el formulario a la vista; con sesiones se pliega en una línea y la terminal se queda con la pantalla. */}
       {!hasTabs ? <Section title={t("ssh.new")}>{form}</Section> : <details ref={newRef} className="ssh-new"><summary>{t("ssh.new")}</summary>{form}</details>}
       {err && <Notice kind="error">{err}</Notice>}
+      {openHk && hostKeyNotice(openHk.hk, openHk.dev, (next) => void open(next, openHk.dev, openHk.cred, openHk.hostId, openHk.startup))}
       {note && <Notice kind="warn">{t(note === "nosession" ? "ssh.scriptNoSession" : "scripts.noSend")}</Notice>}
       {tabs.length === 0 && <EmptyState icon="terminal" title={t("ssh.empty.title")}>{t("ssh.empty")}</EmptyState>}
       {cur && !second && head(cur)}
