@@ -493,8 +493,9 @@ type CredentialInfo struct {
 	// Fase 44: "key" = solo llave SSH (sin contraseña ni enable; autentica solo por publickey y solo sirve para el terminal
 	// de hosts linux y windows: Patrol, el cambio asistido y las demás herramientas la rechazan); "password" = el resto.
 	Kind string `protobuf:"bytes,6,opt,name=kind,proto3" json:"kind,omitempty"`
-	// Fase 47: origen de una credencial "key": "generated" (nació en el núcleo) o "imported" (ImportKeyCredential).
-	// Vacío en las de contraseña. Se deriva de la llave guardada; las anteriores a la fase 47 salen "generated".
+	// Fase 47: origen de una credencial "key": "generated" (ed25519 nacida en el núcleo) o "imported" (cualquier otra: las de
+	// ImportKeyCredential y las de solo llave anteriores a la fase 44). Vacío en las de contraseña. Se deriva de la llave
+	// guardada. Es informativo, no un control de seguridad: un .mcvault armado a mano puede decir cualquiera de los dos.
 	Origin        string `protobuf:"bytes,7,opt,name=origin,proto3" json:"origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -990,14 +991,15 @@ func (x *GetCredentialPublicKeyResponse) GetFingerprint() string {
 	return ""
 }
 
-// Fase 47 (ADR 0013 §1b). Errores (ErrorInfo.reason): vault.key_passphrase_required (FailedPrecondition, la llave está
-// cifrada y falta la frase), vault.key_passphrase_wrong, vault.key_invalid (metadata format), vault.key_unsupported
-// (DSA, sk-*, curva o tamaño fuera de OpenSSH; metadata type) y vault.field_too_long (más de 64 KiB), todos InvalidArgument.
+// Fase 47 (ADR 0013 §1b). Errores (ErrorInfo.reason = código i18n): vault.err.key_passphrase_required (FailedPrecondition:
+// la llave está cifrada y falta la frase); InvalidArgument: vault.err.key_passphrase_wrong, vault.err.key_import_invalid
+// (metadata format), vault.err.key_import_unsupported (DSA, sk-*, P-224, RSA fuera de 1024..16384, PKCS#8 cifrada;
+// metadata type o format) y vault.err.field_too_long (más de 64 KiB; metadata max).
 type ImportKeyCredentialRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"` // mismas reglas que GenerateKeyCredential; no puede ser reservada
 	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
-	PrivateKey    []byte                 `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // el CONTENIDO de la llave (OpenSSH, PKCS#1, PKCS#8 o SEC1), nunca una ruta; tope 64 KiB
+	PrivateKey    []byte                 `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // el CONTENIDO (OpenSSH, PKCS#1, PKCS#8 sin cifrar, SEC1, PEM legado), nunca una ruta; tope 64 KiB
 	Passphrase    []byte                 `protobuf:"bytes,4,opt,name=passphrase,proto3" json:"passphrase,omitempty"`                   // vacía si la llave no está cifrada; se usa una vez y no se guarda
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1064,11 +1066,11 @@ func (x *ImportKeyCredentialRequest) GetPassphrase() []byte {
 type ImportKeyCredentialResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	PublicKey     string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // línea authorized_keys, con el comentario original de la llave o imported@<hostname>
+	PublicKey     string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // línea authorized_keys, igual que GetCredentialPublicKey (comentario macuahuitl@<hostname>)
 	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`              // "SHA256:…"
 	Algorithm     string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                  // ssh-ed25519, ecdsa-sha2-nistp256|384|521, ssh-rsa
-	Bits          uint32                 `protobuf:"varint,5,opt,name=bits,proto3" json:"bits,omitempty"`
-	Weak          bool                   `protobuf:"varint,6,opt,name=weak,proto3" json:"weak,omitempty"` // RSA de menos de 3072 bits: aviso, no error
+	Bits          uint32                 `protobuf:"varint,5,opt,name=bits,proto3" json:"bits,omitempty"`                           // ed25519 = 256, ECDSA = tamaño de la curva, RSA = largo del módulo
+	Weak          bool                   `protobuf:"varint,6,opt,name=weak,proto3" json:"weak,omitempty"`                           // RSA de menos de 3072 bits: aviso, no error (algunos servidores exigen 2048)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1198,10 +1200,11 @@ func (x *RegenerateKeyCredentialRequest) GetConfirm() bool {
 }
 
 type RegenerateKeyCredentialResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PublicKey     string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // la nueva, en el mismo formato que GenerateKeyCredentialResponse
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PublicKey      string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`                // la nueva, en el mismo formato que GenerateKeyCredentialResponse
+	PreviousOrigin string                 `protobuf:"bytes,2,opt,name=previous_origin,json=previousOrigin,proto3" json:"previous_origin,omitempty"` // fase 47: origen de la llave reemplazada ("imported" → la UI y mctl avisan)
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RegenerateKeyCredentialResponse) Reset() {
@@ -1237,6 +1240,13 @@ func (*RegenerateKeyCredentialResponse) Descriptor() ([]byte, []int) {
 func (x *RegenerateKeyCredentialResponse) GetPublicKey() string {
 	if x != nil {
 		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *RegenerateKeyCredentialResponse) GetPreviousOrigin() string {
+	if x != nil {
+		return x.PreviousOrigin
 	}
 	return ""
 }
@@ -1883,10 +1893,11 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x04weak\x18\x06 \x01(\bR\x04weak\"J\n" +
 	"\x1eRegenerateKeyCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aconfirm\x18\x02 \x01(\bR\aconfirm\"@\n" +
+	"\aconfirm\x18\x02 \x01(\bR\aconfirm\"i\n" +
 	"\x1fRegenerateKeyCredentialResponse\x12\x1d\n" +
 	"\n" +
-	"public_key\x18\x01 \x01(\tR\tpublicKey\")\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12'\n" +
+	"\x0fprevious_origin\x18\x02 \x01(\tR\x0epreviousOrigin\")\n" +
 	"\x17DeleteCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1a\n" +
 	"\x18DeleteCredentialResponse\"\x81\x01\n" +

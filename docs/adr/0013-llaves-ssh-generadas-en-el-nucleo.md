@@ -17,7 +17,7 @@ Además, la libreta de hosts solo admite plataformas Cisco (`devices.HostPlatfor
 
 ### 1. La privada nace en el núcleo y solo sale cifrada en el respaldo
 
-- **Generación.** `vault.GenerateKey` crea un par ed25519 con `crypto/rand` dentro del paquete `internal/vault`. La privada no pasa por el servicio ni por gRPC: el servicio recibe solo el id y la pública.
+- **Generación** (salvo la importación de §1b). `vault.GenerateKey` crea un par ed25519 con `crypto/rand` dentro del paquete `internal/vault`. La privada no pasa por el servicio ni por gRPC: el servicio recibe solo el id y la pública.
 - **Almacenamiento.**
   - La privada va en el campo «llave SSH» de la entrada, que ya existe y va cifrado con la DEK (AES-256-GCM).
   - Se guarda en formato OpenSSH sin frase (`-----BEGIN OPENSSH PRIVATE KEY-----`, armado a mano en `internal/vault/keygen.go` (`noegress` prohíbe `x/crypto/ssh` en `vault` y `core`); la interoperabilidad se prueba con `x/crypto/ssh` en `internal/transport`). Es el formato que `transport.OpenSSH` ya lee con `ssh.ParsePrivateKey`, así que no hay un segundo formato.
@@ -39,10 +39,17 @@ Además, la libreta de hosts solo admite plataformas Cisco (`devices.HostPlatfor
 
 - **Qué recibe.** El núcleo recibe el **contenido** de la llave, nunca una ruta. mctl y el puente leen el archivo del lado del cliente.
 - **Formatos y tipos.**
-  - Formatos: OpenSSH, PKCS#1, PKCS#8 y SEC1, con o sin frase.
+  - Formatos: OpenSSH (con o sin frase), PKCS#1, PKCS#8 sin cifrar, SEC1 y PEM legado cifrado.
   - Tipos aceptados: ed25519, ecdsa P-256/384/521 y RSA de al menos 1024 bits (aviso si es de menos de 3072).
   - Rechazadas: DSA y `sk-*`.
-- **Cómo se guarda.** La frase se usa una vez. La privada se guarda en OpenSSH **sin frase**, en el mismo campo que las generadas, así que `transport.OpenSSH` y la validación de lo guardado no cambian. El formato del archivo de la bóveda tampoco cambia: el origen (`generated` o `imported`) se deriva de la llave guardada.
+- **Cómo se guarda.**
+  - La frase se usa una vez.
+  - La privada se guarda en OpenSSH **sin frase** (`ssh.MarshalPrivateKey` con el comentario `macuahuitl:imported`), en el mismo campo que las generadas. Así `transport.OpenSSH` y la validación de lo guardado no cambian.
+  - El formato del archivo de la bóveda tampoco cambia.
+  - El origen se deriva de la llave guardada: `generated` = ed25519 sin frase con el comentario vacío, que es lo que escribe `keygen.go`; `imported` = cualquier otra. **No es un control de seguridad**: un `.mcvault` armado a mano puede decir cualquiera de los dos.
+  - El comentario original de la llave no se conserva, porque `x/crypto/ssh` lo descarta.
+- **La privada cruza el socket local.** En la importación sí viaja por el socket local (gRPC) y deja copias de mejor esfuerzo en el heap: el búfer de gRPC y los intermedios de `x/crypto`. Es el límite 1 de THREAT_MODEL.
+- **Formatos.** La PKCS#8 cifrada no se admite (`x/crypto` no la soporta): se sugiere `ssh-keygen -p`. La política de tipos y tamaños (`sshkey.Check`) es una sola para la importación y para la frontera estricta de la bóveda.
 - **Lo que sigue igual.** La privada importada tiene las mismas salidas que una generada: ninguna RPC la devuelve y solo viaja dentro del `.mcvault` cifrado.
 - **Regenerar.** Sobre una importada, la reemplaza por una ed25519 generada.
 - **`PutCredential.ssh_private_key`** sigue rechazado: el único camino de entrada es `ImportKeyCredential`, que valida, normaliza y audita (`credential.keyimport`, sin material de llave).
@@ -81,6 +88,6 @@ Decisión del dueño (2026-11-16): la orden de inicio y las credenciales `key` v
 ## Consecuencias
 
 - **Respaldo.** Quien tenga el `.mcvault` y su frase tiene las llaves privadas. La frase propia de al menos 12 caracteres es lo que las protege, como protege las contraseñas que el respaldo ya lleva. El aviso con la cuenta de llaves lo hace explícito.
-- **Llaves importadas antes de la fase 44.** Las credenciales con llave importada por gRPC, si existen, siguen como estaban. `cred pubkey` da `vault.err.key_unsupported` con todo lo que no sea una ed25519 OpenSSH sin frase (RSA, ECDSA, PKCS#8, cifradas); `cred rekey` sí las reemplaza por una ed25519 nueva conservando el id (la auditoría anota `old=unsupported`). Si son de solo llave, ahora solo sirven para el terminal de hosts `linux` o `windows`.
+- **Llaves importadas antes de la fase 44.** Las credenciales con llave importada por gRPC, si existen, siguen como estaban. Desde la fase 47, `cred pubkey` da la pública de ed25519, ECDSA y RSA (sale `origin=imported`); sigue dando `vault.err.key_unsupported` con una llave cifrada o con un tipo que `sshkey.Check` no admite. `cred rekey` sí las reemplaza por una ed25519 nueva conservando el id (la auditoría anota `old=unsupported`). Si son de solo llave, ahora solo sirven para el terminal de hosts `linux` o `windows`.
 - **Alcance.** La app deja de ser solo Cisco en un punto acotado: el terminal. Cualquier otra herramienta que se quiera abrir a `linux` o `windows` necesita su propia decisión.
 - **Documentos de seguridad.** `docs/security/CRYPTO.md` y `THREAT_MODEL.md` describen la llave generada y su límite: la privada pasa por memoria de Go sin bloquear al generarla, al regenerarla y al firmar, igual que la contraseña (límite declarado 1). También dicen que el respaldo lleva las llaves.
