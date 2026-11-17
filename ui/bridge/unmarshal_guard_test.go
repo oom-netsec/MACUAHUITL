@@ -17,7 +17,9 @@ import (
 // Una entrada nueva exige revisar los campos de su request antes de agregarla aquí.
 var unmarshalRevisados = map[string]string{
 	// JobSpec: nombre, objetivos, credenciales, playbooks, salida, horario y opciones (disable_masking,
-	// accept_changed_host_keys) que el usuario marca en el formulario; no hay actor ni job_id.
+	// accept_changed_host_keys) que el usuario marca en el formulario; no hay actor ni job_id. El campo kind
+	// no es del usuario: CreateJob lo vacía antes de llamar (un patrol no se hace pasar por backup, adhoc o change)
+	// y el núcleo pone el suyo en ChangeCreate (change.go) y en backup; lo fija TestCreateJobVaciaElKind.
 	"Bridge.CreateJob":    "JobSpec",
 	"Bridge.ChangeCreate": "JobSpec",
 	// Planes del modo asistido: solo lectura; ejecutar exige assisted=true que viaja aparte en AssistStart.
