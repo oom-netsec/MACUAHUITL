@@ -16,7 +16,7 @@ func lookPath(name string) (string, error) {
 	if i := lastSep(exe); i > 0 {
 		dir = exe[:i]
 	}
-	return winLook(os.Getenv, dir, func(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }, name)
+	return winLook(sysEnv, dir, func(p string) bool { st, err := os.Stat(p); return err == nil && st.Mode().IsRegular() }, name)
 }
 
 func lastSep(s string) int {
@@ -52,7 +52,29 @@ func realAdapters() []winAdapter {
 	return nil
 }
 
-func childEnv(tool string) []string { return winChildEnv(os.Getenv, tool) }
+func childEnv(tool string) []string { return winChildEnv(sysEnv, tool) }
+
+// sysEnv es os.Getenv salvo en las raíces del sistema, que salen de la API y no del entorno: un SystemRoot,
+// ProgramFiles o ProgramFiles(x86) falsos (C:\evil) no cambian de dónde se resuelven ping.exe, nmap.exe ni dumpcap.exe.
+// Si la API falla se devuelve "": la herramienta no se encuentra, nunca se cae al entorno.
+func sysEnv(k string) string {
+	var p string
+	var err error
+	switch k {
+	case "SystemRoot":
+		p, err = windows.GetSystemWindowsDirectory()
+	case "ProgramFiles":
+		p, err = windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	case "ProgramFiles(x86)":
+		p, err = windows.KnownFolderPath(windows.FOLDERID_ProgramFilesX86, 0)
+	default:
+		return os.Getenv(k)
+	}
+	if err != nil {
+		return ""
+	}
+	return p
+}
 
 // confine mete el hijo en un Job Object con KILL_ON_JOB_CLOSE: cancelar o cerrar el job mata todo el árbol. El hijo
 // arranca suspendido y se reanuda tras asignarlo al job, así que no hay ventana en la que un nieto escape.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -104,6 +105,28 @@ func TestBindTextosGolden(t *testing.T) {
 	} {
 		if got := tc.c.Localize(tc.loc); got != tc.want {
 			t.Errorf("%s:\n got %q\nwant %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// 43d-3 (4.8): el sysctl solo lleva dígitos que salen de un entero; el prefijo y el error hostiles no llegan a cmd.
+func TestBindSysctlSoloDigitos(t *testing.T) {
+	cmdRe := regexp.MustCompile(`^echo 'net\.ipv4\.ip_unprivileged_port_start=\d+' \| sudo tee /etc/sysctl\.d/60-macuahuitl\.conf && sudo sysctl --system$`)
+	for _, port := range []int{-1, 1, 20, 21, 22, 69, 1023, 1024} {
+		err := bindFor("linux", "li'sten;$(x)\u202e\n", &net.OpError{Op: "listen", Err: os.NewSyscallError("bind", syscall.EACCES)}, port)
+		var c i18n.Coded
+		if !errors.As(err, &c) {
+			t.Fatalf("%d: sin código: %v", port, err)
+		}
+		cmd := c.Metadata()["cmd"]
+		if port >= 1024 {
+			if cmd != "" {
+				t.Errorf("%d: cmd sin sysctl esperado: %q", port, cmd)
+			}
+			continue
+		}
+		if !cmdRe.MatchString(cmd) {
+			t.Errorf("%d: cmd no es solo dígitos: %q", port, cmd)
 		}
 	}
 }

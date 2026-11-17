@@ -283,6 +283,9 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 			argv = append(argv, "-c", v)
 		}
 		if v, ok := o.str("filter"); ok && v != "" {
+			if strings.ContainsRune(v, 0) {
+				return "", nil, PingPlan{}, i18n.New("diag.err.pcap_filter", nil)
+			}
 			argv = append(argv, "-f", v) // un solo argv: sin shell no hay inyección
 		}
 		bin = "dumpcap"

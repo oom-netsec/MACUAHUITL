@@ -197,7 +197,7 @@ func RedirectCommandIn(loc, proto, ip string, port int) string {
 // tiene puerto privilegiado). Se muestra al cerrar el servidor.
 func RedirectCleanup(proto, ip string, port int) string {
 	if isWindows() {
-		return firewallRemove(proto, ip, port)
+		return firewallRemove(proto, ip, port, exePath())
 	}
 	if _, ok := standard[proto]; !ok {
 		return ""
@@ -245,8 +245,8 @@ func HintIn(loc, proto, listen string, files []string) string {
 				code, kv = "fileserve.hint.win_tftp_redir_other", i18n.A("port", port)
 			}
 		}
-		if isWindows() || port != 69 { // en el 69 no hace falta redirigir nada
-			b.WriteString(i18n.Msg(loc, code, kv) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
+		if r := RedirectHintIn(loc, "tftp", h, port); r != "" && (isWindows() || port != 69) { // en el 69 no hace falta redirigir nada
+			b.WriteString(i18n.Msg(loc, code, kv) + "\n  " + r + "\n")
 		}
 	}
 	return b.String()

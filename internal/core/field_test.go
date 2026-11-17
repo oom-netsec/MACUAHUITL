@@ -63,9 +63,9 @@ func TestFieldServeListensHintsAndAudits(t *testing.T) {
 	port, _ := strings.CutPrefix(first.Listening, "127.0.0.1:")
 	hintPort := ":" + port
 	if runtime.GOOS == "windows" {
-		hintPort = port
+		hintPort = "" // con loopback no hay regla de firewall que lleve el puerto
 	}
-	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, hintPort) { // Windows: la pista de firewall trae el puerto sin «:»
+	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, hintPort) {
 		t.Fatalf("first = %+v", first)
 	}
 	for err == nil {
