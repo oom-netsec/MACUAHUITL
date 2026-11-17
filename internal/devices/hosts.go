@@ -78,7 +78,12 @@ func NameKey(n string) string { return strings.ToLower(strings.ToUpper(n)) }
 // Key identifica un host por dirección y puerto (la dirección ya canónica, ver Clean).
 func Key(h Host) string { return h.Address + ":" + strconv.Itoa(h.Port) }
 
+// hasControl: con allowNL (notas) solo los controles que no son salto ni tab; sin él (nombre de host, etiqueta de credencial) la regla de
+// badStartupRune: también formato Unicode (bidi, ancho cero) y separadores de línea y de párrafo, que disfrazan lo que se ve.
 func hasControl(s string, allowNL bool) bool {
+	if !allowNL {
+		return badStartupRune(s)
+	}
 	for _, r := range s {
 		if unicode.IsControl(r) && !(allowNL && (r == '\n' || r == '\t')) {
 			return true

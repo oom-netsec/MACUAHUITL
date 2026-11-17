@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
@@ -322,12 +323,12 @@ var (
 	months    = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec"
 )
 
-// sanitize deja solo UTF-8 válido y sin caracteres de control (evita inyectar
-// secuencias de terminal en la salida).
+// sanitize deja solo UTF-8 válido, sin controles (C0, DEL, C1: secuencias de terminal), sin formato Unicode (U+202E y demás bidi,
+// ancho cero, BOM) y sin los separadores de línea y de párrafo; el tab se queda. La misma regla que fileserve/reason.go.
 func sanitize(b []byte) string {
 	s := strings.ToValidUTF8(string(b), "?")
 	return strings.Map(func(r rune) rune {
-		if r == utf8.RuneError || r < 0x20 && r != '\t' || r == 0x7f {
+		if r == utf8.RuneError || r != '\t' && (unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp)) {
 			return '.'
 		}
 		return r
