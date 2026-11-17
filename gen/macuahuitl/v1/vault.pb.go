@@ -492,7 +492,11 @@ type CredentialInfo struct {
 	HasSshKey       bool                   `protobuf:"varint,5,opt,name=has_ssh_key,json=hasSshKey,proto3" json:"has_ssh_key,omitempty"`
 	// Fase 44: "key" = solo llave SSH (sin contraseña ni enable; autentica solo por publickey y solo sirve para el terminal
 	// de hosts linux y windows: Patrol, el cambio asistido y las demás herramientas la rechazan); "password" = el resto.
-	Kind          string `protobuf:"bytes,6,opt,name=kind,proto3" json:"kind,omitempty"`
+	Kind string `protobuf:"bytes,6,opt,name=kind,proto3" json:"kind,omitempty"`
+	// Fase 47: origen de una credencial "key": "generated" (ed25519 nacida en el núcleo) o "imported" (cualquier otra: las de
+	// ImportKeyCredential y las de solo llave anteriores a la fase 44). Vacío en las de contraseña. Se deriva de la llave
+	// guardada. Es informativo, no un control de seguridad: un .mcvault armado a mano puede decir cualquiera de los dos.
+	Origin        string `protobuf:"bytes,7,opt,name=origin,proto3" json:"origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -565,6 +569,13 @@ func (x *CredentialInfo) GetHasSshKey() bool {
 func (x *CredentialInfo) GetKind() string {
 	if x != nil {
 		return x.Kind
+	}
+	return ""
+}
+
+func (x *CredentialInfo) GetOrigin() string {
+	if x != nil {
+		return x.Origin
 	}
 	return ""
 }
@@ -931,6 +942,7 @@ func (x *GetCredentialPublicKeyRequest) GetId() string {
 type GetCredentialPublicKeyResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicKey     string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // igual que en GenerateKeyCredentialResponse; el comentario lleva el hostname de hoy
+	Fingerprint   string                 `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`              // fase 47: "SHA256:…" de la pública
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -972,6 +984,169 @@ func (x *GetCredentialPublicKeyResponse) GetPublicKey() string {
 	return ""
 }
 
+func (x *GetCredentialPublicKeyResponse) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+// Fase 47 (ADR 0013 §1b). Errores (ErrorInfo.reason = código i18n): vault.err.key_passphrase_required (FailedPrecondition:
+// la llave está cifrada y falta la frase); InvalidArgument: vault.err.key_passphrase_wrong, vault.err.key_import_invalid
+// (metadata format), vault.err.key_import_unsupported (DSA, sk-*, P-224, RSA fuera de 1024..16384, PKCS#8 cifrada;
+// metadata type o format) y vault.err.field_too_long (más de 64 KiB; metadata max).
+type ImportKeyCredentialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"` // mismas reglas que GenerateKeyCredential; no puede ser reservada
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	PrivateKey    []byte                 `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // el CONTENIDO (OpenSSH, PKCS#1, PKCS#8 sin cifrar, SEC1, PEM legado), nunca una ruta; tope 64 KiB
+	Passphrase    []byte                 `protobuf:"bytes,4,opt,name=passphrase,proto3" json:"passphrase,omitempty"`                   // vacía si la llave no está cifrada; se usa una vez y no se guarda
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportKeyCredentialRequest) Reset() {
+	*x = ImportKeyCredentialRequest{}
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportKeyCredentialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportKeyCredentialRequest) ProtoMessage() {}
+
+func (x *ImportKeyCredentialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportKeyCredentialRequest.ProtoReflect.Descriptor instead.
+func (*ImportKeyCredentialRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ImportKeyCredentialRequest) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialRequest) GetPrivateKey() []byte {
+	if x != nil {
+		return x.PrivateKey
+	}
+	return nil
+}
+
+func (x *ImportKeyCredentialRequest) GetPassphrase() []byte {
+	if x != nil {
+		return x.Passphrase
+	}
+	return nil
+}
+
+type ImportKeyCredentialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PublicKey     string                 `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // línea authorized_keys, igual que GetCredentialPublicKey (comentario macuahuitl@<hostname>)
+	Fingerprint   string                 `protobuf:"bytes,3,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`              // "SHA256:…"
+	Algorithm     string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                  // ssh-ed25519, ecdsa-sha2-nistp256|384|521, ssh-rsa
+	Bits          uint32                 `protobuf:"varint,5,opt,name=bits,proto3" json:"bits,omitempty"`                           // ed25519 = 256, ECDSA = tamaño de la curva, RSA = largo del módulo
+	Weak          bool                   `protobuf:"varint,6,opt,name=weak,proto3" json:"weak,omitempty"`                           // RSA de menos de 3072 bits: aviso, no error (algunos servidores exigen 2048)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportKeyCredentialResponse) Reset() {
+	*x = ImportKeyCredentialResponse{}
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportKeyCredentialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportKeyCredentialResponse) ProtoMessage() {}
+
+func (x *ImportKeyCredentialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportKeyCredentialResponse.ProtoReflect.Descriptor instead.
+func (*ImportKeyCredentialResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ImportKeyCredentialResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialResponse) GetPublicKey() string {
+	if x != nil {
+		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialResponse) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialResponse) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *ImportKeyCredentialResponse) GetBits() uint32 {
+	if x != nil {
+		return x.Bits
+	}
+	return 0
+}
+
+func (x *ImportKeyCredentialResponse) GetWeak() bool {
+	if x != nil {
+		return x.Weak
+	}
+	return false
+}
+
 type RegenerateKeyCredentialRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`            // credencial de tipo "key"; de otro tipo, FailedPrecondition
@@ -982,7 +1157,7 @@ type RegenerateKeyCredentialRequest struct {
 
 func (x *RegenerateKeyCredentialRequest) Reset() {
 	*x = RegenerateKeyCredentialRequest{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -994,7 +1169,7 @@ func (x *RegenerateKeyCredentialRequest) String() string {
 func (*RegenerateKeyCredentialRequest) ProtoMessage() {}
 
 func (x *RegenerateKeyCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1007,7 +1182,7 @@ func (x *RegenerateKeyCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegenerateKeyCredentialRequest.ProtoReflect.Descriptor instead.
 func (*RegenerateKeyCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RegenerateKeyCredentialRequest) GetId() string {
@@ -1025,15 +1200,16 @@ func (x *RegenerateKeyCredentialRequest) GetConfirm() bool {
 }
 
 type RegenerateKeyCredentialResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PublicKey     string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"` // la nueva, en el mismo formato que GenerateKeyCredentialResponse
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PublicKey      string                 `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`                // la nueva, en el mismo formato que GenerateKeyCredentialResponse
+	PreviousOrigin string                 `protobuf:"bytes,2,opt,name=previous_origin,json=previousOrigin,proto3" json:"previous_origin,omitempty"` // fase 47: origen de la llave reemplazada ("imported" → la UI y mctl avisan)
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RegenerateKeyCredentialResponse) Reset() {
 	*x = RegenerateKeyCredentialResponse{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1045,7 +1221,7 @@ func (x *RegenerateKeyCredentialResponse) String() string {
 func (*RegenerateKeyCredentialResponse) ProtoMessage() {}
 
 func (x *RegenerateKeyCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1058,12 +1234,19 @@ func (x *RegenerateKeyCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegenerateKeyCredentialResponse.ProtoReflect.Descriptor instead.
 func (*RegenerateKeyCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RegenerateKeyCredentialResponse) GetPublicKey() string {
 	if x != nil {
 		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *RegenerateKeyCredentialResponse) GetPreviousOrigin() string {
+	if x != nil {
+		return x.PreviousOrigin
 	}
 	return ""
 }
@@ -1077,7 +1260,7 @@ type DeleteCredentialRequest struct {
 
 func (x *DeleteCredentialRequest) Reset() {
 	*x = DeleteCredentialRequest{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1089,7 +1272,7 @@ func (x *DeleteCredentialRequest) String() string {
 func (*DeleteCredentialRequest) ProtoMessage() {}
 
 func (x *DeleteCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1102,7 +1285,7 @@ func (x *DeleteCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteCredentialRequest.ProtoReflect.Descriptor instead.
 func (*DeleteCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DeleteCredentialRequest) GetId() string {
@@ -1120,7 +1303,7 @@ type DeleteCredentialResponse struct {
 
 func (x *DeleteCredentialResponse) Reset() {
 	*x = DeleteCredentialResponse{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1132,7 +1315,7 @@ func (x *DeleteCredentialResponse) String() string {
 func (*DeleteCredentialResponse) ProtoMessage() {}
 
 func (x *DeleteCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1145,7 +1328,7 @@ func (x *DeleteCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteCredentialResponse.ProtoReflect.Descriptor instead.
 func (*DeleteCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{22}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{24}
 }
 
 type ExportBackupRequest struct {
@@ -1160,7 +1343,7 @@ type ExportBackupRequest struct {
 
 func (x *ExportBackupRequest) Reset() {
 	*x = ExportBackupRequest{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1355,7 @@ func (x *ExportBackupRequest) String() string {
 func (*ExportBackupRequest) ProtoMessage() {}
 
 func (x *ExportBackupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1368,7 @@ func (x *ExportBackupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportBackupRequest.ProtoReflect.Descriptor instead.
 func (*ExportBackupRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{23}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ExportBackupRequest) GetPath() string {
@@ -1229,7 +1412,7 @@ type ExportBackupResponse struct {
 
 func (x *ExportBackupResponse) Reset() {
 	*x = ExportBackupResponse{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1424,7 @@ func (x *ExportBackupResponse) String() string {
 func (*ExportBackupResponse) ProtoMessage() {}
 
 func (x *ExportBackupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1437,7 @@ func (x *ExportBackupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportBackupResponse.ProtoReflect.Descriptor instead.
 func (*ExportBackupResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{24}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ExportBackupResponse) GetCount() int32 {
@@ -1288,7 +1471,7 @@ type PreviewBackupImportRequest struct {
 
 func (x *PreviewBackupImportRequest) Reset() {
 	*x = PreviewBackupImportRequest{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1300,7 +1483,7 @@ func (x *PreviewBackupImportRequest) String() string {
 func (*PreviewBackupImportRequest) ProtoMessage() {}
 
 func (x *PreviewBackupImportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1313,7 +1496,7 @@ func (x *PreviewBackupImportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewBackupImportRequest.ProtoReflect.Descriptor instead.
 func (*PreviewBackupImportRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{25}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PreviewBackupImportRequest) GetPath() string {
@@ -1342,7 +1525,7 @@ type VaultBackupItem struct {
 
 func (x *VaultBackupItem) Reset() {
 	*x = VaultBackupItem{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1354,7 +1537,7 @@ func (x *VaultBackupItem) String() string {
 func (*VaultBackupItem) ProtoMessage() {}
 
 func (x *VaultBackupItem) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1367,7 +1550,7 @@ func (x *VaultBackupItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VaultBackupItem.ProtoReflect.Descriptor instead.
 func (*VaultBackupItem) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{26}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *VaultBackupItem) GetId() string {
@@ -1409,7 +1592,7 @@ type PreviewBackupImportResponse struct {
 
 func (x *PreviewBackupImportResponse) Reset() {
 	*x = PreviewBackupImportResponse{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1604,7 @@ func (x *PreviewBackupImportResponse) String() string {
 func (*PreviewBackupImportResponse) ProtoMessage() {}
 
 func (x *PreviewBackupImportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1617,7 @@ func (x *PreviewBackupImportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewBackupImportResponse.ProtoReflect.Descriptor instead.
 func (*PreviewBackupImportResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{27}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *PreviewBackupImportResponse) GetToken() string {
@@ -1468,7 +1651,7 @@ type VaultBackupDecision struct {
 
 func (x *VaultBackupDecision) Reset() {
 	*x = VaultBackupDecision{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1480,7 +1663,7 @@ func (x *VaultBackupDecision) String() string {
 func (*VaultBackupDecision) ProtoMessage() {}
 
 func (x *VaultBackupDecision) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1493,7 +1676,7 @@ func (x *VaultBackupDecision) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VaultBackupDecision.ProtoReflect.Descriptor instead.
 func (*VaultBackupDecision) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{28}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *VaultBackupDecision) GetId() string {
@@ -1520,7 +1703,7 @@ type ApplyBackupImportRequest struct {
 
 func (x *ApplyBackupImportRequest) Reset() {
 	*x = ApplyBackupImportRequest{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1532,7 +1715,7 @@ func (x *ApplyBackupImportRequest) String() string {
 func (*ApplyBackupImportRequest) ProtoMessage() {}
 
 func (x *ApplyBackupImportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1545,7 +1728,7 @@ func (x *ApplyBackupImportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyBackupImportRequest.ProtoReflect.Descriptor instead.
 func (*ApplyBackupImportRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{29}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ApplyBackupImportRequest) GetToken() string {
@@ -1575,7 +1758,7 @@ type ApplyBackupImportResponse struct {
 
 func (x *ApplyBackupImportResponse) Reset() {
 	*x = ApplyBackupImportResponse{}
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1770,7 @@ func (x *ApplyBackupImportResponse) String() string {
 func (*ApplyBackupImportResponse) ProtoMessage() {}
 
 func (x *ApplyBackupImportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_vault_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_vault_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1783,7 @@ func (x *ApplyBackupImportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApplyBackupImportResponse.ProtoReflect.Descriptor instead.
 func (*ApplyBackupImportResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{30}
+	return file_macuahuitl_v1_vault_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ApplyBackupImportResponse) GetCreated() int32 {
@@ -1658,14 +1841,15 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x1bChangeMasterPasswordRequest\x126\n" +
 	"\x17current_master_password\x18\x01 \x01(\fR\x15currentMasterPassword\x12.\n" +
 	"\x13new_master_password\x18\x02 \x01(\fR\x11newMasterPassword\"\x1e\n" +
-	"\x1cChangeMasterPasswordResponse\"\xb2\x01\n" +
+	"\x1cChangeMasterPasswordResponse\"\xca\x01\n" +
 	"\x0eCredentialInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12*\n" +
 	"\x11has_enable_secret\x18\x04 \x01(\bR\x0fhasEnableSecret\x12\x1e\n" +
 	"\vhas_ssh_key\x18\x05 \x01(\bR\thasSshKey\x12\x12\n" +
-	"\x04kind\x18\x06 \x01(\tR\x04kind\"\x18\n" +
+	"\x04kind\x18\x06 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06origin\x18\a \x01(\tR\x06origin\"\x18\n" +
 	"\x16ListCredentialsRequest\"Z\n" +
 	"\x17ListCredentialsResponse\x12?\n" +
 	"\vcredentials\x18\x01 \x03(\v2\x1d.macuahuitl.v1.CredentialInfoR\vcredentials\"\xc1\x01\n" +
@@ -1686,16 +1870,34 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\n" +
 	"public_key\x18\x02 \x01(\tR\tpublicKey\"/\n" +
 	"\x1dGetCredentialPublicKeyRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"?\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"a\n" +
 	"\x1eGetCredentialPublicKeyResponse\x12\x1d\n" +
 	"\n" +
-	"public_key\x18\x01 \x01(\tR\tpublicKey\"J\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"\x8f\x01\n" +
+	"\x1aImportKeyCredentialRequest\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x1f\n" +
+	"\vprivate_key\x18\x03 \x01(\fR\n" +
+	"privateKey\x12\x1e\n" +
+	"\n" +
+	"passphrase\x18\x04 \x01(\fR\n" +
+	"passphrase\"\xb4\x01\n" +
+	"\x1bImportKeyCredentialResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x02 \x01(\tR\tpublicKey\x12 \n" +
+	"\vfingerprint\x18\x03 \x01(\tR\vfingerprint\x12\x1c\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\x12\x12\n" +
+	"\x04bits\x18\x05 \x01(\rR\x04bits\x12\x12\n" +
+	"\x04weak\x18\x06 \x01(\bR\x04weak\"J\n" +
 	"\x1eRegenerateKeyCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
-	"\aconfirm\x18\x02 \x01(\bR\aconfirm\"@\n" +
+	"\aconfirm\x18\x02 \x01(\bR\aconfirm\"i\n" +
 	"\x1fRegenerateKeyCredentialResponse\x12\x1d\n" +
 	"\n" +
-	"public_key\x18\x01 \x01(\tR\tpublicKey\")\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12'\n" +
+	"\x0fprevious_origin\x18\x02 \x01(\tR\x0epreviousOrigin\")\n" +
 	"\x17DeleteCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1a\n" +
 	"\x18DeleteCredentialResponse\"\x81\x01\n" +
@@ -1742,8 +1944,7 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x17VAULT_STATE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12VAULT_STATE_ABSENT\x10\x01\x12\x16\n" +
 	"\x12VAULT_STATE_LOCKED\x10\x02\x12\x18\n" +
-	"\x14VAULT_STATE_UNLOCKED\x10\x032\xcc\n" +
-	"\n" +
+	"\x14VAULT_STATE_UNLOCKED\x10\x032\xba\v\n" +
 	"\fVaultService\x12E\n" +
 	"\x06Status\x12\x1c.macuahuitl.v1.StatusRequest\x1a\x1d.macuahuitl.v1.StatusResponse\x12E\n" +
 	"\x06Create\x12\x1c.macuahuitl.v1.CreateRequest\x1a\x1d.macuahuitl.v1.CreateResponse\x12E\n" +
@@ -1757,7 +1958,8 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x13PreviewBackupImport\x12).macuahuitl.v1.PreviewBackupImportRequest\x1a*.macuahuitl.v1.PreviewBackupImportResponse\x12f\n" +
 	"\x11ApplyBackupImport\x12'.macuahuitl.v1.ApplyBackupImportRequest\x1a(.macuahuitl.v1.ApplyBackupImportResponse\x12r\n" +
 	"\x15GenerateKeyCredential\x12+.macuahuitl.v1.GenerateKeyCredentialRequest\x1a,.macuahuitl.v1.GenerateKeyCredentialResponse\x12u\n" +
-	"\x16GetCredentialPublicKey\x12,.macuahuitl.v1.GetCredentialPublicKeyRequest\x1a-.macuahuitl.v1.GetCredentialPublicKeyResponse\x12x\n" +
+	"\x16GetCredentialPublicKey\x12,.macuahuitl.v1.GetCredentialPublicKeyRequest\x1a-.macuahuitl.v1.GetCredentialPublicKeyResponse\x12l\n" +
+	"\x13ImportKeyCredential\x12).macuahuitl.v1.ImportKeyCredentialRequest\x1a*.macuahuitl.v1.ImportKeyCredentialResponse\x12x\n" +
 	"\x17RegenerateKeyCredential\x12-.macuahuitl.v1.RegenerateKeyCredentialRequest\x1a..macuahuitl.v1.RegenerateKeyCredentialResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
@@ -1773,7 +1975,7 @@ func file_macuahuitl_v1_vault_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_vault_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_vault_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_macuahuitl_v1_vault_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_macuahuitl_v1_vault_proto_goTypes = []any{
 	(VaultState)(0),                         // 0: macuahuitl.v1.VaultState
 	(*StatusRequest)(nil),                   // 1: macuahuitl.v1.StatusRequest
@@ -1795,24 +1997,26 @@ var file_macuahuitl_v1_vault_proto_goTypes = []any{
 	(*GenerateKeyCredentialResponse)(nil),   // 17: macuahuitl.v1.GenerateKeyCredentialResponse
 	(*GetCredentialPublicKeyRequest)(nil),   // 18: macuahuitl.v1.GetCredentialPublicKeyRequest
 	(*GetCredentialPublicKeyResponse)(nil),  // 19: macuahuitl.v1.GetCredentialPublicKeyResponse
-	(*RegenerateKeyCredentialRequest)(nil),  // 20: macuahuitl.v1.RegenerateKeyCredentialRequest
-	(*RegenerateKeyCredentialResponse)(nil), // 21: macuahuitl.v1.RegenerateKeyCredentialResponse
-	(*DeleteCredentialRequest)(nil),         // 22: macuahuitl.v1.DeleteCredentialRequest
-	(*DeleteCredentialResponse)(nil),        // 23: macuahuitl.v1.DeleteCredentialResponse
-	(*ExportBackupRequest)(nil),             // 24: macuahuitl.v1.ExportBackupRequest
-	(*ExportBackupResponse)(nil),            // 25: macuahuitl.v1.ExportBackupResponse
-	(*PreviewBackupImportRequest)(nil),      // 26: macuahuitl.v1.PreviewBackupImportRequest
-	(*VaultBackupItem)(nil),                 // 27: macuahuitl.v1.VaultBackupItem
-	(*PreviewBackupImportResponse)(nil),     // 28: macuahuitl.v1.PreviewBackupImportResponse
-	(*VaultBackupDecision)(nil),             // 29: macuahuitl.v1.VaultBackupDecision
-	(*ApplyBackupImportRequest)(nil),        // 30: macuahuitl.v1.ApplyBackupImportRequest
-	(*ApplyBackupImportResponse)(nil),       // 31: macuahuitl.v1.ApplyBackupImportResponse
+	(*ImportKeyCredentialRequest)(nil),      // 20: macuahuitl.v1.ImportKeyCredentialRequest
+	(*ImportKeyCredentialResponse)(nil),     // 21: macuahuitl.v1.ImportKeyCredentialResponse
+	(*RegenerateKeyCredentialRequest)(nil),  // 22: macuahuitl.v1.RegenerateKeyCredentialRequest
+	(*RegenerateKeyCredentialResponse)(nil), // 23: macuahuitl.v1.RegenerateKeyCredentialResponse
+	(*DeleteCredentialRequest)(nil),         // 24: macuahuitl.v1.DeleteCredentialRequest
+	(*DeleteCredentialResponse)(nil),        // 25: macuahuitl.v1.DeleteCredentialResponse
+	(*ExportBackupRequest)(nil),             // 26: macuahuitl.v1.ExportBackupRequest
+	(*ExportBackupResponse)(nil),            // 27: macuahuitl.v1.ExportBackupResponse
+	(*PreviewBackupImportRequest)(nil),      // 28: macuahuitl.v1.PreviewBackupImportRequest
+	(*VaultBackupItem)(nil),                 // 29: macuahuitl.v1.VaultBackupItem
+	(*PreviewBackupImportResponse)(nil),     // 30: macuahuitl.v1.PreviewBackupImportResponse
+	(*VaultBackupDecision)(nil),             // 31: macuahuitl.v1.VaultBackupDecision
+	(*ApplyBackupImportRequest)(nil),        // 32: macuahuitl.v1.ApplyBackupImportRequest
+	(*ApplyBackupImportResponse)(nil),       // 33: macuahuitl.v1.ApplyBackupImportResponse
 }
 var file_macuahuitl_v1_vault_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.StatusResponse.state:type_name -> macuahuitl.v1.VaultState
 	11, // 1: macuahuitl.v1.ListCredentialsResponse.credentials:type_name -> macuahuitl.v1.CredentialInfo
-	27, // 2: macuahuitl.v1.PreviewBackupImportResponse.items:type_name -> macuahuitl.v1.VaultBackupItem
-	29, // 3: macuahuitl.v1.ApplyBackupImportRequest.decisions:type_name -> macuahuitl.v1.VaultBackupDecision
+	29, // 2: macuahuitl.v1.PreviewBackupImportResponse.items:type_name -> macuahuitl.v1.VaultBackupItem
+	31, // 3: macuahuitl.v1.ApplyBackupImportRequest.decisions:type_name -> macuahuitl.v1.VaultBackupDecision
 	1,  // 4: macuahuitl.v1.VaultService.Status:input_type -> macuahuitl.v1.StatusRequest
 	3,  // 5: macuahuitl.v1.VaultService.Create:input_type -> macuahuitl.v1.CreateRequest
 	5,  // 6: macuahuitl.v1.VaultService.Unlock:input_type -> macuahuitl.v1.UnlockRequest
@@ -1820,29 +2024,31 @@ var file_macuahuitl_v1_vault_proto_depIdxs = []int32{
 	9,  // 8: macuahuitl.v1.VaultService.ChangeMasterPassword:input_type -> macuahuitl.v1.ChangeMasterPasswordRequest
 	12, // 9: macuahuitl.v1.VaultService.ListCredentials:input_type -> macuahuitl.v1.ListCredentialsRequest
 	14, // 10: macuahuitl.v1.VaultService.PutCredential:input_type -> macuahuitl.v1.PutCredentialRequest
-	22, // 11: macuahuitl.v1.VaultService.DeleteCredential:input_type -> macuahuitl.v1.DeleteCredentialRequest
-	24, // 12: macuahuitl.v1.VaultService.ExportBackup:input_type -> macuahuitl.v1.ExportBackupRequest
-	26, // 13: macuahuitl.v1.VaultService.PreviewBackupImport:input_type -> macuahuitl.v1.PreviewBackupImportRequest
-	30, // 14: macuahuitl.v1.VaultService.ApplyBackupImport:input_type -> macuahuitl.v1.ApplyBackupImportRequest
+	24, // 11: macuahuitl.v1.VaultService.DeleteCredential:input_type -> macuahuitl.v1.DeleteCredentialRequest
+	26, // 12: macuahuitl.v1.VaultService.ExportBackup:input_type -> macuahuitl.v1.ExportBackupRequest
+	28, // 13: macuahuitl.v1.VaultService.PreviewBackupImport:input_type -> macuahuitl.v1.PreviewBackupImportRequest
+	32, // 14: macuahuitl.v1.VaultService.ApplyBackupImport:input_type -> macuahuitl.v1.ApplyBackupImportRequest
 	16, // 15: macuahuitl.v1.VaultService.GenerateKeyCredential:input_type -> macuahuitl.v1.GenerateKeyCredentialRequest
 	18, // 16: macuahuitl.v1.VaultService.GetCredentialPublicKey:input_type -> macuahuitl.v1.GetCredentialPublicKeyRequest
-	20, // 17: macuahuitl.v1.VaultService.RegenerateKeyCredential:input_type -> macuahuitl.v1.RegenerateKeyCredentialRequest
-	2,  // 18: macuahuitl.v1.VaultService.Status:output_type -> macuahuitl.v1.StatusResponse
-	4,  // 19: macuahuitl.v1.VaultService.Create:output_type -> macuahuitl.v1.CreateResponse
-	6,  // 20: macuahuitl.v1.VaultService.Unlock:output_type -> macuahuitl.v1.UnlockResponse
-	8,  // 21: macuahuitl.v1.VaultService.Lock:output_type -> macuahuitl.v1.LockResponse
-	10, // 22: macuahuitl.v1.VaultService.ChangeMasterPassword:output_type -> macuahuitl.v1.ChangeMasterPasswordResponse
-	13, // 23: macuahuitl.v1.VaultService.ListCredentials:output_type -> macuahuitl.v1.ListCredentialsResponse
-	15, // 24: macuahuitl.v1.VaultService.PutCredential:output_type -> macuahuitl.v1.PutCredentialResponse
-	23, // 25: macuahuitl.v1.VaultService.DeleteCredential:output_type -> macuahuitl.v1.DeleteCredentialResponse
-	25, // 26: macuahuitl.v1.VaultService.ExportBackup:output_type -> macuahuitl.v1.ExportBackupResponse
-	28, // 27: macuahuitl.v1.VaultService.PreviewBackupImport:output_type -> macuahuitl.v1.PreviewBackupImportResponse
-	31, // 28: macuahuitl.v1.VaultService.ApplyBackupImport:output_type -> macuahuitl.v1.ApplyBackupImportResponse
-	17, // 29: macuahuitl.v1.VaultService.GenerateKeyCredential:output_type -> macuahuitl.v1.GenerateKeyCredentialResponse
-	19, // 30: macuahuitl.v1.VaultService.GetCredentialPublicKey:output_type -> macuahuitl.v1.GetCredentialPublicKeyResponse
-	21, // 31: macuahuitl.v1.VaultService.RegenerateKeyCredential:output_type -> macuahuitl.v1.RegenerateKeyCredentialResponse
-	18, // [18:32] is the sub-list for method output_type
-	4,  // [4:18] is the sub-list for method input_type
+	20, // 17: macuahuitl.v1.VaultService.ImportKeyCredential:input_type -> macuahuitl.v1.ImportKeyCredentialRequest
+	22, // 18: macuahuitl.v1.VaultService.RegenerateKeyCredential:input_type -> macuahuitl.v1.RegenerateKeyCredentialRequest
+	2,  // 19: macuahuitl.v1.VaultService.Status:output_type -> macuahuitl.v1.StatusResponse
+	4,  // 20: macuahuitl.v1.VaultService.Create:output_type -> macuahuitl.v1.CreateResponse
+	6,  // 21: macuahuitl.v1.VaultService.Unlock:output_type -> macuahuitl.v1.UnlockResponse
+	8,  // 22: macuahuitl.v1.VaultService.Lock:output_type -> macuahuitl.v1.LockResponse
+	10, // 23: macuahuitl.v1.VaultService.ChangeMasterPassword:output_type -> macuahuitl.v1.ChangeMasterPasswordResponse
+	13, // 24: macuahuitl.v1.VaultService.ListCredentials:output_type -> macuahuitl.v1.ListCredentialsResponse
+	15, // 25: macuahuitl.v1.VaultService.PutCredential:output_type -> macuahuitl.v1.PutCredentialResponse
+	25, // 26: macuahuitl.v1.VaultService.DeleteCredential:output_type -> macuahuitl.v1.DeleteCredentialResponse
+	27, // 27: macuahuitl.v1.VaultService.ExportBackup:output_type -> macuahuitl.v1.ExportBackupResponse
+	30, // 28: macuahuitl.v1.VaultService.PreviewBackupImport:output_type -> macuahuitl.v1.PreviewBackupImportResponse
+	33, // 29: macuahuitl.v1.VaultService.ApplyBackupImport:output_type -> macuahuitl.v1.ApplyBackupImportResponse
+	17, // 30: macuahuitl.v1.VaultService.GenerateKeyCredential:output_type -> macuahuitl.v1.GenerateKeyCredentialResponse
+	19, // 31: macuahuitl.v1.VaultService.GetCredentialPublicKey:output_type -> macuahuitl.v1.GetCredentialPublicKeyResponse
+	21, // 32: macuahuitl.v1.VaultService.ImportKeyCredential:output_type -> macuahuitl.v1.ImportKeyCredentialResponse
+	23, // 33: macuahuitl.v1.VaultService.RegenerateKeyCredential:output_type -> macuahuitl.v1.RegenerateKeyCredentialResponse
+	19, // [19:34] is the sub-list for method output_type
+	4,  // [4:19] is the sub-list for method input_type
 	4,  // [4:4] is the sub-list for extension type_name
 	4,  // [4:4] is the sub-list for extension extendee
 	0,  // [0:4] is the sub-list for field type_name
@@ -1859,7 +2065,7 @@ func file_macuahuitl_v1_vault_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_vault_proto_rawDesc), len(file_macuahuitl_v1_vault_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   31,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

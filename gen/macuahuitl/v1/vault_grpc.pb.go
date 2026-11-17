@@ -32,6 +32,7 @@ const (
 	VaultService_ApplyBackupImport_FullMethodName       = "/macuahuitl.v1.VaultService/ApplyBackupImport"
 	VaultService_GenerateKeyCredential_FullMethodName   = "/macuahuitl.v1.VaultService/GenerateKeyCredential"
 	VaultService_GetCredentialPublicKey_FullMethodName  = "/macuahuitl.v1.VaultService/GetCredentialPublicKey"
+	VaultService_ImportKeyCredential_FullMethodName     = "/macuahuitl.v1.VaultService/ImportKeyCredential"
 	VaultService_RegenerateKeyCredential_FullMethodName = "/macuahuitl.v1.VaultService/RegenerateKeyCredential"
 )
 
@@ -58,6 +59,8 @@ type VaultServiceClient interface {
 	// pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
 	GenerateKeyCredential(ctx context.Context, in *GenerateKeyCredentialRequest, opts ...grpc.CallOption) (*GenerateKeyCredentialResponse, error)
 	GetCredentialPublicKey(ctx context.Context, in *GetCredentialPublicKeyRequest, opts ...grpc.CallOption) (*GetCredentialPublicKeyResponse, error)
+	// Fase 47: importa una llave SSH privada existente (ADR 0013 §1b).
+	ImportKeyCredential(ctx context.Context, in *ImportKeyCredentialRequest, opts ...grpc.CallOption) (*ImportKeyCredentialResponse, error)
 	// Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
 	RegenerateKeyCredential(ctx context.Context, in *RegenerateKeyCredentialRequest, opts ...grpc.CallOption) (*RegenerateKeyCredentialResponse, error)
 }
@@ -200,6 +203,16 @@ func (c *vaultServiceClient) GetCredentialPublicKey(ctx context.Context, in *Get
 	return out, nil
 }
 
+func (c *vaultServiceClient) ImportKeyCredential(ctx context.Context, in *ImportKeyCredentialRequest, opts ...grpc.CallOption) (*ImportKeyCredentialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImportKeyCredentialResponse)
+	err := c.cc.Invoke(ctx, VaultService_ImportKeyCredential_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vaultServiceClient) RegenerateKeyCredential(ctx context.Context, in *RegenerateKeyCredentialRequest, opts ...grpc.CallOption) (*RegenerateKeyCredentialResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RegenerateKeyCredentialResponse)
@@ -233,6 +246,8 @@ type VaultServiceServer interface {
 	// pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
 	GenerateKeyCredential(context.Context, *GenerateKeyCredentialRequest) (*GenerateKeyCredentialResponse, error)
 	GetCredentialPublicKey(context.Context, *GetCredentialPublicKeyRequest) (*GetCredentialPublicKeyResponse, error)
+	// Fase 47: importa una llave SSH privada existente (ADR 0013 §1b).
+	ImportKeyCredential(context.Context, *ImportKeyCredentialRequest) (*ImportKeyCredentialResponse, error)
 	// Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
 	RegenerateKeyCredential(context.Context, *RegenerateKeyCredentialRequest) (*RegenerateKeyCredentialResponse, error)
 	mustEmbedUnimplementedVaultServiceServer()
@@ -283,6 +298,9 @@ func (UnimplementedVaultServiceServer) GenerateKeyCredential(context.Context, *G
 }
 func (UnimplementedVaultServiceServer) GetCredentialPublicKey(context.Context, *GetCredentialPublicKeyRequest) (*GetCredentialPublicKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCredentialPublicKey not implemented")
+}
+func (UnimplementedVaultServiceServer) ImportKeyCredential(context.Context, *ImportKeyCredentialRequest) (*ImportKeyCredentialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportKeyCredential not implemented")
 }
 func (UnimplementedVaultServiceServer) RegenerateKeyCredential(context.Context, *RegenerateKeyCredentialRequest) (*RegenerateKeyCredentialResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RegenerateKeyCredential not implemented")
@@ -542,6 +560,24 @@ func _VaultService_GetCredentialPublicKey_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VaultService_ImportKeyCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportKeyCredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VaultServiceServer).ImportKeyCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VaultService_ImportKeyCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VaultServiceServer).ImportKeyCredential(ctx, req.(*ImportKeyCredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VaultService_RegenerateKeyCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RegenerateKeyCredentialRequest)
 	if err := dec(in); err != nil {
@@ -618,6 +654,10 @@ var VaultService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCredentialPublicKey",
 			Handler:    _VaultService_GetCredentialPublicKey_Handler,
+		},
+		{
+			MethodName: "ImportKeyCredential",
+			Handler:    _VaultService_ImportKeyCredential_Handler,
 		},
 		{
 			MethodName: "RegenerateKeyCredential",
