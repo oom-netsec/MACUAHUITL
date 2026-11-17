@@ -19,6 +19,9 @@ import (
 
 var ErrAuth error = i18n.New("transport.err.auth", nil)
 
+// ErrKeyCredential: la credencial es una llave generada por la app (tipo key). shortcut: rechazo total hasta que 44b/44c lo cambien por el de plataforma.
+var ErrKeyCredential error = i18n.New("transport.err.key_credential", nil)
+
 var errAlreadySent = errors.New("transport: contraseña ya enviada; no se reintenta")
 
 // SSHOptions viene del perfil del equipo. Los ceros toman los valores de spec §6.
@@ -50,6 +53,9 @@ type Session struct {
 func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cred vault.Credential, hk ssh.HostKeyCallback, o SSHOptions) (*Session, error) {
 	defer cred.Password.Destroy()
 	defer cred.SSHKey.Destroy()
+	if cred.IsKey() { // punto único: Patrol, terminal, métricas, transferencias y asistente pasan por aquí
+		return nil, ErrKeyCredential
+	}
 	if o.Keepalive == 0 {
 		o.Keepalive = 15 * time.Second
 	}

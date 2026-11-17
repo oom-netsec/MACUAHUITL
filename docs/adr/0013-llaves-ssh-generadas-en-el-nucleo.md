@@ -20,7 +20,7 @@ Además, la libreta de hosts solo admite plataformas Cisco (`devices.HostPlatfor
 - **Generación.** `vault.GenerateKey` crea un par ed25519 con `crypto/rand` dentro del paquete `internal/vault`. La privada no pasa por el servicio ni por gRPC: el servicio recibe solo el id y la pública.
 - **Almacenamiento.**
   - La privada va en el campo «llave SSH» de la entrada, que ya existe y va cifrado con la DEK (AES-256-GCM).
-  - Se guarda en formato OpenSSH sin frase (`-----BEGIN OPENSSH PRIVATE KEY-----`, `ssh.MarshalPrivateKey`). Es el formato que `transport.OpenSSH` ya lee con `ssh.ParsePrivateKey`, así que no hay un segundo formato.
+  - Se guarda en formato OpenSSH sin frase (`-----BEGIN OPENSSH PRIVATE KEY-----`, armado a mano en `internal/vault/keygen.go` (`noegress` prohíbe `x/crypto/ssh` en `vault` y `core`); la interoperabilidad se prueba con `x/crypto/ssh` en `internal/transport`). Es el formato que `transport.OpenSSH` ya lee con `ssh.ParsePrivateKey`, así que no hay un segundo formato.
   - El formato del archivo de la bóveda no cambia: ni versión nueva ni migración.
 - **Tipo de credencial.** Una credencial es `key` si tiene llave y no tiene contraseña ni enable. Se calcula al listar, no se guarda. Una credencial `key` solo autentica por publickey: `transport.OpenSSH` ofrece password y keyboard-interactive solo si hay contraseña, y eso ya es así hoy.
 - **Regenerar.** `vault.RegenerateKey(id)` reemplaza la privada de una credencial `key` por una nueva y conserva el id, la etiqueta y el usuario. La vieja se destruye. Los hosts que apuntan a esa credencial no cambian; solo hay que autorizar la pública nueva en cada equipo.
@@ -67,6 +67,6 @@ Decisión del dueño (2026-11-16): la orden de inicio y las credenciales `key` v
 ## Consecuencias
 
 - **Respaldo.** Quien tenga el `.mcvault` y su frase tiene las llaves privadas. La frase propia de al menos 12 caracteres es lo que las protege, como protege las contraseñas que el respaldo ya lleva. El aviso con la cuenta de llaves lo hace explícito.
-- **Llaves importadas antes de la fase 44.** Las credenciales con llave importada por gRPC, si existen, siguen como estaban, y `cred pubkey` funciona con ellas. Si son de solo llave, ahora solo sirven para el terminal de hosts `linux` o `windows`.
+- **Llaves importadas antes de la fase 44.** Las credenciales con llave importada por gRPC, si existen, siguen como estaban. `cred pubkey` da `vault.err.key_unsupported` con todo lo que no sea una ed25519 OpenSSH sin frase (RSA, ECDSA, PKCS#8, cifradas); `cred rekey` sí las reemplaza por una ed25519 nueva conservando el id (la auditoría anota `old=unsupported`). Si son de solo llave, ahora solo sirven para el terminal de hosts `linux` o `windows`.
 - **Alcance.** La app deja de ser solo Cisco en un punto acotado: el terminal. Cualquier otra herramienta que se quiera abrir a `linux` o `windows` necesita su propia decisión.
 - **Documentos de seguridad.** `docs/security/CRYPTO.md` y `THREAT_MODEL.md` describen la llave generada y su límite: la privada pasa por memoria de Go sin bloquear al generarla, al regenerarla y al firmar, igual que la contraseña (límite declarado 1). También dicen que el respaldo lleva las llaves.
