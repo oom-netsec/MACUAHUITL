@@ -3,6 +3,7 @@ package sys
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c); la ruta debe ser absoluta. En Windows la deja con
@@ -84,4 +85,29 @@ func PrivateDir(path string) error {
 			return nil
 		}
 	}
+}
+
+// groupIsPrivate dice si el grupo de la carpeta es el grupo privado del usuario (UPG: Debian, Ubuntu y Fedora crean un grupo con
+// su mismo gid y uid): ahí g+w no da escritura a nadie más, y con el umask 002 de esas distribuciones toda carpeta nueva sale 0775.
+// Variable para las pruebas. shortcut: no mira los miembros del grupo; un grupo compartido con el mismo número que el uid es raro.
+var groupIsPrivate = func(fi os.FileInfo) bool {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	return ok && st.Gid == uint32(os.Getegid()) && st.Gid == uint32(os.Geteuid())
+}
+
+// ForeignWriters dice quién más que el usuario puede escribir en la carpeta: los bits de grupo (salvo que el grupo sea el privado
+// del usuario) y de otros («g+w», «o+w»).
+func ForeignWriters(path string) (Writers, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return Writers{}, err
+	}
+	var w Writers
+	if fi.Mode().Perm()&0o020 != 0 && !groupIsPrivate(fi) {
+		w.Who = append(w.Who, "g+w")
+	}
+	if fi.Mode().Perm()&0o002 != 0 {
+		w.Who = append(w.Who, "o+w")
+	}
+	return w, nil
 }

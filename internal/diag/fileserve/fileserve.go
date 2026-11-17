@@ -392,6 +392,10 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		if err != nil {
 			return nil, nil, err
 		}
+		if err := checkRecvOwn(dir); err != nil {
+			root.Close()
+			return nil, nil, err
+		}
 		rcv = newReceiverIn(root, dir, c.MaxFile, c.MaxTotal)
 		src.rcv = rcv
 	}

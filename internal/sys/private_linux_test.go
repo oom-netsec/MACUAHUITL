@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -124,5 +125,27 @@ func TestOpenNewPrivateYCreateTempPrivateEnLinux(t *testing.T) {
 	tmp.Close()
 	if ok, _ := IsPrivate(tmp.Name()); !ok {
 		t.Fatal("CreateTempPrivate no dejó 0600")
+	}
+}
+
+// ForeignWriters: el bit de grupo cuenta salvo con el grupo privado del usuario (umask 002); el de otros siempre.
+func TestForeignWritersBitsDeGrupoYOtros(t *testing.T) {
+	old := groupIsPrivate
+	t.Cleanup(func() { groupIsPrivate = old })
+	for _, c := range []struct {
+		modo    os.FileMode
+		privado bool
+		want    []string
+	}{
+		{0o700, false, nil}, {0o750, false, nil}, {0o770, false, []string{"g+w"}}, {0o770, true, nil}, {0o707, true, []string{"o+w"}},
+		{0o777, false, []string{"g+w", "o+w"}}, {0o777, true, []string{"o+w"}}, {0o775, false, []string{"g+w"}},
+	} {
+		groupIsPrivate = func(os.FileInfo) bool { return c.privado }
+		d := t.TempDir()
+		os.Chmod(d, c.modo)
+		w, err := ForeignWriters(d)
+		if err != nil || !slices.Equal(w.Who, c.want) {
+			t.Errorf("%o privado=%v: %v %v, quería %v", c.modo, c.privado, w.Who, err, c.want)
+		}
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -22,25 +21,21 @@ var (
 	// AncestorInfo da el modo y el dueño de un ancestro de la carpeta (sin seguir enlaces).
 	AncestorInfo = RealAncestorInfo
 	CreateTemp   = os.CreateTemp
-	// OutputsGOOS es el sistema para la regla «solo X:\\» (en Linux una ruta con \\ es solo un nombre raro): las pruebas simulan Windows.
+	// OutputsGOOS es el sistema para la regla «solo X:\» (en Linux una ruta con \ es solo un nombre raro): las pruebas simulan Windows.
 	OutputsGOOS = runtime.GOOS
 )
 
-// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
-// números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
-var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
+// safeShellPath y safeCmdPath: ver sys.SafeShellPath y sys.SafeCmdPath (la misma regla para fileserve).
+var (
+	safeShellPath = sys.SafeShellPath
+	safeCmdPath   = sys.SafeCmdPath
+	sidRe         = sys.SIDRe
+)
 
 // driveRoot: la raíz de una unidad de Windows (D:\), el equivalente de «/» (en Linux ninguna ruta tiene esa forma).
 func driveRoot(p string) bool {
 	return len(p) == 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') && ('a' <= p[0]|0x20 && p[0]|0x20 <= 'z')
 }
-
-// safeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^,
-// $ ni comillas invertidas ni caracteres de formato (bidi).
-var safeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
-
-// sidRe es la forma de un SID en texto: lo único que puede ir dentro de las comillas de la orden icacls.
-var sidRe = regexp.MustCompile(`^S-1-\d+(-\d+)*$`)
 
 // outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
 func outputsErr(code string, kv ...any) error {

@@ -342,3 +342,19 @@ func TestOpenNewPrivateInRechazaCarpetaCambiadaPorJunction(t *testing.T) {
 		t.Fatalf("se escribió contenido en el destino de la junction (%d bytes)", fi.Size())
 	}
 }
+
+// 2.3 en Windows de verdad: ForeignWriters ve a Users/Everyone con escritura y no ve la DACL propia ni la de solo lectura.
+func TestForeignWritersWindows(t *testing.T) {
+	d := filepath.Join(privateTemp(t), "recv")
+	if err := MkdirPrivate(d); err != nil {
+		t.Fatal(err)
+	}
+	w, err := ForeignWriters(d)
+	if err != nil || len(w.Who) != 0 || w.User != userString(t) {
+		t.Fatalf("DACL propia: %+v %v", w, err)
+	}
+	setDACL(t, d, true, userString(t), sidSystem, sidAdmins, sidTodos)
+	if w, err = ForeignWriters(d); err != nil || len(w.Who) != 1 || w.Who[0] != sidTodos {
+		t.Fatalf("Everyone con control total: %+v %v", w, err)
+	}
+}

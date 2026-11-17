@@ -328,3 +328,50 @@ func hiddenUnderHome(p string) string {
 	}
 	return ""
 }
+
+// foreignWriters es variable para simular los escritores ajenos en las pruebas.
+var foreignWriters = sys.ForeignWriters
+
+// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w»; Windows: SID) y la orden que lo arregla ("" si no es segura de pegar).
+func ajenos(dir string) (who []string, fix string) {
+	w, err := foreignWriters(dir)
+	if err != nil || len(w.Who) == 0 { // sin poder leer la ACL (FAT, exFAT) no se sabe: no se bloquea
+		return nil, ""
+	}
+	if goos == "windows" {
+		return w.Who, sys.IcaclsFix(dir, w.User, w.Who)
+	}
+	return w.Who, sys.ChmodFix(dir, w.Who)
+}
+
+// checkRecvOwn rechaza la carpeta de RECEPCIÓN si otro usuario puede escribir en ella: podría plantar o cambiar lo recibido.
+func checkRecvOwn(dir string) error {
+	who, fix := ajenos(dir)
+	if len(who) == 0 {
+		return nil
+	}
+	if fix != "" {
+		return i18n.New("fileserve.err.recv_dir_open_cmd", i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix))
+	}
+	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", strings.Join(who, ", ")))
+}
+
+// fromDirWarning es el aviso (sin rechazo) de la carpeta de PUBLICACIÓN con escritores ajenos, en el idioma loc; "" si no hay.
+func fromDirWarning(loc string, c Config) string {
+	if c.FromDir == "" {
+		return ""
+	}
+	dir := c.FromDir
+	if r, err := evalSymlinks(dir); err == nil {
+		dir = r
+	}
+	who, fix := ajenos(dir)
+	if len(who) == 0 {
+		return ""
+	}
+	code := "fileserve.hint.warn_from_writable"
+	if fix != "" {
+		code += "_cmd"
+	}
+	return i18n.Msg(loc, code, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix))
+}

@@ -326,3 +326,18 @@ func PrivateDir(path string) error {
 		}
 	}
 }
+
+// ForeignWriters dice qué SID, además del usuario, SYSTEM y Administradores, tienen en la DACL derecho de escribir en la carpeta
+// o en lo que se cree dentro. User es el SID del usuario (para la orden icacls). shortcut: no mira la pertenencia a grupos ni
+// los derechos efectivos (AccessCheck), igual que PrivateDir.
+func ForeignWriters(path string) (Writers, error) {
+	user, err := currentSID()
+	if err != nil {
+		return Writers{}, err
+	}
+	_, _, aces, err := readACL(path)
+	if err != nil {
+		return Writers{}, err
+	}
+	return Writers{Who: foreignWriters(aces, user.String()), User: user.String()}, nil
+}
