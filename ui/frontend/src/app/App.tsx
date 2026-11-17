@@ -51,9 +51,15 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   // Cada módulo empieza arriba: el desplazamiento del anterior no se hereda.
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [current]);
 
-  const recheck = useCallback(() => { core.coreStatus().then(setStatus).catch(() => setStatus("disconnected")); }, [core]);
+  // Respuesta y evento llegan por canales distintos: una respuesta de coreStatus no pisa un evento que llegó después de pedirla.
+  const events = useRef(0);
+  const recheck = useCallback(() => {
+    const seen = events.current;
+    const set = (s: CoreStatus) => { if (events.current === seen) setStatus(s); };
+    core.coreStatus().then(set).catch(() => set("disconnected"));
+  }, [core]);
   useEffect(() => {
-    const off = core.onStatus(setStatus);
+    const off = core.onStatus((s) => { events.current++; setStatus(s); });
     recheck(); // el primer core:status pudo salir antes de que existiera la ventana
     return off;
   }, [core, recheck]);

@@ -39,6 +39,30 @@ test("al reconectar el núcleo se avisa a las vistas para que recarguen", async 
   off();
 });
 
+test("abrir con el núcleo caído y que luego llegue: también se avisa a las vistas", async () => {
+  const core = fakeCore();
+  vi.mocked(core.coreStatus).mockResolvedValueOnce("disconnected");
+  render(<App core={core} />);
+  await act(async () => {});
+  const seen = vi.fn();
+  const off = onVaultChanged(seen);
+  act(() => core.emitStatus("connected"));
+  expect(seen).toHaveBeenCalledTimes(1);
+  off();
+});
+
+// Respuesta y evento van por canales distintos: un «disconnected» viejo de la consulta no pisa el «connected» que ya llegó.
+test("la respuesta tardía de coreStatus no pisa un evento de estado más nuevo", async () => {
+  const core = fakeCore();
+  let answer: (s: "disconnected") => void = () => {};
+  vi.mocked(core.coreStatus).mockImplementationOnce(() => new Promise((r) => { answer = r; }));
+  render(<App core={core} />);
+  act(() => core.emitStatus("connected"));
+  await act(async () => answer("disconnected"));
+  expect(screen.getByText("Núcleo conectado")).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
 test("muestra el aviso de núcleo desconectado y lo quita al reconectar", async () => {
   const core = fakeCore();
   render(<App core={core} />);

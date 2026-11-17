@@ -563,3 +563,12 @@ test("el error de la primera carga desaparece cuando la recarga sale bien", asyn
   act(() => vaultChanged());
   await waitFor(() => expect(screen.queryByText(/cannot find the file/)).toBeNull());
 });
+
+test("el catálogo que falló al abrir sin núcleo se vuelve a pedir al reconectar, sin pulsar Reintentar", async () => {
+  const listPlaybooks = vi.fn().mockRejectedValueOnce(new Error("connection error")).mockResolvedValue([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [] }]);
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks });
+  render(<PatrolView core={core} />);
+  expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
+  act(() => vaultChanged()); // lo que App avisa al reconectar el núcleo
+  expect(await findPb("STP")).toBeInTheDocument();
+});
