@@ -4,6 +4,7 @@ package diag
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,5 +167,50 @@ func TestStopRunConcurrenteYCancelacion(t *testing.T) {
 	<-done2
 	if n := s.liveRuns(); n != 0 {
 		t.Errorf("registro tras cancelar: %d", n)
+	}
+}
+
+// Barrido por el servicio: sweep_point ok, ok, frag y el resumen total en el evento final; auditoría con run=.
+func TestRunBarrido(t *testing.T) {
+	d := servicetest.New(t)
+	p := filepath.Join(t.TempDir(), "ping")
+	script := `#!/bin/sh
+size=56
+while [ $# -gt 0 ]; do [ "$1" = "-s" ] && size=$2; shift; done
+if [ "$size" -ge 1000 ]; then
+  echo "ping: local error: message too long, mtu=1500"
+  echo "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"
+  exit 1
+fi
+echo "$((size+8)) bytes from 192.0.2.1: icmp_seq=1 ttl=64 time=2.00 ms"
+echo "1 packets transmitted, 1 received, 0% packet loss, time 0ms"
+`
+	if err := os.WriteFile(p, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	d.Look = func(string) (string, error) { return p, nil }
+	s := &diagSvc{d: d}
+	st := &recStream{ctx: context.Background()}
+	err := s.Run(&v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: "192.0.2.1"}},
+		Options: map[string]string{"sweep_start": "0", "sweep_end": "1000", "sweep_step": "500", "df": "true"}}, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	ev := st.snapshot()
+	for _, e := range ev {
+		if sp := e.SweepPoint; sp != nil {
+			got = append(got, fmt.Sprintf("%d/%d/%d/%s", sp.Size, sp.Sent, sp.Received, sp.Result))
+		}
+	}
+	if want := "0/1/1/ok 500/1/1/ok 1000/1/0/frag"; strings.Join(got, " ") != want {
+		t.Errorf("puntos %q, quería %q", got, want)
+	}
+	last := ev[len(ev)-1]
+	if sum := last.PingSummary; !last.Done || sum == nil || sum.Sent != 3 || sum.Received != 2 || sum.AvgMs != 2 {
+		t.Errorf("final %+v", last)
+	}
+	if n := strings.Count(d.AuditText(), "run="+ev[0].RunId); n != 2 {
+		t.Errorf("run= en %d entradas: %s", n, d.AuditText())
 	}
 }

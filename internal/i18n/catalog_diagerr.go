@@ -36,7 +36,6 @@ func init() {
 			return c
 		}(),
 		"diag.err.not_ping":      e("el plan solo existe para ping", "a plan only exists for ping"),
-		"diag.err.sweep_pending": e("el barrido de tamaños todavía no está disponible", "the size sweep is not available yet"),
 		"diag.err.sweep_all":     key(e("el barrido necesita sweep_start, sweep_end y sweep_step", "the sweep needs sweep_start, sweep_end and sweep_step"), "sweep_start"),
 		"diag.err.sweep_max":     key(e("el barrido admite como máximo 100 tamaños", "the sweep allows at most 100 sizes"), "sweep_start"),
 		"diag.err.source_bad":    key(e("source {value:q} debe ser una IP sin zona o una interfaz local existente", "source {value:q} must be an IP without a zone or an existing local interface", "value"), "source"),

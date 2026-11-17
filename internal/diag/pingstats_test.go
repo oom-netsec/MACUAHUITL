@@ -159,3 +159,32 @@ func TestPingStatsBadChecksum(t *testing.T) {
 		t.Errorf("%+v", s)
 	}
 }
+
+// Frag: el aviso de fragmentar con DF, en iputils y en ping.exe (en/es); y una salida normal no lo activa.
+func TestPingStatsFrag(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		win  bool
+		out  []string
+		frag bool
+		sent int64
+	}{
+		{"linux local", false, []string{"ping: local error: message too long, mtu=1500", "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"}, true, 1},
+		{"linux message too long", false, []string{"ping: sendmsg: Message too long"}, true, 0},
+		{"linux frag needed", false, []string{"From 192.0.2.254 icmp_seq=1 Frag needed and DF set (mtu = 1400)", "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"}, true, 1},
+		{"linux normal", false, []string{"64 bytes from 192.0.2.1: icmp_seq=1 ttl=64 time=2.00 ms", "1 packets transmitted, 1 received, 0% packet loss, time 0ms"}, false, 1},
+		{"win en", true, []string{"Packet needs to be fragmented but DF set."}, true, 1},
+		{"win en remoto", true, []string{"Reply from 192.0.2.254: Packet needs to be fragmented but DF set."}, true, 1},
+		{"win es", true, []string{"Es necesario fragmentar el paquete pero se especificó DF."}, true, 1},
+		{"win normal", true, []string{"Reply from 192.0.2.1: bytes=32 time=1ms TTL=64"}, false, 1},
+		{"win timeout", true, []string{"Request timed out."}, false, 1},
+	} {
+		p := NewPingStats(c.win)
+		for _, l := range c.out {
+			p.Feed(l)
+		}
+		if p.Frag() != c.frag || p.Summary().Sent != c.sent {
+			t.Errorf("%s: frag=%v sent=%d, quería %v y %d", c.name, p.Frag(), p.Summary().Sent, c.frag, c.sent)
+		}
+	}
+}
