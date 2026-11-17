@@ -37,6 +37,7 @@ func init() {
 		"fileserve.reason.name_utf8":        e("el nombre no es UTF-8 válido", "the name is not valid UTF-8"),
 		"fileserve.reason.name_control":     e("el nombre tiene caracteres de control", "the name has control characters"),
 		"fileserve.reason.name_format":      e("el nombre tiene caracteres de formato invisibles", "the name has invisible formatting characters"),
+		"fileserve.reason.name_windows":     e("el nombre no es válido en Windows (':', '<>\"|?*', punto final o nombre reservado como CON o NUL)", "the name is not valid on Windows (':', '<>\"|?*', trailing dot or a reserved name such as CON or NUL)"),
 		"fileserve.reason.line_long":        e("línea demasiado larga", "line too long"),
 		"fileserve.reason.control_chars":    e("caracteres de control", "control characters"),
 		"fileserve.reason.bad_command":      e("orden inválida", "invalid command"),

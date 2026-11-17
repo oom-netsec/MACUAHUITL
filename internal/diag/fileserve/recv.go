@@ -57,11 +57,39 @@ func SafeName(raw string) (string, error) {
 		if unicode.IsControl(r) {
 			return "", i18n.New("fileserve.reason.name_control", nil)
 		}
-		if unicode.Is(unicode.Cf, r) {
+		if invisible(r) {
 			return "", i18n.New("fileserve.reason.name_format", nil)
 		}
 	}
+	if !winName(raw) {
+		return "", i18n.New("fileserve.reason.name_windows", nil)
+	}
 	return raw, nil
+}
+
+// invisible: formato Unicode (bidi, ancho cero, BOM) y separadores de línea o párrafo, que disfrazan el nombre.
+func invisible(r rune) bool {
+	return unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r)
+}
+
+// reservados son los dispositivos de DOS: Windows los abre en vez de crear el archivo, con cualquier extensión.
+var reservados = map[string]bool{"CON": true, "PRN": true, "AUX": true, "NUL": true, "CONIN$": true, "CONOUT$": true, "CLOCK$": true}
+
+// winName dice si el nombre es seguro en Windows: sin ':' (flujos alternos y unidades), sin "<>\"|?*", sin
+// punto o espacio final (Win32 los recorta y el archivo sería otro) y sin nombre de dispositivo (CON, NUL, COM1,
+// LPT², con o sin extensión). Se aplica en todos los sistemas para que el comportamiento sea el mismo.
+func winName(n string) bool {
+	if strings.ContainsAny(n, `<>:"|?*`) || strings.HasSuffix(n, ".") || strings.HasSuffix(n, " ") {
+		return false
+	}
+	stem := strings.ToUpper(strings.TrimRight(strings.SplitN(n, ".", 2)[0], " "))
+	if reservados[stem] {
+		return false
+	}
+	if r := []rune(stem); len(r) == 4 && (string(r[:3]) == "COM" || string(r[:3]) == "LPT") && strings.ContainsRune("123456789\u00b9\u00b2\u00b3", r[3]) {
+		return false
+	}
+	return true
 }
 
 type receiver struct {

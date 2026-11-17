@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -42,11 +43,11 @@ func plainName(name string) (string, bool) {
 		return "", false
 	}
 	for _, r := range name { // un nombre con salto de línea rompería las órdenes de scp y FTP
-		if r < 0x20 || r == 0x7f {
+		if unicode.IsControl(r) || invisible(r) {
 			return "", false
 		}
 	}
-	return name, true
+	return name, winName(name)
 }
 
 func (s *source) hidden(name string) bool {
