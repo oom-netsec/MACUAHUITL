@@ -28,10 +28,24 @@ Además, la libreta de hosts solo admite plataformas Cisco (`devices.HostPlatfor
   - Ninguna RPC ni el CLI devuelven la privada. `GetCredentialPublicKey` devuelve solo la pública, en formato authorized_keys con el comentario `macuahuitl@<hostname local>`.
   - **El respaldo `.mcvault` sí la lleva**, cifrada como el resto del respaldo: un archivo de bóveda nuevo, con su propia sal y su propia DEK, sellado con una frase de al menos 12 caracteres distinta de la maestra. Su import la restaura. **Fue decisión del dueño (2026-11-16)**: a cambio de comodidad al cambiar de laptop, se acepta que la privada viaje en un archivo que él guarda. Es una excepción acotada a su regla de no copiar privadas: solo viaja dentro de ese archivo cifrado, nunca suelta. La respuesta del export cuenta cuántas llaves lleva (`ssh_keys_included`), y la UI y mctl lo avisan antes y después de exportar.
   - El export de hosts nunca llevó secretos (solo la etiqueta de la credencial) y sigue igual.
-- **Nada mete una privada de fuera.**
+- **Nada mete una privada de fuera** (hasta la fase 47; ver §1b).
   - `PutCredential` rechaza `ssh_private_key` con InvalidArgument. El campo queda en el proto por compatibilidad de cable, marcado obsoleto en su comentario.
   - `PutCredential` tampoco reemplaza una credencial `key`, porque la convertiría en otra cosa sin generar nada. Para cambiar la llave está `RegenerateKeyCredential`.
   - **Límite aceptado.** El import de respaldo trae lo que haya en el `.mcvault`. Alguien que arme a mano un archivo con el formato de la bóveda podría meter una privada generada fuera. No se distingue, porque el respaldo es el camino de restauración que pidió el dueño. Armarlo exige reproducir el formato (Argon2id + AES-GCM) y conocer la frase.
+
+### 1b. Enmienda (fase 47, 2026-11-17): importar una llave existente
+
+**Decisión explícita del dueño**, que cambia su regla de «nunca copiar una privada»: puede importar a la bóveda una llave que ya tiene (por ejemplo `~/.ssh/id_ed25519`) con `ImportKeyCredential`. Plan: `docs/plans/2026-11-17-fase-47-importar-llave-ssh.md`.
+
+- **Qué recibe.** El núcleo recibe el **contenido** de la llave, nunca una ruta. mctl y el puente leen el archivo del lado del cliente.
+- **Formatos y tipos.**
+  - Formatos: OpenSSH, PKCS#1, PKCS#8 y SEC1, con o sin frase.
+  - Tipos aceptados: ed25519, ecdsa P-256/384/521 y RSA de al menos 1024 bits (aviso si es de menos de 3072).
+  - Rechazadas: DSA y `sk-*`.
+- **Cómo se guarda.** La frase se usa una vez. La privada se guarda en OpenSSH **sin frase**, en el mismo campo que las generadas, así que `transport.OpenSSH` y la validación de lo guardado no cambian. El formato del archivo de la bóveda tampoco cambia: el origen (`generated` o `imported`) se deriva de la llave guardada.
+- **Lo que sigue igual.** La privada importada tiene las mismas salidas que una generada: ninguna RPC la devuelve y solo viaja dentro del `.mcvault` cifrado.
+- **Regenerar.** Sobre una importada, la reemplaza por una ed25519 generada.
+- **`PutCredential.ssh_private_key`** sigue rechazado: el único camino de entrada es `ImportKeyCredential`, que valida, normaliza y audita (`credential.keyimport`, sin material de llave).
 
 ### 2. Plataformas `linux` y `windows`, solo para el terminal
 

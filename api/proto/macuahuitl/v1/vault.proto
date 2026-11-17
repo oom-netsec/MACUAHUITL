@@ -23,6 +23,8 @@ service VaultService {
   // pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
   rpc GenerateKeyCredential(GenerateKeyCredentialRequest) returns (GenerateKeyCredentialResponse);
   rpc GetCredentialPublicKey(GetCredentialPublicKeyRequest) returns (GetCredentialPublicKeyResponse);
+  // Fase 47: importa una llave SSH privada existente (ADR 0013 §1b).
+  rpc ImportKeyCredential(ImportKeyCredentialRequest) returns (ImportKeyCredentialResponse);
   // Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
   rpc RegenerateKeyCredential(RegenerateKeyCredentialRequest) returns (RegenerateKeyCredentialResponse);
 }
@@ -70,6 +72,9 @@ message CredentialInfo {
   // Fase 44: "key" = solo llave SSH (sin contraseña ni enable; autentica solo por publickey y solo sirve para el terminal
   // de hosts linux y windows: Patrol, el cambio asistido y las demás herramientas la rechazan); "password" = el resto.
   string kind = 6;
+  // Fase 47: origen de una credencial "key": "generated" (nació en el núcleo) o "imported" (ImportKeyCredential).
+  // Vacío en las de contraseña. Se deriva de la llave guardada; las anteriores a la fase 47 salen "generated".
+  string origin = 7;
 }
 
 message ListCredentialsRequest {}
@@ -106,6 +111,25 @@ message GetCredentialPublicKeyRequest {
 }
 message GetCredentialPublicKeyResponse {
   string public_key = 1;               // igual que en GenerateKeyCredentialResponse; el comentario lleva el hostname de hoy
+  string fingerprint = 2;              // fase 47: "SHA256:…" de la pública
+}
+
+// Fase 47 (ADR 0013 §1b). Errores (ErrorInfo.reason): vault.key_passphrase_required (FailedPrecondition, la llave está
+// cifrada y falta la frase), vault.key_passphrase_wrong, vault.key_invalid (metadata format), vault.key_unsupported
+// (DSA, sk-*, curva o tamaño fuera de OpenSSH; metadata type) y vault.field_too_long (más de 64 KiB), todos InvalidArgument.
+message ImportKeyCredentialRequest {
+  string label = 1;                    // mismas reglas que GenerateKeyCredential; no puede ser reservada
+  string username = 2;
+  bytes private_key = 3;               // el CONTENIDO de la llave (OpenSSH, PKCS#1, PKCS#8 o SEC1), nunca una ruta; tope 64 KiB
+  bytes passphrase = 4;                // vacía si la llave no está cifrada; se usa una vez y no se guarda
+}
+message ImportKeyCredentialResponse {
+  string id = 1;
+  string public_key = 2;               // línea authorized_keys, con el comentario original de la llave o imported@<hostname>
+  string fingerprint = 3;              // "SHA256:…"
+  string algorithm = 4;                // ssh-ed25519, ecdsa-sha2-nistp256|384|521, ssh-rsa
+  uint32 bits = 5;
+  bool weak = 6;                       // RSA de menos de 3072 bits: aviso, no error
 }
 
 message RegenerateKeyCredentialRequest {
