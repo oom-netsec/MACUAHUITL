@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	DiagService_Run_FullMethodName            = "/macuahuitl.v1.DiagService/Run"
 	DiagService_ListInterfaces_FullMethodName = "/macuahuitl.v1.DiagService/ListInterfaces"
+	DiagService_StopRun_FullMethodName        = "/macuahuitl.v1.DiagService/StopRun"
 )
 
 // DiagServiceClient is the client API for DiagService service.
@@ -32,6 +33,9 @@ type DiagServiceClient interface {
 	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RunResponse], error)
 	// Interfaces locales, solo lectura: no genera tráfico de red.
 	ListInterfaces(ctx context.Context, in *ListInterfacesRequest, opts ...grpc.CallOption) (*ListInterfacesResponse, error)
+	// Detiene una ejecución en curso sin cortar su stream (#200): el núcleo para el proceso y manda el último evento de Run
+	// con done=true (y ping_summary en ping). run_id desconocido o ya terminado: NOT_FOUND.
+	StopRun(ctx context.Context, in *StopRunRequest, opts ...grpc.CallOption) (*StopRunResponse, error)
 }
 
 type diagServiceClient struct {
@@ -71,6 +75,16 @@ func (c *diagServiceClient) ListInterfaces(ctx context.Context, in *ListInterfac
 	return out, nil
 }
 
+func (c *diagServiceClient) StopRun(ctx context.Context, in *StopRunRequest, opts ...grpc.CallOption) (*StopRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StopRunResponse)
+	err := c.cc.Invoke(ctx, DiagService_StopRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DiagServiceServer is the server API for DiagService service.
 // All implementations must embed UnimplementedDiagServiceServer
 // for forward compatibility.
@@ -80,6 +94,9 @@ type DiagServiceServer interface {
 	Run(*RunRequest, grpc.ServerStreamingServer[RunResponse]) error
 	// Interfaces locales, solo lectura: no genera tráfico de red.
 	ListInterfaces(context.Context, *ListInterfacesRequest) (*ListInterfacesResponse, error)
+	// Detiene una ejecución en curso sin cortar su stream (#200): el núcleo para el proceso y manda el último evento de Run
+	// con done=true (y ping_summary en ping). run_id desconocido o ya terminado: NOT_FOUND.
+	StopRun(context.Context, *StopRunRequest) (*StopRunResponse, error)
 	mustEmbedUnimplementedDiagServiceServer()
 }
 
@@ -95,6 +112,9 @@ func (UnimplementedDiagServiceServer) Run(*RunRequest, grpc.ServerStreamingServe
 }
 func (UnimplementedDiagServiceServer) ListInterfaces(context.Context, *ListInterfacesRequest) (*ListInterfacesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListInterfaces not implemented")
+}
+func (UnimplementedDiagServiceServer) StopRun(context.Context, *StopRunRequest) (*StopRunResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopRun not implemented")
 }
 func (UnimplementedDiagServiceServer) mustEmbedUnimplementedDiagServiceServer() {}
 func (UnimplementedDiagServiceServer) testEmbeddedByValue()                     {}
@@ -146,6 +166,24 @@ func _DiagService_ListInterfaces_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DiagService_StopRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DiagServiceServer).StopRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DiagService_StopRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DiagServiceServer).StopRun(ctx, req.(*StopRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DiagService_ServiceDesc is the grpc.ServiceDesc for DiagService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -156,6 +194,10 @@ var DiagService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListInterfaces",
 			Handler:    _DiagService_ListInterfaces_Handler,
+		},
+		{
+			MethodName: "StopRun",
+			Handler:    _DiagService_StopRun_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

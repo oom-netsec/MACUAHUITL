@@ -11,6 +11,9 @@ service DiagService {
   rpc Run(RunRequest) returns (stream RunResponse);
   // Interfaces locales, solo lectura: no genera tráfico de red.
   rpc ListInterfaces(ListInterfacesRequest) returns (ListInterfacesResponse);
+  // Detiene una ejecución en curso sin cortar su stream (#200): el núcleo para el proceso y manda el último evento de Run
+  // con done=true (y ping_summary en ping). run_id desconocido o ya terminado: NOT_FOUND.
+  rpc StopRun(StopRunRequest) returns (StopRunResponse);
 }
 
 enum DiagTool {
@@ -35,7 +38,35 @@ message RunResponse {
   bool done = 2;
   int32 exit_code = 3;
   string output_path = 4;
+  string run_id = 5;             // solo en el primer evento: id para StopRun (distinto de cualquier id del cliente)
+  PingSummary ping_summary = 6;  // ping: en el evento final (done=true), también tras StopRun o duration
+  SweepPoint sweep_point = 7;    // ping con barrido: un evento por tamaño terminado
 }
+
+// Resumen de un ping, calculado por el núcleo a partir de las respuestas (igual en Linux y en Windows).
+message PingSummary {
+  int64 sent = 1;
+  int64 received = 2;
+  double loss_pct = 3;  // 0-100
+  double min_ms = 4;    // los cuatro en 0 si no hubo respuestas
+  double avg_ms = 5;
+  double max_ms = 6;
+  double mdev_ms = 7;   // desviación media, como el mdev de iputils
+}
+
+// Resultado de un tamaño del barrido.
+message SweepPoint {
+  int32 size = 1;       // bytes de datos ICMP (como size)
+  int64 sent = 2;
+  int64 received = 3;
+  string result = 4;    // ok (todas volvieron), loss (alguna se perdió) o frag (el sistema avisó que hacía falta fragmentar con DF)
+}
+
+message StopRunRequest {
+  string run_id = 1;
+}
+
+message StopRunResponse {}
 
 message ListInterfacesRequest {}
 
