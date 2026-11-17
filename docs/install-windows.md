@@ -13,6 +13,8 @@ The Windows version is a **beta**. It does not promise parity with Linux, and it
 
 From the [latest release](../../../releases/latest), download the installer and `SHA256SUMS`. The installer is named `MACUAHUITL-<version>-setup.exe`; the exact name is on the release page.
 
+The release also has `macuahuitl_<version>_windows_amd64.zip`, with the same three programs and the license files and no installer. This guide covers the installer.
+
 Check the hash in PowerShell, in the folder you downloaded to, and compare it with the line for your file in `SHA256SUMS`:
 
 ```powershell
