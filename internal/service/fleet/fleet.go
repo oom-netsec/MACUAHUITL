@@ -2,7 +2,6 @@ package fleet
 
 import (
 	"context"
-	"path/filepath"
 
 	"google.golang.org/grpc/codes"
 
@@ -26,7 +25,7 @@ func (s *fleetSvc) load(ctx context.Context, action, dir, detail string) (*fleet
 		dir = s.d.Outputs()
 		extra = service.JobOutputRoots(s.d)
 	}
-	if !filepath.IsAbs(dir) {
+	if !service.ClientPathOK(dir) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.relative_path", i18n.A("path", dir))
 	}
 	f, err := fleet.Load(dir, s.d.Now().UTC(), extra...)

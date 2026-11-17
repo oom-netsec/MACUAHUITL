@@ -30,7 +30,7 @@ type driftSvc struct {
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
 func (s *driftSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
-	if !filepath.IsAbs(job) {
+	if !service.ClientPathOK(job) {
 		j, err := s.d.Job(ctx, job)
 		if err != nil {
 			return nil, err

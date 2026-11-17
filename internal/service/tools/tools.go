@@ -30,7 +30,7 @@ var resolvConf = "/etc/resolv.conf" // las pruebas lo apuntan a un archivo propi
 
 func (s *toolsSvc) AnalyzePcap(ctx context.Context, r *v1.AnalyzePcapRequest) (*v1.AnalyzePcapResponse, error) {
 	s.d.MarkActive()
-	if !filepath.IsAbs(r.Path) {
+	if !service.ClientPathOK(r.Path) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.pcap_path", nil)
 	}
 	s.d.Audit("tools.pcap", r.Path, "")

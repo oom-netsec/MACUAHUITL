@@ -37,7 +37,7 @@ const maxSyslogBytes = 64 << 20
 // upTo > 0 carga solo hasta esa ronda.
 func (s *analysisSvc) bundle(ctx context.Context, job string, upTo int) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
-	if !filepath.IsAbs(job) {
+	if !service.ClientPathOK(job) {
 		j, err := s.d.Job(ctx, job)
 		if err != nil {
 			return nil, err
@@ -96,7 +96,7 @@ func (s *analysisSvc) DiffRounds(ctx context.Context, r *v1.DiffRoundsRequest) (
 
 func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.TimelineResponse, error) {
 	s.d.MarkActive()
-	if r.PcapPath != "" && !filepath.IsAbs(r.PcapPath) {
+	if r.PcapPath != "" && !service.ClientPathOK(r.PcapPath) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "analyze.err.pcap_path", nil)
 	}
 	b, err := s.bundle(ctx, r.Job, 0)

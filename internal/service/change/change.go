@@ -199,7 +199,7 @@ func (s *changeSvc) GetChangeReport(ctx context.Context, r *v1.GetChangeReportRe
 		if postDir, err = s.outputDir(ctx, post, "POST"); err != nil {
 			return nil, err
 		}
-	} else if !filepath.IsAbs(preDir) || !filepath.IsAbs(postDir) {
+	} else if !service.ClientPathOK(preDir) || !service.ClientPathOK(postDir) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "change.err.no_input", nil)
 	}
 	a, err := capture.ReadDir(preDir)

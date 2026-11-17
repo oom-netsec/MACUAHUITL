@@ -19,9 +19,15 @@ func AbsPath(ctx context.Context, p string) (string, error) {
 	return AbsPathReason(ctx, p, "file.err.path_abs")
 }
 
+// ClientPathOK dice si p sirve como ruta que manda el cliente: absoluta y, en Windows (OutputsGOOS), con letra de unidad: las UNC
+// (\\host\share, que abren SMB y filtran el hash NTLM), \\?\ y \\.\ no pasan. Úsala en vez de filepath.IsAbs con toda ruta del cliente.
+func ClientPathOK(p string) bool {
+	return filepath.IsAbs(p) && !(OutputsGOOS == "windows" && sys.NoDriveLetter(p))
+}
+
 // AbsPathReason es AbsPath con el código del error de ruta relativa (el respaldo cifrado conserva el suyo).
 func AbsPathReason(ctx context.Context, p, reason string) (string, error) {
-	if !filepath.IsAbs(p) {
+	if !ClientPathOK(p) {
 		return "", Err(ctx, codes.InvalidArgument, reason, nil)
 	}
 	return filepath.Clean(p), nil
