@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
@@ -37,7 +38,22 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	sem := make(chan struct{}, maxTransfers)
+	// srv.Close no espera a los handlers: Serve los espera para no volver antes de su OnTransfer (el que
+	// llama cierra su canal de eventos al volver y una transferencia tardía se perdería de la auditoría).
+	var (
+		hmu     sync.Mutex
+		stopped bool
+		active  sync.WaitGroup
+	)
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hmu.Lock()
+		if stopped {
+			hmu.Unlock()
+			return
+		}
+		active.Add(1)
+		hmu.Unlock()
+		defer active.Done()
 		start := time.Now()
 		name := strings.TrimPrefix(r.URL.Path, "/")
 		t := Transfer{Proto: "http", Client: r.RemoteAddr, File: name, Dir: "lectura", Result: "error"}
@@ -91,12 +107,22 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	c.ready(Ready{Addr: ln.Addr().String()})
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
+	// Mismo apagado si Serve termina con error: sin srv.Close las conexiones keep-alive seguirían bajando archivos.
+	err = nil
 	select {
 	case <-ctx.Done():
-		srv.Close()
+	case err = <-done:
+	}
+	srv.Close()
+	if err == nil {
 		<-done
-		return nil
-	case err := <-done:
+	}
+	hmu.Lock()
+	stopped = true
+	hmu.Unlock()
+	active.Wait()
+	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
+	return nil
 }
