@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { NoPacks } from "../../components/NoPacks";
 import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI, PackDetail, PackInfo, PackInspectResult } from "../../lib/core";
 import { Check, ConfirmButton, Notice, errorText } from "../../components/Field";
@@ -165,7 +166,7 @@ export function PacksSection({ core }: { core: CoreAPI }) {
         <button type="button" onClick={pickImport}>{t("packs.import.open")}</button></div>
       {err && <Notice kind="error">{err}</Notice>}
       {msg && <Notice kind="info">{msg}</Notice>}
-      {packs?.length === 0 && <p className="hint">{t("packs.empty")}</p>}
+      {packs?.length === 0 && <NoPacks />}
       <ul className="pack-list">
         {packs?.map((p) => (
           <li key={p.id} className="pack-card">

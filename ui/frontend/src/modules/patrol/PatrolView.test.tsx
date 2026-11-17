@@ -7,6 +7,7 @@ import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
+import { NavContext } from "../../app/activity";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
   expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
@@ -176,7 +177,7 @@ test("la línea de fases combina el historial y los eventos en vivo", async () =
 test("si la bóveda no existe, Patrol lo indica y lleva a crearla", async () => {
   const core = fakeCore({ vaultStatus: vi.fn(async () => ({ state: "absent" as const, armedJobs: [] })) });
   render(<PatrolView core={core} />);
-  expect(await screen.findByRole("status")).toHaveTextContent("No existe una bóveda");
+  expect((await screen.findAllByRole("status")).some((e) => e.textContent?.includes("No existe una bóveda"))).toBe(true); // también está el aviso de paquetes
   expect(screen.getByRole("button", { name: "Crear bóveda" })).toBeInTheDocument();
 });
 
@@ -571,4 +572,28 @@ test("el catálogo que falló al abrir sin núcleo se vuelve a pedir al reconect
   expect(await screen.findByRole("button", { name: "Reintentar" })).toBeVisible();
   act(() => vaultChanged()); // lo que App avisa al reconectar el núcleo
   expect(await findPb("STP")).toBeInTheDocument();
+});
+
+// Instalación nueva: solo los playbooks base del núcleo; los de cada tecnología vienen en paquetes que hay que instalar.
+test("sin paquetes de contenido instalados, Patrol lo dice con el enlace al release y lleva a Ajustes → Paquetes", async () => {
+  const go = vi.fn();
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "ios-xe/tac-baseline", platform: "ios-xe", name: "TAC baseline", commands: [], params: [], pack: "" }]) });
+  render(<NavContext.Provider value={{ go, inbox: {} }}><PatrolView core={core} /></NavContext.Provider>);
+  expect(await screen.findByText(/No hay paquetes de contenido instalados/)).toBeVisible();
+  expect(screen.getByText("https://github.com/oom-netsec/MACUAHUITL/releases/latest")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Abrir Ajustes → Paquetes" }));
+  expect(go).toHaveBeenCalledWith("settings", "packs");
+});
+
+test("con un paquete instalado no hay aviso de paquetes", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [], params: [], pack: "oom/ios-xe" }]) });
+  render(<PatrolView core={core} />);
+  expect(await findPb("STP")).toBeInTheDocument();
+  expect(screen.queryByText(/No hay paquetes de contenido instalados/)).toBeNull();
+});
+
+test("los playbooks propios no cuentan como paquete de contenido: el aviso sigue", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "usuario/mio", platform: "ios-xe", name: "Mío", commands: ["show clock"], params: [], pack: "usuario" }]) });
+  render(<PatrolView core={core} />);
+  expect(await screen.findByText(/No hay paquetes de contenido instalados/)).toBeVisible();
 });

@@ -2550,7 +2550,6 @@ export const en: Record<Key, string> = {
   "settings.packs.desc": "Content packs (.mpack): playbooks and scripts per technology.",
   "packs.install": "Install pack…",
   "packs.pick": "Choose a .mpack pack",
-  "packs.empty": "No packs installed.",
   "packs.official": "official",
   "packs.thirdParty": "third-party",
   "packs.counts": "{playbooks} playbooks · {scripts} scripts · {hidden} hidden",
@@ -2961,4 +2960,7 @@ export const en: Record<Key, string> = {
   "diag.ping.err.count": "Packets are 1 to 100.",
   "diag.ping.err.sourceFamily": "The source is not of the chosen family.",
   "diag.sweep.mtuUnknown": "The MTU cannot be estimated: with Auto family and a host name it is unknown whether it is IPv4 (+28) or IPv6 (+48). Choose the family.",
+  "packs.none": "No content packs installed: download the official .mpack files from the release and install them in Settings → Packs.",
+  "packs.none.link": "release link",
+  "packs.none.open": "Open Settings → Packs",
 };

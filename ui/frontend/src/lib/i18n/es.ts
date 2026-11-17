@@ -2548,7 +2548,6 @@ export const es = {
   "settings.packs.desc": "Paquetes de contenido (.mpack): playbooks y scripts por tecnología.",
   "packs.install": "Instalar paquete…",
   "packs.pick": "Elegir un paquete .mpack",
-  "packs.empty": "No hay paquetes instalados.",
   "packs.official": "oficial",
   "packs.thirdParty": "de terceros",
   "packs.counts": "{playbooks} playbooks · {scripts} scripts · {hidden} ocultos",
@@ -2960,6 +2959,9 @@ export const es = {
   "diag.ping.err.count": "Los paquetes van de 1 a 100.",
   "diag.ping.err.sourceFamily": "El origen no es de la familia elegida.",
   "diag.sweep.mtuUnknown": "No se puede estimar la MTU: con familia Automática y un nombre de host no se sabe si son IPv4 (+28) o IPv6 (+48). Elige la familia.",
+  "packs.none": "No hay paquetes de contenido instalados: descarga los archivos .mpack oficiales del release e instálalos en Ajustes → Paquetes.",
+  "packs.none.link": "enlace del release",
+  "packs.none.open": "Abrir Ajustes → Paquetes",
 };
 
 export type Key = keyof typeof es;
