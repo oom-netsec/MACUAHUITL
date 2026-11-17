@@ -128,7 +128,9 @@ func TestDiagStopNotFoundDelNucleo(t *testing.T) {
 }
 
 // fakePingRunIDSolo: como el núcleo de 200-3, el primer evento trae solo run_id (sin línea); luego salida y cierre.
-type fakePingRunIDSolo struct{ v1.UnimplementedDiagServiceServer }
+type fakePingRunIDSolo struct {
+	v1.UnimplementedDiagServiceServer
+}
 
 func (fakePingRunIDSolo) Run(_ *v1.RunRequest, st v1.DiagService_RunServer) error {
 	st.Send(&v1.RunResponse{RunId: "core-7"})
