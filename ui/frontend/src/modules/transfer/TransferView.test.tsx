@@ -24,7 +24,7 @@ async function openServer(core: ReturnType<typeof setup>) {
   return core;
 }
 
-test("el formulario inválido no abre nada y el válido usa el puerto alto por omisión", async () => {
+test("el formulario inválido no abre nada y el válido usa el puerto estándar por omisión", async () => {
   const core = setup();
   expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeDisabled(); // sin IP ni carpeta o archivos
   expect(core.transferServe).not.toHaveBeenCalled();
@@ -136,6 +136,30 @@ test("el puerto estándar negado por el sistema muestra la orden de sysctl para 
   vi.mocked(core.transferServe).mockRejectedValueOnce(new Error("puerto en uso"));
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   await waitFor(() => expect(screen.queryByText(cmd)).toBeNull());
+});
+
+test("el bind negado llega por el evento de cierre (StartServer es un stream) y también muestra la orden", async () => {
+  const cmd = "echo 'net.ipv4.ip_unprivileged_port_start=69' | sudo tee /etc/sysctl.d/60-macuahuitl.conf && sudo sysctl --system";
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", done: true, error: "rpc error: code = FailedPrecondition desc = Linux no deja abrir el puerto 69",
+    errorInfo: { code: "FailedPrecondition", reason: "fileserve.err.port_denied", metadata: { port: "69", min_port: "69", cmd } } }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Linux no deja abrir el puerto 69");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  // Solo el error de puerto negado trae orden para copiar: otro motivo con metadata.cmd no la muestra.
+  act(() => core.emitTransfer({ runId: "r2", done: true, error: "otra cosa", errorInfo: { code: "Internal", reason: "fileserve.err.otro", metadata: { cmd: "rm -rf /" } } }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("otra cosa"));
+  expect(screen.queryByText("rm -rf /")).toBeNull();
+  expect(screen.queryByText(cmd)).toBeNull();
+});
+
+test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
+  await waitFor(() => expect(core.transferHint).toHaveBeenCalled());
+  await act(async () => {});
+  expect(within(card).queryByRole("log", { name: "Regla de redirección (nftables)" })).toBeNull();
+  expect(within(card).queryByText(/Firewall de Windows/)).toBeNull();
 });
 
 const client = async (core: ReturnType<typeof setup>, url: string) => {

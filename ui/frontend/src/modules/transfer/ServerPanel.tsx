@@ -7,7 +7,10 @@ import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { iosCommands, splitListen } from "./ios";
-import { errInfo } from "../../lib/coreError";
+import { errInfo, type ErrInfo } from "../../lib/coreError";
+import { isWindows } from "../../lib/platform";
+
+const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
 import { portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
@@ -66,7 +69,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {r.user && <p className="hint">{t("transfer.cred.note")}</p>}
       {r.fingerprints?.map((fp, i) => <p key={fp} className="meta">{t("transfer.fingerprint", { n: i + 1 })}: <code>{fp}</code> <CopyButton value={fp} label={t("transfer.fingerprint", { n: i + 1 })} /></p>)}
       {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
-      {hint && (
+      {hint && (isWindows() || hint.standardPort !== port) && ( /* en Linux, en el puerto estándar no hay redirección que aplicar */
         <>
           <Notice kind="warn">{t(hint.standardPort === port ? "transfer.privilegedSame" : "transfer.privileged", { std: hint.standardPort, port })}</Notice>
           <Console label={t("transfer.redirect")} text={hint.nftables} copy={core.copyText} />
@@ -101,8 +104,9 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [any, setAny] = useState(false);
   const [legacy, setLegacy] = useState(false);
   const legacyNext = useRef(false); // lo que se pidió al abrir: la tarjeta lo recuerda
-  const [err, setErr] = useState("");
-  const [errCmd, setErrCmd] = useState(""); // orden de sysctl que trae el error de puerto negado: solo para copiar
+  // Error visible y, si es el de puerto negado, la orden de sysctl que trae (solo para copiar). Juntos: un error nuevo nunca deja la orden vieja.
+  const [err, setErrState] = useState({ text: "", cmd: "" });
+  const setErr = (text: string, cmd = "") => setErrState({ text, cmd });
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
@@ -119,7 +123,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       const msg = e.error && errorText(new Error(e.error));
       // Un error sin tarjeta es que el servidor no llegó a abrir (carpeta o regla inválida).
       if (seen.current.has(e.runId)) setServers((l) => l.map((s) => (s.runId === e.runId ? { ...s, done: true, error: msg || undefined, cleanup: e.cleanup } : s)));
-      else if (msg) setErr(msg);
+      else if (msg) setErr(msg, sysctlCmd(e.errorInfo)); // el bind negado llega aquí: StartServer es un stream
     }
   }), [core]);
   useBusy(servers.some((s) => !s.done));
@@ -130,7 +134,6 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otro servidor
   const start = async () => {
     const p = serveProblem(form);
-    setErrCmd("");
     if (p) { setErr(t(p)); return; }
     setErr("");
     const host = any ? "0.0.0.0" : listen;
@@ -142,8 +145,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         files: splitList(files), fromDir, write, recvDir: write ? recvDir : "", allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
       });
     } catch (e) {
-      setErr(errorText(e));
-      setErrCmd(errInfo(e)?.metadata.cmd ?? "");
+      setErr(errorText(e), sysctlCmd(errInfo(e)));
     } finally {
       setStarting(false);
     }
@@ -173,8 +175,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
         <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
-        {err && <Notice kind="error">{err}</Notice>}
-        {err && errCmd && <Console label={t("transfer.portDenied.cmd")} text={errCmd} copy={core.copyText} />}
+        {err.text && <Notice kind="error">{err.text}</Notice>}
+        {err.text && err.cmd && <Console label={t("transfer.portDenied.cmd")} text={err.cmd} copy={core.copyText} />}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}
       {servers.map((s) => (
