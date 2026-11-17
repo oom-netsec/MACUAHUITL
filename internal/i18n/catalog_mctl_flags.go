@@ -449,6 +449,7 @@ func init() {
 		"mctl.flag.transfer.ls.accept-host-key":  {Es: "huella SHA256 de la llave de host a aceptar (repetible)", En: "SHA256 fingerprint of the host key to accept (repeatable)"},
 		"mctl.flag.transfer.ls.cred":             {Es: "ID de la credencial de la bóveda (obligatoria en scp y sftp)", En: "vault credential ID (required for scp and sftp)"},
 		"mctl.flag.transfer.ls.json":             {Es: "salida JSON", En: "JSON output"},
+		"mctl.flag.transfer.status.json":         {Es: "salida JSON (protojson de la respuesta)", En: "JSON output (protojson of the response)"},
 		"mctl.flag.transfer.ls.legacy-ssh":       {Es: "scp/sftp hacia equipos con SSH antiguo (queda auditado)", En: "scp/sftp to devices with legacy SSH (audited)"},
 		"mctl.flag.transfer.ls.timeout":          {Es: "tiempo máximo (30s por omisión, máximo 5m)", En: "maximum time (default 30s, maximum 5m)"},
 		"mctl.flag.transfer.put.accept-host-key": {Es: "huella SHA256 de la llave de host a aceptar (repetible)", En: "SHA256 fingerprint of the host key to accept (repeatable)"},

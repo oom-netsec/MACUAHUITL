@@ -45,14 +45,20 @@ func pagefileWarnings(files []string, err error) []i18n.Text {
 	if err != nil {
 		return []i18n.Text{i18n.Tx("harden.pagefile_unknown", "cause", err.Error())}
 	}
-	var set []string
+	var set []i18n.Text
 	for _, f := range files {
-		if f = strings.TrimSpace(f); f != "" {
-			set = append(set, f)
+		if f = strings.TrimSpace(f); f == "" {
+			continue
+		}
+		// «?:» es el marcador de Windows para «la unidad del sistema»; así se lee en claro.
+		if rest, ok := strings.CutPrefix(f, "?:"); ok {
+			set = append(set, i18n.Tx("harden.pagefile_sysdrive", "path", rest))
+		} else {
+			set = append(set, i18n.Lit(f, f))
 		}
 	}
 	if len(set) == 0 {
 		return nil
 	}
-	return []i18n.Text{i18n.Tx("harden.pagefile", "files", strings.Join(set, ", "))}
+	return []i18n.Text{i18n.Join("", i18n.Tx("harden.pagefile_head"), i18n.Join(", ", set...), i18n.Tx("harden.pagefile_tail"))}
 }

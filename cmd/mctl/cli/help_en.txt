@@ -141,6 +141,8 @@
         (lists a remote folder: ftp (MLSD or LIST), sftp, scp (if the server has SFTP) and http(s) (HTML index); tftp does not list)
   transfer stop ID | transfer list | transfer hint tftp|ftp|scp|sftp PORT [IP]
         (closes a server, lists them, or explains the nftables redirect to ports 69, 21 and 22)
+  transfer status [ID] [--json]
+        (one read of the sessions in progress and recent ones of the servers, and of the grouped rejections; serve prints progress every 5 s)
   job metrics JOB|FOLDER [--device EQ] [--iface I]... [--top N] [--max-points N] [--csv|--json]
         (CPU, memory per pool and traffic/errors per interface, round by round; what the playbook did not collect comes with a warning. Playbook: ios-xe/metricas)
   ports status JOB|FOLDER [--device EQ] [--json]  |  ports status --device HOST[:PORT] --cred ID [--accept-host-key SHA256:...] [--legacy-ssh] [--json]

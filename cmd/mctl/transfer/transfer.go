@@ -22,6 +22,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // absAll vuelve absolutas las rutas (el núcleo no conoce el directorio de trabajo de mctl).
@@ -152,6 +153,12 @@ func serve(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := &lockedWriter{w: c.Out} // el stream y el avance escriben a la misma salida
+	pctx, pstop := context.WithCancel(ctx)
+	defer pstop()
+	client := v1.NewTransferServiceClient(c.Conn)
+	loc := cli.Lang() // fijo para todo el comando: otra goroutine puede cambiar el global
+	tr := func(code string, kv ...interface{}) string { return i18n.Msg(loc, code, i18n.A(kv...)) }
 	for {
 		r, err := st.Recv()
 		if err == io.EOF || ctx.Err() != nil {
@@ -162,36 +169,31 @@ func serve(c *cli.Env, args []string) error {
 		}
 		if cl := r.GetClosed(); cl != nil {
 			if cl.Cleanup != "" {
-				fmt.Fprintln(c.Out, cli.T("mctl.transfer.closed", "cmd", cl.Cleanup))
+				fmt.Fprintln(out, cli.T("mctl.transfer.closed", "cmd", cl.Cleanup))
 			}
 			continue
 		}
 		if rd := r.GetReady(); rd != nil {
-			fmt.Fprintln(c.Out, cli.T("mctl.transfer.serving", "proto", rd.Protocol, "addr", rd.Listening, "id", rd.ServerId))
+			fmt.Fprintln(out, cli.T("mctl.transfer.serving", "proto", rd.Protocol, "addr", rd.Listening, "id", rd.ServerId))
 			if rd.FromDir != "" {
-				fmt.Fprintln(c.Out, cli.T("mctl.transfer.reads_from", "dir", rd.FromDir))
+				fmt.Fprintln(out, cli.T("mctl.transfer.reads_from", "dir", rd.FromDir))
 			}
 			if rd.RecvDir != "" {
-				fmt.Fprintln(c.Out, cli.T("mctl.transfer.receives_in", "dir", rd.RecvDir))
+				fmt.Fprintln(out, cli.T("mctl.transfer.receives_in", "dir", rd.RecvDir))
 			}
 			if rd.User != "" {
-				fmt.Fprintln(c.Out, cli.T("mctl.transfer.credentials", "user", rd.User, "password", rd.Password))
+				fmt.Fprintln(out, cli.T("mctl.transfer.credentials", "user", rd.User, "password", rd.Password))
 			}
-			fmt.Fprint(c.Out, rd.Hint)
+			fmt.Fprint(out, rd.Hint)
+			id := rd.ServerId
+			go progressLoop(pctx, tr("mctl.transfer.progress"), progressEvery, func() (*v1.ListTransferSessionsResponse, error) {
+				return client.ListTransferSessions(pctx, &v1.ListTransferSessionsRequest{ServerId: id})
+			}, out)
 			continue
 		}
-		var t struct {
-			Proto, Dir, Client, File, Path, SHA256, Result, Error string
-			Bytes                                                 int64
-			Duration                                              time.Duration
-			Rejected                                              bool
-		}
+		var t transferEvent
 		json.Unmarshal([]byte(r.GetTransferJson()), &t)
-		mark := ""
-		if t.Rejected {
-			mark = cli.T("mctl.transfer.rejected")
-		}
-		fmt.Fprintf(c.Out, "%s  %s %s %s  %s  %d bytes  %s  %s %s%s\n", time.Now().Format("15:04:05"), t.Proto, t.Dir, t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error, mark)
+		fmt.Fprintln(out, serveLine(t, time.Now(), tr))
 	}
 }
 
@@ -447,7 +449,9 @@ const helpText = `  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:P
   transfer ls URL [--cred ID] [--path CARPETA] [--max N] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...] [--json]
         (lista una carpeta remota: ftp (MLSD o LIST), sftp, scp (si el servidor tiene SFTP) y http(s) (índice HTML); tftp no lista)
   transfer stop ID | transfer list | transfer hint tftp|ftp|scp|sftp PUERTO [IP]
-        (cierra un servidor, los lista, o explica la redirección nftables a los puertos 69, 21 y 22)`
+        (cierra un servidor, los lista, o explica la redirección nftables a los puertos 69, 21 y 22)
+  transfer status [ID] [--json]
+        (una lectura de las sesiones en curso y recientes de los servidores y de los rechazos agrupados; serve imprime el avance cada 5 s)`
 
 // Area registra los comandos de transferencias.
 func Area() cli.Area {
@@ -459,5 +463,6 @@ func Area() cli.Area {
 		{Name: "transfer stop", Run: stop},
 		{Name: "transfer list", Run: list},
 		{Name: "transfer hint", Run: hint},
+		{Name: "transfer status", Run: status},
 	}}
 }
