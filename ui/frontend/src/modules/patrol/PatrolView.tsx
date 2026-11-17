@@ -7,7 +7,7 @@ import { useBusy, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { errInfo } from "../../lib/coreError";
 import { NewJobForm } from "./NewJobForm";
-import { JobsPanel } from "./JobsPanel";
+import { JobsPanel, isFinished } from "./JobsPanel";
 import { JobDetail } from "./JobDetail";
 import "./patrol.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
@@ -57,7 +57,8 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   const refreshJobs = useCallback(async () => {
     const n = ++listSeq.current;
     try {
-      const js = await core.listJobs();
+      // Siempre con includePast: un solo pedido, el núcleo ya poda a los 7 días (la lista no crece sin límite) y así no hay segundo pedido ni estado al abrir «Past jobs».
+      const js = await core.listJobs({ includePast: true });
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
       // Solo los activos: el manifest y el zip se hacen mientras el trabajo sigue armado, y suscribir a los ya cerrados abriría un stream y
@@ -112,10 +113,11 @@ export function PatrolView({ core }: { core: CoreAPI }) {
             </Notice>
           )}
           {job
-            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} subscribe={subscribeJobs} />
+            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} onRemoved={async () => { setSelected(null); await refreshJobs(); }} subscribe={subscribeJobs} />
             : <NewJobForm core={core} creds={creds} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
         </div>
-        <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)} />
+        <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)}
+          onClearFinished={async () => { await core.removeJobs({ allFinished: true }); if (job && isFinished(job)) setSelected(null); await refreshJobs(); }} />
       </div>
     </Page>
   );

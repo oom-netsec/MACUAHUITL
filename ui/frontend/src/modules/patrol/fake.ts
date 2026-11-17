@@ -1,6 +1,6 @@
 // Doble del módulo para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { CoreEvent, PlaybookInfo } from "./api";
+import type { CoreEvent, Job, PlaybookInfo, RemoveSel } from "./api";
 import type { DeviceMetrics, InterfaceSeries, JobMetrics } from "../metrics/api";
 
 const MiB = 1024 * 1024;
@@ -63,7 +63,8 @@ export function fakePatrol() {
     loginTest: vi.fn(async () => []),
     armJob: vi.fn(async () => ({ windowEndsAt: "2026-11-04T10:00:00Z", missingInhibitors: [] })),
     cancelJob: vi.fn(async () => {}),
-    listJobs: vi.fn(async () => []),
+    listJobs: vi.fn(async (_o?: { includePast?: boolean }) => [] as Job[]),
+    removeJobs: vi.fn(async (_s: RemoveSel) => ({ removed: 0, removedIds: [] as string[] })),
     subscribe: vi.fn(async () => {}),
     listPlaybooks: vi.fn(async () => samplePlaybooks),
     emitEvent: (e: CoreEvent) => events.forEach((cb) => cb(e)),

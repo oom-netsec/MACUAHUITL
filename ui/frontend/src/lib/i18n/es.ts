@@ -3007,6 +3007,17 @@ export const es = {
   "paths.err.rel": "Escribe la ruta completa con unidad, como C:\\datos. Una ruta relativa (carpeta\\a, \\a o C:a) depende de la carpeta actual.",
   "paths.err.reserved": "Ese nombre está reservado por Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$), con o sin extensión: elige otro.",
   "transfer.ios.skipped": "{n} archivo(s) tienen en su nombre saltos de línea, controles o caracteres invisibles: no se genera orden de IOS para ellos, porque pegarla cambiaría lo que corre el equipo.",
+  "patrol.history.removeOne": "Quitar del historial",
+  "patrol.history.removeOne.title": "Quitar del historial",
+  "patrol.history.removeOne.body": "«{name}» se quitará del historial. La evidencia en disco no se borra: sigue en esta carpeta.",
+  "patrol.history.clear": "Limpiar terminados ({n})",
+  "patrol.history.clear.title": "Limpiar trabajos terminados",
+  "patrol.history.clear.body": "{n} trabajos terminados se quitarán del historial. La evidencia en disco no se borra: cada trabajo conserva su carpeta.",
+  "patrol.history.confirm": "Quitar",
+  "patrol.history.onlyActive": "Solo activos",
+  "patrol.history.past": "Trabajos pasados ({n})",
+  "patrol.history.pastHelp": "Trabajos de días anteriores. Se quitan solos a los 7 días.",
+  "patrol.history.activeBlocked": "Hay trabajos activos que no se pueden quitar: {ids}.",
 };
 
 export type Key = keyof typeof es;

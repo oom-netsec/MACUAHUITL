@@ -8,11 +8,12 @@ import type { Key } from "../../lib/i18n/es";
 import { DeviceGrid, type Row } from "./DeviceGrid";
 import { MetricsPanel, useMetrics } from "./MetricsPanel";
 import { perRound } from "./metrics";
-import { tones, useStateLabel } from "./JobsPanel";
+import { tones, useStateLabel, isFinished } from "./JobsPanel";
+import { RemoveDialog } from "./RemoveDialog";
 import { devicesText, activeMs, clock, elapsed, when } from "./format";
 
 // Detalle de un trabajo: cifras, línea de fases, Login Test y armado, y la grilla en vivo.
-export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: CoreAPI; job: Job; phases: JobPhase[]; onChanged: () => void; subscribe: (ids: string[], force?: boolean) => Promise<void> }) {
+export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }: { core: CoreAPI; job: Job; phases: JobPhase[]; onChanged: () => void; onRemoved: () => void; subscribe: (ids: string[], force?: boolean) => Promise<void> }) {
   const t = useT();
   const stateLabel = useStateLabel();
   const [login, setLogin] = useState<LoginResult[]>([]);
@@ -20,6 +21,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState<ArmResult | null>(null);
   const [err, setErr] = useState("");
+  const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState<"" | "login" | "arm">("");
   const [grid, setGrid] = useState<{ devices: string[]; initial?: Record<string, Row> } | null>(null);
 
@@ -98,8 +100,12 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
     <section aria-labelledby="job-h" className="job-detail">
       <header className="job-head">
         <h3 id="job-h">{job.name}</h3>
+        {isFinished(job) && <button onClick={() => setRemoving(true)}>{t("patrol.history.removeOne")}</button>}
         {live && <ConfirmButton label={t("patrol.cancel")} confirmLabel={t("patrol.cancel.confirm")} onConfirm={cancel} />}
       </header>
+
+      {removing && <RemoveDialog title={t("patrol.history.removeOne.title")} body={t("patrol.history.removeOne.body", { name: job.name })} jobs={[job]}
+        onConfirm={async () => { await core.removeJobs({ jobIds: [job.id] }); onRemoved(); }} onClose={() => setRemoving(false)} />}
 
       <dl className="stats">
         <div><dt>{t("patrol.stat.state")}</dt><dd><Badge tone={tones[job.state]}>{stateLabel(job.state)}</Badge></dd></div>

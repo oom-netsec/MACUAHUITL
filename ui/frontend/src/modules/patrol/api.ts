@@ -12,7 +12,12 @@ export interface Job {
   round?: number; rounds?: number; devicesTotal?: number; devicesOk?: number; devicesFailed?: number; devicesPartial?: number;
   outputDir?: string; phases?: JobPhase[];
   kind?: string; // patrol, adhoc, backup o change; un núcleo anterior no lo manda
+  finishedAt?: string; // ISO: cuando terminó (completed, cancelled o failed)
+  past?: boolean; // lo calcula el núcleo: terminó en un día anterior; la UI no calcula «hoy»
 }
+// Selección para quitar del historial: ids concretos o todos los terminados. Nunca borra la evidencia en disco.
+export type RemoveSel = { jobIds: string[] } | { allFinished: true };
+export interface RemoveResult { removed: number; removedIds: string[] }
 // Evento de core:event: JSON de SubscribeResponse (protojson, camelCase).
 export interface CoreEvent {
   jobId: string;
@@ -54,7 +59,10 @@ export interface PatrolAPI {
   loginTest(jobId: string): Promise<LoginResult[]>;
   armJob(jobId: string, accept: string[], exclude: string[]): Promise<ArmResult>;
   cancelJob(jobId: string): Promise<void>;
-  listJobs(): Promise<Job[]>;
+  // Sin includePast: activos y terminados hoy; con él, también los días anteriores (el núcleo los poda a los 7 días).
+  listJobs(opts?: { includePast?: boolean }): Promise<Job[]>;
+  // Falla entera con reason patrol.job_active (metadata job_ids, separados por comas) si algún id está activo; los ids inexistentes se ignoran.
+  removeJobs(sel: RemoveSel): Promise<RemoveResult>;
   subscribe(jobIds: string[]): Promise<void>;
   // Catálogo de playbooks del núcleo (PatrolService.ListPlaybooks); el id es el que acepta JobSpec.playbookIds.
   listPlaybooks(): Promise<PlaybookInfo[]>;
@@ -69,7 +77,8 @@ export const patrolWails = (call: Call): PatrolAPI => ({
   loginTest: (id) => call("LoginTest", id),
   armJob: (id, a, x) => call("ArmJob", id, a, x),
   cancelJob: (id) => call("CancelJob", id),
-  listJobs: () => call("ListJobs"),
+  listJobs: (o) => call("ListJobs", { includePast: false, ...o }),
+  removeJobs: (sel) => call("RemoveJobs", { jobIds: [], allFinished: false, ...sel }),
   subscribe: (ids) => call("Subscribe", ids),
   // protojson omite las listas vacías: {} sin playbooks, y un playbook sin commands.
   listPlaybooks: async () => ((JSON.parse(await call<string>("ListPlaybooks")) as { playbooks?: Partial<PlaybookInfo>[] }).playbooks ?? [])
