@@ -76,7 +76,7 @@ func Listen(name string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ipc: %w", err)
 	}
-	return &peerListener{Listener: l, sid: sid}, nil
+	return &peerListener{Listener: closeWait{Listener: l, max: 2 * time.Second}, sid: sid}, nil
 }
 
 // peerListener cierra toda conexión cuyo cliente (GetNamedPipeClientProcessId) no corra con el SID esperado.

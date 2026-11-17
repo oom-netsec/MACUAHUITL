@@ -160,7 +160,7 @@ func TestDialPipeRechazaDuenoAjeno(t *testing.T) {
 	if err != nil {
 		t.Skipf("este token no puede fijar a Administradores como dueño: %v", err) // ERROR_INVALID_OWNER sin elevar
 	}
-	serve(t, l)
+	serve(t, closeWait{Listener: l, max: 2 * time.Second})
 	if c, _, err := dialPipe(context.Background(), name); err == nil {
 		c.Close()
 		t.Fatal("dialPipe aceptó un pipe de otro dueño")
