@@ -424,6 +424,7 @@ type ServeFilesResponse struct {
 	Listening     string                 `protobuf:"bytes,1,opt,name=listening,proto3" json:"listening,omitempty"`                           // primer evento: dirección real
 	Hint          string                 `protobuf:"bytes,2,opt,name=hint,proto3" json:"hint,omitempty"`                                     // primer evento: cómo copiar desde el equipo (y redirección nftables para TFTP)
 	TransferJson  string                 `protobuf:"bytes,3,opt,name=transfer_json,json=transferJson,proto3" json:"transfer_json,omitempty"` // una transferencia terminada
+	ServerId      string                 `protobuf:"bytes,4,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`             // primer evento: id para TransferService.ListTransferSessions (fase 45b); no sale en ListServers
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -475,6 +476,13 @@ func (x *ServeFilesResponse) GetHint() string {
 func (x *ServeFilesResponse) GetTransferJson() string {
 	if x != nil {
 		return x.TransferJson
+	}
+	return ""
+}
+
+func (x *ServeFilesResponse) GetServerId() string {
+	if x != nil {
+		return x.ServerId
 	}
 	return ""
 }
@@ -622,11 +630,12 @@ const file_macuahuitl_v1_field_proto_rawDesc = "" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x12\x1b\n" +
 	"\tallow_any\x18\x03 \x01(\bR\ballowAny\x12\x14\n" +
 	"\x05files\x18\x04 \x03(\tR\x05files\x12)\n" +
-	"\x10duration_seconds\x18\x05 \x01(\x05R\x0fdurationSeconds\"k\n" +
+	"\x10duration_seconds\x18\x05 \x01(\x05R\x0fdurationSeconds\"\x88\x01\n" +
 	"\x12ServeFilesResponse\x12\x1c\n" +
 	"\tlistening\x18\x01 \x01(\tR\tlistening\x12\x12\n" +
 	"\x04hint\x18\x02 \x01(\tR\x04hint\x12#\n" +
-	"\rtransfer_json\x18\x03 \x01(\tR\ftransferJson\"O\n" +
+	"\rtransfer_json\x18\x03 \x01(\tR\ftransferJson\x12\x1b\n" +
+	"\tserver_id\x18\x04 \x01(\tR\bserverId\"O\n" +
 	"\x0fHashFileRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x10\n" +
 	"\x03md5\x18\x02 \x01(\tR\x03md5\x12\x16\n" +

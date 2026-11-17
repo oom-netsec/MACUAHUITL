@@ -2187,7 +2187,8 @@ func (x *ListTransferSessionsRequest) GetServerId() string {
 
 type ListTransferSessionsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sessions      []*TransferSession     `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"` // activas primero (la más antigua arriba); luego las terminadas, la más reciente arriba
+	Sessions      []*TransferSession     `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`     // activas primero (la más antigua arriba); luego las terminadas, la más reciente arriba
+	Rejections    []*TransferRejection   `protobuf:"bytes,2,rep,name=rejections,proto3" json:"rejections,omitempty"` // últimos rechazos, el más reciente arriba
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2229,6 +2230,134 @@ func (x *ListTransferSessionsResponse) GetSessions() []*TransferSession {
 	return nil
 }
 
+func (x *ListTransferSessionsResponse) GetRejections() []*TransferRejection {
+	if x != nil {
+		return x.Rejections
+	}
+	return nil
+}
+
+// Rechazos de un servidor agrupados por (IP, causa). Se guardan los últimos 32 grupos por servidor (sale el de
+// `last` más viejo), con la misma vida que las sesiones (10 min tras cerrar el servidor). Cuidado: en TFTP (UDP) la
+// IP de origen se puede falsificar; el grupo dice qué llegó, no quién lo mandó.
+type TransferRejection struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ServerId string                 `protobuf:"bytes,1,opt,name=server_id,json=serverId,proto3" json:"server_id,omitempty"`
+	Ip       string                 `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`             // sin puerto: un equipo que reintenta cae en el mismo grupo
+	Protocol string                 `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"` // tftp, ftp, scp, sftp o http
+	Cause    string                 `protobuf:"bytes,4,opt,name=cause,proto3" json:"cause,omitempty"`       // not_found (archivo no publicado o inexistente), origin_denied (IP fuera de --allow),
+	// write_disabled, read_disabled, method (HTTP), busy (cupo lleno), other
+	Name string `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"` // último nombre pedido, saneado para mostrar (control y formato → «?») y cortado a 128
+	// caracteres; vacío si el rechazo fue antes de pedir un archivo
+	Count         int64  `protobuf:"varint,6,opt,name=count,proto3" json:"count,omitempty"`
+	First         int64  `protobuf:"varint,7,opt,name=first,proto3" json:"first,omitempty"`                             // unix ms
+	Last          int64  `protobuf:"varint,8,opt,name=last,proto3" json:"last,omitempty"`                               // unix ms
+	Reason        string `protobuf:"bytes,9,opt,name=reason,proto3" json:"reason,omitempty"`                            // motivo del último rechazo en el idioma de la petición
+	ReasonCode    string `protobuf:"bytes,10,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"` // clave estable del catálogo; vacío si el motivo no tiene clave
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransferRejection) Reset() {
+	*x = TransferRejection{}
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferRejection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferRejection) ProtoMessage() {}
+
+func (x *TransferRejection) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferRejection.ProtoReflect.Descriptor instead.
+func (*TransferRejection) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *TransferRejection) GetServerId() string {
+	if x != nil {
+		return x.ServerId
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetCause() string {
+	if x != nil {
+		return x.Cause
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *TransferRejection) GetFirst() int64 {
+	if x != nil {
+		return x.First
+	}
+	return 0
+}
+
+func (x *TransferRejection) GetLast() int64 {
+	if x != nil {
+		return x.Last
+	}
+	return 0
+}
+
+func (x *TransferRejection) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *TransferRejection) GetReasonCode() string {
+	if x != nil {
+		return x.ReasonCode
+	}
+	return ""
+}
+
 // Una transferencia de un servidor de StartServer. Se guardan todas las activas y las últimas 100 terminadas por
 // servidor, hasta 10 min después de cerrarse el servidor.
 type TransferSession struct {
@@ -2253,7 +2382,7 @@ type TransferSession struct {
 
 func (x *TransferSession) Reset() {
 	*x = TransferSession{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2265,7 +2394,7 @@ func (x *TransferSession) String() string {
 func (*TransferSession) ProtoMessage() {}
 
 func (x *TransferSession) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2278,7 +2407,7 @@ func (x *TransferSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferSession.ProtoReflect.Descriptor instead.
 func (*TransferSession) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{31}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *TransferSession) GetId() string {
@@ -2556,9 +2685,25 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x02ok\x18\x01 \x01(\x05R\x02ok\x12\x16\n" +
 	"\x06failed\x18\x02 \x01(\x05R\x06failed\":\n" +
 	"\x1bListTransferSessionsRequest\x12\x1b\n" +
-	"\tserver_id\x18\x01 \x01(\tR\bserverId\"Z\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\"\x9c\x01\n" +
 	"\x1cListTransferSessionsResponse\x12:\n" +
-	"\bsessions\x18\x01 \x03(\v2\x1e.macuahuitl.v1.TransferSessionR\bsessions\"\xef\x02\n" +
+	"\bsessions\x18\x01 \x03(\v2\x1e.macuahuitl.v1.TransferSessionR\bsessions\x12@\n" +
+	"\n" +
+	"rejections\x18\x02 \x03(\v2 .macuahuitl.v1.TransferRejectionR\n" +
+	"rejections\"\xff\x01\n" +
+	"\x11TransferRejection\x12\x1b\n" +
+	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x0e\n" +
+	"\x02ip\x18\x02 \x01(\tR\x02ip\x12\x1a\n" +
+	"\bprotocol\x18\x03 \x01(\tR\bprotocol\x12\x14\n" +
+	"\x05cause\x18\x04 \x01(\tR\x05cause\x12\x12\n" +
+	"\x04name\x18\x05 \x01(\tR\x04name\x12\x14\n" +
+	"\x05count\x18\x06 \x01(\x03R\x05count\x12\x14\n" +
+	"\x05first\x18\a \x01(\x03R\x05first\x12\x12\n" +
+	"\x04last\x18\b \x01(\x03R\x04last\x12\x16\n" +
+	"\x06reason\x18\t \x01(\tR\x06reason\x12\x1f\n" +
+	"\vreason_code\x18\n" +
+	" \x01(\tR\n" +
+	"reasonCode\"\xef\x02\n" +
 	"\x0fTransferSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tserver_id\x18\x02 \x01(\tR\bserverId\x12\x16\n" +
@@ -2602,7 +2747,7 @@ func file_macuahuitl_v1_transfer_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_transfer_proto_rawDescData
 }
 
-var file_macuahuitl_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_macuahuitl_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_macuahuitl_v1_transfer_proto_goTypes = []any{
 	(*StartServerRequest)(nil),           // 0: macuahuitl.v1.StartServerRequest
 	(*ServerReady)(nil),                  // 1: macuahuitl.v1.ServerReady
@@ -2635,7 +2780,8 @@ var file_macuahuitl_v1_transfer_proto_goTypes = []any{
 	(*BatchSummary)(nil),                 // 28: macuahuitl.v1.BatchSummary
 	(*ListTransferSessionsRequest)(nil),  // 29: macuahuitl.v1.ListTransferSessionsRequest
 	(*ListTransferSessionsResponse)(nil), // 30: macuahuitl.v1.ListTransferSessionsResponse
-	(*TransferSession)(nil),              // 31: macuahuitl.v1.TransferSession
+	(*TransferRejection)(nil),            // 31: macuahuitl.v1.TransferRejection
+	(*TransferSession)(nil),              // 32: macuahuitl.v1.TransferSession
 }
 var file_macuahuitl_v1_transfer_proto_depIdxs = []int32{
 	1,  // 0: macuahuitl.v1.StartServerResponse.ready:type_name -> macuahuitl.v1.ServerReady
@@ -2653,34 +2799,35 @@ var file_macuahuitl_v1_transfer_proto_depIdxs = []int32{
 	27, // 12: macuahuitl.v1.TransferEvent.file:type_name -> macuahuitl.v1.FileResult
 	28, // 13: macuahuitl.v1.TransferEvent.done:type_name -> macuahuitl.v1.BatchSummary
 	9,  // 14: macuahuitl.v1.FileResult.result:type_name -> macuahuitl.v1.TransferResult
-	31, // 15: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
-	0,  // 16: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
-	4,  // 17: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
-	6,  // 18: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
-	10, // 19: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
-	12, // 20: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
-	14, // 21: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
-	16, // 22: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
-	20, // 23: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
-	21, // 24: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
-	19, // 25: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
-	29, // 26: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
-	2,  // 27: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
-	5,  // 28: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
-	8,  // 29: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
-	11, // 30: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
-	13, // 31: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
-	15, // 32: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
-	18, // 33: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
-	22, // 34: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
-	23, // 35: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
-	24, // 36: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
-	30, // 37: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
-	27, // [27:38] is the sub-list for method output_type
-	16, // [16:27] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	32, // 15: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
+	31, // 16: macuahuitl.v1.ListTransferSessionsResponse.rejections:type_name -> macuahuitl.v1.TransferRejection
+	0,  // 17: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
+	4,  // 18: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
+	6,  // 19: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
+	10, // 20: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
+	12, // 21: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
+	14, // 22: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
+	16, // 23: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
+	20, // 24: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
+	21, // 25: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
+	19, // 26: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
+	29, // 27: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
+	2,  // 28: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
+	5,  // 29: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
+	8,  // 30: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
+	11, // 31: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
+	13, // 32: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
+	15, // 33: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
+	18, // 34: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
+	22, // 35: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
+	23, // 36: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
+	24, // 37: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
+	30, // 38: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
+	28, // [28:39] is the sub-list for method output_type
+	17, // [17:28] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_transfer_proto_init() }
@@ -2704,7 +2851,7 @@ func file_macuahuitl_v1_transfer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_transfer_proto_rawDesc), len(file_macuahuitl_v1_transfer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

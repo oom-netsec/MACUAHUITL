@@ -21,7 +21,7 @@
 rpc ListTransferSessions(ListTransferSessionsRequest) returns (ListTransferSessionsResponse);
 
 message ListTransferSessionsRequest  { string server_id = 1; }            // vacío = todos (abiertos y cerrados hace < 10 min)
-message ListTransferSessionsResponse { repeated TransferSession sessions = 1; }
+message ListTransferSessionsResponse { repeated TransferSession sessions = 1; repeated TransferRejection rejections = 2; }
 message TransferSession {
   string id = 1; string server_id = 2; string client = 3; string name = 4;
   string direction = 5;      // "in" (el equipo sube) | "out" (el equipo descarga)
@@ -32,6 +32,14 @@ message TransferSession {
   string state = 12;         // active | done | failed
   string error = 13; string error_code = 14;
 }
+message TransferRejection {   // agrupado por (IP, causa); 32 grupos por servidor
+  string server_id = 1; string ip = 2; string protocol = 3;
+  string cause = 4;          // not_found | origin_denied | write_disabled | read_disabled | method | busy | other
+  string name = 5;           // último nombre pedido, saneado, ≤ 128 caracteres
+  int64 count = 6; int64 first = 7; int64 last = 8;   // unix ms
+  string reason = 9; string reason_code = 10;
+}
+// field.proto, ServeFilesResponse: string server_id = 4;  // primer evento
 ```
 
 Es el contrato provisional de Front sin cambios de nombre ni de forma. Solo se fija lo que no decía: `server_id` vacío lista todo, un `server_id` desconocido (o cerrado hace más de 10 min) da `NOT_FOUND`, el orden de la lista, y que `error_code` es la clave del catálogo.
@@ -48,13 +56,20 @@ interface TransferSession {
   state: "active" | "done" | "failed";
   error: string; errorCode: string;
 }
+interface TransferRejection {
+  serverId: string; ip: string; protocol: string;
+  cause: "not_found" | "origin_denied" | "write_disabled" | "read_disabled" | "method" | "busy" | "other";
+  name: string; count: number; first: number; last: number;
+  reason: string; reasonCode: string;
+}
+// El puente devuelve { sessions: TransferSession[]; rejections: TransferRejection[] } (vacíos como []).
 // core.transferSessions(serverId: string): Promise<TransferSession[]>  — Bridge.TransferSessions(serverID string) ([]TransferSessionDTO, error)
 ```
 
 ## Decisiones
 
 1. **Encuesta, no stream** (lo acordado con Front). Una RPC unaria barata: toma dos candados cortos y lee atómicos. Ya existe un stream (`StartServer`) que da el resultado final de cada transferencia; agregarle eventos de avance obligaría a regular el ritmo por cliente y a duplicar la lógica en mctl. Con la encuesta, la UI, mctl y cualquier otro cliente leen lo mismo.
-2. **Sesión = transferencia que empezó.** El punto de inicio de cada protocolo está en la tabla de abajo. Los rechazos previos (archivo no publicado, origen no permitido, método, saturación) **no** son sesiones: un escáner o un RRQ falsificado no deben sacar del registro las transferencias reales. Siguen como hoy en el stream de `StartServer` (`transfer_json` con `Rejected`) y en `ServerInfo.rejected`. Una falla después del inicio (sin respuesta, tope, disco) sí es sesión `failed`. Lo que falla antes de empezar sin ser rechazo (p. ej. FTP sin conexión de datos) se audita como hoy y sale en el stream, pero no se lista.
+2. **Sesión = transferencia que empezó.** El punto de inicio de cada protocolo está en la tabla de abajo. Los rechazos previos (archivo no publicado, origen no permitido, método, saturación) **no** son sesiones: un escáner o un RRQ falsificado no deben sacar del registro las transferencias reales. Van aparte en `rejections` (decisión 11) y siguen como hoy en el stream de `StartServer` (`transfer_json` con `Rejected`) y en `ServerInfo.rejected`. Una falla después del inicio (sin respuesta, tope, disco) sí es sesión `failed`. Lo que falla antes de empezar sin ser rechazo (p. ej. FTP sin conexión de datos) se audita como hoy y sale en el stream, pero no se lista.
 3. **TFTP empieza al verificar al par.** RRQ: con el primer ACK (del OACK o del bloque 1). WRQ: con el primer DATA. Antes de eso el origen UDP es falsificable: hoy esos intentos ya cuestan un cupo y unos segundos, y no deben además ensuciar la lista.
 4. **Bytes confirmados, no enviados.** TFTP suma tras el ACK de cada bloque. Las subidas cuentan hasta donde se escribió en disco (`recvFile.WriteAt`, el mismo punto que aplica los topes). Las descargas TCP cuentan lo entregado al socket. Así la barra nunca pasa del 100 % ni retrocede.
 5. **La tasa la calcula quien lee, no la transferencia.** Cada sesión guarda una muestra `(bytes, hora)`. En `List`, si pasó ≥ 1 s desde la muestra, `bytes_per_sec = Δbytes/Δt` y se renueva la muestra; si no, se repite el último valor. La primera lectura usa el promedio desde el inicio. Una sesión terminada da el promedio `bytes/(ended-started)`. Varios lectores a la vez (UI + mctl) no se estorban: la muestra nunca se renueva antes de 1 s. La hora sale de `Deps.Now()`, que es reemplazable en pruebas.
@@ -62,7 +77,10 @@ interface TransferSession {
 7. **`error` en el idioma de la petición** con `fileserve.ReasonIn(loc, t)`, como el stream. **`error_code`** es `t.ReasonT.Key`, la clave del catálogo (`fileserve.reason.no_reply`, `fileserve.reason.stopped`…), o vacío cuando el motivo no tiene clave (error del sistema, «HTTP 416»). La sesión guarda `Error` y `ReasonT` y traduce al leer: dos clientes con idiomas distintos ven cada uno el suyo.
 8. **`direction`**: `"in"` = escritura en el servidor (el equipo sube), `"out"` = lectura (el equipo descarga). Es el mismo criterio que la insignia actual de `ServerPanel` (`dirCode === "write"` → `transfer.dir.in`).
 9. **`started`/`ended` en ms** con los nombres del contrato de Front (en proto otros campos usan `_ms`). Cambiarlos solo por estilo no es razón fuerte.
-10. **Fuera de alcance:** el servidor de Campo (`FieldService.ServeFiles`) no tiene `server_id` ni aparece en `ListServers`; no pasa `OnStart` y no cambia. Los clientes `GetStream`/`PutStream` ya tienen su avance. `ServerInfo` no cambia; «hay algo activo» sale de `ListTransferSessions("")`.
+10. **Campo entra** (decisión de Release, 2026-11-16): `FieldService.ServeFiles` usa el mismo registro. Su primer evento trae `server_id` (campo 4 nuevo) y `ListTransferSessions` lo acepta; `""` también lo lista. No aparece en `ListServers`, que sigue siendo de `StartServer`. El registro vive en un lugar que ambos servicios puedan usar sin romper `archcheck` (paquete propio bajo `internal/service/`, una sola instancia armada en `core`). Los clientes `GetStream`/`PutStream` ya tienen su avance. `ServerInfo` no cambia; «hay algo activo» sale de `ListTransferSessions("")`.
+
+11. **Rechazos por IP, aparte y con causa** (decisión de Release, 2026-11-16). `fileserve.Transfer` gana `Cause string` (`not_found`, `origin_denied`, `write_disabled`, `read_disabled`, `method`, `busy`, `other`), que cada rechazo de hoy pone junto a su `ReasonT`. El registro agrupa por (servidor, IP sin puerto, causa): suma `count`, mueve `last`, guarda el último nombre y motivo. Tope de **32** grupos por servidor (sale el de `last` más viejo), así la memoria queda acotada aunque un escáner mande nombres o IPs distintos. El nombre viene crudo del equipo: se sanea con `transfer.SanitizeName` y se corta a 128 caracteres antes de guardarlo. En TFTP la IP de origen se puede falsificar: la UI lo dice como «llegó desde», no como identidad.
+12. **Valores** (confirmados por Release): 100 terminadas por servidor, 10 min tras el cierre, y avance cada 5 s en `mctl transfer serve`.
 
 ## Avance por protocolo
 
@@ -98,7 +116,7 @@ func (l *Live) Total() int64
 
 - En `server`: `mu sync.Mutex`, `active map[*fileserve.Live]*session` y `recent []*session`, un anillo de **100** terminadas por servidor (la más vieja sale). En `svc`: `closed`, los servidores cerrados con su `recent`, conservados **10 min** tras el cierre y como mucho **8** (sale el más viejo). Se purga al leer y al cerrar un servidor; no hay goroutine de limpieza.
 - `session`: `id` (`service.NewID()`), `live`, `started`, `ended`, `state`, `bytes`, `total` (copiados del `Live` al terminar), `err string`, `reason i18n.Text`, `name` ya saneado, y la muestra de la tasa.
-- **Tope de memoria:** una sesión ocupa < 1 KiB (nombre ≤ 255 B). Las activas ya están acotadas por los cupos de cada protocolo (`maxTransfers` = 16 en TFTP y HTTP, conexiones SSH/FTP limitadas). Peor caso: (4 abiertos + 8 cerrados) × 100 × 1 KiB ≈ 1,2 MiB.
+- **Tope de memoria:** una sesión ocupa < 1 KiB (nombre ≤ 255 B). Las activas ya están acotadas por los cupos de cada protocolo (`maxTransfers` = 16 en TFTP y HTTP, conexiones SSH/FTP limitadas). Peor caso: (4 abiertos + 8 cerrados) × 100 × 1 KiB ≈ 1,2 MiB. Los rechazos suman 32 grupos × < 1 KiB por servidor. Campo cuenta como un servidor abierto más.
 - **Cierre de seguridad:** cuando `fileserve.Serve` vuelve, toda sesión que siga en `active` pasa a `failed` con `fileserve.reason.stopped`, y se audita como cualquier otra. Ningún camino olvidado deja una sesión «activa» para siempre.
 
 ## Concurrencia
@@ -118,7 +136,7 @@ Ya existe y alcanza: `transfer.serve.transfer` por cada transferencia no rechaza
 
 ## mctl
 
-- `mctl transfer status [ID] [--json]`: una lectura de `ListTransferSessions` con una línea por sesión: `ESTADO  SERVIDOR  PROTO  CLIENTE  in|out  NOMBRE  bytes/total (pct)  tasa  [motivo]`. Con total 0 no hay porcentaje. `--json` es `protojson` de la respuesta. No trae `--watch`: `watch -n1 mctl transfer status` ya lo hace.
+- `mctl transfer status [ID] [--json]`: después de las sesiones, una sección de rechazos con una línea por grupo: `IP  PROTO  causa  ×count  hace N s  NOMBRE`. Una lectura de `ListTransferSessions` con una línea por sesión: `ESTADO  SERVIDOR  PROTO  CLIENTE  in|out  NOMBRE  bytes/total (pct)  tasa  [motivo]`. Con total 0 no hay porcentaje. `--json` es `protojson` de la respuesta. No trae `--watch`: `watch -n1 mctl transfer status` ya lo hace.
 - `mctl transfer serve`: además del stream, cada **5 s** consulta `ListTransferSessions(server_id)` e imprime una línea `progreso` por sesión activa. Las líneas de fin siguen siendo las del stream. Las sesiones ya vienen saneadas del núcleo; lo que imprime del stream pasa por un `strings.Map` local con la misma regla que `SanitizeName` (control y formato Unicode → «?»). Es local porque `cmd/mctl` no debe importar `internal/diag/...`, que trae `net`.
 - **De paso, una falla de hoy:** `serve` imprime con `%s` el `File` de los rechazos TFTP, que es el nombre crudo del paquete UDP; un nombre con secuencias ANSI le escribe a la terminal. Se sanea en este mismo bloque (prueba con `\x1b[2J` en el nombre).
 - Textos nuevos en `internal/i18n/catalog_mctl_a.go` (es y en). `cmd/mctl` no importa `net` ni `grpc` directamente (noegress).
@@ -139,11 +157,13 @@ Pruebas:
 - Mutación a mano: quitar el `add` de un protocolo hace fallar su prueba.
 
 ### 45b-3 — Registro y RPC en el servicio
-Archivos: `internal/service/transfer/{sessions.go,transfer.go}`, `sessions_test.go`, `internal/i18n/catalog_transfer.go` (`transfer.svc.no_server`).
+Archivos: el registro compartido (decisión 10), `internal/service/transfer/transfer.go`, `internal/service/field/field.go`, `internal/core` (una instancia), sus pruebas, `internal/i18n/catalog_transfer.go` (`transfer.svc.no_server`).
 Pruebas:
 - Unitarias del registro, sin red y con reloj falso: anillo de 100, 10 min tras el cierre, tope de 8 cerrados, orden de la lista y tasa (primera lectura = promedio; luego Δ por ventana ≥ 1 s; terminada = promedio).
 - Integración con TFTP en loopback: activa con `client`, `name`, `total`; luego `done`. Falla → `failed` con `error_code`. Un rechazo no aparece y sube `rejected`. Un `server_id` desconocido da `NOT_FOUND`. `""` lista todos.
 - Nombre publicado con U+202E → «?».
+- Rechazos: se agrupan por (IP, causa) con `count`, `first`, `last`; el grupo 33 desplaza al de `last` más viejo; un nombre crudo con `\x1b[2J` y U+202E sale saneado y cortado a 128; las tres causas pedidas (`not_found`, `origin_denied`, `write_disabled`) salen de rechazos reales por TFTP en loopback.
+- Campo: `ServeFiles` manda `server_id` en el primer evento y `ListTransferSessions(server_id)` lista sus sesiones; `""` las incluye.
 - Cierre de seguridad: `Live` sin `OnTransfer` → `failed` y auditada.
 - Auditoría con `session=`.
 - `-race` con `List` en paralelo.
@@ -158,13 +178,13 @@ Pruebas:
 - `noegress` limpio.
 
 ### 45b-5 — Puente
-Archivos: `ui/bridge/transfer.go` (`TransferSessionDTO`, `TransferSessions`) y su prueba de mapeo. Después Front agrega `api.ts`, `fake.ts`, la vista y las claves `transfer.session.*` en `es.ts` y `en.ts`; no es parte de este plan.
+Archivos: `ui/bridge/transfer.go` (`TransferSessionDTO`, `TransferRejectionDTO`, `TransferSessions` que devuelve las dos listas) y su prueba de mapeo. Después Front agrega `api.ts`, `fake.ts`, la vista y las claves `transfer.session.*` en `es.ts` y `en.ts`; no es parte de este plan.
 
 ## Review Focus
 
 1. **Ninguna sesión queda activa para siempre:** cada camino que llama a `start` termina en `OnTransfer`; si no, actúa el cierre de seguridad. Prueba en 45b-2 por protocolo y en 45b-3.
 2. **El bucle de datos no toma candados ni espera a la UI.** Revisión de 45b-2 más `-race` en 45b-3.
-3. **Un escáner o un RRQ falsificado no desplaza la historia real:** los rechazos y los pares TFTP sin verificar no crean sesión. Pruebas en 45b-2 y 45b-3.
+3. **Un escáner o un RRQ falsificado no desplaza la historia real:** los rechazos y los pares TFTP sin verificar no crean sesión; los rechazos tienen su propio tope de 32 grupos. Pruebas en 45b-2 y 45b-3.
 4. **Ningún nombre crudo llega a la UI ni a la terminal.** Pruebas en 45b-3 y 45b-4.
 5. **`--allow`, `--write`, los topes y la validación de nombres no cambian:** las pruebas existentes de `fileserve` y `transfer` pasan sin tocarse.
 

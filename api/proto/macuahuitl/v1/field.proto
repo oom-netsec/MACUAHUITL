@@ -59,6 +59,7 @@ message ServeFilesResponse {
   string listening = 1;     // primer evento: dirección real
   string hint = 2;          // primer evento: cómo copiar desde el equipo (y redirección nftables para TFTP)
   string transfer_json = 3; // una transferencia terminada
+  string server_id = 4;     // primer evento: id para TransferService.ListTransferSessions (fase 45b); no sale en ListServers
 }
 
 message HashFileRequest {

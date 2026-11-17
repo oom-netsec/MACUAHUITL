@@ -64,10 +64,11 @@ type TransferServiceClient interface {
 	// Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
 	// avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
 	GetMany(ctx context.Context, in *GetManyRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetManyResponse], error)
-	// Sesiones de los servidores abiertos con StartServer (fase 45b), para una encuesta de 1 s: las activas con su
-	// avance y las recientes con su resultado. Una sesión es una transferencia que empezó (TFTP: el par ya respondió;
-	// FTP: ya hay conexión de datos); los rechazos previos (archivo no publicado, origen no permitido) no son sesiones:
-	// siguen en el stream de StartServer y en ServerInfo.rejected. server_id desconocido: NOT_FOUND.
+	// Sesiones de los servidores abiertos con StartServer y con FieldService.ServeFiles (fase 45b), para una encuesta
+	// de 1 s: las activas con su avance y las recientes con su resultado. Una sesión es una transferencia que empezó
+	// (TFTP: el par ya respondió; FTP: ya hay conexión de datos). Los rechazos previos (archivo no publicado, origen no
+	// permitido, escritura no habilitada…) no son sesiones: van aparte en `rejections`, agrupados por IP y causa, con su
+	// propio tope, para que un escáner no desplace la historia real. server_id desconocido: NOT_FOUND.
 	ListTransferSessions(ctx context.Context, in *ListTransferSessionsRequest, opts ...grpc.CallOption) (*ListTransferSessionsResponse, error)
 }
 
@@ -257,10 +258,11 @@ type TransferServiceServer interface {
 	// Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
 	// avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
 	GetMany(*GetManyRequest, grpc.ServerStreamingServer[GetManyResponse]) error
-	// Sesiones de los servidores abiertos con StartServer (fase 45b), para una encuesta de 1 s: las activas con su
-	// avance y las recientes con su resultado. Una sesión es una transferencia que empezó (TFTP: el par ya respondió;
-	// FTP: ya hay conexión de datos); los rechazos previos (archivo no publicado, origen no permitido) no son sesiones:
-	// siguen en el stream de StartServer y en ServerInfo.rejected. server_id desconocido: NOT_FOUND.
+	// Sesiones de los servidores abiertos con StartServer y con FieldService.ServeFiles (fase 45b), para una encuesta
+	// de 1 s: las activas con su avance y las recientes con su resultado. Una sesión es una transferencia que empezó
+	// (TFTP: el par ya respondió; FTP: ya hay conexión de datos). Los rechazos previos (archivo no publicado, origen no
+	// permitido, escritura no habilitada…) no son sesiones: van aparte en `rejections`, agrupados por IP y causa, con su
+	// propio tope, para que un escáner no desplace la historia real. server_id desconocido: NOT_FOUND.
 	ListTransferSessions(context.Context, *ListTransferSessionsRequest) (*ListTransferSessionsResponse, error)
 	mustEmbedUnimplementedTransferServiceServer()
 }
