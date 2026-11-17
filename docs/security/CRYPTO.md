@@ -47,6 +47,7 @@ Associated data of the encrypted DEK: header bytes 0–46. Changing any paramete
 
 - Associated data: vault ID (16 B) ‖ entry ID (16 B) ‖ format version (2 B, big-endian).
 - Plaintext: 6 fields `uint32 length (big-endian) ‖ bytes`, in the order label, user, password, enable, SSH key and one empty reserved field. Everything is encrypted, including the label. This format was chosen over Protocol Buffers to avoid depending on generated code inside the cryptographic package and to be able to wipe each field from memory.
+- SSH key field (phase 44, [ADR 0013](../adr/0013-llaves-ssh-generadas-en-el-nucleo.md)): an ed25519 key generated in the core with `crypto/rand`, stored as an unencrypted OpenSSH private key (PEM, `ssh.MarshalPrivateKey`), the same format `transport` reads with `ssh.ParsePrivateKey`. It lives only inside the encrypted entry: the vault file format and version do not change. A credential with an SSH key and no password or enable secret is of kind `key`; the kind is computed, not stored. The seed and the PEM intermediates are zeroed after use. A `.mcvault` backup carries the keys inside, encrypted with the backup passphrase.
 - The nonce is a random 96-bit value and is renewed on every write of the entry. At the volume of a single vault, the collision risk is negligible.
 
 ## Validation on read

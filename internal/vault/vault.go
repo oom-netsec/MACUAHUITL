@@ -34,6 +34,8 @@ var (
 	ErrExists        = i18n.New("vault.err.exists", nil)
 	ErrWeakParams    = i18n.New("vault.err.weak_params", nil)
 	ErrReserved      = i18n.New("vault.err.reserved", nil)
+	ErrNoKey         = i18n.New("vault.err.no_key", nil)
+	ErrNotKey        = i18n.New("vault.err.not_key_credential", nil)
 )
 
 // ReservedPrefix marca las entradas que guarda el sistema (por ejemplo la llave de las fichas de respaldo): no salen en List, Get las rechaza
@@ -78,7 +80,11 @@ type Credential struct {
 type Info struct {
 	ID, Label, Username  string
 	HasEnable, HasSSHKey bool
+	HasPassword          bool
 }
+
+// IsKey dice si la credencial es de tipo "key": llave sin contraseña ni enable. Se calcula, no se guarda.
+func (i Info) IsKey() bool { return i.HasSSHKey && !i.HasPassword && !i.HasEnable }
 
 // Vault es una bóveda abierta desde disco. Es segura para uso concurrente.
 type Vault struct {
@@ -440,7 +446,7 @@ func (v *Vault) list(reserved bool) ([]Info, error) {
 			return nil, err
 		}
 		if reserved || !Reserved(c.Label) {
-			out = append(out, Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty()})
+			out = append(out, Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty(), HasPassword: !c.Password.Empty()})
 		}
 		c.Password.Destroy()
 		c.Enable.Destroy()

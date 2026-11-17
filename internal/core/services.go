@@ -132,7 +132,7 @@ func (s *vaultSvc) ListCredentials(ctx context.Context, _ *v1.ListCredentialsReq
 	}
 	r := &v1.ListCredentialsResponse{}
 	for _, i := range infos {
-		r.Credentials = append(r.Credentials, &v1.CredentialInfo{Id: i.ID, Label: i.Label, Username: i.Username, HasEnableSecret: i.HasEnable, HasSshKey: i.HasSSHKey})
+		r.Credentials = append(r.Credentials, &v1.CredentialInfo{Id: i.ID, Label: i.Label, Username: i.Username, HasEnableSecret: i.HasEnable, HasSshKey: i.HasSSHKey, Kind: kindOf(i)})
 	}
 	return r, nil
 }
@@ -146,6 +146,19 @@ func (s *vaultSvc) PutCredential(ctx context.Context, r *v1.PutCredentialRequest
 	if vault.Reserved(r.Label) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "patrol.svc.reserved_label", i18n.A("label", r.Label))
 	}
+	if len(r.SshPrivateKey) > 0 {
+		clear(r.SshPrivateKey)
+		return nil, service.Err(ctx, codes.InvalidArgument, "vault.err.no_key_import", nil)
+	}
+	if r.Id != "" {
+		if infos, err := v.List(); err == nil {
+			for _, i := range infos {
+				if i.ID == r.Id && i.IsKey() {
+					return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.key_credential", nil)
+				}
+			}
+		}
+	}
 	// secret.New pone en ceros los bytes recibidos; el búfer de gRPC del cable no se puede borrar.
 	c := vault.Credential{ID: r.Id, Label: r.Label, Username: r.Username,
 		Password: secret.New(r.Password), Enable: secret.New(r.EnableSecret), SSHKey: secret.New(r.SshPrivateKey)}
@@ -158,6 +171,61 @@ func (s *vaultSvc) PutCredential(ctx context.Context, r *v1.PutCredentialRequest
 	}
 	s.c.audit("credential.put", id, "")
 	return &v1.PutCredentialResponse{Id: id}, nil
+}
+
+func kindOf(i vault.Info) string {
+	if i.IsKey() {
+		return "key"
+	}
+	return "password"
+}
+
+func (s *vaultSvc) GenerateKeyCredential(ctx context.Context, r *v1.GenerateKeyCredentialRequest) (*v1.GenerateKeyCredentialResponse, error) {
+	s.c.markActive()
+	v, err := s.v(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if vault.Reserved(r.Label) {
+		return nil, service.Err(ctx, codes.InvalidArgument, "patrol.svc.reserved_label", i18n.A("label", r.Label))
+	}
+	id, pub, err := v.GenerateKey(r.Label, r.Username)
+	if err != nil {
+		return nil, service.VaultErr(ctx, err)
+	}
+	s.c.audit("credential.keygen", id, "type=ssh-ed25519 fingerprint="+pub.Fingerprint())
+	return &v1.GenerateKeyCredentialResponse{Id: id, PublicKey: pub.AuthorizedKey()}, nil
+}
+
+func (s *vaultSvc) GetCredentialPublicKey(ctx context.Context, r *v1.GetCredentialPublicKeyRequest) (*v1.GetCredentialPublicKeyResponse, error) {
+	s.c.markActive()
+	v, err := s.v(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pub, err := v.PublicKey(r.Id)
+	if err != nil {
+		return nil, service.VaultErr(ctx, err)
+	}
+	s.c.audit("credential.pubkey", r.Id, "fingerprint="+pub.Fingerprint())
+	return &v1.GetCredentialPublicKeyResponse{PublicKey: pub.AuthorizedKey()}, nil
+}
+
+func (s *vaultSvc) RegenerateKeyCredential(ctx context.Context, r *v1.RegenerateKeyCredentialRequest) (*v1.RegenerateKeyCredentialResponse, error) {
+	s.c.markActive()
+	v, err := s.v(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !r.Confirm {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.rekey_confirm", nil)
+	}
+	old, pub, err := v.RegenerateKey(r.Id)
+	if err != nil {
+		return nil, service.VaultErr(ctx, err)
+	}
+	s.c.audit("credential.keyrotate", r.Id, "old="+old.Fingerprint()+" new="+pub.Fingerprint())
+	return &v1.RegenerateKeyCredentialResponse{PublicKey: pub.AuthorizedKey()}, nil
 }
 
 func (s *vaultSvc) DeleteCredential(ctx context.Context, r *v1.DeleteCredentialRequest) (*v1.DeleteCredentialResponse, error) {
