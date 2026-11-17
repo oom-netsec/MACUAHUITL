@@ -8,8 +8,9 @@ import type { Key } from "../../lib/i18n/es";
 import { DeviceGrid, type Row } from "./DeviceGrid";
 import { MetricsPanel, useMetrics } from "./MetricsPanel";
 import { perRound } from "./metrics";
-import { tones, useStateLabel, isFinished } from "./JobsPanel";
+import { tones, useStateLabel } from "./JobsPanel";
 import { RemoveDialog } from "./RemoveDialog";
+import { isRemovable } from "./states";
 import { devicesText, activeMs, clock, elapsed, when } from "./format";
 
 // Detalle de un trabajo: cifras, línea de fases, Login Test y armado, y la grilla en vivo.
@@ -100,12 +101,12 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
     <section aria-labelledby="job-h" className="job-detail">
       <header className="job-head">
         <h3 id="job-h">{job.name}</h3>
-        {isFinished(job) && <button onClick={() => setRemoving(true)}>{t("patrol.history.removeOne")}</button>}
+        {isRemovable(job) && <button onClick={() => setRemoving(true)}>{t("patrol.history.removeOne")}</button>}
         {live && <ConfirmButton label={t("patrol.cancel")} confirmLabel={t("patrol.cancel.confirm")} onConfirm={cancel} />}
       </header>
 
-      {removing && <RemoveDialog title={t("patrol.history.removeOne.title")} body={t("patrol.history.removeOne.body", { name: job.name })} jobs={[job]}
-        onConfirm={async () => { await core.removeJobs({ jobIds: [job.id] }); onRemoved(); }} onClose={() => setRemoving(false)} />}
+      {removing && <RemoveDialog title={t("patrol.history.removeOne.title")} body={`${t("patrol.history.removeOne.body", { name: job.name })}${job.outputDir ? ` ${t("patrol.history.removeOne.folder")}` : ""}`} jobs={[job]}
+        onConfirm={async () => { const r = await core.removeJobs({ jobIds: [job.id] }); if (r.skipped?.length) onChanged(); return r; }} onDone={onRemoved} onClose={() => setRemoving(false)} />}
 
       <dl className="stats">
         <div><dt>{t("patrol.stat.state")}</dt><dd><Badge tone={tones[job.state]}>{stateLabel(job.state)}</Badge></dd></div>

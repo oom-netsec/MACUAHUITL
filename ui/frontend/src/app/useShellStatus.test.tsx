@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useShellStatus, assistOwnerKey } from "./useShellStatus";
 import { fakeCore } from "../lib/fake";
 import { fakePorts } from "../modules/ports/fake";
@@ -52,4 +52,11 @@ test("un assist:done con la ejecución aún activa en el núcleo conserva el due
   const ports = setupDone(live("r4"));
   await act(async () => { ports.emitAssistDone({ runId: "r4" }); });
   expect(localStorage.getItem(assistOwnerKey("r4"))).toBe("ports");
+});
+
+test("cuenta los trabajos vivos (armado, armándose, en pausa) y no los terminados ni sin armar", async () => {
+  const mk = (id: string, state: string) => ({ id, name: id, state });
+  const core = fakeCore({ listJobs: vi.fn(async () => [mk("a", "armed"), mk("b", "arming"), mk("c", "paused"), mk("d", "completed"), mk("e", "created")]) });
+  const { result } = renderHook(() => useShellStatus(core));
+  await waitFor(() => expect(result.current.patrolArmed).toBe(3));
 });

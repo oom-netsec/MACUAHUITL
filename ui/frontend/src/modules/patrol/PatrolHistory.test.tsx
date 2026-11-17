@@ -1,86 +1,153 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatrolView } from "./PatrolView";
+import { fakePatrol } from "./fake";
 import { fakeCore } from "../../lib/fake";
 import type { Job } from "../../lib/core";
 
+const now = new Date().toISOString();
 const jobs: Job[] = [
-  { id: "j0", name: "Respaldo activo", state: "armed", armedAt: new Date().toISOString(), outputDir: "/ev/activo" },
-  { id: "j1", name: "Caso de hoy", state: "completed", finishedAt: new Date().toISOString(), outputDir: "/ev/hoy" },
-  { id: "j2", name: "Caso viejo", state: "failed", finishedAt: "2026-11-10T10:00:00Z", past: true, outputDir: "/ev/viejo" },
+  { id: "j0", name: "Respaldo activo", state: "armed", kind: "backup", armedAt: now, outputDir: "/ev/activo" },
+  { id: "j1", name: "Caso de hoy", state: "completed", kind: "patrol", finishedAt: now, outputDir: "/ev/hoy" },
+  { id: "j2", name: "Caso viejo", state: "failed", kind: "patrol", finishedAt: "2026-11-10T10:00:00Z", past: true, outputDir: "/ev/viejo" },
+  { id: "j3", name: "Sin armar", state: "created", kind: "backup", outputDir: "/ev/sin-armar" },
 ];
-const setup = (over: Record<string, unknown> = {}) => {
-  const removeJobs = vi.fn(async () => ({ removed: 1, removedIds: ["j1"] }));
-  const listJobs = vi.fn(async () => jobs);
-  const core = fakeCore({ listJobs, removeJobs, ...over } as never);
+const setup = (list: Job[] = jobs, over: Record<string, unknown> = {}) => {
+  const patrol = fakePatrol(list);
+  const core = fakeCore({ ...patrol, ...over } as never);
   render(<PatrolView core={core} />);
-  return { core, removeJobs, listJobs };
+  return patrol;
 };
 const list = () => within(screen.getByRole("region", { name: "Trabajos" }));
+const openPast = () => userEvent.click(screen.getByText(/Trabajos pasados/));
+const dialog = () => within(screen.getByRole("dialog"));
 
-test("activos arriba, terminados hoy y los pasados en una sección plegada", async () => {
-  const { listJobs } = setup();
+test("activos arriba y los pasados en una sección plegada que no monta su contenido hasta abrirse", async () => {
+  const p = setup();
   await screen.findByText("Caso de hoy");
-  expect(listJobs).toHaveBeenCalledWith({ includePast: true });
-  const past = screen.getByText("Trabajos pasados (1)").closest("details")!;
-  expect(past).not.toHaveAttribute("open");
-  expect(past).toContainElement(screen.getByText("Caso viejo"));
-  expect(past).not.toContainElement(screen.getByText("Caso de hoy"));
+  expect(p.listJobs).toHaveBeenCalledWith({ includePast: true });
+  const det = screen.getByText("Trabajos pasados (1)").closest("details")!;
+  expect(det).not.toHaveAttribute("open");
+  expect(screen.queryByText("Caso viejo")).toBeNull();
   const names = list().getAllByRole("button").map((b) => b.textContent ?? "");
   expect(names.findIndex((n) => n.includes("Respaldo activo"))).toBeLessThan(names.findIndex((n) => n.includes("Caso de hoy")));
-  expect(past).toHaveTextContent(/7 días/);
+  await openPast();
+  expect(det).toHaveAttribute("open");
+  expect(det).toContainElement(screen.getByText("Caso viejo"));
+  expect(det).toHaveTextContent(/7 días/);
 });
 
-test("«Solo activos» oculta terminados y pasados", async () => {
+test("con un trabajo pasado elegido, la sección se puede plegar de nuevo", async () => {
+  setup();
+  await screen.findByText("Caso de hoy");
+  await openPast();
+  await userEvent.click(screen.getByText("Caso viejo"));
+  await openPast();
+  expect(screen.getByText(/Trabajos pasados/).closest("details")).not.toHaveAttribute("open");
+  expect(list().queryByText("Caso viejo")).toBeNull();
+});
+
+test("«Solo activos» muestra solo los vivos: no los terminados, pasados ni sin armar", async () => {
   setup();
   await screen.findByText("Caso de hoy");
   await userEvent.click(screen.getByLabelText("Solo activos"));
   expect(screen.queryByText("Caso de hoy")).toBeNull();
-  expect(screen.queryByText("Caso viejo")).toBeNull();
+  expect(screen.queryByText("Sin armar")).toBeNull();
+  expect(screen.queryByText(/Trabajos pasados/)).toBeNull();
   expect(list().getByText("Respaldo activo")).toBeInTheDocument();
 });
 
-test("quitar uno: la confirmación dice que la evidencia no se borra y muestra la carpeta; cancelar no llama", async () => {
-  const { removeJobs, listJobs } = setup();
-  await userEvent.click(await list().findByText("Caso de hoy"));
-  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
-  const dlg = screen.getByRole("dialog");
-  expect(dlg).toHaveTextContent(/no se borra/);
-  expect(dlg).toHaveTextContent("/ev/hoy");
-  expect(within(dlg).getByRole("button", { name: /ruta del paquete/ })).toBeInTheDocument();
-  await userEvent.click(within(dlg).getByRole("button", { name: "Cancelar" }));
-  expect(removeJobs).not.toHaveBeenCalled();
-  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
-  listJobs.mockClear();
-  await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Quitar" }));
-  await waitFor(() => expect(removeJobs).toHaveBeenCalledWith({ jobIds: ["j1"] }));
-  await waitFor(() => expect(listJobs).toHaveBeenCalled());
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(await screen.findByLabelText("Nombre del trabajo")).toBeInTheDocument(); // el elegido se quitó: vuelve el formulario
-});
-
-test("un trabajo activo no tiene «Quitar del historial»", async () => {
+test("filtros combinados: tipo + solo activos; lista vacía dice que no hay con ese filtro; el conteo de limpiar sigue lo visible", async () => {
   setup();
   await screen.findByText("Caso de hoy");
+  expect(screen.getByRole("button", { name: "Limpiar terminados (3)" })).toBeInTheDocument(); // hoy, sin armar y el pasado
+  await userEvent.click(screen.getByRole("radio", { name: "Patrol" }));
+  expect(screen.getByRole("button", { name: "Limpiar terminados (2)" })).toBeInTheDocument(); // hoy y pasado
+  await userEvent.click(screen.getByLabelText("Solo activos"));
+  expect(list().getByText("No hay trabajos con este filtro.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Limpiar terminados (0)" })).toBeDisabled();
+});
+
+test("quitar uno: confirmación con carpeta; cancelar no llama; al confirmar desaparece, vuelve el formulario y el foco va a «Nuevo trabajo»", async () => {
+  const p = setup();
+  await userEvent.click(await list().findByText("Caso de hoy"));
+  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
+  expect(dialog().getByText(/no se borra/)).toBeInTheDocument();
+  expect(screen.getByRole("dialog")).toHaveTextContent("/ev/hoy");
+  expect(dialog().getByRole("button", { name: "Copiar carpeta de evidencia de Caso de hoy" })).toBeInTheDocument();
+  await userEvent.click(dialog().getByRole("button", { name: "Cancelar" }));
+  expect(p.removeJobs).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
+  await userEvent.click(dialog().getByRole("button", { name: "Quitar" }));
+  await waitFor(() => expect(p.removeJobs).toHaveBeenCalledWith({ jobIds: ["j1"] }));
+  expect(await screen.findByLabelText("Nombre del trabajo")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(list().queryByText("Caso de hoy")).toBeNull();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Nuevo trabajo" })).toHaveFocus());
+});
+
+test("un trabajo sin armar se puede quitar; uno armado no", async () => {
+  setup();
+  await userEvent.click(await list().findByText("Sin armar"));
+  expect(screen.getByRole("button", { name: "Quitar del historial" })).toBeInTheDocument();
+  await userEvent.click(list().getByText("Respaldo activo"));
   expect(screen.queryByRole("button", { name: "Quitar del historial" })).toBeNull();
 });
 
-test("limpiar terminados: cuenta, carpetas de todos y llamada en bloque", async () => {
-  const { removeJobs } = setup();
-  await userEvent.click(await screen.findByRole("button", { name: "Limpiar terminados (2)" }));
-  const dlg = screen.getByRole("dialog");
-  expect(dlg).toHaveTextContent(/conserva su carpeta/);
-  expect(dlg).toHaveTextContent("/ev/hoy");
-  expect(dlg).toHaveTextContent("/ev/viejo");
-  expect(dlg).not.toHaveTextContent("/ev/activo");
-  await userEvent.click(within(dlg).getByRole("button", { name: "Quitar" }));
-  await waitFor(() => expect(removeJobs).toHaveBeenCalledWith({ allFinished: true }));
+test("un trabajo sin carpeta registrada lo dice y no promete «sigue en esta carpeta»", async () => {
+  setup([{ id: "j1", name: "Sin ruta", state: "completed", finishedAt: now }]);
+  await userEvent.click(await list().findByText("Sin ruta"));
+  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
+  const d = screen.getByRole("dialog");
+  expect(d).toHaveTextContent("no hay carpeta de salida registrada");
+  expect(d).not.toHaveTextContent(/Sigue en esta carpeta/);
+  expect(within(d).queryByRole("button", { name: /Copiar/ })).toBeNull();
 });
 
-test("si el núcleo rechaza por trabajo activo, el diálogo lo dice con los ids", async () => {
-  const removeJobs = vi.fn(async () => { throw Object.assign(new Error("x"), { cause: { code: "FailedPrecondition", reason: "patrol.job_active", metadata: { job_ids: "j0" } } }); });
-  setup({ removeJobs });
-  await userEvent.click(await screen.findByRole("button", { name: "Limpiar terminados (2)" }));
-  await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Quitar" }));
-  expect(await within(screen.getByRole("dialog")).findByRole("alert")).toHaveTextContent(/activos.*j0/);
+test("con la llamada en curso el diálogo no se cierra: Cancelar deshabilitado y Escape ignorado", async () => {
+  let done!: (r: { removed: number; removedIds: string[] }) => void;
+  const removeJobs = vi.fn(() => new Promise<{ removed: number; removedIds: string[] }>((r) => { done = r; }));
+  setup(jobs, { removeJobs });
+  await userEvent.click(await list().findByText("Caso de hoy"));
+  await userEvent.click(screen.getByRole("button", { name: "Quitar del historial" }));
+  await userEvent.click(dialog().getByRole("button", { name: "Quitar" }));
+  expect(dialog().getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  await userEvent.keyboard("{Escape}");
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  await act(async () => done({ removed: 1, removedIds: ["j1"] }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("limpiar terminados manda exactamente los ids que mostró el diálogo (incluido el pasado), sin allFinished", async () => {
+  const p = setup();
+  await userEvent.click(await screen.findByRole("button", { name: "Limpiar terminados (3)" }));
+  const d = screen.getByRole("dialog");
+  expect(d).toHaveTextContent(/conserva su carpeta/);
+  for (const dir of ["/ev/hoy", "/ev/viejo", "/ev/sin-armar"]) expect(d).toHaveTextContent(dir);
+  expect(d).not.toHaveTextContent("/ev/activo");
+  await userEvent.click(dialog().getByRole("button", { name: "Quitar" }));
+  await waitFor(() => expect(p.removeJobs).toHaveBeenCalledWith({ jobIds: ["j3", "j1", "j2"] }));
+  expect(await screen.findByRole("button", { name: "Limpiar terminados (0)" })).toBeDisabled();
+});
+
+test("limpiar con un terminado seleccionado vuelve al formulario", async () => {
+  setup();
+  await userEvent.click(await list().findByText("Caso de hoy"));
+  await userEvent.click(screen.getByRole("button", { name: "Limpiar terminados (3)" }));
+  await userEvent.click(dialog().getByRole("button", { name: "Quitar" }));
+  expect(await screen.findByLabelText("Nombre del trabajo")).toBeInTheDocument();
+});
+
+test("skipped: el diálogo sigue abierto y dice por nombre y motivo; un id desconocido y un motivo nuevo tienen respaldo", async () => {
+  const removeJobs = vi.fn(async () => ({ removed: 1, removedIds: ["j1"], skipped: [
+    { jobId: "j3", reason: "change_pre" }, { jobId: "j2", reason: "adhoc_unread" }, { jobId: "zz", reason: "raro" }] }));
+  setup(jobs, { removeJobs });
+  await userEvent.click(await screen.findByRole("button", { name: "Limpiar terminados (3)" }));
+  await userEvent.click(dialog().getByRole("button", { name: "Quitar" }));
+  const d = await screen.findByRole("dialog");
+  await waitFor(() => expect(d).toHaveTextContent("No se quitaron 3 trabajos:"));
+  expect(d).toHaveTextContent("Sin armar: es el estado previo de un cambio");
+  expect(d).toHaveTextContent("Caso viejo: su resultado ad hoc aún no se ha leído");
+  expect(d).toHaveTextContent("zz: el núcleo no lo pudo quitar (raro)");
+  expect(d).not.toHaveTextContent("j3");
 });
