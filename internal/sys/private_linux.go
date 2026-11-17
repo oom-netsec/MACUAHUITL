@@ -108,6 +108,9 @@ var (
 	}
 )
 
+// nisLine: una línea «+» o «-» de /etc/group o /etc/passwd (NIS/compat) trae miembros que el archivo no lista.
+func nisLine(l string) bool { return strings.HasPrefix(l, "+") || strings.HasPrefix(l, "-") }
+
 // groupShared: el gid tiene algún miembro suplementario en /etc/group, o es el grupo primario de otro uid en /etc/passwd. Si
 // no se pueden leer los archivos o el grupo no está en /etc/group (NSS: LDAP, sssd) no se sabe: cuenta como compartido.
 func groupShared(gid, uid uint32) bool {
@@ -117,6 +120,9 @@ func groupShared(gid, uid uint32) bool {
 	}
 	found := false
 	for _, l := range strings.Split(string(g), "\n") {
+		if nisLine(l) {
+			return true
+		}
 		f := strings.Split(l, ":")
 		if len(f) >= 4 && f[2] == strconv.FormatUint(uint64(gid), 10) {
 			found = true
@@ -130,6 +136,9 @@ func groupShared(gid, uid uint32) bool {
 		return true
 	}
 	for _, l := range strings.Split(string(p), "\n") {
+		if nisLine(l) {
+			return true
+		}
 		f := strings.Split(l, ":")
 		if len(f) >= 4 && f[3] == strconv.FormatUint(uint64(gid), 10) && f[2] != strconv.FormatUint(uint64(uid), 10) {
 			return true
@@ -146,42 +155,62 @@ func groupIsPrivate(f *os.File, st *syscall.Stat_t) bool {
 	return st.Gid == gid && gid == uid && !hasPosixACL(f) && !groupShared(gid, uid)
 }
 
-// noPermsFuse: la línea de mountinfo del dispositivo dev es un ntfs-3g sin «permissions» (el núcleo FUSE no aplica
-// default_permissions): los modos son inventados y cualquier usuario del equipo accede.
-func noPermsFuse(info string, dev uint64) bool {
+// fuseOpts es lo que importa de la línea de mountinfo del dispositivo dev: si es FUSE, si el núcleo aplica los permisos
+// (default_permissions) y el user_id= de las super options (quien montó; "" si no lo trae).
+func fuseOpts(info string, dev uint64) (fuse, defaultPerms bool, userID string) {
 	want := fmt.Sprintf("%d:%d", unix.Major(dev), unix.Minor(dev))
 	for _, l := range strings.Split(info, "\n") {
 		pre, post, ok := strings.Cut(l, " - ")
 		if f := strings.Fields(pre); ok && len(f) > 2 && f[2] == want {
 			g := strings.Fields(post)
-			if len(g) < 3 || !(g[0] == "fuseblk" || strings.HasPrefix(g[0], "fuse.ntfs") || g[0] == "ntfs-3g") {
-				return false
+			if len(g) < 3 || !(g[0] == "fuseblk" || strings.HasPrefix(g[0], "fuse.") || g[0] == "fuse" || g[0] == "ntfs-3g") {
+				return false, false, ""
 			}
-			return !slices.Contains(strings.Split(g[2], ","), "default_permissions")
+			opts := strings.Split(g[2], ",")
+			for _, o := range opts {
+				if v, ok := strings.CutPrefix(o, "user_id="); ok {
+					userID = v
+				}
+			}
+			return true, slices.Contains(opts, "default_permissions"), userID
 		}
 	}
-	return false
+	return false, false, ""
 }
 
-// noPermsVolume dice si el volumen de f no tiene permisos por usuario: FAT (vfat, msdos), exFAT y ntfs-3g sin «permissions».
-func noPermsVolume(f *os.File, st *syscall.Stat_t) bool {
+// noPermsFuse: la línea de mountinfo del dispositivo dev es FUSE sin default_permissions (ntfs-3g sin «permissions», sshfs…): el núcleo
+// no aplica los modos, son inventados y cualquier usuario del equipo accede.
+func noPermsFuse(info string, dev uint64) bool {
+	fuse, dp, _ := fuseOpts(info, dev)
+	return fuse && !dp
+}
+
+// fuseForeignOwner: el volumen FUSE lo montó otro usuario (user_id= que no es el euid ni 0): sus archivos son de él.
+func fuseForeignOwner(info string, dev uint64) bool {
+	_, _, u := fuseOpts(info, dev)
+	return u != "" && u != "0" && u != strconv.FormatUint(uint64(geteuid()), 10)
+}
+
+// volumeKind (variable: las pruebas simulan el volumen) clasifica el volumen de f: FUSE (los modos los pone el montaje; lee mountinfo), FAT/exFAT (los modos salen de uid, gid y
+// umask del montaje: se evalúan, pero chmod no sirve) o común.
+var volumeKind = func(f *os.File, st *syscall.Stat_t) (fuse, fat bool, info string) {
 	var s syscall.Statfs_t
 	if syscall.Fstatfs(int(f.Fd()), &s) != nil {
-		return false
+		return false, false, ""
 	}
 	switch int64(s.Type) {
 	case 0x4d44, 0x2011BAB0: // MSDOS_SUPER_MAGIC (vfat y msdos), EXFAT_SUPER_MAGIC
-		return true
+		return false, true, ""
 	case 0x65735546: // FUSE_SUPER_MAGIC (ntfs-3g es fuseblk)
 		b, _ := os.ReadFile(mountInfoFile)
-		return noPermsFuse(string(b), uint64(st.Dev))
+		return true, false, string(b)
 	}
-	return false
+	return false, false, ""
 }
 
 // ForeignWritersFile dice quién más que el usuario puede escribir en la carpeta abierta f: su dueño si no es el usuario («owner»; cambiarlo exige
-// privilegios), los bits de grupo (salvo grupo privado sin otros miembros ni ACL) y los de otros («g+w», «o+w»). Un volumen sin
-// permisos por usuario devuelve errors.ErrUnsupported.
+// privilegios), los bits de grupo (salvo grupo privado sin otros miembros ni ACL) y los de otros («g+w», «o+w»). FUSE sin default_permissions devuelve errors.ErrUnsupported; FUSE de otro usuario (user_id=) cuenta como dueño ajeno; vfat/exfat se evalúan por
+// sus bits de modo (NoChmod: chmod no los cambia).
 func ForeignWritersFile(f *os.File) (Writers, error) {
 	fi, err := f.Stat()
 	if err != nil {
@@ -191,10 +220,15 @@ func ForeignWritersFile(f *os.File) (Writers, error) {
 	if !ok {
 		return Writers{}, errors.New("sys: sin datos de dueño")
 	}
-	if noPermsVolume(f, st) {
+	fuse, fat, info := volumeKind(f, st)
+	var w Writers
+	w.NoChmod = fat
+	if fuse && fuseForeignOwner(info, uint64(st.Dev)) {
+		return Writers{Who: []string{"owner"}, ForeignOwner: true}, nil
+	}
+	if fuse && noPermsFuse(info, uint64(st.Dev)) {
 		return Writers{}, errors.ErrUnsupported
 	}
-	var w Writers
 	if st.Uid != geteuid() {
 		w.Who, w.ForeignOwner = append(w.Who, "owner"), true
 	}

@@ -360,34 +360,29 @@ var foreignWriters = func(dir string, root *os.Root) (sys.Writers, error) {
 	return sys.ForeignWriters(dir)
 }
 
-// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w», «owner»; Windows: SID) y la orden que lo arregla ("" si no es segura
-// de pegar o si el dueño es otro: cambiarlo exige privilegios). Un volumen sin permisos por usuario (FAT, exFAT, ntfs-3g sin
-// permissions) devuelve errors.ErrUnsupported y no se sabe nada más; cualquier otro error es de quien llama.
-func ajenos(dir string, root *os.Root) (who []string, fix string, err error) {
-	w, err := foreignWriters(dir, root)
+// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w», «owner»; Windows: SID) y la orden que lo arregla (sys.FixCmd: "" si no es
+// segura de pegar o si el dueño es otro). Un volumen sin permisos por usuario (FUSE sin default_permissions, FAT sin ACL en Windows)
+// devuelve errors.ErrUnsupported y no se sabe nada más; cualquier otro error es de quien llama.
+func ajenos(dir string, root *os.Root) (w sys.Writers, fix string, err error) {
+	w, err = foreignWriters(dir, root)
 	if err != nil || len(w.Who) == 0 {
-		return nil, "", err
+		return sys.Writers{}, "", err
 	}
-	if w.ForeignOwner {
-		return w.Who, "", nil
-	}
-	if goos == "windows" {
-		return w.Who, sys.IcaclsFix(dir, w.User, w.Who), nil
-	}
-	return w.Who, sys.ChmodFix(dir, w.Who), nil
+	return w, sys.FixCmd(goos, dir, w), nil
 }
 
 // checkRecvOwn rechaza la carpeta de RECEPCIÓN (abierta como root) si otro usuario puede escribir en ella: podría plantar o cambiar lo
 // recibido. Falla cerrado: solo un volumen sin permisos por usuario pasa (con el aviso de ServerHintIn); cualquier otro error rechaza.
 func checkRecvOwn(dir string, root *os.Root) error {
-	who, fix, err := ajenos(dir, root)
+	w, fix, err := ajenos(dir, root)
+	who := w.Who
 	if errors.Is(err, errors.ErrUnsupported) {
 		return nil
 	}
 	if err != nil {
 		return i18n.New("fileserve.err.recv_dir_perm", i18n.A("dir", dir, "err", err.Error()))
 	}
-	if len(who) == 0 {
+	if len(who) == 0 || w.NoChmod && !w.ForeignOwner { // vfat/exfat: chmod no sirve; el aviso (dirWarnings) dice que el volumen no tiene permisos por usuario
 		return nil
 	}
 	if fix != "" {
@@ -421,9 +416,10 @@ func dirWarnings(loc string, c Config) []string {
 			continue
 		}
 		seen[dir+"|"+e.kind] = true
-		who, fix, err := ajenos(dir, nil)
+		w, fix, err := ajenos(dir, nil)
+		who := w.Who
 		switch {
-		case errors.Is(err, errors.ErrUnsupported):
+		case errors.Is(err, errors.ErrUnsupported), len(who) > 0 && w.NoChmod && !w.ForeignOwner && e.kind == "recv":
 			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_noperms_"+e.kind, i18n.A("dir", dir)))
 		case err != nil:
 			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_unverified", i18n.A("dir", dir, "err", err.Error())))

@@ -164,7 +164,7 @@ func Msg(loc, code string, args Args) string {
 // el texto se escriben en el idioma pedido, así un mensaje cita un valor traducible. Varios códigos separados por
 // coma se escriben separados por «, ».
 func isValKey(v string) bool {
-	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") && !strings.HasPrefix(v, "assist.what.") {
+	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") && !strings.HasPrefix(v, "assist.what.") && !strings.HasPrefix(v, "sys.who.") {
 		return false
 	}
 	_, ok := catalog[v]

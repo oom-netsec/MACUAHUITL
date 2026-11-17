@@ -92,11 +92,11 @@ func hasControl(s string, allowNL bool) bool {
 	return false
 }
 
-// hiddenRune: control de dirección del texto (bidi: U+202A-202E, U+2066-2069, U+200E, U+200F, U+061C) o ancho cero (U+200B, U+2060,
-// U+FEFF). No cuenta el resto de \p{Cf}: U+200D y U+200C (necesarios en persa, hindi y emoji) ni el guion blando U+00AD.
+// hiddenRune: control de dirección del texto (bidi: U+202A-202E, U+2066-2069, U+200E, U+200F, U+061C), ancho cero (U+200B, U+2060,
+// U+FEFF), operadores matemáticos invisibles (U+2061-2064) y las etiquetas (U+E0000-E007F, que esconden texto «tag» invisible). No cuenta el resto de \p{Cf}: U+200D y U+200C (necesarios en persa, hindi y emoji) ni el guion blando U+00AD.
 func hiddenRune(r rune) bool {
 	switch {
-	case r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069:
+	case r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069, r >= 0x2061 && r <= 0x2064, r >= 0xE0000 && r <= 0xE007F:
 		return true
 	}
 	return r == 0x200E || r == 0x200F || r == 0x061C || r == 0x200B || r == 0x2060 || r == 0xFEFF

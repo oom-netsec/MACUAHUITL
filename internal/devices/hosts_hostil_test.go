@@ -8,7 +8,8 @@ func TestNombreYEtiquetaRechazanFormatoUnicode(t *testing.T) {
 	for nombre, s := range map[string]string{
 		"RLO": "r1\u202etxt", "LRI": "r\u2066x", "PDI": "r\u2069x", "ancho cero": "r\u200b1", "BOM": "\ufeffr1", "LRM": "r\u200e1",
 		"ALM": "r\u061c1", "separador de línea": "r\u20281", "de párrafo": "r\u20291", "NEL (C1)": "r\u00851", "tab": "r\t1", "NUL": "r\x001", "DEL": "r\x7f1",
-		"RLE": "r\u202a1", "RLM": "r\u200f1", "word joiner": "r\u20601",
+		"RLE": "r\u202a1", "RLM": "r\u200f1", "word joiner": "r\u20601", "función aplicada": "r\u20611", "tiempos invisibles": "r\u20621", "separador invisible": "r\u20631", "coma invisible": "r\u20641",
+		"etiqueta": "r\U000E00411", "etiqueta cancelar": "r\U000E007F1", "etiqueta inicio": "r\U000E00001",
 	} {
 		if _, err := Clean(Host{Name: s, Address: "10.0.0.1"}); err == nil {
 			t.Errorf("nombre %s (%q) debía rechazarse", nombre, s)

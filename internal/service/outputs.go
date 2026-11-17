@@ -82,6 +82,8 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if slices.Contains(strings.Split(dir, string(filepath.Separator)), "..") {
 		return "", outputsErr("prefs.outputs.punto_punto", "dir", dir)
 	}
+	// shortcut: EvalSymlinks ya resolvió (y abrió SMB si el enlace apuntaba a una UNC) antes de poder comprobar el destino. Solo el propio
+	// usuario crea enlaces en sus carpetas; el hash NTLM que se filtra es el suyo (docs/security/THREAT_MODEL.md). Subir de nivel: resolver a mano, componente a componente.
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {

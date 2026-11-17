@@ -26,7 +26,7 @@ func (s *fleetSvc) load(ctx context.Context, action, dir, detail string) (*fleet
 		extra = service.JobOutputRoots(s.d)
 	}
 	if !service.ClientPathOK(dir) {
-		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.relative_path", i18n.A("path", dir))
+		return nil, service.ClientPathErr(ctx, dir, "fleet.err.relative_path", i18n.A("path", dir))
 	}
 	f, err := fleet.Load(dir, s.d.Now().UTC(), extra...)
 	if err != nil {

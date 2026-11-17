@@ -180,6 +180,19 @@ type Writers struct {
 	Who          []string
 	User         string
 	ForeignOwner bool // el dueño de la carpeta es otro (Who lo incluye): cambiarlo exige privilegios, ninguna orden lo arregla
+	NoChmod      bool // Linux: los modos salen de las opciones de montaje (vfat, exfat): chmod no cambia nada, solo remontar
+}
+
+// FixCmd es la orden que quita a los escritores ajenos de dir ("" si no hay, si el dueño es otro (cambiarlo exige privilegios), si
+// el volumen no admite chmod o si la ruta o el SID no son seguros de pegar en una terminal). goos es el sistema (Windows: icacls).
+func FixCmd(goos, dir string, w Writers) string {
+	if len(w.Who) == 0 || w.ForeignOwner || w.NoChmod {
+		return ""
+	}
+	if goos == "windows" {
+		return IcaclsFix(dir, w.User, w.Who)
+	}
+	return ChmodFix(dir, w.Who)
 }
 
 // ForeignWriters abre la carpeta path y dice quién más escribe en ella (ver ForeignWritersFile). Un volumen sin permisos por

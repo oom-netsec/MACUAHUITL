@@ -2,6 +2,7 @@ package sys
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestPrivadasEnLinux(t *testing.T) {
@@ -239,11 +242,85 @@ func TestNoPermsFuse(t *testing.T) {
 		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0,allow_other,blksize=4096", true},
 		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0,default_permissions,allow_other", false},
 		{"40 25 8:1 / /mnt rw - fuse.ntfs-3g /dev/sda1 rw,user_id=0", true},
-		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=0", false},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=0", true},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=0,default_permissions", false},
+		{"40 25 8:1 / /mnt rw - ext4 /dev/sda1 rw", false},
 		{"40 25 8:2 / /mnt rw - fuseblk /dev/sda2 rw", false}, // otro dispositivo
 	} {
 		if got := noPermsFuse(c.linea+"\n", dev); got != c.want {
 			t.Errorf("%q: %v", c.linea, got)
+		}
+	}
+}
+
+// Un FUSE montado por otro usuario (user_id= distinto del euid y de 0) es de ese usuario; el propio, root o sin user_id, no.
+func TestFuseForeignOwner(t *testing.T) {
+	const dev = 8<<8 | 1
+	old := geteuid
+	geteuid = func() uint32 { return 1000 }
+	t.Cleanup(func() { geteuid = old })
+	for _, c := range []struct {
+		linea string
+		want  bool
+	}{
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=1001,group_id=1001,default_permissions", true},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=1000,group_id=1000", false},
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0", false},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw", false},
+		{"40 25 8:1 / /mnt rw - ext4 /dev/sda1 rw,user_id=1001", false},
+	} {
+		if got := fuseForeignOwner(c.linea+"\n", dev); got != c.want {
+			t.Errorf("%q: %v", c.linea, got)
+		}
+	}
+}
+
+// fijaVolumen simula el tipo de volumen de la carpeta abierta.
+func fijaVolumen(t *testing.T, fuse, fat bool, info string) {
+	t.Helper()
+	old := volumeKind
+	volumeKind = func(*os.File, *syscall.Stat_t) (bool, bool, string) { return fuse, fat, info }
+	t.Cleanup(func() { volumeKind = old })
+}
+
+// vfat/exfat: los bits de modo del montaje se evalúan (con NoChmod); FUSE sin default_permissions no se sabe; FUSE de otro usuario es ajeno.
+func TestForeignWritersVolumenesSinChmod(t *testing.T) {
+	d := t.TempDir()
+	fijaGrupo(t, d, "yo:x:GID:\n", "-")
+	st := mustStat(t, d)
+	geteuid = func() uint32 { return st.Uid }
+	fijaVolumen(t, false, true, "")
+	os.Chmod(d, 0o700)
+	if w, err := ForeignWriters(d); err != nil || len(w.Who) != 0 || !w.NoChmod {
+		t.Errorf("fat privado: %+v %v", w, err)
+	}
+	os.Chmod(d, 0o707)
+	if w, err := ForeignWriters(d); err != nil || !slices.Equal(w.Who, []string{"o+w"}) || !w.NoChmod {
+		t.Errorf("fat o+w: %+v %v", w, err)
+	}
+	info := fmt.Sprintf("40 25 %d:%d / /mnt rw - fuseblk /dev/sda1 rw,user_id=%%d\n", unix.Major(st.Dev), unix.Minor(st.Dev))
+	fijaVolumen(t, true, false, fmt.Sprintf(info, st.Uid))
+	if _, err := ForeignWriters(d); !errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("fuse sin default_permissions: %v", err)
+	}
+	fijaVolumen(t, true, false, fmt.Sprintf(info, st.Uid+1))
+	if w, err := ForeignWriters(d); err != nil || !w.ForeignOwner {
+		t.Errorf("fuse de otro usuario: %+v %v", w, err)
+	}
+}
+
+// Una línea NIS («+», «-») en /etc/group o /etc/passwd trae miembros que el archivo no lista: el grupo cuenta como compartido.
+func TestGroupSharedLineasNIS(t *testing.T) {
+	d := t.TempDir()
+	os.Chmod(d, 0o770)
+	for _, c := range []struct{ group, passwd string }{
+		{"yo:x:GID:\n+::0:\n", "yo:x:UID:GID::/:/bin/sh\n"},
+		{"yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n+::::::\n"},
+		{"yo:x:GID:\n-@x:::\n", "yo:x:UID:GID::/:/bin/sh\n"},
+	} {
+		fijaGrupo(t, d, c.group, strings.ReplaceAll(c.passwd, "UID", strconv.Itoa(int(mustStat(t, d).Gid))))
+		if !groupShared(mustStat(t, d).Gid, mustStat(t, d).Gid) {
+			t.Errorf("debía contar como compartido: %q %q", c.group, c.passwd)
 		}
 	}
 }

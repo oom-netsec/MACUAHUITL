@@ -28,7 +28,7 @@ func TestRutasDelClienteExigenUnidadEnWindows(t *testing.T) {
 		call   func() error
 		reason string
 	}{
-		{"flota", func() error { _, e := fc.Find(con(t, "en"), &v1.FindRequest{Dir: p, Query: "x"}); return e }, "fleet.err.relative_path"},
+		{"flota", func() error { _, e := fc.Find(con(t, "en"), &v1.FindRequest{Dir: p, Query: "x"}); return e }, "file.err.no_drive"},
 		{"cambio pre", func() error {
 			_, e := cc.GetChangeReport(con(t, "en"), &v1.GetChangeReportRequest{PreDir: p, PostDir: "/abs/y"})
 			return e
@@ -37,12 +37,18 @@ func TestRutasDelClienteExigenUnidadEnWindows(t *testing.T) {
 			_, e := cc.GetChangeReport(con(t, "en"), &v1.GetChangeReportRequest{PreDir: "/abs/y", PostDir: p})
 			return e
 		}, "change.err.no_input"},
-		{"métricas", func() error { _, e := mc.GetJobMetrics(con(t, "en"), &v1.GetJobMetricsRequest{Dir: p}); return e }, "metrics.svc.relative"},
-		{"herramientas", func() error { _, e := tc.AnalyzePcap(con(t, "en"), &v1.AnalyzePcapRequest{Path: p}); return e }, "tools.svc.pcap_path"},
+		{"métricas", func() error { _, e := mc.GetJobMetrics(con(t, "en"), &v1.GetJobMetricsRequest{Dir: p}); return e }, "file.err.no_drive"},
+		{"herramientas", func() error { _, e := tc.AnalyzePcap(con(t, "en"), &v1.AnalyzePcapRequest{Path: p}); return e }, "file.err.no_drive"},
 		{"análisis", func() error {
 			_, e := ac.Timeline(con(t, "en"), &v1.TimelineRequest{Job: labDir(t), PcapPath: p})
 			return e
-		}, "analyze.err.pcap_path"},
+		}, "file.err.no_drive"},
+		// una relativa sigue siendo «relativa»; una UNC en el lugar del trabajo ya no es «trabajo no encontrado»
+		{"métricas relativa", func() error { _, e := mc.GetJobMetrics(con(t, "en"), &v1.GetJobMetricsRequest{Dir: "x"}); return e }, "metrics.svc.relative"},
+		{"análisis UNC", func() error {
+			_, e := ac.Timeline(con(t, "en"), &v1.TimelineRequest{Job: `\\host\share\x`})
+			return e
+		}, "file.err.no_drive"},
 	} {
 		err := c.call()
 		if why, _ := reasonOf(err); status.Code(err) != codes.InvalidArgument || why != c.reason {

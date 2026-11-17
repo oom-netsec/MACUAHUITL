@@ -183,3 +183,22 @@ func TestRecepcionYPublicacionLinuxBitDeOtros(t *testing.T) {
 		}
 	}
 }
+
+// vfat/exfat con bits que dejan escribir a otros (NoChmod): la recepción NO se rechaza (chmod no sirve) y da el aviso de «sin permisos
+// por usuario»; si el dueño es ajeno sí se rechaza.
+func TestRecepcionVolumenSinChmodAvisaYNoRechaza(t *testing.T) {
+	dir := realTemp(t)
+	fijaEscritores(t, sys.Writers{Who: []string{"o+w"}, NoChmod: true}, nil)
+	c := cfgRecv(dir)
+	if err := Check(c); err != nil {
+		t.Fatalf("no debía rechazar: %v", err)
+	}
+	es := ServerHintIn(i18n.Es, c, Ready{Addr: c.Addr}, nil)
+	if !strings.Contains(es, "volumen sin permisos por usuario: cualquier usuario del equipo puede leer o cambiar lo recibido") || strings.Contains(es, "chmod") {
+		t.Errorf("aviso:\n%s", es)
+	}
+	fijaEscritores(t, sys.Writers{Who: []string{"owner"}, NoChmod: true, ForeignOwner: true}, nil)
+	if err := Check(c); err == nil {
+		t.Error("dueño ajeno se rechaza")
+	}
+}

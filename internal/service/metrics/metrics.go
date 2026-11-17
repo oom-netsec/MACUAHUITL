@@ -43,7 +43,7 @@ func (s *svc) jobDir(ctx context.Context, jobID, dir string) (string, error) {
 		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.no_source", nil)
 	}
 	if !service.ClientPathOK(dir) {
-		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.relative", i18n.A("path", dir))
+		return "", service.ClientPathErr(ctx, dir, "metrics.svc.relative", i18n.A("path", dir))
 	}
 	return dir, nil
 }

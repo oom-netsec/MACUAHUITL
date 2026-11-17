@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -74,7 +75,7 @@ var ErrWaitTimeout = i18n.New("sys.err.wait_timeout", nil)
 // ruta (la carpeta de fábrica puede ser un enlace del usuario) y valida lo ABIERTO, no la ruta: el dueño es el usuario y nadie
 // más escribe en ella (ForeignWritersRoot: la misma regla de fileserve). Así un enlace cambiado entre la validación de ajustes y
 // el uso se rechaza si apunta a una carpeta ajena o compartida; si el destino es propio y privado se acepta. Un volumen sin permisos
-// por usuario (FAT, exFAT) se acepta: no hay nada que validar. Quien la llama cierra el Root.
+// por usuario (FUSE sin default_permissions, FAT en Windows) se acepta: no hay nada que validar. Quien la llama cierra el Root.
 func OpenOutDir(dir string) (*os.Root, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
@@ -94,7 +95,22 @@ func OpenOutDir(dir string) (*os.Root, error) {
 	}
 	if len(w.Who) > 0 {
 		root.Close()
-		return nil, i18n.New("sys.err.outdir_shared", i18n.A("dir", real, "who", strings.Join(w.Who, ", ")))
+		who := make([]string, len(w.Who))
+		for i, x := range w.Who { // en Linux, el código del texto traducible; en Windows el SID tal cual
+			who[i] = map[string]string{"owner": "sys.who.owner", "g+w": "sys.who.group", "o+w": "sys.who.others"}[x]
+			if who[i] == "" {
+				who[i] = x
+			}
+		}
+		a := i18n.A("dir", real, "who", strings.Join(who, ","))
+		switch cmd := FixCmd(runtime.GOOS, real, w); {
+		case w.NoChmod && !w.ForeignOwner: // vfat/exfat: chmod no sirve, hay que remontar
+			return nil, i18n.New("sys.err.outdir_mount", a)
+		case cmd != "":
+			a["cmd"] = cmd
+			return nil, i18n.New("sys.err.outdir_shared_cmd", a)
+		}
+		return nil, i18n.New("sys.err.outdir_shared", a)
 	}
 	return root, nil
 }
