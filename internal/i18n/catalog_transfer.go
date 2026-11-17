@@ -81,6 +81,7 @@ func init() {
 		"fileserve.err.path_relative":     e("fileserve: la ruta {path:q} debe ser absoluta", "fileserve: the path {path:q} must be absolute", "path"),
 		"fileserve.err.not_regular":       e("fileserve: {path} no es un archivo regular", "fileserve: {path} is not a regular file", "path"),
 		"fileserve.err.hardlinks":         e("fileserve: {path} tiene enlaces duros (más de un nombre): publica una copia", "fileserve: {path} has hard links (more than one name): publish a copy", "path"),
+		"fileserve.err.bad_name":          e("fileserve: el nombre {name:q} no se puede servir (caracteres prohibidos, punto o espacio final, o nombre reservado de Windows como AUX, NUL o COM1): renombra el archivo", "fileserve: the name {name:q} cannot be served (forbidden characters, trailing dot or space, or a reserved Windows name such as AUX, NUL or COM1): rename the file", "name"),
 		"fileserve.err.dup_name":          e("fileserve: dos archivos se llaman {name:q}", "fileserve: two files are named {name:q}", "name"),
 		"fileserve.err.bad_proto":         e("fileserve: protocolo {proto:q} no soportado (tftp, ftp, scp, sftp o http)", "fileserve: protocol {proto:q} not supported (tftp, ftp, scp, sftp or http)", "proto"),
 		"fileserve.err.http_ro":           e("fileserve: HTTP es de solo lectura", "fileserve: HTTP is read-only"),

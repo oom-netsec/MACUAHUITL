@@ -123,7 +123,7 @@ func (s *svc) GetStream(r *v1.GetStreamRequest, st v1.TransferService_GetStreamS
 	name := path.Base(req.Name)
 	if req.Name == "" {
 		if u, err := url.Parse(req.Url); err == nil {
-			name = path.Base(u.Path)
+			name = xfer.URLName(u.Path)
 		}
 	}
 	res, err := s.get(st.Context(), req, func(p xfer.Progress) { ev.send(&v1.GetStreamResponse{Event: progressEvent(0, 1, name, p)}) })

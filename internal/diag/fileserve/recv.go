@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,7 +74,7 @@ func invisible(r rune) bool {
 }
 
 // reservados son los dispositivos de DOS: Windows los abre en vez de crear el archivo, con cualquier extensión.
-var reservados = map[string]bool{"CON": true, "PRN": true, "AUX": true, "NUL": true, "CONIN$": true, "CONOUT$": true, "CLOCK$": true}
+var reservados = map[string]bool{"COM0": true, "LPT0": true, "CON": true, "PRN": true, "AUX": true, "NUL": true, "CONIN$": true, "CONOUT$": true, "CLOCK$": true}
 
 // winName dice si el nombre es seguro en Windows: sin ':' (flujos alternos y unidades), sin "<>\"|?*", sin
 // punto o espacio final (Win32 los recorta y el archivo sería otro) y sin nombre de dispositivo (CON, NUL, COM1,
@@ -134,6 +135,7 @@ func (r *receiver) exists(name string) bool {
 }
 
 func (r *receiver) writing(name string) bool {
+	li, err := r.root.Lstat(name) // fuera del candado: es E/S
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.inFlight) == 0 {
@@ -143,12 +145,20 @@ func (r *receiver) writing(name string) bool {
 		return true
 	}
 	// Otro nombre del mismo archivo (mayúsculas, 8.3 como FW~1.BIN, enlace duro): se compara la identidad.
-	li, err := r.root.Lstat(name)
-	if err != nil {
-		return false
-	}
-	for _, fi := range r.inFlight {
-		if os.SameFile(li, fi) {
+	return err == nil && r.sameInFlight(li)
+}
+
+// writingFile dice si fi (un handle ya abierto) es un archivo aún en escritura, sea cual sea su nombre.
+func (r *receiver) writingFile(fi os.FileInfo) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sameInFlight(fi)
+}
+
+// sameInFlight: quien llama tiene r.mu.
+func (r *receiver) sameInFlight(fi os.FileInfo) bool {
+	for _, x := range r.inFlight {
+		if os.SameFile(fi, x) {
 			return true
 		}
 	}
@@ -280,7 +290,12 @@ func (w *recvFile) commit() (sum string, size int64, err error) {
 		_, err = io.Copy(h, w.f)
 	}
 	if err == nil {
-		sys.MarkOfTheWeb(w.path) // ruta interna; si falla (FAT) el archivo ya está bien guardado
+		// Ruta interna y con el handle aún abierto: solo se marca si sigue siendo este archivo. Un fallo no pierde nada: se anota.
+		if fi, serr := w.f.Stat(); serr == nil {
+			if merr := sys.MarkOfTheWebIfSame(w.path, fi); merr != nil {
+				log.Printf("fileserve: Mark of the Web not written for %s: %v", w.path, merr)
+			}
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil)), w.size, err
 }

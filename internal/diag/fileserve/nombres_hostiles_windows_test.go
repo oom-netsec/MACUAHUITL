@@ -7,11 +7,28 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
+
+// sinFlujos salta la prueba solo si el volumen de dir no admite flujos alternos (se sondea con un archivo propio);
+// si los admite, quien llama EXIGE la marca.
+func sinFlujos(t *testing.T, dir string) {
+	t.Helper()
+	p := filepath.Join(dir, "sonda-flujo.tmp")
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(p)
+	if err := sys.MarkOfTheWeb(p); err != nil {
+		t.Skip("el volumen no admite flujos alternos:", err)
+	}
+}
 
 // B1: lo recibido por la red lleva la Mark of the Web; el flujo lo escribe el código con la ruta interna.
 func TestWindowsRecepcionEscribeMarkOfTheWeb(t *testing.T) {
 	dir := realTemp(t)
+	sinFlujos(t, dir)
 	r, err := newReceiver(dir, 1000, 10000)
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +44,7 @@ func TestWindowsRecepcionEscribeMarkOfTheWeb(t *testing.T) {
 	}
 	b, err := os.ReadFile(filepath.Join(dir, "fw.bin") + ":Zone.Identifier")
 	if err != nil {
-		t.Skip("el volumen no admite flujos alternos:", err)
+		t.Fatal("el volumen admite flujos pero falta la marca:", err)
 	}
 	if string(b) != "[ZoneTransfer]\r\nZoneId=3\r\n" {
 		t.Fatalf("flujo = %q", b)
@@ -77,18 +94,26 @@ func TestWindowsNoSirveElArchivoAMediasConOtroNombre(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(src.close)
-	w, err := rx.create("FW.BIN", 0)
+	w, err := rx.create("firmware-image.bin", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.Write([]byte("a medias"))
-	alias := []string{"fw.bin", "Fw.Bin"}
-	if long, err := syscall.UTF16PtrFromString(filepath.Join(dir, "FW.BIN")); err == nil {
-		buf := make([]uint16, 300)
-		if n, _ := syscall.GetShortPathName(long, &buf[0], uint32(len(buf))); n > 0 && n < uint32(len(buf)) {
-			alias = append(alias, filepath.Base(syscall.UTF16ToString(buf[:n])))
-		}
+	alias := []string{"FIRMWARE-IMAGE.BIN", "Firmware-Image.Bin"}
+	long, err := syscall.UTF16PtrFromString(filepath.Join(dir, "firmware-image.bin"))
+	if err != nil {
+		t.Fatal(err)
 	}
+	buf := make([]uint16, 300)
+	n, _ := syscall.GetShortPathName(long, &buf[0], uint32(len(buf)))
+	short := ""
+	if n > 0 && n < uint32(len(buf)) {
+		short = filepath.Base(syscall.UTF16ToString(buf[:n]))
+	}
+	if short == "" || short == "firmware-image.bin" {
+		t.Skip("el volumen no genera nombres cortos 8.3")
+	}
+	alias = append(alias, short)
 	for _, n := range alias {
 		if src.exists(n) {
 			t.Errorf("exists(%q) dijo que el archivo a medias está publicado", n)
@@ -101,7 +126,7 @@ func TestWindowsNoSirveElArchivoAMediasConOtroNombre(t *testing.T) {
 	if _, _, err := w.commit(); err != nil {
 		t.Fatal(err)
 	}
-	if !src.exists("fw.bin") {
+	if !src.exists("FIRMWARE-IMAGE.BIN") {
 		t.Error("ya confirmado debe servirse con cualquier capitalización")
 	}
 }

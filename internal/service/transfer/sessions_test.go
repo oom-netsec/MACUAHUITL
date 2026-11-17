@@ -168,7 +168,8 @@ func TestListTransferSessionsOriginDenied(t *testing.T) {
 	}
 }
 
-// El nombre publicado con U+202E sale saneado.
+// Un nombre con U+202E ya no se sirve (plainName rechaza el Unicode de formato): no hay sesión y, si la hubiera,
+// el nombre no saldría crudo.
 func TestListTransferSessionsNameSanitized(t *testing.T) {
 	s, _ := newTest(t)
 	pub := t.TempDir()
@@ -177,14 +178,13 @@ func TestListTransferSessionsNameSanitized(t *testing.T) {
 		t.Skip("el sistema de archivos no acepta el nombre")
 	}
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
-	_, gerr := s.Get(context.Background(), &v1.GetRequest{Url: "http://" + run.ready.Listening + "/a%E2%80%AEb.cfg", DestDir: t.TempDir(), Name: "local.cfg", TimeoutSeconds: 2})
-	run.transfers(t, 1)
-	ss := listSessions(t, s, "").Sessions
-	if len(ss) == 0 {
-		t.Fatal("no hubo sesión para el nombre con U+202E: ", gerr)
+	if _, gerr := s.Get(context.Background(), &v1.GetRequest{Url: "http://" + run.ready.Listening + "/a%E2%80%AEb.cfg", DestDir: t.TempDir(), Name: "local.cfg", TimeoutSeconds: 2}); gerr == nil {
+		t.Fatal("se sirvió un nombre con Unicode de formato")
 	}
-	if ss[0].Name != "a?b.cfg" {
-		t.Fatalf("name = %q", ss[0].Name)
+	for _, x := range listSessions(t, s, "").Sessions {
+		if strings.ContainsRune(x.Name, '\u202e') {
+			t.Fatalf("name = %q", x.Name)
+		}
 	}
 }
 

@@ -336,6 +336,9 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
 		}
 		name := filepath.Base(f)
+		if _, ok := plainName(name); !ok { // lo que no se puede pedir por nombre tampoco se anuncia
+			return nil, nil, i18n.New("fileserve.err.bad_name", i18n.A("name", name))
+		}
 		if _, dup := out[name]; dup {
 			return nil, nil, i18n.New("fileserve.err.dup_name", i18n.A("name", name))
 		}

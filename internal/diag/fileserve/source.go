@@ -50,8 +50,14 @@ func plainName(name string) (string, bool) {
 	return name, winName(name)
 }
 
+// hidden dice si name figura en escritura. Solo para listar y la pista de exists; al abrir manda hiddenFile.
 func (s *source) hidden(name string) bool {
 	return s.rcv != nil && s.rcv.dir == s.dir && s.rcv.writing(name)
+}
+
+// hiddenFile decide con la identidad del handle ya abierto: no hay ventana entre comprobar y abrir.
+func (s *source) hiddenFile(fi os.FileInfo) bool {
+	return s.rcv != nil && s.rcv.dir == s.dir && s.rcv.writingFile(fi)
 }
 
 // exists es la comprobación barata previa a abrir (el servidor TFTP responde error 1 sin abrir nada).
@@ -80,7 +86,7 @@ func (s *source) open(name string) (*os.File, os.FileInfo, error) {
 	path, listed := s.files[name]
 	var li os.FileInfo
 	if !listed {
-		if s.dir == "" || s.hidden(name) {
+		if s.dir == "" {
 			return nil, nil, errNotPublished
 		}
 		var err error
@@ -101,7 +107,7 @@ func (s *source) open(name string) (*os.File, os.FileInfo, error) {
 		return nil, nil, err
 	}
 	fi, err := f.Stat()
-	if err != nil || (li != nil && !os.SameFile(li, fi)) {
+	if err != nil || (li != nil && !os.SameFile(li, fi)) || (!listed && s.hiddenFile(fi)) {
 		f.Close()
 		return nil, nil, errNotPublished
 	}
@@ -164,7 +170,10 @@ func OpenFrom(dir, name string, deny ...string) (*os.File, os.FileInfo, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	defer root.Close() // el archivo abierto sigue siendo válido
+	defer root.Close()                                                                      // el archivo abierto sigue siendo válido
+	if _, ok := plainName(name); !ok && !strings.ContainsAny(name, "/\\") && name != ".." { // un nombre base inválido; lo demás sigue como "no es regular"
+		return nil, nil, i18n.New("fileserve.err.bad_name", i18n.A("name", name))
+	}
 	f, fi, err := (&source{dir: real, root: root, deny: deny}).open(name)
 	if err != nil {
 		return nil, nil, i18n.New("fileserve.err.not_regular_in", i18n.A("name", name, "dir", real))
