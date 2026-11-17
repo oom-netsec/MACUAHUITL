@@ -100,6 +100,15 @@ input[type="radio"]::after { content: ""; width: 8px; height: 8px; border-radius
 input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
 input[type="radio"]:checked::after { opacity: 1; }
 input[type="radio"]:disabled { background-color: var(--surface-2); opacity: 0.6; }
+/* Alto contraste de Windows: el sistema reemplaza los fondos, así que el estado marcado se dibuja con colores del sistema. */
+@media (forced-colors: active) {
+  input[type="checkbox"], input[type="radio"] { forced-color-adjust: none; background: Canvas; border-color: ButtonText; }
+  input[type="checkbox"]:checked, input[type="radio"]:checked { background: Highlight; border-color: Highlight; }
+  input[type="checkbox"]::after { border-color: HighlightText; }
+  input[type="radio"]::after { background: HighlightText; }
+  input[type="checkbox"]:disabled, input[type="radio"]:disabled { border-color: GrayText; }
+  input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible, :focus-visible { outline: 2px solid Highlight; }
+}
 input[type="number"], .mono { font-variant-numeric: tabular-nums; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
