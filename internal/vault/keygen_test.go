@@ -88,7 +88,7 @@ func TestRegenerateKeyConservaIDYDestruyeLaVieja(t *testing.T) {
 	var olds []*secret.Secret
 	afterRekey = func(old *secret.Secret) { olds = append(olds, old) }
 	t.Cleanup(func() { afterRekey = nil })
-	old, pub2, err := v.RegenerateKey(id)
+	old, pub2, _, err := v.RegenerateKey(id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestRegenerateKeyConservaIDYDestruyeLaVieja(t *testing.T) {
 func TestRegenerateKeyRechazaLoQueNoEsKey(t *testing.T) {
 	v, _ := newVault(t)
 	id, _ := v.Put(cred("x", "pw", "en"))
-	if _, _, err := v.RegenerateKey(id); !errors.Is(err, ErrNotKey) {
+	if _, _, _, err := v.RegenerateKey(id); !errors.Is(err, ErrNotKey) {
 		t.Fatalf("password: %v", err)
 	}
 	// Contraseña y llave: tampoco es "key".
@@ -124,7 +124,7 @@ func TestRegenerateKeyRechazaLoQueNoEsKey(t *testing.T) {
 			t.Fatal("llave con contraseña no es de tipo key")
 		}
 	}
-	if _, _, err := v.RegenerateKey(kid); !errors.Is(err, ErrNotKey) {
+	if _, _, _, err := v.RegenerateKey(kid); !errors.Is(err, ErrNotKey) {
 		t.Fatalf("password+llave: %v", err)
 	}
 }
@@ -183,21 +183,33 @@ func parseOpenSSH(t *testing.T, pemBytes []byte) (pub ed25519.PublicKey, priv ed
 	return pub, priv
 }
 
-func TestPublicKeyDeLlaveAjenaNoSoportada(t *testing.T) {
+// Desde la fase 47 PublicKey también deriva la pública de una ecdsa guardada; lo ilegible sigue siendo ErrKeyUnsupported.
+func TestPublicKeyDeEcdsaYDeBasura(t *testing.T) {
 	v, _ := newVault(t)
 	id, _ := v.Put(Credential{Label: "x", Username: "u", SSHKey: secret.New(llaveECDSAPEM(t))})
-	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
+	p, err := v.PublicKey(id)
+	if err != nil || !strings.HasPrefix(p.AuthorizedKey(), "ecdsa-sha2-nistp256 ") {
+		t.Fatalf("ecdsa: %v %q", err, p.AuthorizedKey())
+	}
+	cs := []Credential{{Label: "basura", Username: "u", SSHKey: secret.New([]byte("no es una llave"))}}
+	ids, err := v.putBatch(cs, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.PublicKey(ids[0]); !errors.Is(err, ErrKeyUnsupported) {
 		t.Fatalf("quería ErrKeyUnsupported, vino %v", err)
 	}
 }
 
 func TestRegenerateKeyReemplazaLlaveAnteriorALaFase44(t *testing.T) {
 	v, p := newVault(t)
-	id, _ := v.Put(Credential{Label: "vieja", Username: "u", SSHKey: secret.New(llaveECDSAPEM(t))})
-	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
-		t.Fatalf("PublicKey: %v", err)
+	cs := []Credential{{Label: "vieja", Username: "u", SSHKey: secret.New([]byte("no es una llave"))}}
+	ids, err := v.putBatch(cs, false, false)
+	if err != nil {
+		t.Fatal(err)
 	}
-	old, pub, err := v.RegenerateKey(id)
+	id := ids[0]
+	old, pub, _, err := v.RegenerateKey(id)
 	if err != nil || old != nil || len(pub) == 0 {
 		t.Fatalf("RegenerateKey: old=%v err=%v", old, err)
 	}
@@ -205,7 +217,7 @@ func TestRegenerateKeyReemplazaLlaveAnteriorALaFase44(t *testing.T) {
 	if err != nil || !bytes.Equal(got, pub) {
 		t.Fatalf("no quedó la nueva con el mismo id: %v", err)
 	}
-	if infos, _ := v.List(); len(infos) != 1 || infos[0].Label != "vieja" || !infos[0].IsKey() {
+	if infos, _ := v.List(); len(infos) != 1 || infos[0].Label != "vieja" || !infos[0].IsKey() || infos[0].Origin != OriginGenerated {
 		t.Fatalf("info: %+v", infos)
 	}
 }
@@ -230,7 +242,7 @@ func TestPublicKeyPublicasQueNoCoinciden(t *testing.T) {
 	c, _ := v.Get(mustID(t, v))
 	good := append([]byte(nil), c.SSHKey.Bytes()...)
 	c.SSHKey.Destroy()
-	if _, err := pubOf(good); err != nil {
+	if _, _, err := pubOf(good); err != nil {
 		t.Fatal(err)
 	}
 	for n := 0; n < 3; n++ { // 0: cabecera, 1: pública de la sección privada, 2: segunda mitad de la privada
@@ -244,7 +256,7 @@ func TestPublicKeyPublicasQueNoCoinciden(t *testing.T) {
 			from = at + 1
 		}
 		der[at+31] ^= 1
-		if _, err := pubOf(armor(der)); !errors.Is(err, ErrKeyUnsupported) {
+		if _, _, err := pubOf(armor(der)); !errors.Is(err, ErrKeyUnsupported) {
 			t.Errorf("copia %d alterada: %v", n, err)
 		}
 	}

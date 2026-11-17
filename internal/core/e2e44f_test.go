@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"io"
 	"net/netip"
 	"regexp"
@@ -19,24 +20,99 @@ const e2eStartup = "cmd /c echo macuahuitl-ok"
 // e2eHost arma el flujo común: llave generada, simulador que solo acepta esa pública y un host windows con orden de inicio.
 func e2eHost(t *testing.T) (h *harness, hostID, keyID string, log *[]string, rec *simulator.Recorder, conns *atomic.Int32) {
 	t.Helper()
+	return e2eHostKey(t, "windows", e2eStartup, "cmd /c echo ", func(h *harness) (string, string) {
+		keyID := h.keygen(t, "llave-e2e").Id
+		pub, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: keyID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return keyID, pub.PublicKey
+	})
+}
+
+// e2eHostKey es e2eHost con la plataforma, la orden de inicio (que el simulador contesta quitando el prefijo echo) y la creación de la
+// llave a cargo de mk, que devuelve su id y la línea authorized_keys que el simulador acepta.
+func e2eHostKey(t *testing.T, platform, startup, echo string, mk func(h *harness) (keyID, authorized string)) (h *harness, hostID, keyID string, log *[]string, rec *simulator.Recorder, conns *atomic.Int32) {
+	t.Helper()
 	h = newHarness(t, nil)
 	h.ready(t)
-	keyID = h.keygen(t, "llave-e2e").Id
-	pub, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: keyID})
-	if err != nil {
-		t.Fatal(err)
-	}
+	keyID, authorized := mk(h)
 	log, rec, conns = new([]string), &simulator.Recorder{}, new(atomic.Int32)
-	addr, _ := simulator.Start(t, simulator.Config{Hostname: "win", Username: "pi", AuthLog: log, Recorder: rec, Conns: conns,
-		Transcripts: t.TempDir(), AuthorizedKeys: simulator.Keys(simulator.ParseAuthorizedKey(t, pub.PublicKey)),
-		Exec: func(cmd string) string { return strings.TrimPrefix(cmd, "cmd /c echo ") + "\r\n" }})
+	addr, _ := simulator.Start(t, simulator.Config{Hostname: "host", Username: "pi", AuthLog: log, Recorder: rec, Conns: conns,
+		Transcripts: t.TempDir(), AuthorizedKeys: simulator.Keys(simulator.ParseAuthorizedKey(t, authorized)),
+		Exec: func(cmd string) string { return strings.TrimPrefix(cmd, echo) + "\r\n" }})
 	ap := netip.MustParseAddrPort(addr)
-	r, err := v1.NewInventoryServiceClient(h.conn).PutDevice(ctx(t), &v1.PutDeviceRequest{Device: &v1.Device{Name: "win1", Platform: "windows",
-		Target: &v1.Target{Address: ap.Addr().String()}, Profile: &v1.DeviceProfile{Port: uint32(ap.Port())}, CredentialId: keyID, StartupCommand: e2eStartup}})
+	r, err := v1.NewInventoryServiceClient(h.conn).PutDevice(ctx(t), &v1.PutDeviceRequest{Device: &v1.Device{Name: "host1", Platform: platform,
+		Target: &v1.Target{Address: ap.Addr().String()}, Profile: &v1.DeviceProfile{Port: uint32(ap.Port())}, CredentialId: keyID, StartupCommand: startup}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return h, r.Id, keyID, log, rec, conns
+}
+
+// TestE2ELinuxLlavesImportadas: host linux guardado con una llave IMPORTADA, terminal por host_id, huella del host aceptada, orden de
+// inicio y salida. La RSA autentica con rsa-sha2 (el servidor de x/crypto no acepta ssh-rsa con SHA-1), no con el algoritmo viejo.
+func TestE2ELinuxLlavesImportadas(t *testing.T) {
+	frase := []byte("frase-e2e-del-dueno")
+	edPEM, _ := simulator.EncryptedEd25519(t, frase)
+	rsaPEM, _ := rsaPKCS1(t, 2048)
+	for _, c := range []struct {
+		n         string
+		pem, pass []byte
+	}{{"ed25519 con frase", edPEM, frase}, {"rsa 2048 sin frase", rsaPEM, nil}} {
+		t.Run(c.n, func(t *testing.T) {
+			startup := "echo macuahuitl-ok"
+			h, hostID, _, authLog, rec, _ := e2eHostKey(t, "linux", startup, "echo ", func(h *harness) (string, string) {
+				r, err := h.importKey(t, "importada", bytes.Clone(c.pem), bytes.Clone(c.pass))
+				if err != nil {
+					t.Fatal(err)
+				}
+				return r.Id, r.PublicKey
+			})
+			tc := v1.NewTerminalServiceClient(h.conn)
+			open := &v1.TerminalOpen{HostId: hostID, ExpectedStartupCommand: startup}
+			req := &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: open}}
+			st, err := tc.OpenTerminal(ctx(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := st.Send(req); err != nil {
+				t.Fatal(err)
+			}
+			_, err = st.Recv()
+			if err == nil || !strings.Contains(err.Error(), "SHA256:") {
+				t.Fatalf("llave de host nueva: %v", err)
+			}
+			open.AcceptedHostKeyFingerprints = []string{regexp.MustCompile(`SHA256:[^\s\\"]+`).FindString(err.Error())}
+			st, err = tc.OpenTerminal(ctx(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := st.Send(req); err != nil {
+				t.Fatal(err)
+			}
+			var got strings.Builder
+			for {
+				r, err := st.Recv()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatalf("la sesión debía terminar sin error: %v (%q)", err, got.String())
+				}
+				got.Write(r.Data)
+			}
+			if !strings.Contains(got.String(), "macuahuitl-ok") {
+				t.Fatalf("no llegó macuahuitl-ok: %q", got.String())
+			}
+			if !strings.Contains(strings.Join(*authLog, ","), "publickey") {
+				t.Fatalf("sin publickey: %v", *authLog)
+			}
+			if l := strings.Join(rec.Lines(), "\n"); !strings.Contains(l, "!exec pty=true "+startup) {
+				t.Fatalf("el simulador no vio el exec con PTY:\n%s", l)
+			}
+		})
+	}
 }
 
 func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {

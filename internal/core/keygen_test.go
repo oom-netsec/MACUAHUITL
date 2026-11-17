@@ -287,8 +287,10 @@ func TestRegenerarLlaveAnteriorALaFase44(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: id}); codeOf(err) != codes.FailedPrecondition {
-		t.Fatalf("pubkey de una RSA: %v", err)
+	// Desde la fase 47 la pública de una ecdsa guardada se muestra, con su huella.
+	g0, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: id})
+	if err != nil || !strings.HasPrefix(g0.PublicKey, "ecdsa-sha2-nistp256 ") || g0.Fingerprint != fp(t, g0.PublicKey) {
+		t.Fatalf("pubkey de una ecdsa: %v", err)
 	}
 	r, err := h.vault.RegenerateKeyCredential(ctx(t), &v1.RegenerateKeyCredentialRequest{Id: id, Confirm: true})
 	if err != nil || !strings.HasPrefix(r.PublicKey, "ssh-ed25519 ") {
@@ -298,7 +300,7 @@ func TestRegenerarLlaveAnteriorALaFase44(t *testing.T) {
 	if err != nil || fp(t, g.PublicKey) != fp(t, r.PublicKey) {
 		t.Fatalf("la nueva no persistió con el mismo id: %v", err)
 	}
-	if a := h.auditText(t); !strings.Contains(a, "old=unsupported new="+fp(t, r.PublicKey)) {
+	if a := h.auditText(t); !strings.Contains(a, "old="+g0.Fingerprint+" new="+fp(t, r.PublicKey)) {
 		t.Fatalf("auditoría:\n%s", a)
 	}
 }
@@ -306,6 +308,13 @@ func TestRegenerarLlaveAnteriorALaFase44(t *testing.T) {
 // openKey abre SSH con la llave guardada en h bajo id, contra un simulador que solo autoriza la pública dada.
 // Devuelve el error de OpenSSH (nil si autenticó).
 func (h *harness) openKey(t *testing.T, id, authorized string) error {
+	t.Helper()
+	_, err := h.openKeyLog(t, id, authorized)
+	return err
+}
+
+// openKeyLog es openKey y además devuelve los métodos de autenticación que el simulador vio.
+func (h *harness) openKeyLog(t *testing.T, id, authorized string) ([]string, error) {
 	t.Helper()
 	var log []string
 	addr, hk := simulator.Start(t, simulator.Config{Hostname: "pi", Username: "pi", NoPassword: true, AuthLog: &log, Transcripts: t.TempDir(),
@@ -323,7 +332,7 @@ func (h *harness) openKey(t *testing.T, id, authorized string) error {
 	if err == nil {
 		s.Close()
 	}
-	return err
+	return log, err
 }
 
 func TestLlaveRegeneradaAutenticaSoloLaNueva(t *testing.T) {

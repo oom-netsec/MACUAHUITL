@@ -85,6 +85,7 @@ type Info struct {
 	ID, Label, Username  string
 	HasEnable, HasSSHKey bool
 	HasPassword          bool
+	Origin               string // fase 47: OriginGenerated u OriginImported en una credencial "key"; "" en las demás
 }
 
 // IsKey dice si la credencial es de tipo "key" (como Info.IsKey, pero con los secretos a la vista).
@@ -582,7 +583,11 @@ func (v *Vault) list(reserved bool) ([]Info, error) {
 			return nil, err
 		}
 		if reserved || !Reserved(c.Label) {
-			out = append(out, Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty(), HasPassword: !c.Password.Empty()})
+			in := Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty(), HasPassword: !c.Password.Empty()}
+			if in.IsKey() {
+				in.Origin = originOf(c.SSHKey.Bytes())
+			}
+			out = append(out, in)
 		}
 		c.Password.Destroy()
 		c.Enable.Destroy()

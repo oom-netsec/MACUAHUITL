@@ -132,7 +132,7 @@ func (s *vaultSvc) ListCredentials(ctx context.Context, _ *v1.ListCredentialsReq
 	}
 	r := &v1.ListCredentialsResponse{}
 	for _, i := range infos {
-		r.Credentials = append(r.Credentials, &v1.CredentialInfo{Id: i.ID, Label: i.Label, Username: i.Username, HasEnableSecret: i.HasEnable, HasSshKey: i.HasSSHKey, Kind: kindOf(i)})
+		r.Credentials = append(r.Credentials, &v1.CredentialInfo{Id: i.ID, Label: i.Label, Username: i.Username, HasEnableSecret: i.HasEnable, HasSshKey: i.HasSSHKey, Kind: kindOf(i), Origin: i.Origin})
 	}
 	return r, nil
 }
@@ -199,7 +199,30 @@ func (s *vaultSvc) GetCredentialPublicKey(ctx context.Context, r *v1.GetCredenti
 		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.audit("credential.pubkey", r.Id, "fingerprint="+pub.Fingerprint())
-	return &v1.GetCredentialPublicKeyResponse{PublicKey: pub.AuthorizedKey()}, nil
+	return &v1.GetCredentialPublicKeyResponse{PublicKey: pub.AuthorizedKey(), Fingerprint: pub.Fingerprint()}, nil
+}
+
+func (s *vaultSvc) ImportKeyCredential(ctx context.Context, r *v1.ImportKeyCredentialRequest) (*v1.ImportKeyCredentialResponse, error) {
+	s.c.markActive()
+	// ImportKey borra la llave y la frase recibidas; si salimos antes, se borran aquí (el búfer de gRPC del cable no se puede borrar).
+	v, err := s.v(ctx)
+	if err != nil {
+		clear(r.PrivateKey)
+		clear(r.Passphrase)
+		return nil, err
+	}
+	if vault.Reserved(r.Label) {
+		clear(r.PrivateKey)
+		clear(r.Passphrase)
+		return nil, service.Err(ctx, codes.InvalidArgument, "patrol.svc.reserved_label", i18n.A("label", r.Label))
+	}
+	id, info, err := v.ImportKey(r.Label, r.Username, r.PrivateKey, r.Passphrase)
+	if err != nil {
+		return nil, service.VaultErr(ctx, err)
+	}
+	s.c.audit("credential.keyimport", id, fmt.Sprintf("type=%s bits=%d fingerprint=%s", info.Algorithm, info.Bits, info.Fingerprint))
+	return &v1.ImportKeyCredentialResponse{Id: id, PublicKey: vault.PublicKey(info.Wire).AuthorizedKey(), Fingerprint: info.Fingerprint,
+		Algorithm: info.Algorithm, Bits: uint32(info.Bits), Weak: info.Weak}, nil
 }
 
 func (s *vaultSvc) RegenerateKeyCredential(ctx context.Context, r *v1.RegenerateKeyCredentialRequest) (*v1.RegenerateKeyCredentialResponse, error) {
@@ -211,7 +234,7 @@ func (s *vaultSvc) RegenerateKeyCredential(ctx context.Context, r *v1.Regenerate
 	if !r.Confirm {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.rekey_confirm", nil)
 	}
-	old, pub, err := v.RegenerateKey(r.Id)
+	old, pub, prev, err := v.RegenerateKey(r.Id)
 	if err != nil {
 		return nil, service.VaultErr(ctx, err)
 	}
@@ -220,7 +243,7 @@ func (s *vaultSvc) RegenerateKeyCredential(ctx context.Context, r *v1.Regenerate
 		oldFp = old.Fingerprint()
 	}
 	s.c.audit("credential.keyrotate", r.Id, "old="+oldFp+" new="+pub.Fingerprint())
-	return &v1.RegenerateKeyCredentialResponse{PublicKey: pub.AuthorizedKey()}, nil
+	return &v1.RegenerateKeyCredentialResponse{PublicKey: pub.AuthorizedKey(), PreviousOrigin: prev}, nil
 }
 
 func (s *vaultSvc) DeleteCredential(ctx context.Context, r *v1.DeleteCredentialRequest) (*v1.DeleteCredentialResponse, error) {

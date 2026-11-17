@@ -217,7 +217,7 @@ func TestLlavesGeneradasPasanLaValidacion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := v.RegenerateKey(id); err != nil {
+	if _, _, _, err := v.RegenerateKey(id); err != nil {
 		t.Fatal(err)
 	}
 	dst := rutaRespaldo(t)
@@ -464,7 +464,7 @@ func TestLlaveBasuraGuardadaSeRegeneraYNoSePuedeExportar(t *testing.T) {
 	if _, err := WriteBackup(v, rutaRespaldo(t), pw(frase), false); !errors.Is(err, ErrKeyInvalid) || !strings.Contains(err.Error(), `"basura"`) {
 		t.Fatalf("export: %v", err)
 	}
-	if _, _, err := v.RegenerateKey(ids[0]); err != nil {
+	if _, _, _, err := v.RegenerateKey(ids[0]); err != nil {
 		t.Fatalf("RegenerateKey: %v", err)
 	}
 	if _, err := v.PublicKey(ids[0]); err != nil {

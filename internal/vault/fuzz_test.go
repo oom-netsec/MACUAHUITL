@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"slices"
@@ -63,6 +64,41 @@ func FuzzOpenBackup(f *testing.F) {
 			if w, ok := want[i.Label]; !ok || w != c.Username+"\x00"+string(c.Password.Bytes()) {
 				t.Fatalf("SEGURIDAD: un respaldo alterado abrió con una credencial que no estaba: %q", i.Label)
 			}
+		}
+	})
+}
+
+// FuzzOrigin pasa bytes arbitrarios (y una llave válida mutada) por el analizador manual: sin pánico, y si pubOf la acepta, unarmor
+// también y el origen es uno de los dos conocidos.
+func FuzzOrigin(f *testing.F) {
+	k, _, err := newKeyPair()
+	if err != nil {
+		f.Fatal(err)
+	}
+	good := bytes.Clone(k.Bytes())
+	k.Destroy()
+	f.Add(good, uint32(0), byte(0))
+	f.Add(good, uint32(100), byte(0xff))
+	f.Add([]byte("-----BEGIN OPENSSH PRIVATE KEY-----\n-----END OPENSSH PRIVATE KEY-----\n"), uint32(0), byte(0))
+	f.Add([]byte(nil), uint32(0), byte(0))
+	f.Fuzz(func(t *testing.T, raw []byte, pos uint32, x byte) {
+		data := bytes.Clone(raw)
+		if d, err := unarmor(data); err == nil && len(d) > 0 { // muta el binario ya decodificado para llegar al parser de pubOf
+			d[int(pos)%len(d)] ^= x
+			data = armor(d)
+		} else if len(data) > 0 {
+			data[int(pos)%len(data)] ^= x
+		}
+		_, _, perr := pubOf(data)
+		if perr == nil {
+			d, err := unarmor(data)
+			if err != nil {
+				t.Fatal("pubOf aceptó lo que unarmor rechaza")
+			}
+			wipe(d)
+		}
+		if o := originOf(data); o != OriginGenerated && o != OriginImported {
+			t.Fatalf("origen %q", o)
 		}
 	})
 }

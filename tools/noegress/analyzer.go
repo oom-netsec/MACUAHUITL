@@ -61,7 +61,7 @@ var allowed = []string{
 
 // allowedExact se permiten sin subpaquetes: un paquete nuevo bajo ellos tendría que pedir su propio permiso.
 var allowedExact = []string{
-	"internal/sshkey", // solo ssh.ParsePrivateKey: valida llaves sin que vault ni core importen x/crypto/ssh
+	"internal/sshkey", // analiza, valida e importa llaves privadas (sin sockets) sin que vault ni core importen x/crypto/ssh
 }
 
 var Analyzer = &analysis.Analyzer{
