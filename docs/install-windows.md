@@ -53,6 +53,20 @@ The beta has no code signature. Verification relies on `SHA256SUMS`, the attesta
 
 If the installer is started as administrator, it warns you: run it again without "Run as administrator".
 
+## Content packs
+
+Playbooks come in content packs (`.mpack`), published with each release. Install the ones you need in **Settings → Packs → Install pack…**, or with `mctl`. `cmd.exe` does not expand `*`, so give the full file name (with the version of the file you downloaded):
+
+```bat
+mctl pack install oom-ios-xe-1.1.0.mpack
+```
+
+In PowerShell, to install every official pack in the current folder:
+
+```powershell
+Get-ChildItem oom-*.mpack | ForEach-Object { mctl pack install $_.FullName }
+```
+
 ## Firewall and ports
 
 Windows has no privileged ports, so the TFTP, FTP, SCP/SFTP, syslog and trap servers listen on their standard ports. What stands in the way is Windows Firewall.
