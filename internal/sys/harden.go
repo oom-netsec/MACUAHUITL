@@ -51,6 +51,7 @@ func pagefileWarnings(files []string, err error) []i18n.Text {
 			continue
 		}
 		// «?:» es el marcador de Windows para «la unidad del sistema»; así se lee en claro.
+		f = pagefilePath(f)
 		if rest, ok := strings.CutPrefix(f, "?:"); ok {
 			set = append(set, i18n.Tx("harden.pagefile_sysdrive", "path", rest))
 		} else {
@@ -60,5 +61,15 @@ func pagefileWarnings(files []string, err error) []i18n.Text {
 	if len(set) == 0 {
 		return nil
 	}
-	return []i18n.Text{i18n.Join("", i18n.Tx("harden.pagefile_head"), i18n.Join(", ", set...), i18n.Tx("harden.pagefile_tail"))}
+	return []i18n.Text{i18n.Tx("harden.pagefile").With("files", i18n.Join(", ", set...))}
+}
+
+// pagefilePath deja solo la ruta de una entrada de PagingFiles, que puede traer tamaños («C:\pagefile.sys 0 0»).
+func pagefilePath(f string) string {
+	for i := 0; i+1 < len(f); i++ {
+		if f[i] == ' ' && f[i+1] >= '0' && f[i+1] <= '9' {
+			return strings.TrimSpace(f[:i])
+		}
+	}
+	return f
 }

@@ -3,7 +3,9 @@ package transfer
 import (
 	"bytes"
 	"context"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,8 +15,8 @@ import (
 
 func TestCleanSaneaControlYFormato(t *testing.T) {
 	// "\x1b[2J" borra la terminal; U+202E invierte el texto: ninguno debe salir tal cual.
-	got := clean("a\x1b[2Jb\u202ec\u200bd\té")
-	if strings.ContainsAny(got, "\x1b\u202e\u200b\t") || got != "a?[2Jb?c?d?é" {
+	got := clean("a\x1b[2Jb\u202ec\u200bd\té\u2028")
+	if strings.ContainsAny(got, "\x1b\u202e\u200b\t\u2028") || got != "a?[2Jb?c?d?é?" {
 		t.Fatalf("clean = %q", got)
 	}
 }
@@ -95,5 +97,94 @@ func TestProgresoImprimeSoloActivas(t *testing.T) {
 	out := b.String()
 	if !strings.Contains(out, "progress  active  s  ftp  c  in  n?[2J  1/0  0 B/s") || strings.Contains(out, "fin") || strings.ContainsAny(out, "\x1b") {
 		t.Fatalf("salida: %q", out)
+	}
+}
+
+// Cada campo de texto que llega del núcleo pasa por clean antes de salir.
+func TestSaneadoCampoPorCampo(t *testing.T) {
+	cli.SetLang("en")
+	t.Cleanup(func() { cli.SetLang("") })
+	const esc = "\x1b[31m"
+	fill := func(v any) {
+		e := reflect.ValueOf(v).Elem()
+		for i := 0; i < e.NumField(); i++ {
+			if f := e.Field(i); f.Kind() == reflect.String && f.CanSet() {
+				f.SetString(esc)
+			}
+		}
+	}
+	s, j := &v1.TransferSession{Bytes: 1, Total: 2}, &v1.TransferRejection{Count: 1}
+	fill(s)
+	fill(j)
+	var b bytes.Buffer
+	renderStatus(&b, &v1.ListTransferSessionsResponse{Sessions: []*v1.TransferSession{s}, Rejections: []*v1.TransferRejection{j}}, time.Now())
+	if strings.Contains(b.String(), "\x1b") || strings.Count(b.String(), "?[31m") < 11 {
+		t.Fatalf("status: %q", b.String())
+	}
+	var ev transferEvent
+	fill(&ev)
+	ev.Rejected = true
+	for _, lang := range []string{"en", "es"} {
+		cli.SetLang(lang)
+		if out := serveLine(ev, time.Now(), cli.T); strings.Contains(out, "\x1b") || !strings.Contains(out, "?[31m") {
+			t.Fatalf("serve %s: %q", lang, out)
+		}
+	}
+}
+
+func TestLineaDeServeCodigoManda(t *testing.T) {
+	cli.SetLang("en")
+	t.Cleanup(func() { cli.SetLang("") })
+	// DirCode manda aunque Dir diga otra cosa.
+	if got := serveLine(transferEvent{Proto: "ftp", Dir: "escritura", DirCode: "read"}, time.Now(), cli.T); !strings.Contains(got, "ftp read ") {
+		t.Fatal(got)
+	}
+}
+
+func TestProgresoSigueTrasUnError(t *testing.T) {
+	var n int
+	ctx, cancel := context.WithCancel(context.Background())
+	list := func() (*v1.ListTransferSessionsResponse, error) {
+		if n++; n == 1 {
+			return nil, context.DeadlineExceeded
+		}
+		cancel()
+		return &v1.ListTransferSessionsResponse{Sessions: []*v1.TransferSession{{State: "active", Name: "n"}}}, nil
+	}
+	var b bytes.Buffer
+	progressLoop(ctx, "progress", time.Millisecond, list, &b)
+	if !strings.Contains(b.String(), "progress  active") {
+		t.Fatalf("no reintentó: %q", b.String())
+	}
+}
+
+// Dos bucles de avance y el del stream comparten el lockedWriter; con -race lo demuestra.
+func TestLockedWriterSerializa(t *testing.T) {
+	var b bytes.Buffer
+	out := &lockedWriter{w: &b}
+	list := func() (*v1.ListTransferSessionsResponse, error) {
+		return &v1.ListTransferSessionsResponse{Sessions: []*v1.TransferSession{{State: "active", Name: "n"}}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() { defer wg.Done(); progressLoop(ctx, "progress", time.Millisecond, list, out) }()
+	}
+	for range 50 {
+		out.Write([]byte("fin\n"))
+	}
+	wg.Wait()
+	for _, l := range strings.Split(strings.TrimSpace(b.String()), "\n") {
+		if l != "fin" && !strings.HasPrefix(l, "progress  active") {
+			t.Fatalf("línea mezclada: %q", l)
+		}
+	}
+}
+
+func TestLineasSaneadas(t *testing.T) {
+	if got := cleanLines("a\x1b[2J\nb\u202e\n"); got != "a?[2J\nb?\n" {
+		t.Fatalf("%q", got)
 	}
 }

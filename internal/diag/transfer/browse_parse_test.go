@@ -31,6 +31,7 @@ func TestSanitizeName(t *testing.T) {
 		{"ancho\u200bcero", "ancho?cero", true},
 		{"mal\xffutf8", "mal?utf8", true},
 		{"ñandú.cfg", "ñandú.cfg", false},
+		{"l\u2028s\u2029p", "l?s?p", true},
 	}
 	for _, c := range cases {
 		got, unsafe := SanitizeName(c.in)

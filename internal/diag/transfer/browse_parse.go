@@ -24,14 +24,14 @@ type Entry struct {
 }
 
 // SanitizeName deja un nombre del servidor listo para mostrar: los caracteres de control, los de
-// formato Unicode (U+202E, ancho cero, BOM) y los bytes que no son UTF-8 se cambian por «?».
+// formato Unicode (U+202E, ancho cero, BOM), U+2028/2029 y los bytes que no son UTF-8 se cambian por «?».
 // unsafe dice si hubo que cambiar algo.
 func SanitizeName(raw string) (name string, unsafe bool) {
 	if !utf8.ValidString(raw) {
 		raw, unsafe = strings.ToValidUTF8(raw, "?"), true
 	}
 	out := strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+		if unicode.In(r, unicode.Cc, unicode.Cf, unicode.Zl, unicode.Zp) {
 			unsafe = true
 			return '?'
 		}

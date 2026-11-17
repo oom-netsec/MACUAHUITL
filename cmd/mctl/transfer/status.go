@@ -16,19 +16,29 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-// progressEvery es cada cuánto `transfer serve` consulta el avance (plan 45b, decisión 12); las pruebas lo reducen.
+// progressEvery es cada cuánto `transfer serve` consulta el avance (plan 45b, decisión 12). Las pruebas de progressLoop
+// pasan su propio intervalo; ninguna prueba cambia esta variable.
 var progressEvery = 5 * time.Second
 
-// clean cambia los controles (\p{Cc}) y los caracteres de formato (\p{Cf}) por «?»: un nombre crudo (el de un paquete UDP)
+// clean cambia los controles (\p{Cc}), los de formato (\p{Cf}) y los separadores de línea y párrafo (U+2028/2029) por «?»: un nombre crudo (el de un paquete UDP)
 // con secuencias ANSI o U+202E no debe escribirle a la terminal. Local porque cmd/mctl no puede importar internal/diag
 // (trae net); es la misma regla que SanitizeName del núcleo.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.In(r, unicode.Cc, unicode.Cf) {
+		if unicode.In(r, unicode.Cc, unicode.Cf, unicode.Zl, unicode.Zp) {
 			return '?'
 		}
 		return r
 	}, s)
+}
+
+// cleanLines sanea un texto de varias líneas (la pista de serve) sin perder sus saltos.
+func cleanLines(s string) string {
+	l := strings.Split(s, "\n")
+	for i := range l {
+		l[i] = clean(l[i])
+	}
+	return strings.Join(l, "\n")
 }
 
 // sessionLine: ESTADO  SERVIDOR  PROTO  CLIENTE  in|out  NOMBRE  bytes/total (pct)  tasa  [motivo]

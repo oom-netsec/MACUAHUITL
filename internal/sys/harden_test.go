@@ -35,6 +35,10 @@ func TestPagefileWarnings(t *testing.T) {
 	if len(w) != 1 || !strings.Contains(w[0].In("en"), `paging file is on (C:\pagefile.sys)`) {
 		t.Fatalf("una letra de unidad sale tal cual: %v", w)
 	}
+	w = pagefileWarnings([]string{`C:\pagefile.sys 0 0`}, nil)
+	if len(w) != 1 || !strings.Contains(w[0].In("en"), `(C:\pagefile.sys)`) {
+		t.Fatalf("solo la ruta, sin tamaños: %q", w[0].In("en"))
+	}
 	w = pagefileWarnings(nil, errors.New("sin clave"))
 	if len(w) != 1 || !strings.Contains(w[0].In("es"), "no se pudo comprobar") {
 		t.Fatalf("si no se puede leer, debe decirlo: %v", w)

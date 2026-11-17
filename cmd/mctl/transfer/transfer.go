@@ -169,22 +169,22 @@ func serve(c *cli.Env, args []string) error {
 		}
 		if cl := r.GetClosed(); cl != nil {
 			if cl.Cleanup != "" {
-				fmt.Fprintln(out, cli.T("mctl.transfer.closed", "cmd", cl.Cleanup))
+				fmt.Fprintln(out, cli.T("mctl.transfer.closed", "cmd", cleanLines(cl.Cleanup)))
 			}
 			continue
 		}
 		if rd := r.GetReady(); rd != nil {
 			fmt.Fprintln(out, cli.T("mctl.transfer.serving", "proto", rd.Protocol, "addr", rd.Listening, "id", rd.ServerId))
 			if rd.FromDir != "" {
-				fmt.Fprintln(out, cli.T("mctl.transfer.reads_from", "dir", rd.FromDir))
+				fmt.Fprintln(out, cli.T("mctl.transfer.reads_from", "dir", clean(rd.FromDir)))
 			}
 			if rd.RecvDir != "" {
-				fmt.Fprintln(out, cli.T("mctl.transfer.receives_in", "dir", rd.RecvDir))
+				fmt.Fprintln(out, cli.T("mctl.transfer.receives_in", "dir", clean(rd.RecvDir)))
 			}
 			if rd.User != "" {
-				fmt.Fprintln(out, cli.T("mctl.transfer.credentials", "user", rd.User, "password", rd.Password))
+				fmt.Fprintln(out, cli.T("mctl.transfer.credentials", "user", clean(rd.User), "password", clean(rd.Password)))
 			}
-			fmt.Fprint(out, rd.Hint)
+			fmt.Fprint(out, cleanLines(rd.Hint))
 			id := rd.ServerId
 			go progressLoop(pctx, tr("mctl.transfer.progress"), progressEvery, func() (*v1.ListTransferSessionsResponse, error) {
 				return client.ListTransferSessions(pctx, &v1.ListTransferSessionsRequest{ServerId: id})
