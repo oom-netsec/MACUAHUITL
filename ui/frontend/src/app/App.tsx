@@ -51,9 +51,15 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   // Cada módulo empieza arriba: el desplazamiento del anterior no se hereda.
   useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [current]);
 
-  const recheck = useCallback(() => { core.coreStatus().then(setStatus).catch(() => setStatus("disconnected")); }, [core]);
+  // Respuesta y evento llegan por canales distintos: una respuesta de coreStatus no pisa un evento que llegó después de pedirla.
+  const events = useRef(0);
+  const recheck = useCallback(() => {
+    const seen = events.current;
+    const set = (s: CoreStatus) => { if (events.current === seen) setStatus(s); };
+    core.coreStatus().then(set).catch(() => set("disconnected"));
+  }, [core]);
   useEffect(() => {
-    const off = core.onStatus(setStatus);
+    const off = core.onStatus((s) => { events.current++; setStatus(s); });
     recheck(); // el primer core:status pudo salir antes de que existiera la ventana
     return off;
   }, [core, recheck]);
@@ -62,7 +68,8 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   const down = useRef(false);
   useEffect(() => {
     if (status !== "connected") down.current = true;
-    else if (down.current) { down.current = false; void resync(lang); }
+    // Además las vistas recargan: un núcleo que vuelve puede traer la bóveda en otro estado, y lo que falló al abrir se reintenta.
+    else if (down.current) { down.current = false; void resync(lang); vaultChanged(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el estado del núcleo
   }, [status]);
 

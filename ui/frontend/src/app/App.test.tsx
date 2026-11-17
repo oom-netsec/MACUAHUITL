@@ -7,6 +7,7 @@ import { es } from "../lib/i18n/es";
 import { lazyView } from "../modules/lazy";
 import { useBusy, useNav } from "./activity";
 import { useState } from "react";
+import { onVaultChanged } from "../lib/vaultSignal";
 
 const nav = () => screen.getByRole("navigation", { name: "Secciones" });
 const item = (name: RegExp) => within(nav()).getByRole("button", { name });
@@ -22,6 +23,44 @@ test("al reconectar el núcleo se le manda otra vez el idioma de la interfaz", a
   await act(async () => {}); // la llamada sale en fila, tras la anterior
   expect(core.setPreference).toHaveBeenCalledTimes(2);
   expect(core.setPreference).toHaveBeenLastCalledWith("ui.language", "es");
+});
+
+// Un núcleo que vuelve (arranque bajo demanda o reinicio) puede traer la bóveda en otro estado: las vistas recargan lo que listan.
+test("al reconectar el núcleo se avisa a las vistas para que recarguen", async () => {
+  const core = fakeCore();
+  render(<App core={core} />);
+  await act(async () => {});
+  const seen = vi.fn();
+  const off = onVaultChanged(seen);
+  act(() => core.emitStatus("disconnected"));
+  expect(seen).not.toHaveBeenCalled();
+  act(() => core.emitStatus("connected"));
+  expect(seen).toHaveBeenCalledTimes(1);
+  off();
+});
+
+test("abrir con el núcleo caído y que luego llegue: también se avisa a las vistas", async () => {
+  const core = fakeCore();
+  vi.mocked(core.coreStatus).mockResolvedValueOnce("disconnected");
+  render(<App core={core} />);
+  await act(async () => {});
+  const seen = vi.fn();
+  const off = onVaultChanged(seen);
+  act(() => core.emitStatus("connected"));
+  expect(seen).toHaveBeenCalledTimes(1);
+  off();
+});
+
+// Respuesta y evento van por canales distintos: un «disconnected» viejo de la consulta no pisa el «connected» que ya llegó.
+test("la respuesta tardía de coreStatus no pisa un evento de estado más nuevo", async () => {
+  const core = fakeCore();
+  let answer: (s: "disconnected") => void = () => {};
+  vi.mocked(core.coreStatus).mockImplementationOnce(() => new Promise((r) => { answer = r; }));
+  render(<App core={core} />);
+  act(() => core.emitStatus("connected"));
+  await act(async () => answer("disconnected"));
+  expect(screen.getByText("Núcleo conectado")).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 test("muestra el aviso de núcleo desconectado y lo quita al reconectar", async () => {

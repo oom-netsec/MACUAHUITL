@@ -77,6 +77,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
     let live = true; // un cambio de bóveda posterior no se pisa con una respuesta vieja
+    setErr(""); // recarga (bóveda o núcleo reconectado): el error del intento anterior ya no vale; si vuelve a fallar, reaparece
     core.vaultStatus().then(async (s) => {
       if (!live) return;
       setVault(s.state);

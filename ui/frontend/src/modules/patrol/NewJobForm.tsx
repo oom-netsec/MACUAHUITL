@@ -9,6 +9,7 @@ import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
+import { useVaultVersion } from "../../lib/vaultSignal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
 const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"].includes(k);
@@ -32,13 +33,15 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const [pbs, setPbs] = useState<string[]>([]);
   const [pbTry, setPbTry] = useState(0); // el núcleo pudo estar arrancando: reintentar sin rehacer el formulario
   // Los nombres vienen en el idioma del núcleo: se piden cuando el núcleo ya tiene el de la interfaz.
+  // vv: también al reconectar el núcleo (App avisa con vaultChanged), para que no quede el aviso del intento sin núcleo.
+  const vv = useVaultVersion();
   useEffect(() => {
     if (!coreLang) return;
     let off = false; // una respuesta tardía en el idioma anterior no pisa la nueva
     setPbErr(false);
     core.listPlaybooks().then((c) => { if (!off) setCatalog(c); }).catch(() => { if (!off) setPbErr(true); });
     return () => { off = true; };
-  }, [core, pbTry, coreLang, contentVer]);
+  }, [core, pbTry, coreLang, contentVer, vv]);
   const [vals, setVals] = useState<Record<string, string>>({});
   const [paramErr, setParamErr] = useState<Record<string, string>>({});
   // Un campo por nombre, aunque dos playbooks elegidos lo pidan.
