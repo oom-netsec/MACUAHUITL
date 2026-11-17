@@ -417,14 +417,12 @@ func (v *Vault) putBatchLocked(cs []Credential, reserved, strict bool) ([]string
 		max = MaxFieldBytes
 	}
 	for _, c := range cs {
-		if len(c.Label) > max || len(c.Username) > max || len(c.Password.Bytes()) > max ||
-			len(c.Enable.Bytes()) > max || len(c.SSHKey.Bytes()) > max {
-			return nil, ErrFieldTooLong
-		}
 		if strict {
-			if err := ValidateKey(c.Label, c.SSHKey); err != nil {
+			if err := checkStrict(c); err != nil {
 				return nil, err
 			}
+		} else if overLen(c, max) {
+			return nil, ErrFieldTooLong
 		}
 	}
 	next := append([]rawEntry(nil), v.entries...)
@@ -517,13 +515,28 @@ func (v *Vault) ImportFrom(src *Vault, items []Import) ([]string, error) {
 	return ids, nil
 }
 
-// sealStrict es sealInto con la frontera de entrada: tope de MaxFieldBytes por campo y llave SSH válida.
-func (v *Vault) sealStrict(next *[]rawEntry, c Credential) (string, error) {
-	if len(c.Label) > MaxFieldBytes || len(c.Username) > MaxFieldBytes || len(c.Password.Bytes()) > MaxFieldBytes ||
-		len(c.Enable.Bytes()) > MaxFieldBytes || len(c.SSHKey.Bytes()) > MaxFieldBytes {
-		return "", ErrFieldTooLong
+// overLen dice si algún campo de c pasa de max bytes.
+func overLen(c Credential, max int) bool {
+	return len(c.Label) > max || len(c.Username) > max || len(c.Password.Bytes()) > max ||
+		len(c.Enable.Bytes()) > max || len(c.SSHKey.Bytes()) > max
+}
+
+// checkStrict es la frontera de entrada (Put*, import y export): tope de MaxFieldBytes por campo y llave SSH válida. El error nombra
+// la credencial para que el usuario sepa cuál editar o borrar.
+func checkStrict(c Credential) error {
+	if overLen(c, MaxFieldBytes) {
+		l := c.Label
+		if len(l) > 64 {
+			l = l[:64] + "…"
+		}
+		return i18n.Wrap("vault.err.field_too_long_in", ErrFieldTooLong, i18n.A("label", l, "max", fmt.Sprintf("%d KiB", MaxFieldBytes>>10)))
 	}
-	if err := ValidateKey(c.Label, c.SSHKey); err != nil {
+	return ValidateKey(c.Label, c.SSHKey)
+}
+
+// sealStrict es sealInto tras checkStrict.
+func (v *Vault) sealStrict(next *[]rawEntry, c Credential) (string, error) {
+	if err := checkStrict(c); err != nil {
 		return "", err
 	}
 	return v.sealInto(next, c, false)

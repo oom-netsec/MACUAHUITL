@@ -17,7 +17,7 @@ const plainFields = 6
 const MaxFieldBytes = 64 << 10
 
 // maxOwnFieldBytes es el tope de cordura de la bóveda propia (como ipc.MaxMsg): evita reservar memoria por un largo absurdo.
-const maxOwnFieldBytes = 16 << 20
+const maxOwnFieldBytes = 4 << 20
 
 func encodePlain(c Credential) []byte {
 	fields := [plainFields][]byte{[]byte(c.Label), []byte(c.Username), c.Password.Bytes(), c.Enable.Bytes(), c.SSHKey.Bytes(), nil}

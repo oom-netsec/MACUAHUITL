@@ -137,7 +137,7 @@ func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (int
 			held += lockedSize(c)
 			creds = append(creds, c)
 		}
-		_, err := b.putBatch(creds, false, false) // lo ya guardado se exporta tal cual; la frontera estricta es la del import
+		_, err := b.putBatch(creds, false, true) // frontera estricta: lo que el import no aceptaría falla al EXPORTAR, no al restaurar
 		destroyAll(creds)
 		if err != nil {
 			return 0, 0, false, err

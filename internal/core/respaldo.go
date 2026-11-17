@@ -82,7 +82,7 @@ func (st *respaldoStore) stash(v *vault.Vault, now time.Time, p respaldoPend) (s
 		st.pend = map[string]respaldoPend{}
 	}
 	st.pend[tok] = p
-	// Aunque nadie vuelva a llamar, a los 10 minutos las credenciales descifradas se borran.
+	// Aunque nadie vuelva a llamar, a los 10 minutos se suelta el respaldo abierto (su DEK).
 	time.AfterFunc(respaldoTTL+time.Second, func() { st.sweep(time.Now()) })
 	return tok, true
 }
@@ -278,8 +278,8 @@ func classify(v *vault.Vault, c vault.Credential, ids []string) (planned, error)
 	return pl, nil
 }
 
-// PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Las credenciales descifradas quedan
-// en memoria protegida solo hasta que se aplique, venza el token o se cierre la bóveda.
+// PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Queda abierto el respaldo (su DEK en
+// memoria protegida; las credenciales se descifran de a una y no se retienen) hasta que se aplique, venza el token o se cierre la bóveda.
 func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()

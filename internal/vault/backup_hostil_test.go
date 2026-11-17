@@ -123,8 +123,8 @@ func TestBackupHostilArchivoMayorAlTope(t *testing.T) {
 }
 
 // Un respaldo con un campo enorme dentro del cifrado (la frase la pone quien lo arma) no debe tumbar el proceso: memguard entra en
-// pánico si no puede bloquear la memoria (RLIMIT_MEMLOCK). Uno de 200 KiB pasa la cota de memoria pero no el tope por campo
-// (ErrFieldTooLong, no «dañado»); uno de 9 MiB ya lo rechaza la cota antes de descifrar nada.
+// pánico si no puede bloquear la memoria (RLIMIT_MEMLOCK). Tanto uno de 200 KiB como uno de 9 MiB dan
+// ErrFieldTooLong (no «dañado»): el tope por campo de OpenBackup se aplica al descifrar la entrada.
 func TestBackupHostilCampoEnormeDentroDelCifrado(t *testing.T) {
 	for _, c := range []struct {
 		n    int
@@ -185,11 +185,15 @@ func TestPutRechazaCampoMayorAlTope(t *testing.T) {
 	}
 }
 
-// Una llave privada que x/crypto/ssh no parsea no entra: ni por Put ni al exportar (la frontera es el import, que usa el mismo
-// PutBatch). El error nombra la credencial culpable y no deja nada a medias.
+// Una llave privada que x/crypto/ssh no parsea no entra: ni por Put ni al exportar ni al importar (todos usan la misma frontera
+// estricta). El error nombra la credencial culpable y no deja nada a medias.
 func TestPutRechazaLlaveSSHInvalida(t *testing.T) {
 	v, _ := newVault(t)
-	malas := [][]byte{[]byte("-----BEGIN OPENSSH PRIVATE KEY-----\ntruncada"), {0, 1, 2, 0xFF}, bytes.Repeat([]byte("A"), 1<<16)}
+	conFrase, err := os.ReadFile("testdata/llave_con_frase.pem") // OpenSSH ed25519 cifrada con frase: transport tampoco la puede usar
+	if err != nil {
+		t.Fatal(err)
+	}
+	malas := [][]byte{conFrase, []byte("-----BEGIN OPENSSH PRIVATE KEY-----\ntruncada"), {0, 1, 2, 0xFF}, bytes.Repeat([]byte("A"), 1<<16)}
 	for _, k := range malas {
 		_, err := v.Put(Credential{Label: "mala", Username: "u", SSHKey: secret.New(bytes.Clone(k))})
 		if !errors.Is(err, ErrKeyInvalid) || !strings.Contains(err.Error(), `"mala"`) {
@@ -197,7 +201,7 @@ func TestPutRechazaLlaveSSHInvalida(t *testing.T) {
 		}
 	}
 	// En un lote, una mala tumba todo.
-	_, err := v.PutBatch([]Credential{cred("buena", "p", ""), {Label: "k", SSHKey: secret.New(pw("xx"))}})
+	_, err = v.PutBatch([]Credential{cred("buena", "p", ""), {Label: "k", SSHKey: secret.New(pw("xx"))}})
 	if !errors.Is(err, ErrKeyInvalid) {
 		t.Fatalf("err = %v", err)
 	}
@@ -281,18 +285,13 @@ func TestBovedaConCampoMayorAlTopeSigueFuncionando(t *testing.T) {
 		t.Fatalf("ListAll: %v %v", all, err)
 	}
 	dst := rutaRespaldo(t)
-	if n, err := WriteBackup(v, dst, pw(frase), false); err != nil || n != 2 {
-		t.Fatalf("export: n=%d %v", n, err)
+	// Exportar falla de una vez, nombrando la credencial, en vez de producir un respaldo que no se podría restaurar.
+	if _, err := WriteBackup(v, dst, pw(frase), false); !errors.Is(err, ErrFieldTooLong) || !strings.Contains(err.Error(), `"grande"`) {
+		t.Fatalf("export: %v", err)
 	}
-	// Ese respaldo ya es ajeno al abrirlo: el tope estricto da un error claro, no «dañado».
-	b, err := OpenBackup(dst, pw(frase))
-	if err != nil {
-		t.Fatal(err)
+	if _, err := os.Stat(dst); err == nil {
+		t.Fatal("quedó un respaldo a medias")
 	}
-	if _, err := b.ListAll(); !errors.Is(err, ErrFieldTooLong) {
-		t.Fatalf("ListAll del respaldo: %v", err)
-	}
-	b.LockAll()
 	var id string
 	for _, i := range infos {
 		if i.Label == "grande" {
@@ -447,4 +446,31 @@ func nuevaLlaveECDSA() []byte {
 		panic(err)
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
+}
+
+// Una llave basura que ya estaba guardada (de antes de la frontera): RegenerateKey la reemplaza y PublicKey la da por no soportada;
+// exportar falla nombrando la credencial.
+func TestLlaveBasuraGuardadaSeRegeneraYNoSePuedeExportar(t *testing.T) {
+	v, _ := newVault(t)
+	cs := []Credential{{Label: "basura", Username: "u", SSHKey: secret.New([]byte("no es una llave"))}}
+	ids, err := v.putBatch(cs, false, false)
+	destroyAll(cs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.PublicKey(ids[0]); !errors.Is(err, ErrKeyUnsupported) {
+		t.Fatalf("PublicKey: %v", err)
+	}
+	if _, err := WriteBackup(v, rutaRespaldo(t), pw(frase), false); !errors.Is(err, ErrKeyInvalid) || !strings.Contains(err.Error(), `"basura"`) {
+		t.Fatalf("export: %v", err)
+	}
+	if _, _, err := v.RegenerateKey(ids[0]); err != nil {
+		t.Fatalf("RegenerateKey: %v", err)
+	}
+	if _, err := v.PublicKey(ids[0]); err != nil {
+		t.Fatalf("PublicKey tras regenerar: %v", err)
+	}
+	if n, err := WriteBackup(v, rutaRespaldo(t), pw(frase), false); err != nil || n != 1 {
+		t.Fatalf("export tras regenerar: n=%d %v", n, err)
+	}
 }
