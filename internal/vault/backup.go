@@ -32,26 +32,6 @@ const MaxBackupEntries = 10000
 
 var ErrTooManyEntries = i18n.New("vault.err.too_many", nil)
 
-// MaxBackupLockedBytes es el presupuesto de memoria bloqueada (cota, ver LockedBound) de un respaldo que se abre. RLIMIT_MEMLOCK suele ser
-// de 8 MiB y memguard entra en pánico si no puede bloquear: con 5 MiB caben unas 320 credenciales (4 páginas de cota cada una), y
-// el núcleo reparte además un total entre todas las vistas previas pendientes (core.respaldoBudget).
-const MaxBackupLockedBytes = 5 << 20
-
-var ErrBackupTooLarge = i18n.New("vault.err.backup_too_large", i18n.A("max", fmt.Sprintf("%d MiB", MaxBackupLockedBytes>>20)))
-
-// LockedBound es una cota de la memoria bloqueada que pide descifrar todas las entradas a la vez, calculada sin descifrar nada:
-// por entrada, el largo del texto (el cifrado menos la etiqueta de 16 bytes) redondeado a páginas, más 3 páginas por los tres secretos.
-func (v *Vault) LockedBound() int64 {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	pg := int64(os.Getpagesize())
-	var n int64
-	for _, e := range v.entries {
-		n += (int64(max(len(e.CT)-16, 0))+pg-1)/pg*pg + 3*pg
-	}
-	return n
-}
-
 // deriveFn es variable para que las pruebas vean cuándo se deriva y desde qué lock.
 var deriveFn = deriveKEK
 
@@ -242,14 +222,11 @@ func OpenBackup(path string, phrase []byte) (*Vault, error) {
 	if err != nil || !backupParamsOK(h.Params) {
 		return nil, ErrNotBackup
 	}
-	// Y las entradas, antes de descifrar ninguna: cada una pide memoria bloqueada.
+	// Y las entradas, antes de descifrar ninguna. Quien lo use descifra de a una: no hay cota de memoria bloqueada.
 	if len(entries) > MaxBackupEntries {
 		return nil, ErrTooManyEntries
 	}
 	v := &Vault{hdr: h, entries: entries, now: time.Now, windows: map[string]Window{}, fieldMax: MaxFieldBytes} // sin path: no se escribe de vuelta
-	if v.LockedBound() > MaxBackupLockedBytes {
-		return nil, ErrBackupTooLarge
-	}
 	if err := v.Unlock(phrase); err != nil {
 		return nil, err
 	}

@@ -24,59 +24,30 @@ import (
 
 const (
 	respaldoTTL     = 10 * time.Minute
-	respaldoMaxPend = 4 // cada vista previa guarda credenciales descifradas: pocas y de corta vida
-	// respaldoBudget es la memoria bloqueada (cota de vault.LockedBound) que pueden retener juntas las vistas previas: de los 8 MiB
-	// de RLIMIT_MEMLOCK deja 2 a la bóveda viva y al resto del núcleo. Una sola puede pedir hasta vault.MaxBackupLockedBytes (5 MiB).
-	respaldoBudget = 6 << 20
+	respaldoMaxPend = 4 // cada vista previa retiene el respaldo abierto (una DEK en memoria protegida): pocas y de corta vida
 )
 
-// respaldoPend es una vista previa de import: las credenciales descifradas del respaldo (secretos en memoria protegida) hasta que se
-// aplique, venza el token o se cierre la bóveda. Cada credencial lleva por ID el que tiene dentro del respaldo.
+// respaldoPend es una vista previa de import: el respaldo abierto (sus entradas siguen cifradas en memoria normal y solo su DEK de 32
+// bytes vive en un buffer protegido, así que no cuenta por entrada) y los metadatos no secretos de sus credenciales. Los secretos se
+// descifran de a una al comparar y al aplicar, y se destruyen al instante. Dura hasta que se aplique, venza el token o se cierre la bóveda.
 type respaldoPend struct {
-	creds    []vault.Credential
-	bound    int64 // cota de memoria bloqueada que retiene (vault.LockedBound)
-	reserved int   // entradas del sistema del respaldo: se omiten y no se descifran
+	b        *vault.Vault
+	infos    []vault.Info // credenciales no reservadas del respaldo, con su ID en él
+	reserved int          // entradas del sistema del respaldo: se omiten y no se descifran
 	path     string
 	expires  time.Time
 }
 
 func (p respaldoPend) destroy() {
-	for _, c := range p.creds {
-		c.Password.Destroy()
-		c.Enable.Destroy()
-		c.SSHKey.Destroy()
+	if p.b != nil {
+		p.b.LockAll()
 	}
 }
 
 // respaldoStore guarda las vistas previas por token. Su valor cero sirve.
 type respaldoStore struct {
-	mu       sync.Mutex
-	pend     map[string]respaldoPend
-	inflight int64 // cota de las vistas previas que se están descifrando y aún no se guardan
-}
-
-// reserve hace lugar para una vista previa de bound bytes (cede las pendientes más viejas) y la cuenta como en curso hasta release.
-func (st *respaldoStore) reserve(bound int64, now time.Time) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	st.sweepLocked(now)
-	for len(st.pend) > 0 && st.pendBoundLocked()+st.inflight+bound > respaldoBudget {
-		st.evictOldestLocked()
-	}
-	st.inflight += bound
-}
-
-func (st *respaldoStore) release(bound int64) {
-	st.mu.Lock()
-	st.inflight -= bound
-	st.mu.Unlock()
-}
-
-func (st *respaldoStore) pendBoundLocked() (n int64) {
-	for _, q := range st.pend {
-		n += q.bound
-	}
-	return n
+	mu   sync.Mutex
+	pend map[string]respaldoPend
 }
 
 func (st *respaldoStore) evictOldestLocked() {
@@ -254,7 +225,8 @@ func sameCred(a, b vault.Credential) bool {
 }
 
 // planImport clasifica cada credencial del respaldo (por su ID en él) frente a la bóveda viva y da también las etiquetas ya usadas en ella.
-func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[string]bool, error) {
+// Descifra de a una (la del respaldo y la viva con la que se compara) y valida su llave SSH: nunca retiene secretos.
+func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[string]bool, error) {
 	live, err := v.List()
 	if err != nil {
 		return nil, nil, err
@@ -265,30 +237,45 @@ func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[
 		used[i.Label] = true
 	}
 	out := map[string]planned{}
-	for _, c := range in {
-		ids := byLabel[c.Label]
-		if len(ids) == 0 {
-			out[c.ID] = planned{state: estNueva}
-			continue
+	for _, i := range in {
+		c, err := b.Get(i.ID)
+		if err != nil {
+			return nil, nil, err
 		}
-		pl := planned{state: estConflicto, target: ids[0]}
-		for _, id := range ids {
-			lc, err := v.Get(id)
-			if err != nil {
-				return nil, nil, err
-			}
-			same := sameCred(lc, c)
-			lc.Password.Destroy()
-			lc.Enable.Destroy()
-			lc.SSHKey.Destroy()
-			if same {
-				pl = planned{state: estIgual, target: id}
-				break
-			}
+		pl, err := classify(v, c, byLabel[c.Label])
+		c.Password.Destroy()
+		c.Enable.Destroy()
+		c.SSHKey.Destroy()
+		if err != nil {
+			return nil, nil, err
 		}
-		out[c.ID] = pl
+		out[i.ID] = pl
 	}
 	return out, used, nil
+}
+
+func classify(v *vault.Vault, c vault.Credential, ids []string) (planned, error) {
+	if err := vault.ValidateKey(c.Label, c.SSHKey); err != nil {
+		return planned{}, err // todo el import falla, con la etiqueta culpable
+	}
+	if len(ids) == 0 {
+		return planned{state: estNueva}, nil
+	}
+	pl := planned{state: estConflicto, target: ids[0]}
+	for _, id := range ids {
+		lc, err := v.Get(id)
+		if err != nil {
+			return planned{}, err
+		}
+		same := sameCred(lc, c)
+		lc.Password.Destroy()
+		lc.Enable.Destroy()
+		lc.SSHKey.Destroy()
+		if same {
+			return planned{state: estIgual, target: id}, nil
+		}
+	}
+	return pl, nil
 }
 
 // PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Las credenciales descifradas quedan
@@ -311,21 +298,17 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 	if err != nil {
 		return nil, respaldoErr(ctx, err)
 	}
-	defer b.LockAll()
-	bound := b.LockedBound()
-	s.c.respaldos.reserve(bound, s.c.o.Now())
-	defer s.c.respaldos.release(bound)
-	infos, err := b.ListAll()
-	if err != nil {
-		return nil, respaldoErr(ctx, err)
-	}
-	p := respaldoPend{path: path, bound: bound}
+	p := respaldoPend{b: b, path: path}
 	stored := false
 	defer func() {
 		if !stored {
 			p.destroy()
 		}
 	}()
+	infos, err := b.ListAll()
+	if err != nil {
+		return nil, respaldoErr(ctx, err)
+	}
 	items := make([]*v1.VaultBackupItem, 0, len(infos))
 	for _, i := range infos {
 		it := &v1.VaultBackupItem{Id: i.ID, Label: i.Label, Username: i.Username}
@@ -333,18 +316,11 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 			it.State = estReservada
 			p.reserved++
 		} else {
-			c, err := b.Get(i.ID)
-			if err != nil {
-				return nil, respaldoErr(ctx, err)
-			}
-			p.creds = append(p.creds, c) // antes de validar: destroy() la borra si falla
-			if err := vault.ValidateKey(c.Label, c.SSHKey); err != nil {
-				return nil, service.VaultErr(ctx, err) // todo el import falla, con la etiqueta culpable
-			}
+			p.infos = append(p.infos, i)
 		}
 		items = append(items, it)
 	}
-	plan, _, err := planImport(v, p.creds)
+	plan, _, err := planImport(v, b, p.infos)
 	if err != nil {
 		return nil, service.VaultErr(ctx, err)
 	}
@@ -399,7 +375,7 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 		return service.Err(ctx, codes.InvalidArgument, code, i18n.A(kv...))
 	}
 	label := map[string]string{}
-	for _, c := range p.creds {
+	for _, c := range p.infos {
 		label[c.ID] = c.Label
 	}
 	dec := map[string]string{}
@@ -417,15 +393,15 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 		dec[d.Id] = act
 	}
 	// Se vuelve a comparar contra lo guardado ahora: entre la vista previa y aquí pudo cambiar.
-	plan, used, err := planImport(v, p.creds)
+	plan, used, err := planImport(v, p.b, p.infos)
 	if err != nil {
 		return nil, service.VaultErr(ctx, err)
 	}
-	var batch []vault.Credential
+	var batch []vault.Import
 	reemplazados := map[string]string{} // ID local -> etiqueta de la credencial del respaldo que ya lo reemplaza
 	iguales := map[string]bool{}        // destinos que alguna credencial del respaldo reporta «igual»: reemplazarlos haría mentir al informe
 	var res v1.ApplyBackupImportResponse
-	for _, c := range p.creds {
+	for _, c := range p.infos {
 		pl, act := plan[c.ID], dec[c.ID]
 		switch {
 		case pl.state == estIgual:
@@ -443,24 +419,22 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 				return nil, bad("respaldo.err.double_replace", "label", c.Label)
 			}
 			reemplazados[pl.target] = c.Label
-			c.ID = pl.target
-			batch = append(batch, c)
+			batch = append(batch, vault.Import{SrcID: c.ID, ID: pl.target})
 			res.Replaced++
 		case pl.state == estConflicto:
-			c.ID, c.Label = "", uniqueLabel(c.Label, used)
-			used[c.Label] = true
-			batch = append(batch, c)
+			l := uniqueLabel(c.Label, used)
+			used[l] = true
+			batch = append(batch, vault.Import{SrcID: c.ID, Label: l})
 			res.Renamed++
 		default:
-			c.ID = ""
 			used[c.Label] = true
-			batch = append(batch, c)
+			batch = append(batch, vault.Import{SrcID: c.ID})
 			res.Created++
 		}
 	}
 	res.Skipped += int32(p.reserved)
 	if len(batch) > 0 {
-		if _, err := v.PutBatch(batch); err != nil {
+		if _, err := v.ImportFrom(p.b, batch); err != nil {
 			return nil, service.VaultErr(ctx, err)
 		}
 	}

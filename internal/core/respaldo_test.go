@@ -100,10 +100,8 @@ func (h *harness) pendientes() (n int, destruidos int) {
 	defer h.core.respaldos.mu.Unlock()
 	for _, p := range h.core.respaldos.pend {
 		n++
-		for _, c := range p.creds {
-			if c.Password.Empty() && c.Enable.Empty() {
-				destruidos++
-			}
+		if !p.b.Unlocked() {
+			destruidos++
 		}
 	}
 	return
@@ -416,47 +414,36 @@ func TestRespaldoTokenUnSoloUsoYVence(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("pendientes %d", n)
 	}
-	var guardadas []string
-	o.core.respaldos.mu.Lock()
-	for _, p := range o.core.respaldos.pend {
-		guardadas = append(guardadas, string(p.creds[0].Password.Bytes()))
-	}
-	o.core.respaldos.mu.Unlock()
 	clk.avanza(11 * time.Minute)
 	o.core.respaldos.sweep(clk.now())
 	if n, _ := o.pendientes(); n != 0 {
 		t.Fatal("el barrido no borró la vencida")
 	}
-	_ = guardadas
 }
 
 func TestRespaldoBorraDescifradoAlAplicarYAlCerrar(t *testing.T) {
 	_, path := bovedaConRespaldo(t, nil)
 	o := newHarness(t, nil)
 	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
-	// La vista previa guarda las credenciales; al aplicar se destruyen.
+	// La vista previa retiene el respaldo abierto (solo su DEK) y metadatos, no secretos descifrados; al aplicar se cierra.
 	pr, _ := o.preview(t, path)
 	o.core.respaldos.mu.Lock()
-	var creds []interface{ Empty() bool }
+	var abiertos []*vault.Vault
 	for _, p := range o.core.respaldos.pend {
-		for _, c := range p.creds {
-			if c.Password.Empty() {
-				t.Fatal("la vista previa no guardó el secreto")
-			}
-			creds = append(creds, c.Password)
+		if len(p.infos) != 3 || !p.b.Unlocked() {
+			t.Fatalf("la vista previa no retuvo el respaldo: %d infos", len(p.infos))
 		}
+		abiertos = append(abiertos, p.b)
 	}
 	o.core.respaldos.mu.Unlock()
-	if len(creds) != 3 {
-		t.Fatalf("guardadas %d", len(creds))
+	if len(abiertos) != 1 {
+		t.Fatalf("guardadas %d", len(abiertos))
 	}
 	if _, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token}); err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range creds {
-		if !c.Empty() {
-			t.Fatal("quedó un secreto en memoria tras aplicar")
-		}
+	if abiertos[0].Unlocked() {
+		t.Fatal("quedó el respaldo abierto tras aplicar")
 	}
 	// Al cerrar la bóveda (por cualquier vía) también se borran; aplicar con ella cerrada da FailedPrecondition.
 	for name, cerrar := range map[string]func(){

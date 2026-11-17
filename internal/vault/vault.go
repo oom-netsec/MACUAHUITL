@@ -430,32 +430,11 @@ func (v *Vault) putBatchLocked(cs []Credential, reserved, strict bool) ([]string
 	next := append([]rawEntry(nil), v.entries...)
 	ids := make([]string, 0, len(cs))
 	for _, c := range cs {
-		idx := -1
-		var e rawEntry
-		if c.ID != "" {
-			i, err := v.find(c.ID)
-			if err != nil {
-				return nil, err
-			}
-			if err := v.guardReserved(i); err != nil && !reserved {
-				return nil, err
-			}
-			idx, e.ID = i, v.entries[i].ID
-		} else if _, err := io.ReadFull(rand.Reader, e.ID[:]); err != nil {
-			return nil, fmt.Errorf("vault: %w", err)
+		id, err := v.sealInto(&next, c, reserved)
+		if err != nil {
+			return nil, err
 		}
-		if _, err := io.ReadFull(rand.Reader, e.Nonce[:]); err != nil {
-			return nil, fmt.Errorf("vault: %w", err)
-		}
-		plain := encodePlain(c)
-		e.CT = v.aead.Seal(nil, e.Nonce[:], plain, v.entryAAD(e.ID))
-		wipe(plain)
-		if idx >= 0 {
-			next[idx] = e
-		} else {
-			next = append(next, e)
-		}
-		ids = append(ids, hex.EncodeToString(e.ID[:]))
+		ids = append(ids, id)
 	}
 	prev := v.entries
 	v.entries = next
@@ -464,6 +443,90 @@ func (v *Vault) putBatchLocked(cs []Credential, reserved, strict bool) ([]string
 		return nil, err
 	}
 	return ids, nil
+}
+
+// sealInto cifra c y la agrega a next (o reemplaza la entrada de c.ID). No toca v.entries. Requiere v.mu.
+func (v *Vault) sealInto(next *[]rawEntry, c Credential, reserved bool) (string, error) {
+	idx := -1
+	var e rawEntry
+	if c.ID != "" {
+		i, err := v.find(c.ID)
+		if err != nil {
+			return "", err
+		}
+		if err := v.guardReserved(i); err != nil && !reserved {
+			return "", err
+		}
+		idx, e.ID = i, v.entries[i].ID
+	} else if _, err := io.ReadFull(rand.Reader, e.ID[:]); err != nil {
+		return "", fmt.Errorf("vault: %w", err)
+	}
+	if _, err := io.ReadFull(rand.Reader, e.Nonce[:]); err != nil {
+		return "", fmt.Errorf("vault: %w", err)
+	}
+	plain := encodePlain(c)
+	e.CT = v.aead.Seal(nil, e.Nonce[:], plain, v.entryAAD(e.ID))
+	wipe(plain)
+	if idx >= 0 {
+		(*next)[idx] = e
+	} else {
+		*next = append(*next, e)
+	}
+	return hex.EncodeToString(e.ID[:]), nil
+}
+
+// Import es una credencial de un respaldo abierto que ImportFrom copia: SrcID es su ID en el respaldo; ID, el de la credencial viva que
+// reemplaza ("" crea una); Label, la etiqueta nueva ("" conserva la del respaldo).
+type Import struct{ SrcID, ID, Label string }
+
+// ImportFrom copia de src las credenciales de items con una sola escritura: o entran todas o no entra ninguna. Descifra y cifra de a
+// una (solo una credencial en memoria bloqueada a la vez, sin importar cuántas sean), valida cada una con la frontera estricta de Put
+// y no toca v.entries hasta que todas pasaron; si la escritura falla, la bóveda queda como estaba. src es otra bóveda abierta.
+func (v *Vault) ImportFrom(src *Vault, items []Import) ([]string, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return nil, err
+	}
+	next := append([]rawEntry(nil), v.entries...)
+	ids := make([]string, 0, len(items))
+	for _, it := range items {
+		c, err := src.Get(it.SrcID)
+		if err != nil {
+			return nil, err
+		}
+		c.ID = it.ID
+		if it.Label != "" {
+			c.Label = it.Label
+		}
+		id, err := v.sealStrict(&next, c)
+		c.Password.Destroy()
+		c.Enable.Destroy()
+		c.SSHKey.Destroy()
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	prev := v.entries
+	v.entries = next
+	if err := v.persistReplacingBak(); err != nil {
+		v.entries = prev
+		return nil, err
+	}
+	return ids, nil
+}
+
+// sealStrict es sealInto con la frontera de entrada: tope de MaxFieldBytes por campo y llave SSH válida.
+func (v *Vault) sealStrict(next *[]rawEntry, c Credential) (string, error) {
+	if len(c.Label) > MaxFieldBytes || len(c.Username) > MaxFieldBytes || len(c.Password.Bytes()) > MaxFieldBytes ||
+		len(c.Enable.Bytes()) > MaxFieldBytes || len(c.SSHKey.Bytes()) > MaxFieldBytes {
+		return "", ErrFieldTooLong
+	}
+	if err := ValidateKey(c.Label, c.SSHKey); err != nil {
+		return "", err
+	}
+	return v.sealInto(next, c, false)
 }
 
 // Get descifra una credencial. Quien llama hace Destroy de sus secretos.

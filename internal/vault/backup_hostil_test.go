@@ -129,7 +129,7 @@ func TestBackupHostilCampoEnormeDentroDelCifrado(t *testing.T) {
 	for _, c := range []struct {
 		n    int
 		want error
-	}{{200 << 10, ErrFieldTooLong}, {9 << 20, ErrBackupTooLarge}} {
+	}{{200 << 10, ErrFieldTooLong}, {9 << 20, ErrFieldTooLong}} {
 		_, raw := respaldoChico(t)
 		p := filepath.Join(t.TempDir(), "e.mcvault")
 		os.WriteFile(p, raw, 0o600)
@@ -153,12 +153,6 @@ func TestBackupHostilCampoEnormeDentroDelCifrado(t *testing.T) {
 		}
 		b.LockAll()
 		b, err = OpenBackup(p, pw(frase))
-		if c.want == ErrBackupTooLarge {
-			if !errors.Is(err, c.want) {
-				t.Fatalf("%d: err = %v", c.n, err)
-			}
-			continue
-		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -332,55 +326,108 @@ func poblar(t *testing.T, v *Vault, n int) {
 	}
 }
 
-// Muchas entradas chicas: cada una pide unas páginas de memoria bloqueada aunque su texto sea de bytes. OpenBackup lo rechaza antes
-// de descifrar nada (antes, memguard entraba en pánico en la vista previa).
-func TestOpenBackupRechazaPorMemoriaBloqueada(t *testing.T) {
+// respaldoDe arma un respaldo con n credenciales (de a lotes chicos) y lo abre.
+func respaldoDe(t *testing.T, n int, campo int) *Vault {
+	t.Helper()
 	v, _ := newVault(t)
-	poblar(t, v, 700)
-	dst := rutaRespaldo(t)
-	if n, err := WriteBackup(v, dst, pw(frase), false); err != nil || n != 700 {
-		t.Fatalf("export de 700 (de a trozos, sin pánico): n=%d %v", n, err)
-	}
-	if _, err := OpenBackup(dst, pw(frase)); !errors.Is(err, ErrBackupTooLarge) {
-		t.Fatalf("err = %v", err)
-	}
-	// Un respaldo de unos cientos sí cabe.
-	v2, _ := newVault(t)
-	poblar(t, v2, 250)
-	dst2 := rutaRespaldo(t)
-	if _, err := WriteBackup(v2, dst2, pw(frase), false); err != nil {
-		t.Fatal(err)
-	}
-	b, err := OpenBackup(dst2, pw(frase))
-	if err != nil {
-		t.Fatalf("250 debían caber: %v", err)
-	}
-	if got := b.LockedBound(); got > MaxBackupLockedBytes {
-		t.Fatalf("cota %d", got)
-	}
-	b.LockAll()
-}
-
-// Pocas entradas de 3×64 KiB: la cota por páginas también las rechaza antes de descifrar.
-func TestOpenBackupRechazaCamposGrandesPorMemoriaBloqueada(t *testing.T) {
-	v, _ := newVault(t)
-	f := bytes.Repeat([]byte{'x'}, MaxFieldBytes)
-	for i := 0; i < 43; i++ {
-		c := Credential{Label: fmt.Sprintf("g%02d", i), Password: secret.New(bytes.Clone(f)), Enable: secret.New(bytes.Clone(f)), SSHKey: secret.New(bytes.Clone(f))}
-		_, err := v.putBatch([]Credential{c}, false, false) // salta la llave: aquí solo importa el tamaño
-		c.Password.Destroy()
-		c.Enable.Destroy()
-		c.SSHKey.Destroy()
+	f := bytes.Repeat([]byte{'x'}, campo)
+	for i := 0; i < n; i += 20 {
+		var cs []Credential
+		for j := i; j < min(i+20, n); j++ {
+			cs = append(cs, Credential{Label: fmt.Sprintf("c%04d", j), Password: secret.New(bytes.Clone(f))})
+		}
+		_, err := v.PutBatch(cs)
+		for _, c := range cs {
+			c.Password.Destroy()
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	dst := rutaRespaldo(t)
-	if _, err := WriteBackup(v, dst, pw(frase), false); err != nil {
+	if got, err := WriteBackup(v, dst, pw(frase), false); err != nil || got != n {
+		t.Fatalf("export: %d %v", got, err)
+	}
+	b, err := OpenBackup(dst, pw(frase))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenBackup(dst, pw(frase)); !errors.Is(err, ErrBackupTooLarge) {
+	t.Cleanup(b.LockAll)
+	return b
+}
+
+func importaTodo(t *testing.T, b *Vault) []Import {
+	t.Helper()
+	infos, err := b.ListAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var its []Import
+	for _, i := range infos {
+		its = append(its, Import{SrcID: i.ID})
+	}
+	return its
+}
+
+// Sin cota de memoria bloqueada: 2000 credenciales y 43 de 3x64 KiB se abren y se copian a otra bóveda sin pánico.
+func TestImportFromRespaldosGrandes(t *testing.T) {
+	for _, c := range []struct{ n, campo int }{{2000, 1}, {43, MaxFieldBytes}} {
+		b := respaldoDe(t, c.n, c.campo)
+		live, _ := newVault(t)
+		ids, err := live.ImportFrom(b, importaTodo(t, b))
+		if err != nil || len(ids) != c.n {
+			t.Fatalf("%d: %d %v", c.n, len(ids), err)
+		}
+		if l, _ := live.List(); len(l) != c.n {
+			t.Fatalf("%d: quedaron %d", c.n, len(l))
+		}
+	}
+}
+
+// Todo o nada: una llave SSH inválida en la entrada 1500 (o un campo demasiado largo) deja la bóveda idéntica byte a byte.
+func TestImportFromFallaAMitadDejaLaBovedaIgual(t *testing.T) {
+	src, _ := newVault(t)
+	for i := 0; i < 2000; i += 50 {
+		var cs []Credential
+		for j := i; j < i+50; j++ {
+			c := cred(fmt.Sprintf("c%04d", j), "p", "")
+			if j == 1500 {
+				c.SSHKey = secret.New([]byte("no es una llave"))
+			}
+			if j == 1700 {
+				c.Password = secret.New(bytes.Repeat([]byte{'x'}, MaxFieldBytes+1))
+			}
+			cs = append(cs, c)
+		}
+		_, err := src.putBatch(cs, false, false) // sin frontera estricta: así entra lo ajeno
+		destroyAll(cs)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	live, p := newVault(t)
+	poblar(t, live, 5)
+	antes, _ := os.ReadFile(p)
+	bak0, _ := os.ReadFile(p + ".bak")
+	its := importaTodo(t, src)
+	if _, err := live.ImportFrom(src, its); !errors.Is(err, ErrKeyInvalid) {
 		t.Fatalf("err = %v", err)
+	}
+	if d, _ := os.ReadFile(p); !bytes.Equal(d, antes) {
+		t.Fatal("la bóveda cambió")
+	}
+	if d, _ := os.ReadFile(p + ".bak"); !bytes.Equal(d, bak0) {
+		t.Fatal(".bak cambió")
+	}
+	if l, _ := live.List(); len(l) != 5 {
+		t.Fatalf("en memoria quedaron %d", len(l))
+	}
+	// Sin la llave mala, el campo largo de la 1700 también lo rechaza.
+	if _, err := live.ImportFrom(src, its[1501:]); !errors.Is(err, ErrFieldTooLong) {
+		t.Fatalf("err = %v", err)
+	}
+	if d, _ := os.ReadFile(p); !bytes.Equal(d, antes) {
+		t.Fatal("la bóveda cambió (campo largo)")
 	}
 }
 

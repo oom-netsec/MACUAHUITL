@@ -346,8 +346,8 @@ func TestOpenBackupTopeDeEntradas(t *testing.T) {
 	if _, err := OpenBackup(con(MaxBackupEntries+1), pw(frase)); !errors.Is(err, ErrTooManyEntries) {
 		t.Fatalf("pasado del tope: %v", err)
 	}
-	// En el tope de cuenta ya no pasa el de memoria bloqueada (10000 entradas piden más de 100 MiB): otro error, no ErrTooManyEntries.
-	if _, err := OpenBackup(con(MaxBackupEntries), pw(frase)); !errors.Is(err, ErrBackupTooLarge) {
+	// En el tope de cuenta sí abre (aquí las entradas son basura: descifrar falla, no «demasiadas»).
+	if _, err := OpenBackup(con(MaxBackupEntries), pw(frase)); errors.Is(err, ErrTooManyEntries) {
 		t.Fatalf("en el tope: %v", err)
 	}
 }

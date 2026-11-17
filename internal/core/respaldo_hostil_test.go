@@ -2,21 +2,17 @@ package core
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/secret"
-	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
 // estadoBoveda es la bóveda viva byte a byte y lo que hay en su carpeta: nada a medias, ningún temporal.
@@ -110,57 +106,6 @@ func TestPutCredentialSigueSinAceptarLlaves(t *testing.T) {
 	_, err := h.vault.PutCredential(ctx(t), &v1.PutCredentialRequest{Label: "k", Username: "u", SshPrivateKey: []byte("x")})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("err = %v", err)
-	}
-}
-
-// Muchas entradas chicas: la vista previa las rechaza antes de descifrar (cada secreto pide páginas bloqueadas y memguard entraba en
-// pánico con unas 700), sin dejar vista previa ni tocar la bóveda; y exportarlas no entra en pánico.
-func TestRespaldoHostilMuchasEntradasChicasRechazaSinPanico(t *testing.T) {
-	h := newHarness(t, nil)
-	h.ready(t)
-	for i := 0; i < 700; i += 50 {
-		var cs []vault.Credential
-		for j := i; j < i+50; j++ {
-			cs = append(cs, vault.Credential{Label: fmt.Sprintf("c%04d", j), Username: "u", Password: secret.New([]byte("p"))})
-		}
-		_, err := h.core.vault.PutBatch(cs)
-		for _, c := range cs {
-			c.Password.Destroy()
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	path := filepath.Join(t.TempDir(), "r.mcvault")
-	if r, err := h.export(t, path, true); err != nil || r.Count != 701 {
-		t.Fatalf("export: %+v %v", r, err)
-	}
-	o := newHarness(t, nil)
-	if _, err := o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")}); err != nil {
-		t.Fatal(err)
-	}
-	b0, n0 := estadoBoveda(t, o)
-	if _, err := o.preview(t, path); status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("preview: %v", err)
-	}
-	mismoEstado(t, o, b0, n0, "demasiadas")
-}
-
-// Las vistas previas pendientes comparten un presupuesto de memoria bloqueada: al pedir más de lo que cabe, la más vieja cede.
-func TestRespaldoStoreReservaCedeLasViejas(t *testing.T) {
-	h, path := bovedaConRespaldo(t, nil)
-	now := time.Now()
-	st := &h.core.respaldos
-	if _, err := h.preview(t, path); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := h.pendientes(); n != 1 {
-		t.Fatalf("pendientes = %d", n)
-	}
-	st.reserve(respaldoBudget, now)
-	defer st.release(respaldoBudget)
-	if n, _ := h.pendientes(); n != 0 {
-		t.Fatalf("la vista previa no cedió: %d", n)
 	}
 }
 
