@@ -1013,8 +1013,12 @@ type JobSummary struct {
 	Kind string `protobuf:"bytes,14,opt,name=kind,proto3" json:"kind,omitempty"`
 	// Equipos de la ronda que terminaron en PARTIAL; no cuentan en devices_ok ni en devices_failed.
 	DevicesPartial uint32 `protobuf:"varint,15,opt,name=devices_partial,json=devicesPartial,proto3" json:"devices_partial,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Cuándo terminó (completed, cancelled o failed); sin valor mientras está activo.
+	FinishedAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	// Terminó en un día local anterior al de hoy (hora local del núcleo): la UI lo muestra en «Past jobs».
+	Past          bool `protobuf:"varint,17,opt,name=past,proto3" json:"past,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *JobSummary) Reset() {
@@ -1152,6 +1156,20 @@ func (x *JobSummary) GetDevicesPartial() uint32 {
 	return 0
 }
 
+func (x *JobSummary) GetFinishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinishedAt
+	}
+	return nil
+}
+
+func (x *JobSummary) GetPast() bool {
+	if x != nil {
+		return x.Past
+	}
+	return false
+}
+
 type JobPhase struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	At    *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=at,proto3" json:"at,omitempty"`
@@ -1240,7 +1258,9 @@ func (x *JobPhase) GetArgs() map[string]string {
 }
 
 type ListJobsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// false: activos y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
+	IncludePast   bool `protobuf:"varint,1,opt,name=include_past,json=includePast,proto3" json:"include_past,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1273,6 +1293,13 @@ func (x *ListJobsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListJobsRequest.ProtoReflect.Descriptor instead.
 func (*ListJobsRequest) Descriptor() ([]byte, []int) {
 	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListJobsRequest) GetIncludePast() bool {
+	if x != nil {
+		return x.IncludePast
+	}
+	return false
 }
 
 type ListJobsResponse struct {
@@ -1319,6 +1346,112 @@ func (x *ListJobsResponse) GetJobs() []*JobSummary {
 	return nil
 }
 
+type RemoveJobsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Una de las dos, no ambas: ids concretos o todos los terminados (nunca toca los activos).
+	JobIds        []string `protobuf:"bytes,1,rep,name=job_ids,json=jobIds,proto3" json:"job_ids,omitempty"`
+	AllFinished   bool     `protobuf:"varint,2,opt,name=all_finished,json=allFinished,proto3" json:"all_finished,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveJobsRequest) Reset() {
+	*x = RemoveJobsRequest{}
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveJobsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveJobsRequest) ProtoMessage() {}
+
+func (x *RemoveJobsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveJobsRequest.ProtoReflect.Descriptor instead.
+func (*RemoveJobsRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RemoveJobsRequest) GetJobIds() []string {
+	if x != nil {
+		return x.JobIds
+	}
+	return nil
+}
+
+func (x *RemoveJobsRequest) GetAllFinished() bool {
+	if x != nil {
+		return x.AllFinished
+	}
+	return false
+}
+
+type RemoveJobsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Cuántos se quitaron; los ids que no existen se ignoran y no cuentan.
+	Removed       int32    `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
+	RemovedIds    []string `protobuf:"bytes,2,rep,name=removed_ids,json=removedIds,proto3" json:"removed_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveJobsResponse) Reset() {
+	*x = RemoveJobsResponse{}
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveJobsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveJobsResponse) ProtoMessage() {}
+
+func (x *RemoveJobsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveJobsResponse.ProtoReflect.Descriptor instead.
+func (*RemoveJobsResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RemoveJobsResponse) GetRemoved() int32 {
+	if x != nil {
+		return x.Removed
+	}
+	return 0
+}
+
+func (x *RemoveJobsResponse) GetRemovedIds() []string {
+	if x != nil {
+		return x.RemovedIds
+	}
+	return nil
+}
+
 type RunDevice struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Target *Target                `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
@@ -1336,7 +1469,7 @@ type RunDevice struct {
 
 func (x *RunDevice) Reset() {
 	*x = RunDevice{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1348,7 +1481,7 @@ func (x *RunDevice) String() string {
 func (*RunDevice) ProtoMessage() {}
 
 func (x *RunDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1361,7 +1494,7 @@ func (x *RunDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunDevice.ProtoReflect.Descriptor instead.
 func (*RunDevice) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RunDevice) GetTarget() *Target {
@@ -1423,7 +1556,7 @@ type GetRunRequest struct {
 
 func (x *GetRunRequest) Reset() {
 	*x = GetRunRequest{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1568,7 @@ func (x *GetRunRequest) String() string {
 func (*GetRunRequest) ProtoMessage() {}
 
 func (x *GetRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1581,7 @@ func (x *GetRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunRequest.ProtoReflect.Descriptor instead.
 func (*GetRunRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetRunRequest) GetJobId() string {
@@ -1475,7 +1608,7 @@ type GetRunResponse struct {
 
 func (x *GetRunResponse) Reset() {
 	*x = GetRunResponse{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1487,7 +1620,7 @@ func (x *GetRunResponse) String() string {
 func (*GetRunResponse) ProtoMessage() {}
 
 func (x *GetRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1500,7 +1633,7 @@ func (x *GetRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRunResponse.ProtoReflect.Descriptor instead.
 func (*GetRunResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetRunResponse) GetDevices() []*RunDevice {
@@ -1526,7 +1659,7 @@ type ListPlaybooksRequest struct {
 
 func (x *ListPlaybooksRequest) Reset() {
 	*x = ListPlaybooksRequest{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1538,7 +1671,7 @@ func (x *ListPlaybooksRequest) String() string {
 func (*ListPlaybooksRequest) ProtoMessage() {}
 
 func (x *ListPlaybooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1551,7 +1684,7 @@ func (x *ListPlaybooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlaybooksRequest.ProtoReflect.Descriptor instead.
 func (*ListPlaybooksRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListPlaybooksRequest) GetPlatform() string {
@@ -1575,7 +1708,7 @@ type PlaybookInfo struct {
 
 func (x *PlaybookInfo) Reset() {
 	*x = PlaybookInfo{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1720,7 @@ func (x *PlaybookInfo) String() string {
 func (*PlaybookInfo) ProtoMessage() {}
 
 func (x *PlaybookInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1733,7 @@ func (x *PlaybookInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlaybookInfo.ProtoReflect.Descriptor instead.
 func (*PlaybookInfo) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PlaybookInfo) GetId() string {
@@ -1655,7 +1788,7 @@ type PlaybookParam struct {
 
 func (x *PlaybookParam) Reset() {
 	*x = PlaybookParam{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1667,7 +1800,7 @@ func (x *PlaybookParam) String() string {
 func (*PlaybookParam) ProtoMessage() {}
 
 func (x *PlaybookParam) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1680,7 +1813,7 @@ func (x *PlaybookParam) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlaybookParam.ProtoReflect.Descriptor instead.
 func (*PlaybookParam) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *PlaybookParam) GetName() string {
@@ -1706,7 +1839,7 @@ type ListPlaybooksResponse struct {
 
 func (x *ListPlaybooksResponse) Reset() {
 	*x = ListPlaybooksResponse{}
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1718,7 +1851,7 @@ func (x *ListPlaybooksResponse) String() string {
 func (*ListPlaybooksResponse) ProtoMessage() {}
 
 func (x *ListPlaybooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_patrol_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1731,7 +1864,7 @@ func (x *ListPlaybooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlaybooksResponse.ProtoReflect.Descriptor instead.
 func (*ListPlaybooksResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_patrol_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListPlaybooksResponse) GetPlaybooks() []*PlaybookInfo {
@@ -1805,7 +1938,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x12missing_inhibitors\x18\x02 \x03(\tR\x11missingInhibitors\")\n" +
 	"\x10CancelJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x13\n" +
-	"\x11CancelJobResponse\"\xac\x04\n" +
+	"\x11CancelJobResponse\"\xfd\x04\n" +
 	"\n" +
 	"JobSummary\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x12\n" +
@@ -1825,7 +1958,10 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"output_dir\x18\f \x01(\tR\toutputDir\x12/\n" +
 	"\x06phases\x18\r \x03(\v2\x17.macuahuitl.v1.JobPhaseR\x06phases\x12\x12\n" +
 	"\x04kind\x18\x0e \x01(\tR\x04kind\x12'\n" +
-	"\x0fdevices_partial\x18\x0f \x01(\rR\x0edevicesPartial\"\x9d\x02\n" +
+	"\x0fdevices_partial\x18\x0f \x01(\rR\x0edevicesPartial\x12;\n" +
+	"\vfinished_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"finishedAt\x12\x12\n" +
+	"\x04past\x18\x11 \x01(\bR\x04past\"\x9d\x02\n" +
 	"\bJobPhase\x12*\n" +
 	"\x02at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12/\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1b.macuahuitl.v1.JobPhaseKindR\x04kind\x12\x14\n" +
@@ -1835,10 +1971,18 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x04args\x18\x06 \x03(\v2!.macuahuitl.v1.JobPhase.ArgsEntryR\x04args\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x11\n" +
-	"\x0fListJobsRequest\"A\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"4\n" +
+	"\x0fListJobsRequest\x12!\n" +
+	"\finclude_past\x18\x01 \x01(\bR\vincludePast\"A\n" +
 	"\x10ListJobsResponse\x12-\n" +
-	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"\xd0\x02\n" +
+	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"O\n" +
+	"\x11RemoveJobsRequest\x12\x17\n" +
+	"\ajob_ids\x18\x01 \x03(\tR\x06jobIds\x12!\n" +
+	"\fall_finished\x18\x02 \x01(\bR\vallFinished\"O\n" +
+	"\x12RemoveJobsResponse\x12\x18\n" +
+	"\aremoved\x18\x01 \x01(\x05R\aremoved\x12\x1f\n" +
+	"\vremoved_ids\x18\x02 \x03(\tR\n" +
+	"removedIds\"\xd0\x02\n" +
 	"\tRunDevice\x12-\n" +
 	"\x06target\x18\x01 \x01(\v2\x15.macuahuitl.v1.TargetR\x06target\x120\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.DeviceStateR\x05state\x12\x16\n" +
@@ -1903,13 +2047,15 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x18JOB_PHASE_KIND_CANCELLED\x10\t\x12\x19\n" +
 	"\x15JOB_PHASE_KIND_FAILED\x10\n" +
 	"\x12!\n" +
-	"\x1dJOB_PHASE_KIND_ARM_CHECK_DONE\x10\v2\xb8\x04\n" +
+	"\x1dJOB_PHASE_KIND_ARM_CHECK_DONE\x10\v2\x8b\x05\n" +
 	"\rPatrolService\x12N\n" +
 	"\tCreateJob\x12\x1f.macuahuitl.v1.CreateJobRequest\x1a .macuahuitl.v1.CreateJobResponse\x12P\n" +
 	"\tLoginTest\x12\x1f.macuahuitl.v1.LoginTestRequest\x1a .macuahuitl.v1.LoginTestResponse0\x01\x12E\n" +
 	"\x06ArmJob\x12\x1c.macuahuitl.v1.ArmJobRequest\x1a\x1d.macuahuitl.v1.ArmJobResponse\x12N\n" +
 	"\tCancelJob\x12\x1f.macuahuitl.v1.CancelJobRequest\x1a .macuahuitl.v1.CancelJobResponse\x12K\n" +
-	"\bListJobs\x12\x1e.macuahuitl.v1.ListJobsRequest\x1a\x1f.macuahuitl.v1.ListJobsResponse\x12E\n" +
+	"\bListJobs\x12\x1e.macuahuitl.v1.ListJobsRequest\x1a\x1f.macuahuitl.v1.ListJobsResponse\x12Q\n" +
+	"\n" +
+	"RemoveJobs\x12 .macuahuitl.v1.RemoveJobsRequest\x1a!.macuahuitl.v1.RemoveJobsResponse\x12E\n" +
 	"\x06GetRun\x12\x1c.macuahuitl.v1.GetRunRequest\x1a\x1d.macuahuitl.v1.GetRunResponse\x12Z\n" +
 	"\rListPlaybooks\x12#.macuahuitl.v1.ListPlaybooksRequest\x1a$.macuahuitl.v1.ListPlaybooksResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
@@ -1926,7 +2072,7 @@ func file_macuahuitl_v1_patrol_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_patrol_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_macuahuitl_v1_patrol_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_macuahuitl_v1_patrol_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_macuahuitl_v1_patrol_proto_goTypes = []any{
 	(SplitStrategy)(0),            // 0: macuahuitl.v1.SplitStrategy
 	(ZipPolicy)(0),                // 1: macuahuitl.v1.ZipPolicy
@@ -1947,67 +2093,72 @@ var file_macuahuitl_v1_patrol_proto_goTypes = []any{
 	(*JobPhase)(nil),              // 16: macuahuitl.v1.JobPhase
 	(*ListJobsRequest)(nil),       // 17: macuahuitl.v1.ListJobsRequest
 	(*ListJobsResponse)(nil),      // 18: macuahuitl.v1.ListJobsResponse
-	(*RunDevice)(nil),             // 19: macuahuitl.v1.RunDevice
-	(*GetRunRequest)(nil),         // 20: macuahuitl.v1.GetRunRequest
-	(*GetRunResponse)(nil),        // 21: macuahuitl.v1.GetRunResponse
-	(*ListPlaybooksRequest)(nil),  // 22: macuahuitl.v1.ListPlaybooksRequest
-	(*PlaybookInfo)(nil),          // 23: macuahuitl.v1.PlaybookInfo
-	(*PlaybookParam)(nil),         // 24: macuahuitl.v1.PlaybookParam
-	(*ListPlaybooksResponse)(nil), // 25: macuahuitl.v1.ListPlaybooksResponse
-	nil,                           // 26: macuahuitl.v1.JobSpec.ParamsEntry
-	nil,                           // 27: macuahuitl.v1.LoginTestResponse.ArgsEntry
-	nil,                           // 28: macuahuitl.v1.JobPhase.ArgsEntry
-	nil,                           // 29: macuahuitl.v1.RunDevice.ArgsEntry
-	(*timestamppb.Timestamp)(nil), // 30: google.protobuf.Timestamp
-	(*Target)(nil),                // 31: macuahuitl.v1.Target
-	(DeviceState)(0),              // 32: macuahuitl.v1.DeviceState
+	(*RemoveJobsRequest)(nil),     // 19: macuahuitl.v1.RemoveJobsRequest
+	(*RemoveJobsResponse)(nil),    // 20: macuahuitl.v1.RemoveJobsResponse
+	(*RunDevice)(nil),             // 21: macuahuitl.v1.RunDevice
+	(*GetRunRequest)(nil),         // 22: macuahuitl.v1.GetRunRequest
+	(*GetRunResponse)(nil),        // 23: macuahuitl.v1.GetRunResponse
+	(*ListPlaybooksRequest)(nil),  // 24: macuahuitl.v1.ListPlaybooksRequest
+	(*PlaybookInfo)(nil),          // 25: macuahuitl.v1.PlaybookInfo
+	(*PlaybookParam)(nil),         // 26: macuahuitl.v1.PlaybookParam
+	(*ListPlaybooksResponse)(nil), // 27: macuahuitl.v1.ListPlaybooksResponse
+	nil,                           // 28: macuahuitl.v1.JobSpec.ParamsEntry
+	nil,                           // 29: macuahuitl.v1.LoginTestResponse.ArgsEntry
+	nil,                           // 30: macuahuitl.v1.JobPhase.ArgsEntry
+	nil,                           // 31: macuahuitl.v1.RunDevice.ArgsEntry
+	(*timestamppb.Timestamp)(nil), // 32: google.protobuf.Timestamp
+	(*Target)(nil),                // 33: macuahuitl.v1.Target
+	(DeviceState)(0),              // 34: macuahuitl.v1.DeviceState
 }
 var file_macuahuitl_v1_patrol_proto_depIdxs = []int32{
-	30, // 0: macuahuitl.v1.Schedule.until:type_name -> google.protobuf.Timestamp
-	31, // 1: macuahuitl.v1.JobSpec.targets:type_name -> macuahuitl.v1.Target
+	32, // 0: macuahuitl.v1.Schedule.until:type_name -> google.protobuf.Timestamp
+	33, // 1: macuahuitl.v1.JobSpec.targets:type_name -> macuahuitl.v1.Target
 	4,  // 2: macuahuitl.v1.JobSpec.overrides:type_name -> macuahuitl.v1.DeviceOverride
 	0,  // 3: macuahuitl.v1.JobSpec.split:type_name -> macuahuitl.v1.SplitStrategy
 	5,  // 4: macuahuitl.v1.JobSpec.schedule:type_name -> macuahuitl.v1.Schedule
 	1,  // 5: macuahuitl.v1.JobSpec.zip:type_name -> macuahuitl.v1.ZipPolicy
-	26, // 6: macuahuitl.v1.JobSpec.params:type_name -> macuahuitl.v1.JobSpec.ParamsEntry
+	28, // 6: macuahuitl.v1.JobSpec.params:type_name -> macuahuitl.v1.JobSpec.ParamsEntry
 	6,  // 7: macuahuitl.v1.CreateJobRequest.spec:type_name -> macuahuitl.v1.JobSpec
-	31, // 8: macuahuitl.v1.LoginTestResponse.target:type_name -> macuahuitl.v1.Target
+	33, // 8: macuahuitl.v1.LoginTestResponse.target:type_name -> macuahuitl.v1.Target
 	2,  // 9: macuahuitl.v1.LoginTestResponse.failed_step:type_name -> macuahuitl.v1.LoginTestStep
-	27, // 10: macuahuitl.v1.LoginTestResponse.args:type_name -> macuahuitl.v1.LoginTestResponse.ArgsEntry
-	30, // 11: macuahuitl.v1.ArmJobResponse.window_ends_at:type_name -> google.protobuf.Timestamp
-	30, // 12: macuahuitl.v1.JobSummary.next_round_at:type_name -> google.protobuf.Timestamp
-	30, // 13: macuahuitl.v1.JobSummary.armed_at:type_name -> google.protobuf.Timestamp
-	30, // 14: macuahuitl.v1.JobSummary.window_ends_at:type_name -> google.protobuf.Timestamp
+	29, // 10: macuahuitl.v1.LoginTestResponse.args:type_name -> macuahuitl.v1.LoginTestResponse.ArgsEntry
+	32, // 11: macuahuitl.v1.ArmJobResponse.window_ends_at:type_name -> google.protobuf.Timestamp
+	32, // 12: macuahuitl.v1.JobSummary.next_round_at:type_name -> google.protobuf.Timestamp
+	32, // 13: macuahuitl.v1.JobSummary.armed_at:type_name -> google.protobuf.Timestamp
+	32, // 14: macuahuitl.v1.JobSummary.window_ends_at:type_name -> google.protobuf.Timestamp
 	16, // 15: macuahuitl.v1.JobSummary.phases:type_name -> macuahuitl.v1.JobPhase
-	30, // 16: macuahuitl.v1.JobPhase.at:type_name -> google.protobuf.Timestamp
-	3,  // 17: macuahuitl.v1.JobPhase.kind:type_name -> macuahuitl.v1.JobPhaseKind
-	28, // 18: macuahuitl.v1.JobPhase.args:type_name -> macuahuitl.v1.JobPhase.ArgsEntry
-	15, // 19: macuahuitl.v1.ListJobsResponse.jobs:type_name -> macuahuitl.v1.JobSummary
-	31, // 20: macuahuitl.v1.RunDevice.target:type_name -> macuahuitl.v1.Target
-	32, // 21: macuahuitl.v1.RunDevice.state:type_name -> macuahuitl.v1.DeviceState
-	29, // 22: macuahuitl.v1.RunDevice.args:type_name -> macuahuitl.v1.RunDevice.ArgsEntry
-	19, // 23: macuahuitl.v1.GetRunResponse.devices:type_name -> macuahuitl.v1.RunDevice
-	24, // 24: macuahuitl.v1.PlaybookInfo.params:type_name -> macuahuitl.v1.PlaybookParam
-	23, // 25: macuahuitl.v1.ListPlaybooksResponse.playbooks:type_name -> macuahuitl.v1.PlaybookInfo
-	7,  // 26: macuahuitl.v1.PatrolService.CreateJob:input_type -> macuahuitl.v1.CreateJobRequest
-	9,  // 27: macuahuitl.v1.PatrolService.LoginTest:input_type -> macuahuitl.v1.LoginTestRequest
-	11, // 28: macuahuitl.v1.PatrolService.ArmJob:input_type -> macuahuitl.v1.ArmJobRequest
-	13, // 29: macuahuitl.v1.PatrolService.CancelJob:input_type -> macuahuitl.v1.CancelJobRequest
-	17, // 30: macuahuitl.v1.PatrolService.ListJobs:input_type -> macuahuitl.v1.ListJobsRequest
-	20, // 31: macuahuitl.v1.PatrolService.GetRun:input_type -> macuahuitl.v1.GetRunRequest
-	22, // 32: macuahuitl.v1.PatrolService.ListPlaybooks:input_type -> macuahuitl.v1.ListPlaybooksRequest
-	8,  // 33: macuahuitl.v1.PatrolService.CreateJob:output_type -> macuahuitl.v1.CreateJobResponse
-	10, // 34: macuahuitl.v1.PatrolService.LoginTest:output_type -> macuahuitl.v1.LoginTestResponse
-	12, // 35: macuahuitl.v1.PatrolService.ArmJob:output_type -> macuahuitl.v1.ArmJobResponse
-	14, // 36: macuahuitl.v1.PatrolService.CancelJob:output_type -> macuahuitl.v1.CancelJobResponse
-	18, // 37: macuahuitl.v1.PatrolService.ListJobs:output_type -> macuahuitl.v1.ListJobsResponse
-	21, // 38: macuahuitl.v1.PatrolService.GetRun:output_type -> macuahuitl.v1.GetRunResponse
-	25, // 39: macuahuitl.v1.PatrolService.ListPlaybooks:output_type -> macuahuitl.v1.ListPlaybooksResponse
-	33, // [33:40] is the sub-list for method output_type
-	26, // [26:33] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	32, // 16: macuahuitl.v1.JobSummary.finished_at:type_name -> google.protobuf.Timestamp
+	32, // 17: macuahuitl.v1.JobPhase.at:type_name -> google.protobuf.Timestamp
+	3,  // 18: macuahuitl.v1.JobPhase.kind:type_name -> macuahuitl.v1.JobPhaseKind
+	30, // 19: macuahuitl.v1.JobPhase.args:type_name -> macuahuitl.v1.JobPhase.ArgsEntry
+	15, // 20: macuahuitl.v1.ListJobsResponse.jobs:type_name -> macuahuitl.v1.JobSummary
+	33, // 21: macuahuitl.v1.RunDevice.target:type_name -> macuahuitl.v1.Target
+	34, // 22: macuahuitl.v1.RunDevice.state:type_name -> macuahuitl.v1.DeviceState
+	31, // 23: macuahuitl.v1.RunDevice.args:type_name -> macuahuitl.v1.RunDevice.ArgsEntry
+	21, // 24: macuahuitl.v1.GetRunResponse.devices:type_name -> macuahuitl.v1.RunDevice
+	26, // 25: macuahuitl.v1.PlaybookInfo.params:type_name -> macuahuitl.v1.PlaybookParam
+	25, // 26: macuahuitl.v1.ListPlaybooksResponse.playbooks:type_name -> macuahuitl.v1.PlaybookInfo
+	7,  // 27: macuahuitl.v1.PatrolService.CreateJob:input_type -> macuahuitl.v1.CreateJobRequest
+	9,  // 28: macuahuitl.v1.PatrolService.LoginTest:input_type -> macuahuitl.v1.LoginTestRequest
+	11, // 29: macuahuitl.v1.PatrolService.ArmJob:input_type -> macuahuitl.v1.ArmJobRequest
+	13, // 30: macuahuitl.v1.PatrolService.CancelJob:input_type -> macuahuitl.v1.CancelJobRequest
+	17, // 31: macuahuitl.v1.PatrolService.ListJobs:input_type -> macuahuitl.v1.ListJobsRequest
+	19, // 32: macuahuitl.v1.PatrolService.RemoveJobs:input_type -> macuahuitl.v1.RemoveJobsRequest
+	22, // 33: macuahuitl.v1.PatrolService.GetRun:input_type -> macuahuitl.v1.GetRunRequest
+	24, // 34: macuahuitl.v1.PatrolService.ListPlaybooks:input_type -> macuahuitl.v1.ListPlaybooksRequest
+	8,  // 35: macuahuitl.v1.PatrolService.CreateJob:output_type -> macuahuitl.v1.CreateJobResponse
+	10, // 36: macuahuitl.v1.PatrolService.LoginTest:output_type -> macuahuitl.v1.LoginTestResponse
+	12, // 37: macuahuitl.v1.PatrolService.ArmJob:output_type -> macuahuitl.v1.ArmJobResponse
+	14, // 38: macuahuitl.v1.PatrolService.CancelJob:output_type -> macuahuitl.v1.CancelJobResponse
+	18, // 39: macuahuitl.v1.PatrolService.ListJobs:output_type -> macuahuitl.v1.ListJobsResponse
+	20, // 40: macuahuitl.v1.PatrolService.RemoveJobs:output_type -> macuahuitl.v1.RemoveJobsResponse
+	23, // 41: macuahuitl.v1.PatrolService.GetRun:output_type -> macuahuitl.v1.GetRunResponse
+	27, // 42: macuahuitl.v1.PatrolService.ListPlaybooks:output_type -> macuahuitl.v1.ListPlaybooksResponse
+	35, // [35:43] is the sub-list for method output_type
+	27, // [27:35] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_patrol_proto_init() }
@@ -2022,7 +2173,7 @@ func file_macuahuitl_v1_patrol_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_patrol_proto_rawDesc), len(file_macuahuitl_v1_patrol_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   26,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

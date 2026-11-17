@@ -24,6 +24,7 @@ const (
 	PatrolService_ArmJob_FullMethodName        = "/macuahuitl.v1.PatrolService/ArmJob"
 	PatrolService_CancelJob_FullMethodName     = "/macuahuitl.v1.PatrolService/CancelJob"
 	PatrolService_ListJobs_FullMethodName      = "/macuahuitl.v1.PatrolService/ListJobs"
+	PatrolService_RemoveJobs_FullMethodName    = "/macuahuitl.v1.PatrolService/RemoveJobs"
 	PatrolService_GetRun_FullMethodName        = "/macuahuitl.v1.PatrolService/GetRun"
 	PatrolService_ListPlaybooks_FullMethodName = "/macuahuitl.v1.PatrolService/ListPlaybooks"
 )
@@ -41,6 +42,9 @@ type PatrolServiceClient interface {
 	ArmJob(ctx context.Context, in *ArmJobRequest, opts ...grpc.CallOption) (*ArmJobResponse, error)
 	CancelJob(ctx context.Context, in *CancelJobRequest, opts ...grpc.CallOption) (*CancelJobResponse, error)
 	ListJobs(ctx context.Context, in *ListJobsRequest, opts ...grpc.CallOption) (*ListJobsResponse, error)
+	// Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
+	// Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids) y no quita ninguno.
+	RemoveJobs(ctx context.Context, in *RemoveJobsRequest, opts ...grpc.CallOption) (*RemoveJobsResponse, error)
 	GetRun(ctx context.Context, in *GetRunRequest, opts ...grpc.CallOption) (*GetRunResponse, error)
 	// Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
 	ListPlaybooks(ctx context.Context, in *ListPlaybooksRequest, opts ...grpc.CallOption) (*ListPlaybooksResponse, error)
@@ -113,6 +117,16 @@ func (c *patrolServiceClient) ListJobs(ctx context.Context, in *ListJobsRequest,
 	return out, nil
 }
 
+func (c *patrolServiceClient) RemoveJobs(ctx context.Context, in *RemoveJobsRequest, opts ...grpc.CallOption) (*RemoveJobsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveJobsResponse)
+	err := c.cc.Invoke(ctx, PatrolService_RemoveJobs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *patrolServiceClient) GetRun(ctx context.Context, in *GetRunRequest, opts ...grpc.CallOption) (*GetRunResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRunResponse)
@@ -146,6 +160,9 @@ type PatrolServiceServer interface {
 	ArmJob(context.Context, *ArmJobRequest) (*ArmJobResponse, error)
 	CancelJob(context.Context, *CancelJobRequest) (*CancelJobResponse, error)
 	ListJobs(context.Context, *ListJobsRequest) (*ListJobsResponse, error)
+	// Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
+	// Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids) y no quita ninguno.
+	RemoveJobs(context.Context, *RemoveJobsRequest) (*RemoveJobsResponse, error)
 	GetRun(context.Context, *GetRunRequest) (*GetRunResponse, error)
 	// Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
 	ListPlaybooks(context.Context, *ListPlaybooksRequest) (*ListPlaybooksResponse, error)
@@ -173,6 +190,9 @@ func (UnimplementedPatrolServiceServer) CancelJob(context.Context, *CancelJobReq
 }
 func (UnimplementedPatrolServiceServer) ListJobs(context.Context, *ListJobsRequest) (*ListJobsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListJobs not implemented")
+}
+func (UnimplementedPatrolServiceServer) RemoveJobs(context.Context, *RemoveJobsRequest) (*RemoveJobsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveJobs not implemented")
 }
 func (UnimplementedPatrolServiceServer) GetRun(context.Context, *GetRunRequest) (*GetRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRun not implemented")
@@ -284,6 +304,24 @@ func _PatrolService_ListJobs_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PatrolService_RemoveJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveJobsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PatrolServiceServer).RemoveJobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PatrolService_RemoveJobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PatrolServiceServer).RemoveJobs(ctx, req.(*RemoveJobsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PatrolService_GetRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRunRequest)
 	if err := dec(in); err != nil {
@@ -342,6 +380,10 @@ var PatrolService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListJobs",
 			Handler:    _PatrolService_ListJobs_Handler,
+		},
+		{
+			MethodName: "RemoveJobs",
+			Handler:    _PatrolService_RemoveJobs_Handler,
 		},
 		{
 			MethodName: "GetRun",
