@@ -47,12 +47,14 @@ func Harden() ([]i18n.Text, error) {
 		return warns, i18n.New("harden.err.lockquota", i18n.A("cause", err.Error()))
 	}
 	warns = append(warns, hibernateWarnings(readHibernate())...)
-	return append(warns, pagefileWarnings(readPagingFiles())...), nil
+	files, perr := readPagingFiles()
+	return append(warns, pagefileWarnings(files, readPagingEncrypted(), perr)...), nil
 }
 
 // NoDump excluye al proceso de los reportes de error de Windows (sin volcados de WER); la
 // UI usa solo esto. Devuelve avisos; nunca falla.
 func NoDump() []i18n.Text {
+	windows.SetErrorMode(errorMode) // sin diálogos de error crítico ni de fallo de protección (ADR 0012)
 	var warns []i18n.Text
 	if err := werExclude(); err != nil {
 		warns = append(warns, i18n.Tx("harden.wer", "cause", err.Error()))
@@ -93,6 +95,24 @@ func readHibernate() (uint64, error) {
 		v, _, err = k.GetIntegerValue("HibernateEnabledDefault")
 	}
 	return v, err
+}
+
+// errorMode es lo que Harden pone con SetErrorMode.
+const errorMode = windows.SEM_FAILCRITICALERRORS | windows.SEM_NOGPFAULTERRORBOX
+
+// readPagingEncrypted dice si NtfsEncryptPagingFile (o la política EncryptPagingFile) vale 1. No se pudo leer = false: se avisa.
+func readPagingEncrypted() bool {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\FileSystem`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer k.Close()
+	for _, n := range []string{"NtfsEncryptPagingFile", "EncryptPagingFile"} {
+		if v, _, err := k.GetIntegerValue(n); err == nil && v == 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func readPagingFiles() ([]string, error) {
