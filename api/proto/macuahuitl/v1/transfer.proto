@@ -32,6 +32,11 @@ service TransferService {
   // Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
   // avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
   rpc GetMany(GetManyRequest) returns (stream GetManyResponse);
+  // Sesiones de los servidores abiertos con StartServer (fase 45b), para una encuesta de 1 s: las activas con su
+  // avance y las recientes con su resultado. Una sesión es una transferencia que empezó (TFTP: el par ya respondió;
+  // FTP: ya hay conexión de datos); los rechazos previos (archivo no publicado, origen no permitido) no son sesiones:
+  // siguen en el stream de StartServer y en ServerInfo.rejected. server_id desconocido: NOT_FOUND.
+  rpc ListTransferSessions(ListTransferSessionsRequest) returns (ListTransferSessionsResponse);
 }
 
 message StartServerRequest {
@@ -233,4 +238,31 @@ message FileResult {
 message BatchSummary {
   int32 ok = 1;
   int32 failed = 2;
+}
+
+message ListTransferSessionsRequest {
+  string server_id = 1;               // vacío = todos los servidores abiertos y los cerrados hace menos de 10 min
+}
+
+message ListTransferSessionsResponse {
+  repeated TransferSession sessions = 1; // activas primero (la más antigua arriba); luego las terminadas, la más reciente arriba
+}
+
+// Una transferencia de un servidor de StartServer. Se guardan todas las activas y las últimas 100 terminadas por
+// servidor, hasta 10 min después de cerrarse el servidor.
+message TransferSession {
+  string id = 1;                      // estable de activa a terminada
+  string server_id = 2;
+  string client = 3;                  // IP:puerto del equipo
+  string name = 4;                    // nombre ya validado (publicado o SafeName) y saneado para mostrar (control y formato → «?»)
+  string direction = 5;               // "in": el equipo sube (escritura); "out": el equipo descarga (lectura)
+  string protocol = 6;                // tftp, ftp, scp, sftp o http
+  int64 bytes = 7;                    // confirmados hasta ahora (TFTP: con ACK; subidas: hasta donde se escribió)
+  int64 total = 8;                    // 0 si se desconoce; descarga: tamaño publicado (HTTP: Content-Length); subida: tsize o la orden C de scp
+  double bytes_per_sec = 9;           // activa: del último segundo o más; terminada: promedio de toda la sesión
+  int64 started = 10;                 // unix ms
+  int64 ended = 11;                   // unix ms; 0 si sigue activa
+  string state = 12;                  // active, done o failed
+  string error = 13;                  // motivo en el idioma de la petición; vacío si no falló
+  string error_code = 14;             // clave estable del catálogo (p. ej. fileserve.reason.no_reply); vacío si el motivo no tiene clave
 }
