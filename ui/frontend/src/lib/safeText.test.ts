@@ -1,4 +1,4 @@
-import { pasteNeedsConfirm, pastePreview, safeFileName, showHidden } from "./safeText";
+import { pasteNeedsConfirm, pastePreview, safeFileName, showHidden, stripAnsi } from "./safeText";
 
 test("pegar pide confirmación con saltos de línea y con controles, no con texto normal ni tabulador", () => {
   expect(pasteNeedsConfirm("show version")).toBe(false);
@@ -39,4 +39,28 @@ test("la vista previa de pegar lista los códigos ocultos aunque queden fuera de
   expect(p.preview).not.toMatch(/U\+/);
   expect(p.controls).toBe("⟦U+0015⟧ ⟦U+0010⟧ ⟦U+001A⟧");
   expect(pastePreview("a\nb").controls).toBe("");
+});
+
+describe("stripAnsi", () => {
+  const E = "\u001b";
+  test.each([
+    ["CSI con parámetros", `${E}[1;31mrojo${E}[0m`, "rojo"],
+    ["CSI con «?» y «<=>» como parámetros privados", `${E}[?25lx${E}[>4;2mx${E}[=1h`, "xx"],
+    ["CSI con intermedios", `a${E}[2 qb`, "ab"],
+    ["CSI de 8 bits (\\x9b)", "a\u009b31mb\u009b?25lc", "abc"],
+    ["OSC terminado en BEL", `a${E}]0;titulo\u0007b`, "ab"],
+    ["OSC terminado en ESC \\", `a${E}]8;;http://x${E}\\enlace${E}]8;;${E}\\`, "aenlace"],
+    ["OSC de 8 bits terminado en ST", "a\u009d0;titulo\u009cb", "ab"],
+    ["DCS", `a${E}Pq#0;2;0;0;0${E}\\b`, "ab"],
+    ["DCS, SOS, PM y APC de 8 bits", "a\u0090x\u009cb\u0098y\u009cc\u009ez\u009cd\u009fw\u009ce", "abcde"],
+    ["SOS, PM y APC de 7 bits", `a${E}Xx${E}\\b${E}^y${E}\\c${E}_z${E}\\d`, "abcd"],
+    ["2 bytes: ESC 7 y ESC 8", `a${E}7b${E}8c`, "abc"],
+    ["3 bytes: ESC ( B", `a${E}(Bb${E})0c`, "abc"],
+    ["OSC sin terminar se lleva hasta el final", `ok${E}]0;sin fin`, "ok"],
+  ])("%s", (_n, inp, out) => expect(stripAnsi(inp)).toBe(out));
+
+  test("el texto sin ESC ni C1 no cambia (acentos, bidi y controles de texto incluidos)", () => {
+    const s = "64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.5 ms [x] ñ é ‮\t\n\r <b>";
+    expect(stripAnsi(s)).toBe(s);
+  });
 });

@@ -26,5 +26,7 @@ export const showHidden = (s: string): string =>
 export const safeFileName = (name: string): string =>
   name.replace(new RegExp(`[/\\\\\\t\\n${CONTROL}${INVISIBLE}]`, "gu"), "_").replace(/^\.+/, "_");
 
-// Secuencias ANSI (CSI y OSC) de la salida de una herramienta: en un <pre> se verían como basura («ESC[31m»). El texto queda igual.
-export const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "").replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, "");
+// Secuencias de terminal de la salida de una herramienta: en un <pre> se verían como basura («ESC[31m»). El texto queda igual.
+// CSI (7 y 8 bits, con parámetros «0-?» e intermedios), OSC/DCS/SOS/PM/APC (ESC ] P X ^ _ o C1 \x90 \x98 \x9d-\x9f) hasta BEL, ESC\ o ST (\x9c), y las de 2 o 3 bytes (ESC 7, ESC ( B).
+export const stripAnsi = (s: string): string =>
+  s.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x9b[0-?]*[ -/]*[@-~]|(?:\x1b[\]P_^X]|[\x90\x98\x9d-\x9f])[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)?|\x1b[ -/]*[0-~]/g, "");
