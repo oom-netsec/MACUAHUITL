@@ -75,3 +75,54 @@ func TestDiagPingExtendido200(t *testing.T) {
 		t.Fatalf("DiagStop tras terminar = %v", err)
 	}
 }
+
+// fakePingSinStop: núcleo que no manda run_id (o no tiene StopRun): el ping corre hasta que se corte el stream.
+type fakePingSinStop struct {
+	v1.UnimplementedDiagServiceServer
+	runID string
+}
+
+func (f fakePingSinStop) Run(_ *v1.RunRequest, st v1.DiagService_RunServer) error {
+	st.Send(&v1.RunResponse{RunId: f.runID, OutputLine: "PING 192.0.2.1"})
+	<-st.Context().Done()
+	return nil
+}
+
+// fakePingNotFound: el núcleo ya no conoce la ejecución (terminó entre medio).
+type fakePingNotFound struct{ fakePingSinStop }
+
+func (fakePingNotFound) StopRun(context.Context, *v1.StopRunRequest) (*v1.StopRunResponse, error) {
+	return nil, status.Error(codes.NotFound, "ya terminó")
+}
+
+func TestDiagStopSinIDONiStopRunCorta(t *testing.T) {
+	// Sin run_id del núcleo (núcleo viejo o aún no llegó el primer evento) y con StopRun Unimplemented: Detener corta como Cancelar.
+	for _, runID := range []string{"", "core-1"} {
+		b, rec := startServices(t, func(r ipc.Registrar) { v1.RegisterDiagServiceServer(r, fakePingSinStop{runID: runID}) })
+		id, _ := b.DiagRun("ping", []string{"192.0.2.1"}, map[string]string{"continuous": "true"})
+		waitCount(rec, "diag:line", 1)
+		if err := b.DiagStop(id); err != nil {
+			t.Fatalf("run_id %q: %v", runID, err)
+		}
+		waitCount(rec, "diag:done", 1)
+		rec.mu.Lock()
+		evs := strings.Join(rec.evs, "\n")
+		rec.mu.Unlock()
+		if !strings.Contains(evs, `"canceled":true`) {
+			t.Fatalf("run_id %q: no se cortó: %s", runID, evs)
+		}
+	}
+}
+
+func TestDiagStopNotFoundDelNucleo(t *testing.T) {
+	b, rec := startServices(t, func(r ipc.Registrar) {
+		v1.RegisterDiagServiceServer(r, fakePingNotFound{fakePingSinStop{runID: "core-9"}})
+	})
+	id, _ := b.DiagRun("ping", []string{"192.0.2.1"}, map[string]string{"continuous": "true"})
+	waitCount(rec, "diag:line", 1)
+	var be *Error
+	if err := b.DiagStop(id); !errors.As(err, &be) || be.Code != "NotFound" {
+		t.Fatalf("NotFound del núcleo = %v", err)
+	}
+	b.DiagCancel(id)
+}

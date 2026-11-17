@@ -774,7 +774,8 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 			}
 			ev := map[string]any{"runId": id}
 			sp := r.GetSweepPoint()
-			if r.OutputLine != "" || (sp == nil && r.RunId == "") { // una línea vacía de la salida también cuenta
+			// Una línea vacía de la salida también cuenta; la única que se omite es la del evento que solo trae run_id (el primero).
+			if r.OutputLine != "" || (sp == nil && r.RunId == "") {
 				ev["line"] = r.OutputLine
 			}
 			if sp != nil {
@@ -824,16 +825,27 @@ func (b *Bridge) DiagCancel(runID string) error {
 }
 
 // DiagStop termina un ping continuo o con duración y deja que el núcleo mande el resumen (#200); DiagCancel corta sin él.
-// Si la ejecución ya terminó responde NotFound, igual que StopRun del núcleo: la UI lo ignora.
+// Si la ejecución ya terminó responde NotFound, igual que StopRun del núcleo: la UI lo ignora. Si sigue viva pero no se puede
+// pedir el resumen (aún no llegó el run_id del núcleo, o el núcleo no tiene StopRun), corta como DiagCancel: Detener nunca
+// deja el ping corriendo.
 func (b *Bridge) DiagStop(runID string) error {
 	b.mu.Lock()
-	core, ok := b.coreRun[runID]
+	core, hasCore := b.coreRun[runID]
+	cancel, live := b.runs[runID]
 	b.mu.Unlock()
-	if !ok {
+	if !live {
 		return wrapErr(status.Error(codes.NotFound, i18n.In(b.locale(), i18n.New("bridge.err.run_gone", i18n.A("id", runID)))))
+	}
+	if !hasCore {
+		cancel()
+		return nil
 	}
 	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
 		_, err := v1.NewDiagServiceClient(c).StopRun(ctx, &v1.StopRunRequest{RunId: core})
+		if status.Code(err) == codes.Unimplemented {
+			cancel()
+			return struct{}{}, nil
+		}
 		return struct{}{}, err
 	})
 	return err
