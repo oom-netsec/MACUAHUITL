@@ -78,6 +78,9 @@ func carpetaSegura(t *testing.T) string {
 // Al arrancar se revalida la carpeta guardada: si dejó de ser 0700 rige la de fábrica, queda una entrada prefs.core
 // con el motivo y GetCorePrefs lo avisa en note; los defaults de ingest guardados siguen.
 func TestArranqueRevalidaLaCarpetaGuardada(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la carpeta se vuelve «laxa» con chmod 0755 (modelo POSIX); en Windows el chequeo es por ACL")
+	}
 	h := newHarness(t, nil)
 	nueva := carpetaSegura(t)
 	if _, err := v1.NewPrefsServiceClient(h.conn).SetCorePrefs(context.Background(), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: nueva, IngestDefaults: &v1.IngestDefaults{MaxFiles: 12}}}); err != nil {

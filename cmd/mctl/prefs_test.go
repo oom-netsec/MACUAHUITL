@@ -40,7 +40,7 @@ func TestPrefsShowYSet(t *testing.T) {
 	if err != nil || !strings.Contains(out, "carpeta de salidas: "+nueva) || !strings.Contains(out, "formato: jsonl") || !strings.Contains(out, "max_archivos: 5") || strings.Contains(out, "no se mueven") {
 		t.Fatalf("set parcial = %q %v", out, err)
 	}
-	if out, err = mctl(t, "", "prefs", "show", "--json"); err != nil || !strings.Contains(out, `"outputs_dir_effective"`) || !strings.Contains(out, nueva) {
+	if out, err = mctl(t, "", "prefs", "show", "--json"); err != nil || !strings.Contains(out, `"outputs_dir_effective"`) || !strings.Contains(out, strings.ReplaceAll(nueva, `\`, `\\`)) { // el JSON escapa las barras invertidas
 		t.Fatalf("json = %q %v", out, err)
 	}
 	// --outputs "" vuelve a la de fábrica

@@ -157,7 +157,11 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 			closed = c
 		}
 	}
-	if closed == nil || closed.Cleanup != "sudo nft delete table ip macuahuitl_tftp_"+port {
+	cleanup := "sudo nft delete table ip macuahuitl_tftp_" + port
+	if runtime.GOOS == "windows" { // en Windows se quita la regla del firewall
+		cleanup = "Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 127.0.0.1 " + port + "'"
+	}
+	if closed == nil || closed.Cleanup != cleanup {
 		t.Fatalf("evento de cierre = %+v", closed)
 	}
 	if r, _ := s.StopServer(context.Background(), &v1.StopServerRequest{ServerId: rd.ServerId}); r.Stopped {

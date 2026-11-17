@@ -84,7 +84,7 @@ func TestConfigCleanSalidaNoSobrescribe(t *testing.T) {
 	if _, err := mctl(t, "", "config", "clean", src, "-o", nuevo); err != nil {
 		t.Fatal(err)
 	}
-	if st, err := os.Stat(nuevo); err != nil || st.Mode().Perm() != 0o600 {
+	if st, err := os.Stat(nuevo); err != nil || !testperm.Private(st, 0o600) {
 		t.Errorf("nuevo: %v %v", st, err)
 	}
 }

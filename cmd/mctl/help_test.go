@@ -101,8 +101,8 @@ func TestAreasTable(t *testing.T) {
 
 // Con la bandera de idioma delante, --help, -h, help y --version siguen siendo ayuda y versión, no un error de uso.
 func TestAyudaConLang(t *testing.T) {
-	en, _ := os.ReadFile("testdata/help.golden")
-	es, _ := os.ReadFile("testdata/help_es.golden")
+	en, _ := readHelp("testdata/help.golden")
+	es, _ := readHelp("testdata/help_es.golden")
 	for _, pre := range [][]string{{"--lang", "en"}, {"--lang=es"}, {"--no-color", "--lang", "en"}, {"--no-color", "--lang=es"}} {
 		want := en
 		if strings.Contains(strings.Join(pre, " "), "es") {

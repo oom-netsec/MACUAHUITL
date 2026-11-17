@@ -193,6 +193,7 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 	tail := func(v string) string { // lo que cuelga de una carpeta queda con «/», como en el golden de Linux
 		v = rep.Replace(v)
 		if runtime.GOOS == "windows" {
+			v = strings.NewReplacer("The system cannot find the file specified.", "no such file or directory", "The system cannot find the path specified.", "no such file or directory").Replace(v) // texto del sistema
 			for i := 1; i < len(dirs); i += 2 {
 				v = strings.ReplaceAll(strings.ReplaceAll(v, dirs[i]+`\\`, dirs[i]+"/"), dirs[i]+`\`, dirs[i]+"/")
 			}
