@@ -78,13 +78,14 @@ export function VaultView({ core }: { core: CoreAPI }) {
             lastView.current = c.id;
             try {
               const publicKey = await core.regenerateKeyCredential(c.id, true); // la confirmación la dio la persona en el botón
+              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") }); return; } // la persona ya miró otra credencial: no se la pisa
               setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true });
               setMsg(null);
             } catch (e) { fail(e); }
           }} onDelete={async (id) => {
             try { await core.deleteCredential(id); setKeyShown((k) => (k?.id === id ? null : k)); setMsg({ kind: "ok", text: t("vault.deleted") }); changed(); } catch (e) { fail(e); }
           }} />
-          {keyShown && <PublicKey key={keyShown.id} k={keyShown} onClose={() => setKeyShown(null)} />}
+          {keyShown && <PublicKey key={keyShown.id + keyShown.publicKey} k={keyShown} onClose={() => setKeyShown(null)} />}
           <CredentialForm core={core} onDone={changed} setMsg={setMsg} />
           <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />
           <BackupSection core={core} sshKeys={creds.filter((c) => c.hasSshKey).length} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
