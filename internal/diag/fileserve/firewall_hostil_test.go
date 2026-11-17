@@ -105,3 +105,24 @@ func TestReglaFirewallLoopbackNoEmiteRegla(t *testing.T) {
 		t.Errorf("no loopback sin regla:\n%s", h)
 	}
 }
+
+// RedirectNote da la clave del aviso solo cuando la regla falta por la ruta del programa: Windows, IP que necesita
+// regla y protocolo con puerto estándar. Con ruta segura, loopback, protocolo sin estándar o en Linux, nada.
+func TestRedirectNoteSoloConRutaInsegura(t *testing.T) {
+	fijaWindows(t, "windows")
+	if n := RedirectNote("tftp", "10.0.0.5"); n != "" {
+		t.Errorf("ruta segura: %q", n)
+	}
+	exePath = func() string { return "C:\\Apps\\a\nb.exe" }
+	if n := RedirectNote("tftp", "10.0.0.5"); n != "fileserve.hint.win_no_exe" {
+		t.Errorf("ruta insegura: %q", n)
+	}
+	if n := RedirectNote("tftp", "127.0.0.1") + RedirectNote("http", "10.0.0.5"); n != "" {
+		t.Errorf("loopback o sin puerto estándar: %q", n)
+	}
+	fijaWindows(t, "linux")
+	exePath = func() string { return "" }
+	if n := RedirectNote("tftp", "10.0.0.5"); n != "" {
+		t.Errorf("linux: %q", n)
+	}
+}

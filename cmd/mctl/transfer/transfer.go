@@ -415,6 +415,10 @@ func hint(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if r.Note != "" { // no hay regla que dar: el núcleo dice por qué
+		fmt.Fprintln(c.Out, r.Note)
+		return nil
+	}
 	if r.Nftables == "" { // ya es el puerto estándar: no hay regla que copiar ni limpiar
 		fmt.Fprintln(c.Out, cli.T("fileserve.hint.std_port_ok", "std", r.StandardPort, "proto", fs.Arg(0)))
 		return nil

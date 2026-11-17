@@ -49,6 +49,15 @@ func ruleOK(ip, exe string) bool { return !esLoopback(ip) && exeSeguro(exe) }
 // NeedsRule dice si en Windows la IP necesita regla de firewall (loopback no).
 func NeedsRule(ip string) bool { return !esLoopback(ip) }
 
+// RedirectNote es la clave del catálogo que explica por qué no hay regla cuando falta solo por la ruta del programa
+// (Windows, IP que necesita regla, protocolo con puerto estándar); "" en cualquier otro caso.
+func RedirectNote(proto, ip string) string {
+	if _, ok := standard[proto]; !ok || !isWindows() || !NeedsRule(ip) || exeSeguro(exePath()) {
+		return ""
+	}
+	return "fileserve.hint.win_no_exe"
+}
+
 func isWindows() bool { return hintOS == "windows" }
 
 // psq cita para PowerShell con comillas simples: ahí nada se expande ($var, $(...), acento grave). Dentro se duplica

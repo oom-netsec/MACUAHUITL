@@ -163,6 +163,8 @@ message RedirectHintResponse {
   string nftables = 2;                // regla de redirección; vacía si port ya es el estándar (standard_port lo dice)
   string setcap = 3;                  // obsoleto: siempre vacío desde 45a
   string remove = 4;                  // comando para quitar la regla al terminar; vacío si no hay regla
+  string note = 5;                    // si no hay regla que dar: por qué, en el idioma pedido (prosa, no se copia)
+  string note_code = 6;               // clave estable del catálogo de note (p. ej. fileserve.hint.win_no_exe)
 }
 
 message BrowseRequest {

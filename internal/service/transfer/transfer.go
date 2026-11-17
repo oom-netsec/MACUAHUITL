@@ -258,6 +258,9 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		return &v1.RedirectHintResponse{StandardPort: std}, nil // ya escucha en el estándar: sin regla ni limpieza
 	}
 	h := fileserve.RedirectCommandIn(loc, r.Protocol, r.Ip, int(r.Port)) // sin la nota: se copia tal cual; Remove va aparte
+	if code := fileserve.RedirectNote(r.Protocol, r.Ip); h == "" && code != "" && r.Port > 0 && r.Port <= 65535 {
+		return &v1.RedirectHintResponse{StandardPort: std, Note: i18n.Msg(loc, code, nil), NoteCode: code}, nil // falta la regla por la ruta del programa
+	}
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
