@@ -79,9 +79,12 @@ const logName = "macuahuitld.log"
 // consoleLang es el idioma de lo que el daemon imprime en su consola; sin --lang, el canónico (inglés).
 var consoleLang = i18n.En
 
+// privileged es sys.Privileged; las pruebas lo fijan porque el runner de Windows corre elevado.
+var privileged = sys.Privileged
+
 // run recibe el endurecimiento como dependencia: en producción sys.Harden; las pruebas pasan una falsa (mlockall no va en go test).
 func run(harden func() ([]i18n.Text, error)) error {
-	if sys.Privileged() {
+	if privileged() {
 		key := "harden.err.root"
 		if runtime.GOOS == "windows" {
 			key = "harden.err.elevated"

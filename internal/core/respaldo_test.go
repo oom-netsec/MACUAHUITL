@@ -15,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -130,7 +131,7 @@ func sinSecretos(t *testing.T, texto string, prohibidos ...string) {
 
 func TestRespaldoIdaYVuelta(t *testing.T) {
 	h, path := bovedaConRespaldo(t, nil)
-	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(path); err != nil || !testperm.Private(fi, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
 	// Bóveda vacía distinta: importa las 3.

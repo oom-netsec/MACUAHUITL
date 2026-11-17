@@ -78,16 +78,17 @@ func TestSafeName(t *testing.T) {
 
 // O_EXCL: ni un archivo ni un enlace simbólico con ese nombre se pisan.
 func TestReceiverNeverOverwrites(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	r, err := newReceiver(dir, 100, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(r.close) // en Windows una carpeta abierta no se puede borrar
 	os.WriteFile(filepath.Join(dir, "viejo"), []byte("original"), 0o600)
 	if _, err := r.create("viejo", 0); !errors.Is(err, errExists) {
 		t.Fatalf("err = %v", err)
 	}
-	victim := filepath.Join(t.TempDir(), "victima")
+	victim := filepath.Join(realTemp(t), "victima")
 	os.WriteFile(victim, []byte("intacto"), 0o600)
 	os.Symlink(victim, filepath.Join(dir, "enlace"))
 	if _, err := r.create("enlace", 0); err == nil {
@@ -113,8 +114,9 @@ func TestReceiverNeverOverwrites(t *testing.T) {
 }
 
 func TestReceiverCaps(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	r, _ := newReceiver(dir, 10, 15)
+	t.Cleanup(r.close)
 	if _, err := r.create("grande", 11); !errors.Is(err, errTooBig) {
 		t.Fatalf("anunciado sobre el tope: %v", err)
 	}
@@ -189,7 +191,7 @@ func (c *tftpClient) put(file string, data []byte, blk int, opts ...string) uint
 }
 
 func TestTFTPWrite(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	s, _ := startCfg(t, Config{Proto: "tftp", Write: true, RecvDir: dir})
 	data := bytes.Repeat([]byte("hostname R1\n"), 200)
 	if code := dialTFTP(t, s.addr).put("running-config", data, 512); code != 0 {
@@ -223,7 +225,7 @@ func TestTFTPWrite(t *testing.T) {
 }
 
 func TestTFTPWriteRefusals(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	os.WriteFile(filepath.Join(dir, "existe"), []byte("original"), 0o600)
 	s, _ := startCfg(t, Config{Proto: "tftp", Write: true, RecvDir: dir, MaxFile: 1000, MaxTotal: 1500})
 	c := dialTFTP(t, s.addr)
@@ -269,12 +271,12 @@ func TestTFTPReadAndWriteAreSeparate(t *testing.T) {
 	c.send(c.srv, wrq("x"))
 	c.expectError(2)
 	// Solo escritura: RRQ rechazado aunque el nombre exista en otro lado.
-	s2, _ := startCfg(t, Config{Proto: "tftp", Write: true, RecvDir: t.TempDir()})
+	s2, _ := startCfg(t, Config{Proto: "tftp", Write: true, RecvDir: realTemp(t)})
 	c2 := dialTFTP(t, s2.addr)
 	c2.send(c2.srv, rrq("a.bin"))
 	c2.expectError(2)
 	// Lectura y escritura a la vez.
-	s3, _ := startCfg(t, Config{Proto: "tftp", Files: []string{p}, Write: true, RecvDir: t.TempDir()})
+	s3, _ := startCfg(t, Config{Proto: "tftp", Files: []string{p}, Write: true, RecvDir: realTemp(t)})
 	if got, _ := dialTFTP(t, s3.addr).get("a.bin", 512); len(got) != 10 {
 		t.Fatal("lectura")
 	}
@@ -285,7 +287,7 @@ func TestTFTPReadAndWriteAreSeparate(t *testing.T) {
 
 func TestAllowList(t *testing.T) {
 	p, _ := image(t, "a.bin", 10)
-	dir := t.TempDir()
+	dir := realTemp(t)
 	// 127.0.0.1 no está permitida: el servidor no contesta ni escribe.
 	s, _ := startCfg(t, Config{Proto: "tftp", Files: []string{p}, Write: true, RecvDir: dir, Allow: []netip.Addr{netip.MustParseAddr("10.9.9.9")}})
 	c := dialTFTP(t, s.addr)
@@ -311,11 +313,11 @@ func TestAllowList(t *testing.T) {
 func TestServeWriteValidation(t *testing.T) {
 	ctx := context.Background()
 	for name, c := range map[string]Config{
-		"http escribe":          {Addr: "127.0.0.1:0", Proto: "http", Write: true, RecvDir: t.TempDir()},
+		"http escribe":          {Addr: "127.0.0.1:0", Proto: "http", Write: true, RecvDir: realTemp(t)},
 		"nada que servir":       {Addr: "127.0.0.1:0", Proto: "tftp"},
-		"todas sin lista":       {Addr: "0.0.0.0:6969", AllowAny: true, Proto: "tftp", Write: true, RecvDir: t.TempDir()},
+		"todas sin lista":       {Addr: "0.0.0.0:6969", AllowAny: true, Proto: "tftp", Write: true, RecvDir: realTemp(t)},
 		"carpeta relativa":      {Addr: "127.0.0.1:0", Proto: "tftp", Write: true, RecvDir: "rel"},
-		"protocolo desconocido": {Addr: "127.0.0.1:0", Proto: "gopher", Write: true, RecvDir: t.TempDir()},
+		"protocolo desconocido": {Addr: "127.0.0.1:0", Proto: "gopher", Write: true, RecvDir: realTemp(t)},
 	} {
 		if err := Serve(ctx, c); err == nil {
 			t.Errorf("%s: debió fallar", name)
@@ -333,7 +335,7 @@ func nowPlus(ms int) time.Time { return time.Now().Add(time.Duration(ms) * time.
 
 // Escribir por TFTP exige --allow: en UDP el origen se falsifica, pero sin lista cualquiera escribiría.
 func TestTFTPWriteRequiresAllow(t *testing.T) {
-	c := Config{Addr: "127.0.0.1:6969", Proto: "tftp", Write: true, RecvDir: t.TempDir()}
+	c := Config{Addr: "127.0.0.1:6969", Proto: "tftp", Write: true, RecvDir: realTemp(t)}
 	if err := Check(c); err == nil || !strings.Contains(err.Error(), "--allow") {
 		t.Fatalf("TFTP con escritura y sin lista: %v", err)
 	}
@@ -342,7 +344,7 @@ func TestTFTPWriteRequiresAllow(t *testing.T) {
 		t.Fatalf("con lista: %v", err)
 	}
 	c.Allow, c.Write, c.Files = nil, false, nil
-	c.FromDir = t.TempDir()
+	c.FromDir = realTemp(t)
 	if err := Check(c); err != nil {
 		t.Fatalf("TFTP de solo lectura no pide lista: %v", err)
 	}
@@ -358,23 +360,29 @@ func TestTFTPWriteHintWarnsSpoofing(t *testing.T) {
 
 // El tope de archivos devuelve el cupo al descartar y se comprueba en el mismo candado que el incremento.
 func TestReceiverFileCountReleasedOnAbort(t *testing.T) {
-	r, _ := newReceiver(t.TempDir(), 0, 0)
+	r, _ := newReceiver(realTemp(t), 0, 0)
+	t.Cleanup(r.close)
 	r.maxFiles = 2
 	a, _ := r.create("a", 0)
-	if _, err := r.create("b", 0); err != nil {
+	b, err := r.create("b", 0)
+	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(b.abort) // en Windows un archivo abierto no se puede borrar
 	if _, err := r.create("c", 0); !errors.Is(err, errTooMany) {
 		t.Fatalf("tercero sobre el tope: %v", err)
 	}
 	a.abort()
-	if _, err := r.create("c", 0); err != nil {
+	c, err := r.create("c", 0)
+	if err != nil {
 		t.Fatalf("abort no devolvió el cupo de archivos: %v", err)
 	}
+	t.Cleanup(c.abort)
 }
 
 func TestReceiverFileCountConcurrent(t *testing.T) {
-	r, _ := newReceiver(t.TempDir(), 0, 0)
+	r, _ := newReceiver(realTemp(t), 0, 0)
+	t.Cleanup(r.close)
 	r.maxFiles = 5
 	var wg sync.WaitGroup
 	var ok atomic.Int32
@@ -382,7 +390,8 @@ func TestReceiverFileCountConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := r.create(fmt.Sprintf("f%d", i), 0); err == nil {
+			if f, err := r.create(fmt.Sprintf("f%d", i), 0); err == nil {
+				t.Cleanup(f.abort) // en Windows un archivo abierto no se puede borrar
 				ok.Add(1)
 			}
 		}()

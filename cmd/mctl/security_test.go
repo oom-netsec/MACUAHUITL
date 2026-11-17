@@ -11,6 +11,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/radiustest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tacacstest"
 	"github.com/oom-netsec/MACUAHUITL/internal/ikedec"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 func TestSecurityCommands(t *testing.T) {
@@ -50,7 +51,7 @@ func TestSecurityCommands(t *testing.T) {
 	must(t, "capw\ncapw\n", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
 	must(t, "kpw\nkpw\n", "pki", "csr", "--cn", "ise01.lab", "--dns", "ise01.lab", "--ip", "10.0.0.10", "-o", "ise01")
 	for _, f := range []string{"ca/ca.crt.pem", "ca/ca.key.pem", "ise01.csr.pem", "ise01.key.pem"} {
-		if st, err := os.Stat(f); err != nil || st.Mode().Perm() != 0o600 {
+		if st, err := os.Stat(f); err != nil || !testperm.Private(st, 0o600) {
 			t.Fatalf("%s: %v %v", f, st, err)
 		}
 	}

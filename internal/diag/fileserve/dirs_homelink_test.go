@@ -8,7 +8,7 @@ import (
 
 // Con $HOME bajo un enlace (/home -> /var/home) la ruta real elegida también cae en las carpetas sensibles.
 func TestValidateDirHomeEsEnlace(t *testing.T) {
-	base := t.TempDir()
+	base := realTemp(t)
 	real := filepath.Join(base, "real")
 	for _, d := range []string{".config/autostart", "bin"} {
 		if err := os.MkdirAll(filepath.Join(real, d), 0o755); err != nil {

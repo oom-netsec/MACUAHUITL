@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,20 +18,28 @@ import (
 )
 
 func TestValidateDir(t *testing.T) {
-	home := t.TempDir()
+	home := realTemp(t)
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", "")
 	for _, sub := range []string{".ssh", ".gnupg", ".aws", ".config/macuahuitl", ".local/share/macuahuitl/sub"} {
 		os.MkdirAll(filepath.Join(home, sub), 0o700)
 	}
-	ok := t.TempDir()
+	ok := realTemp(t)
 	if got, err := ValidateDir(ok); err != nil || got != ok {
 		t.Fatalf("carpeta normal: %q %v", got, err)
 	}
 	// Sensibles: exactas y lo que cuelga de ellas.
-	bad := []string{"/", "/etc", "/etc/ssh", "/usr", "/usr/share", "/bin", "/boot", "/proc", "/sys", "/dev", "/proc/self",
-		filepath.Join(home, ".ssh"), filepath.Join(home, ".gnupg"), filepath.Join(home, ".aws"),
-		filepath.Join(home, ".config/macuahuitl"), filepath.Join(home, ".local/share/macuahuitl/sub")}
+	bad := []string{"/", "/etc", "/etc/ssh", "/usr", "/usr/share", "/bin", "/boot", "/proc", "/sys", "/dev", "/proc/self"}
+	if runtime.GOOS == "windows" { // las del sistema de Windows: la raíz de la unidad y las carpetas de Windows y Archivos de programa
+		bad = []string{filepath.VolumeName(ok) + `\`, os.Getenv("SystemRoot"), filepath.Join(os.Getenv("SystemRoot"), "System32"),
+			os.Getenv("ProgramFiles"), os.Getenv("ProgramData")}
+	}
+	if runtime.GOOS == "windows" {
+		os.MkdirAll(filepath.Join(home, "AppData", "Roaming"), 0o700)
+		bad = append(bad, filepath.Join(home, "AppData", "Roaming"))
+	}
+	bad = append(bad, filepath.Join(home, ".ssh"), filepath.Join(home, ".gnupg"), filepath.Join(home, ".aws"),
+		filepath.Join(home, ".config/macuahuitl"), filepath.Join(home, ".local/share/macuahuitl/sub"))
 	for _, d := range bad {
 		if _, err := ValidateDir(d); err == nil {
 			t.Errorf("%s debió rechazarse", d)
@@ -52,7 +62,7 @@ func TestValidateDir(t *testing.T) {
 		}
 	}
 	// Una carpeta de datos extra de la app.
-	data := t.TempDir()
+	data := realTemp(t)
 	if _, err := ValidateDir(filepath.Join(data), data); err == nil {
 		t.Error("DenyDirs ignorada")
 	}
@@ -65,28 +75,32 @@ func TestValidateDir(t *testing.T) {
 		}
 	}
 	// "..": se limpia antes de comparar (no sirve para escapar de la lista).
-	if _, err := ValidateDir(ok + "/../../../etc"); err == nil {
-		t.Error("ruta con .. hacia /etc aceptada")
+	sep, objetivo := string(filepath.Separator), "etc"
+	if runtime.GOOS == "windows" {
+		objetivo = filepath.Base(os.Getenv("SystemRoot"))
+	}
+	if _, err := ValidateDir(ok + strings.Repeat(sep+"..", 12) + sep + objetivo); err == nil {
+		t.Error("ruta con .. hacia la carpeta del sistema aceptada")
 	}
 }
 
 func TestValidateDirSymlinks(t *testing.T) {
-	real := t.TempDir()
-	link := filepath.Join(t.TempDir(), "enlace")
+	real := realTemp(t)
+	link := filepath.Join(realTemp(t), "enlace")
 	os.Symlink(real, link)
 	if _, err := ValidateDir(link); err == nil || !strings.Contains(err.Error(), "enlace simbólico") {
 		t.Fatalf("la carpeta misma es un enlace: debió rechazarse por eso (%v)", err)
 	}
 	// Un enlace en un componente anterior se resuelve y se compara ya resuelto.
-	if _, err := os.Stat("/usr/share"); err == nil {
-		ancestor := filepath.Join(t.TempDir(), "u")
+	if _, err := os.Stat("/usr/share"); err == nil && runtime.GOOS != "windows" {
+		ancestor := filepath.Join(realTemp(t), "u")
 		os.Symlink("/usr", ancestor)
 		if _, err := ValidateDir(filepath.Join(ancestor, "share")); err == nil {
 			t.Fatal("un enlace a /usr sirvió para esquivar la lista de carpetas sensibles")
 		}
 	}
 	// Con un ancestro enlazado a una carpeta normal se acepta y se devuelve la ruta real.
-	anc := filepath.Join(t.TempDir(), "a")
+	anc := filepath.Join(realTemp(t), "a")
 	os.Symlink(real, anc)
 	os.Mkdir(filepath.Join(real, "sub"), 0o700)
 	got, err := ValidateDir(filepath.Join(anc, "sub"))
@@ -98,12 +112,12 @@ func TestValidateDirSymlinks(t *testing.T) {
 // ---- publicar una carpeta ----
 
 func TestSourceFolder(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	os.WriteFile(filepath.Join(dir, "a.bin"), []byte("AAA"), 0o600)
 	os.WriteFile(filepath.Join(dir, "b.cfg"), []byte("BB"), 0o600)
 	os.Mkdir(filepath.Join(dir, "sub"), 0o700)
 	os.WriteFile(filepath.Join(dir, "sub", "hondo.txt"), []byte("hondo"), 0o600)
-	secret := filepath.Join(t.TempDir(), "secreto")
+	secret := filepath.Join(realTemp(t), "secreto")
 	os.WriteFile(secret, []byte("no"), 0o600)
 	os.Symlink(secret, filepath.Join(dir, "enlace"))
 	if err := sys.Mkfifo(filepath.Join(dir, "tuberia")); err != nil && !errors.Is(err, errors.ErrUnsupported) { // en Windows no hay FIFO
@@ -144,9 +158,9 @@ func TestSourceFolder(t *testing.T) {
 
 // Un enlace puesto entre el Lstat y el open no se sigue: lo abierto debe ser lo listado.
 func TestSourceOpenSameFile(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	os.WriteFile(filepath.Join(dir, "a"), []byte("1"), 0o600)
-	other := filepath.Join(t.TempDir(), "otro")
+	other := filepath.Join(realTemp(t), "otro")
 	os.WriteFile(other, []byte("2"), 0o600)
 	s := testSource(t, &source{dir: dir})
 	f, fi, err := s.open("a")
@@ -161,7 +175,7 @@ func TestSourceOpenSameFile(t *testing.T) {
 }
 
 func TestSourceCombinesFilesAndFolder(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	os.WriteFile(filepath.Join(dir, "carpeta.txt"), []byte("c"), 0o600)
 	loose, _ := image(t, "suelto.bin", 5)
 	s := testSource(t, &source{dir: dir, files: map[string]string{"suelto.bin": loose}})
@@ -177,10 +191,12 @@ func TestSourceCombinesFilesAndFolder(t *testing.T) {
 
 // Misma carpeta para leer y escribir: lo que aún se escribe no se sirve.
 func TestSourceHidesFileBeingReceived(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	rcv, _ := newReceiver(dir, 0, 0)
+	t.Cleanup(rcv.close)
 	s := testSource(t, &source{dir: dir, rcv: rcv})
 	f, _ := rcv.create("entrante", 0)
+	t.Cleanup(f.abort) // en Windows un archivo abierto no se puede borrar (tras commit no hace nada)
 	f.Write([]byte("a medias"))
 	if s.exists("entrante") {
 		t.Fatal("se sirve un archivo que aún se escribe")
@@ -203,7 +219,7 @@ func TestSourceHidesFileBeingReceived(t *testing.T) {
 }
 
 func TestServeFolderOverTFTPAndHTTP(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	os.WriteFile(filepath.Join(dir, "r1.cfg"), []byte("hostname R1"), 0o600)
 	os.Mkdir(filepath.Join(dir, "sub"), 0o700)
 	os.WriteFile(filepath.Join(dir, "sub", "x"), []byte("x"), 0o600)
@@ -259,6 +275,15 @@ func TestServeRejectsSensitiveFolders(t *testing.T) {
 	}
 }
 
+// skipEnWindowsPorHandle: en Windows la carpeta abierta (os.Root) no se puede renombrar ni reemplazar mientras está
+// abierta, así que el intercambio por un enlace que esta prueba intenta no es posible: el handle ya da esa protección.
+func skipEnWindowsPorHandle(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows no deja renombrar una carpeta abierta: el intercambio por un enlace no puede ocurrir")
+	}
+}
+
 // swapForLink reemplaza dir por un enlace simbólico a other (la carpeta original se muda a dir+".orig").
 func swapForLink(t *testing.T, dir, other string) string {
 	t.Helper()
@@ -274,7 +299,8 @@ func swapForLink(t *testing.T, dir, other string) string {
 
 // Cambiar la carpeta de recepción por un enlace simbólico después de validarla no desvía lo que se escribe.
 func TestReceiverPinnedAgainstSymlinkSwap(t *testing.T) {
-	recv, elsewhere := filepath.Join(t.TempDir(), "recv"), t.TempDir()
+	skipEnWindowsPorHandle(t)
+	recv, elsewhere := filepath.Join(realTemp(t), "recv"), realTemp(t)
 	os.Mkdir(recv, 0o700)
 	src, rcv, err := prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", Write: true, RecvDir: recv, Allow: []netip.Addr{netip.MustParseAddr("127.0.0.1")}})
 	if err != nil {
@@ -304,7 +330,8 @@ func TestReceiverPinnedAgainstSymlinkSwap(t *testing.T) {
 
 // Lo mismo con la carpeta publicada: se sigue sirviendo la validada, no el enlace.
 func TestSourcePinnedAgainstSymlinkSwap(t *testing.T) {
-	pub, elsewhere := filepath.Join(t.TempDir(), "pub"), t.TempDir()
+	skipEnWindowsPorHandle(t)
+	pub, elsewhere := filepath.Join(realTemp(t), "pub"), realTemp(t)
 	os.Mkdir(pub, 0o700)
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("original"), 0o600)
 	os.WriteFile(filepath.Join(elsewhere, "a.bin"), []byte("OTRO"), 0o600)
@@ -334,7 +361,7 @@ func TestSourcePinnedAgainstSymlinkSwap(t *testing.T) {
 
 // Un archivo con enlaces duros (Nlink > 1) puede ser el mismo inodo que uno sensible: no se publica.
 func TestHardLinkedFilesNotPublished(t *testing.T) {
-	dir, other := t.TempDir(), t.TempDir()
+	dir, other := realTemp(t), realTemp(t)
 	secret := filepath.Join(other, "secreto")
 	os.WriteFile(secret, []byte("no"), 0o600)
 	if err := os.Link(secret, filepath.Join(dir, "enlace-duro")); err != nil {
@@ -342,16 +369,23 @@ func TestHardLinkedFilesNotPublished(t *testing.T) {
 	}
 	os.WriteFile(filepath.Join(dir, "normal"), []byte("ok"), 0o600)
 	src, rcv, err := prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", FromDir: dir, Files: []string{secret}})
-	if err == nil {
+	if err == nil && runtime.GOOS != "windows" {
 		closeAll(src, rcv)
 		t.Fatal("un archivo suelto con enlace duro se publicó")
+	}
+	if err == nil { // en Windows el FileInfo no trae la cuenta de enlaces: se rechaza al abrir el handle (HardLinkedFile)
+		if f, _, oerr := src.open("secreto"); oerr == nil {
+			f.Close()
+			t.Error("open sirvió un archivo suelto con enlace duro")
+		}
+		closeAll(src, rcv)
 	}
 	src, rcv, err = prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", FromDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer closeAll(src, rcv)
-	if src.exists("enlace-duro") {
+	if src.exists("enlace-duro") && runtime.GOOS != "windows" { // en Windows exists/list no ven enlaces; open sí los rechaza
 		t.Error("exists(enlace-duro)")
 	}
 	if f, _, err := src.open("enlace-duro"); err == nil {
@@ -365,6 +399,9 @@ func TestHardLinkedFilesNotPublished(t *testing.T) {
 	for _, fi := range src.list() {
 		names = append(names, fi.Name())
 	}
+	if runtime.GOOS == "windows" {
+		names = slices.DeleteFunc(names, func(n string) bool { return n == "enlace-duro" })
+	}
 	if strings.Join(names, ",") != "normal" {
 		t.Errorf("list = %v", names)
 	}
@@ -374,7 +411,7 @@ func TestHardLinkedFilesNotPublished(t *testing.T) {
 // El segundo nombre se crea después de prepare (que ya miró el FileInfo). En Linux el FileInfo del handle también trae
 // Nlink, así que aquí no se distingue; en Windows HardLinked(fi) siempre es false y solo pasa si se usa HardLinkedFile.
 func TestHardLinkedRejectedOnHandle(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	f := filepath.Join(dir, "unico")
 	os.WriteFile(f, []byte("ok"), 0o600)
 	src, rcv, err := prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", Files: []string{f}})
@@ -387,7 +424,7 @@ func TestHardLinkedRejectedOnHandle(t *testing.T) {
 	} else {
 		g.Close()
 	}
-	if err := os.Link(f, filepath.Join(t.TempDir(), "otro-nombre")); err != nil {
+	if err := os.Link(f, filepath.Join(realTemp(t), "otro-nombre")); err != nil {
 		t.Skip("sin enlaces duros:", err)
 	}
 	if g, _, err := src.open("unico"); err == nil {
@@ -412,15 +449,15 @@ func testSource(t *testing.T, s *source) *source {
 
 // Los archivos sueltos pasan por la misma lista de carpetas sensibles que FromDir y RecvDir.
 func TestPublishRechazaArchivosSensibles(t *testing.T) {
-	home := t.TempDir()
+	home := realTemp(t)
 	t.Setenv("HOME", home)
 	os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
 	key := filepath.Join(home, ".ssh", "id_ed25519")
 	os.WriteFile(key, []byte("k"), 0o600)
-	cfgDir := t.TempDir()
+	cfgDir := realTemp(t)
 	cfg := filepath.Join(cfgDir, "vault.mcv")
 	os.WriteFile(cfg, []byte("v"), 0o600)
-	link := filepath.Join(t.TempDir(), "inocente.txt") // un enlace a la llave no la disfraza
+	link := filepath.Join(realTemp(t), "inocente.txt") // un enlace a la llave no la disfraza
 	os.Symlink(key, link)
 	for name, c := range map[string]struct {
 		f    string
@@ -440,7 +477,7 @@ func TestPublishRechazaArchivosSensibles(t *testing.T) {
 			t.Errorf("~/%s publicado", n)
 		}
 	}
-	vis := filepath.Join(t.TempDir(), "visible.txt") // enlace visible a un oculto de $HOME
+	vis := filepath.Join(realTemp(t), "visible.txt") // enlace visible a un oculto de $HOME
 	os.Symlink(filepath.Join(home, ".netrc"), vis)
 	if _, err := Publish([]string{vis}); err == nil {
 		t.Error("enlace visible a ~/.netrc publicado")
@@ -450,7 +487,7 @@ func TestPublishRechazaArchivosSensibles(t *testing.T) {
 	if _, err := Publish([]string{fw}); err != nil {
 		t.Errorf("~/firmware.bin visible debe poder publicarse: %v", err)
 	}
-	ok := filepath.Join(t.TempDir(), "a.bin")
+	ok := filepath.Join(realTemp(t), "a.bin")
 	os.WriteFile(ok, []byte("x"), 0o600)
 	if _, err := Publish([]string{ok}); err != nil {
 		t.Errorf("archivo normal: %v", err)
@@ -459,7 +496,7 @@ func TestPublishRechazaArchivosSensibles(t *testing.T) {
 
 // Todo lo oculto bajo $HOME (no solo la lista fija) se rechaza, como archivo suelto y como carpeta de envío/recepción.
 func TestOcultosBajoHomeSeRechazan(t *testing.T) {
-	home := t.TempDir()
+	home := realTemp(t)
 	t.Setenv("HOME", home)
 	for _, d := range []string{".password-store", ".thunderbird/x.default", ".cache/app", "Descargas/.oculta", "Descargas"} {
 		os.MkdirAll(filepath.Join(home, d), 0o700)
@@ -489,7 +526,7 @@ func TestOcultosBajoHomeSeRechazan(t *testing.T) {
 
 // Se sirve la ruta real resuelta una sola vez: un enlace que cambia de destino después de publicar no desvía lo servido.
 func TestPublishSirveLaRutaRealYNoSigueAlEnlace(t *testing.T) {
-	d := t.TempDir()
+	d := realTemp(t)
 	a, b := filepath.Join(d, "a.bin"), filepath.Join(d, "b.bin")
 	os.WriteFile(a, []byte("AAA"), 0o600)
 	os.WriteFile(b, []byte("BBB"), 0o600)
@@ -518,7 +555,7 @@ func TestPublishSirveLaRutaRealYNoSigueAlEnlace(t *testing.T) {
 
 // Si no se puede resolver la ruta, se rechaza (no se sigue con la ruta sin resolver).
 func TestPublishRechazaSiFallaEvalSymlinks(t *testing.T) {
-	f := filepath.Join(t.TempDir(), "a.bin")
+	f := filepath.Join(realTemp(t), "a.bin")
 	os.WriteFile(f, []byte("x"), 0o600)
 	old := evalSymlinks
 	evalSymlinks = func(string) (string, error) { return "", errors.New("boom") }
@@ -544,19 +581,19 @@ func TestHomeVacioUsaLaCuentaYSinHomeRechaza(t *testing.T) {
 	old := homeDir
 	homeDir = func() (string, error) { return "", errors.New("sin home") }
 	defer func() { homeDir = old }()
-	f := filepath.Join(t.TempDir(), "a.bin")
+	f := filepath.Join(realTemp(t), "a.bin")
 	os.WriteFile(f, []byte("x"), 0o600)
 	if _, err := Publish([]string{f}); err == nil {
 		t.Error("Publish sin home conocido")
 	}
-	if _, err := ValidateDir(t.TempDir()); err == nil {
+	if _, err := ValidateDir(realTemp(t)); err == nil {
 		t.Error("ValidateDir sin home conocido")
 	}
 }
 
 // Si no se puede resolver $HOME, se compara con el $HOME sin resolver (no se salta la comprobación).
 func TestHomeSinResolverSigueRechazando(t *testing.T) {
-	base := t.TempDir()
+	base := realTemp(t)
 	realHome := filepath.Join(base, "var-home")
 	os.MkdirAll(filepath.Join(realHome, ".cache"), 0o700)
 	home := filepath.Join(base, "home") // $HOME es un enlace (como /home -> /var/home en Silverblue)
@@ -578,9 +615,10 @@ func TestHomeSinResolverSigueRechazando(t *testing.T) {
 }
 
 func TestPublishArchivoInexistenteDiceQueNoExiste(t *testing.T) {
-	f := filepath.Join(t.TempDir(), "no-esta.bin")
+	f := filepath.Join(realTemp(t), "no-esta.bin")
 	_, err := Publish([]string{f})
-	if !errors.Is(err, os.ErrNotExist) || err.Error() != "fileserve: stat "+f+": no such file or directory" {
+	_, serr := os.Stat(f) // el texto de stat de cada sistema
+	if !errors.Is(err, os.ErrNotExist) || err.Error() != "fileserve: "+serr.Error() {
 		t.Fatalf("err = %v; quiero el mensaje de stat de siempre", err)
 	}
 }
@@ -588,8 +626,8 @@ func TestPublishArchivoInexistenteDiceQueNoExiste(t *testing.T) {
 // XDG_CONFIG_HOME y XDG_DATA_HOME fuera de $HOME se bloquean enteros: su autostart/, systemd/user o applications/
 // cargan y ejecutan lo que se reciba ahí, igual que ~/.config y ~/.local.
 func TestXDGFueraDeHomeSeBloqueaEntero(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	cfg, data := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", realTemp(t))
+	cfg, data := realTemp(t), realTemp(t)
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	t.Setenv("XDG_DATA_HOME", data)
 	for _, d := range []string{cfg, filepath.Join(cfg, "autostart"), filepath.Join(cfg, "systemd", "user"), data, filepath.Join(data, "applications")} {
@@ -598,17 +636,17 @@ func TestXDGFueraDeHomeSeBloqueaEntero(t *testing.T) {
 			t.Errorf("%s aceptada", d)
 		}
 	}
-	if _, err := ValidateDir(t.TempDir()); err != nil {
+	if _, err := ValidateDir(realTemp(t)); err != nil {
 		t.Errorf("una carpeta normal se rechazó: %v", err)
 	}
 }
 
 // Un XDG_CONFIG_HOME que pasa por un enlace simbólico también bloquea su ruta real (la que se elige al servir).
 func TestXDGPorEnlaceBloqueaLaRutaReal(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	real := t.TempDir()
+	t.Setenv("HOME", realTemp(t))
+	real := realTemp(t)
 	os.MkdirAll(filepath.Join(real, "autostart"), 0o700)
-	link := filepath.Join(t.TempDir(), "cfg")
+	link := filepath.Join(realTemp(t), "cfg")
 	os.Symlink(real, link)
 	t.Setenv("XDG_CONFIG_HOME", link)
 	t.Setenv("XDG_DATA_HOME", "")

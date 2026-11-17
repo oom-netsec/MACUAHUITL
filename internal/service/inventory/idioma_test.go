@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -53,8 +54,8 @@ func TestLibretaIdiomaCierre(t *testing.T) {
 			_, err := s.DeleteDevice(ctx, &v1.DeleteDeviceRequest{Id: "zz"})
 			return status.Convert(err).Message()
 		}},
-		{"formato no reconocido", `formato no reconocido para "` + raro + `": use la extensión .csv o .json, o pida el formato csv o json`,
-			`unrecognized format for "` + raro + `": use the .csv or .json extension, or ask for the csv or json format`, func(ctx context.Context) string {
+		{"formato no reconocido", `formato no reconocido para ` + strconv.Quote(raro) + `: use la extensión .csv o .json, o pida el formato csv o json`,
+			`unrecognized format for ` + strconv.Quote(raro) + `: use the .csv or .json extension, or ask for the csv or json format`, func(ctx context.Context) string {
 				_, err := s.PreviewImportHosts(ctx, &v1.PreviewImportHostsRequest{Path: raro})
 				return status.Convert(err).Message()
 			}},

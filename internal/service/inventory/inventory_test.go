@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -56,7 +57,7 @@ func TestListDevicesDescubreOutputDirDeLosTrabajos(t *testing.T) {
 	os.MkdirAll(dd, 0o700)
 	os.WriteFile(filepath.Join(dd, "r001.txt"), []byte("===== x ====="), 0o600)
 	if _, err := d.DB().Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at) VALUES('j1','ronda',?,'completed','2026-11-06T10:00:00Z')`,
-		`{"Name":"ronda","OutputDir":"`+raiz+`"}`); err != nil {
+		`{"Name":"ronda","OutputDir":`+strconv.Quote(raiz)+`}`); err != nil { // Quote escapa las barras invertidas de Windows (JSON)
 		t.Fatal(err)
 	}
 	r, err := (&svc{d: d}).ListDevices(context.Background(), &v1.ListDevicesRequest{})

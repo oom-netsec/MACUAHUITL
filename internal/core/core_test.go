@@ -19,6 +19,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -90,7 +91,8 @@ func newHarness(t *testing.T, mut func(*Options)) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := ipc.Listen(filepath.Join(sock, "core.sock"))
+	pipe := ipctest.Addr(sock)
+	l, err := ipc.Listen(pipe)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +101,7 @@ func newHarness(t *testing.T, mut func(*Options)) *harness {
 	go func() { c.Serve(ctx, l); close(served) }()
 	stop := func() { cancel(); <-served }
 	t.Cleanup(func() { cancel(); c.Close() })
-	conn, err := ipc.DialPath(filepath.Join(sock, "core.sock"))
+	conn, err := ipc.DialPath(pipe)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +128,8 @@ func (h *harness) restart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	l, err := ipc.Listen(filepath.Join(sock, "core.sock"))
+	pipe := ipctest.Addr(sock)
+	l, err := ipc.Listen(pipe)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +138,7 @@ func (h *harness) restart(t *testing.T) {
 	go func() { c.Serve(cx, l); close(served) }()
 	h.stop = func() { cancel(); <-served }
 	t.Cleanup(func() { cancel(); c.Close() })
-	conn, err := ipc.DialPath(filepath.Join(sock, "core.sock"))
+	conn, err := ipc.DialPath(pipe)
 	if err != nil {
 		t.Fatal(err)
 	}

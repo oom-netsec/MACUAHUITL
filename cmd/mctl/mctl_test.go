@@ -33,6 +33,11 @@ func TestMain(m *testing.M) {
 	for _, k := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
 		os.Unsetenv(k)
 	}
+	// El runner de CI de Windows corre elevado y mctl se niega a hablar con el núcleo así (ADR 0012): las pruebas fijan «no elevado».
+	// La prueba de la negativa (elevado_test.go) inyecta «elevado» por su cuenta.
+	if runtime.GOOS == "windows" {
+		elevatedBlocked = func() bool { return false }
+	}
 	os.Exit(m.Run())
 }
 

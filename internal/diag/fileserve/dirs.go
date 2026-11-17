@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -37,8 +38,23 @@ var homeDir = func() (string, error) {
 	return "", i18n.New("fileserve.err.no_home", nil)
 }
 
+// windowsSensitiveDirs son las carpetas del sistema de Windows (donde se carga y ejecuta lo que haya) según el entorno:
+// ni se publica ni se recibe en ellas ni en lo que cuelga de ellas. Vacías si la variable no está.
+func windowsSensitiveDirs() []string {
+	var out []string
+	for _, env := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"} {
+		if v := os.Getenv(env); filepath.IsAbs(v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
+	if runtime.GOOS == "windows" {
+		out = append(out, windowsSensitiveDirs()...)
+	}
 	if home, err := homeDir(); err == nil {
 		homes := []string{home}
 		if r, err := evalSymlinks(home); err == nil && r != home { // $HOME bajo un enlace: la ruta real es la que se elige
@@ -47,6 +63,9 @@ func denyList(extra []string) []string {
 		for _, hm := range homes {
 			for _, h := range sensitiveHome {
 				out = append(out, filepath.Join(hm, h))
+			}
+			if runtime.GOOS == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
+				out = append(out, filepath.Join(hm, "AppData"))
 			}
 		}
 	}
@@ -132,7 +151,7 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 			return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", h))
 		}
 	}
-	if real == "/" || clean == "/" {
+	if filepath.Dir(real) == real || filepath.Dir(clean) == clean { // «/» o la raíz de una unidad (C:\)
 		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
 	hr, err := evalSymlinks(home)

@@ -71,7 +71,7 @@ func image(t *testing.T, name string, size int) (string, []byte) {
 	t.Helper()
 	b := make([]byte, size)
 	rand.Read(b)
-	p := filepath.Join(t.TempDir(), name)
+	p := filepath.Join(realTemp(t), name)
 	os.WriteFile(p, b, 0o600)
 	return p, b
 }
@@ -88,7 +88,7 @@ func TestValidate(t *testing.T) {
 			t.Errorf("%+v aceptado", c)
 		}
 	}
-	d := t.TempDir()
+	d := realTemp(t)
 	a, _ := image(t, "c3560.bin", 1)
 	b := filepath.Join(d, "c3560.bin")
 	os.WriteFile(b, nil, 0o600)
@@ -440,7 +440,7 @@ func TestFTPHintWarnsCleartext(t *testing.T) {
 
 // El rango de datos pasivos no baja de 1024.
 func TestFTPPassiveRangeMin(t *testing.T) {
-	dir := t.TempDir()
+	dir := realTemp(t)
 	for _, r := range [][2]uint16{{80, 90}, {1023, 1100}, {0, 5000}, {2000, 1500}} {
 		if err := Check(Config{Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: dir, PassivePorts: r}); err == nil {
 			t.Errorf("rango %v aceptado", r)

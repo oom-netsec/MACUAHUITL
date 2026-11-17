@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // lastExportDest guarda el dest_path del último PkiExport recibido.
@@ -36,7 +37,7 @@ func (fakeSec) PkiCsr(_ context.Context, r *v1.PkiCsrRequest) (*v1.PkiCsrRespons
 func TestSecurityBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

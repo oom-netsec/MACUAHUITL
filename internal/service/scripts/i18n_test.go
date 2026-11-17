@@ -169,7 +169,8 @@ func guionesCasos(t *testing.T, ctx context.Context) map[string]string {
 
 func TestGuionesRegresionEs(t *testing.T) {
 	base := guionesCasos(t, i18n.WithLocale(context.Background(), "es"))
-	i18ntest.Golden(t, "testdata/guiones_es.golden.json", base)
+	// «/tmp/x» no es una ruta absoluta en Windows: ahí el error sería otro
+	i18ntest.Golden(t, "testdata/guiones_es.golden.json", base, "exportar_muchos", "col_exportar_no_existe")
 	for _, loc := range []string{"es", "es-MX"} {
 		for k, v := range guionesCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {

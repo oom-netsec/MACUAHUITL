@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -63,12 +64,15 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 	carpeta(t, filepath.Join(datos, "sub"), 0o700)
 	carpeta(t, filepath.Join(root, "config"), 0o700)
 	laxa := carpeta(t, filepath.Join(root, "laxa"), 0o755)
+	sep, raiz := string(filepath.Separator), "/"
+	if runtime.GOOS == "windows" {
+		raiz = filepath.VolumeName(root) + `\`
+	}
 	cases := []struct{ name, dir, code string }{
 		{"relativa", "salidas", "relativa"},
-		{"con punto punto", root + "/laxa/../x", "punto_punto"},
+		{"con punto punto", root + sep + "laxa" + sep + ".." + sep + "x", "punto_punto"},
 		{"inexistente", filepath.Join(root, "no-existe"), "no_existe"},
 		{"un archivo", archivo, "no_directorio"},
-		{"modo 0755", laxa, "permisos"},
 		{"carpeta de datos", datos, "reservada"},
 		{"dentro de la de datos", filepath.Join(datos, "sub"), "reservada"},
 		{"carpeta de configuración", filepath.Join(root, "config"), "reservada"},
@@ -78,8 +82,11 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 		{"dentro de .ssh", carpeta(t, filepath.Join(root, ".ssh", "x"), 0o700), "reservada"},
 		{"HOME", root, "reservada"},
 		{"un ancestro de HOME", filepath.Dir(root), "reservada"},
-		{"raíz", "/", "reservada"},
-		{"/tmp", "/tmp", "reservada"},
+		{"raíz", raiz, "reservada"},
+	}
+	if runtime.GOOS != "windows" {
+		// Sin modos POSIX ni /tmp en Windows: ahí el rechazo por permisos es el de la ACL (TestWindowsOutputsErr en internal/service).
+		cases = append(cases, struct{ name, dir, code string }{"modo 0755", laxa, "permisos"}, struct{ name, dir, code string }{"/tmp", "/tmp", "reservada"})
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -89,8 +96,10 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 			}
 		})
 	}
-	if err := fija(s, laxa); !strings.Contains(err.Error(), "chmod 700 "+laxa) {
-		t.Fatalf("el rechazo por permisos debe sugerir la orden: %v", err)
+	if runtime.GOOS != "windows" {
+		if err := fija(s, laxa); !strings.Contains(err.Error(), "chmod 700 "+laxa) {
+			t.Fatalf("el rechazo por permisos debe sugerir la orden: %v", err)
+		}
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 func TestBackupCommands(t *testing.T) {
@@ -49,7 +51,7 @@ func TestBackupCommands(t *testing.T) {
 	}
 	dst := filepath.Join(t.TempDir(), "r.cfg")
 	must(t, "", "backup", "export", id, "-o", dst)
-	if st, err := os.Stat(dst); err != nil || st.Mode().Perm() != 0o600 {
+	if st, err := os.Stat(dst); err != nil || !testperm.Private(st, 0o600) {
 		t.Fatalf("archivo %v %v", st, err)
 	}
 	if _, err := mctl(t, "", "backup", "export", id, "-o", dst); err == nil {

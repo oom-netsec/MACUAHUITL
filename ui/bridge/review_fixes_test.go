@@ -14,6 +14,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeEvents struct {
@@ -62,7 +63,7 @@ func (r *recorder) count(prefix string) int {
 func TestSubscribeOutlivesCallContext(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	defer startFull(t, sock)()
 	rec := &recorder{}
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
@@ -89,7 +90,7 @@ func TestSubscribeOutlivesCallContext(t *testing.T) {
 func TestResubscribeAfterReconnect(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	stopSrv := startFull(t, sock)
 	rec := &recorder{}
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
@@ -144,7 +145,7 @@ func (fakeAcl) Generate(_ context.Context, r *v1.GenerateRequest) (*v1.GenerateR
 func TestAclBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -185,7 +186,7 @@ func (fakeDiag) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 func TestDiagBridgeStreamsAndCancels(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -222,7 +223,7 @@ func TestDiagBridgeStreamsAndCancels(t *testing.T) {
 func TestSubscribeSupersededByResubscribe(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	defer startFull(t, sock)()
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	root, stop := context.WithCancel(context.Background())
@@ -275,7 +276,7 @@ func (e *dyingEvents) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subsc
 func TestSubscribeReopensAfterStreamDiesOrOpenFails(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

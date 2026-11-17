@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type endEvents struct {
@@ -28,7 +28,7 @@ func watchWith(t *testing.T, send ...string) (string, error) {
 	t.Helper()
 	d, _ := os.MkdirTemp("", "mw")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "c.sock")
+	sock := ipctest.Addr(d)
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

@@ -2,13 +2,13 @@ package bridge
 
 import (
 	"context"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // lentoSet retiene el primer SetPreference hasta que se libera; los demás pasan.
@@ -61,7 +61,7 @@ func TestSyncLanguageNoDejaElIdiomaViejo(t *testing.T) {
 
 func servirSet(t *testing.T, f *lentoSet) string {
 	t.Helper()
-	sock := filepath.Join(t.TempDir(), "core.sock")
+	sock := ipctest.Addr(t.TempDir())
 	l, err := ipc.Listen(sock)
 	if err != nil {
 		t.Fatal(err)

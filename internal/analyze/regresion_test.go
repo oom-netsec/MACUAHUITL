@@ -232,7 +232,9 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	// las rutas de las carpetas temporales cambian en cada corrida: no entran en el golden
 	for k, g := range out {
 		for _, d := range tmpDirs {
-			g = golden{strings.ReplaceAll(g.JSON, d, "<DIR>"), strings.ReplaceAll(g.Text, d, "<DIR>")}
+			// en el JSON de Windows las barras invertidas de la ruta van duplicadas
+			dj := strings.ReplaceAll(d, `\`, `\\`)
+			g = golden{strings.ReplaceAll(strings.ReplaceAll(g.JSON, dj, "<DIR>"), d, "<DIR>"), strings.ReplaceAll(g.Text, d, "<DIR>")}
 		}
 		out[k] = golden{tmpRe.ReplaceAllString(g.JSON, "<DIR>"), tmpRe.ReplaceAllString(g.Text, "<DIR>")}
 	}

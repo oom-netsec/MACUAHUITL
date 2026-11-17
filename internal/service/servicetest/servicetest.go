@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"io"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,6 +44,9 @@ func New(t *testing.T) *Deps {
 	t.Helper()
 	vault.MinMemoryKiB = 8192 // las pruebas bajan el piso del KDF, como las del núcleo
 	root := t.TempDir()
+	if r, err := filepath.EvalSymlinks(root); err == nil { // en Windows TEMP viene en formato corto: los textos traen la ruta larga
+		root = r
+	}
 	db, err := store.Open(filepath.Join(root, "macuahuitl.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +79,9 @@ func (d *Deps) AuditText() string {
 	var b bytes.Buffer
 	if err := d.ExportAudit(context.Background(), &b, time.Time{}, time.Now().Add(24*time.Hour)); err != nil {
 		d.T.Fatal(err)
+	}
+	if runtime.GOOS == "windows" { // JSON duplica las barras invertidas de las rutas: así las pruebas las buscan tal cual
+		return strings.ReplaceAll(b.String(), `\\`, `\`)
 	}
 	return b.String()
 }

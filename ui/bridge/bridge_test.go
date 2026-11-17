@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +11,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakeVault struct {
@@ -75,7 +75,7 @@ func (r *recorder) reset() {
 func TestBridgeReconnects(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	stop := startFake(t, sock)
 	rec := &recorder{}
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
@@ -95,7 +95,7 @@ func TestBridgeReconnects(t *testing.T) {
 func TestBridgeNeverReturnsSecrets(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	defer startFake(t, sock)()
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, func(string, any) {})
 	creds, err := b.ListCredentials()

@@ -6,16 +6,16 @@ import (
 
 	"errors"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // Con Localize y el idioma sin precargar, un dial que falla no debe colgar el puente (lang.mu + client + disconnected).
 func TestIdiomaSinNucleoNoSeCuelga(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "core.sock") // sin servidor al principio
+	sock := ipctest.Addr(t.TempDir()) // sin servidor al principio
 	up := false
 	b := New(func() (*ipc.ClientConn, error) {
 		if !up {

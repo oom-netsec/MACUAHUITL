@@ -15,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 func nuevoSvc(t *testing.T) (*svc, *servicetest.Deps) {
@@ -58,7 +59,7 @@ func TestExportaSoloLaEtiquetaDeLaCredencial(t *testing.T) {
 	if !strings.Contains(txt, `"credential_label":"admin lab"`) || !strings.Contains(txt, "nota privada") {
 		t.Fatalf("export: %s", txt)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(path); !testperm.Private(fi, 0o600) {
 		t.Fatalf("modo = %v", fi.Mode())
 	}
 	// no sobrescribe sin overwrite; con overwrite sí; la ruta debe ser absoluta; y hay que tener algo que exportar
@@ -306,7 +307,7 @@ func TestExportaYImportaCSV(t *testing.T) {
 	if strings.Contains(txt, cid) {
 		t.Fatal("el id de la credencial no debe viajar")
 	}
-	if fi, _ := os.Stat(csv); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(csv); !testperm.Private(fi, 0o600) {
 		t.Fatalf("modo = %v", fi.Mode())
 	}
 	// el formato sale de la extensión o del campo format; sin ninguno de los dos es un error

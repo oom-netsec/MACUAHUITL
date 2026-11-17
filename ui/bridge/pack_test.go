@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,6 +13,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type fakePack struct {
@@ -54,7 +54,7 @@ func (fakePack) Inspect(_ context.Context, r *v1.PackServiceInspectRequest) (*v1
 func TestPackBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

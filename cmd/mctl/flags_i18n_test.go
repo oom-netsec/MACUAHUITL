@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -175,6 +176,9 @@ func TestAyudaDeComandoSinBanderas(t *testing.T) {
 
 // Sin XDG_RUNTIME_DIR no hay socket: mctl da el error de conexión de siempre y no corre el comando (ni crea «ca-lab»).
 func TestSinXDGNoCorreElComando(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("en Windows no hay XDG_RUNTIME_DIR: el canal es un named pipe del usuario (ADR 0012)")
+	}
 	t.Setenv("XDG_RUNTIME_DIR", "")
 	dir := t.TempDir()
 	t.Chdir(dir)

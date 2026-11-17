@@ -3,12 +3,12 @@ package bridge
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type relojFalso struct{ t time.Time }
@@ -77,7 +77,7 @@ func TestCoreLauncherErrores(t *testing.T) {
 
 // Con el núcleo respondiendo no se consulta al lanzador.
 func TestRunNoConsultaConNucleo(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "core.sock")
+	sock := ipctest.Addr(t.TempDir())
 	defer startFake(t, sock)()
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, func(string, any) {})
 	b.Interval = 10 * time.Millisecond

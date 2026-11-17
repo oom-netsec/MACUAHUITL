@@ -3,12 +3,16 @@ package service
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 // La orden chmod sugerida solo se agrega si la ruta es segura de pegar en una terminal (sin espacios, $, comillas...).
 func TestSugerenciaChmodSoloConRutaSegura(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod y modos POSIX no existen en Windows: la orden de ahí es icacls (TestWindowsOutputsErr)")
+	}
 	old := AncestorInfo
 	AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	t.Cleanup(func() { AncestorInfo = old })

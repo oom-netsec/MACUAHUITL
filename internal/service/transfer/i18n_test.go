@@ -31,15 +31,13 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 	out := map[string]string{}
 	var dirs []string
 	tmp := func() string {
-		d := t.TempDir()
+		d := i18ntest.TempDir(t)
 		dirs = append(dirs, d)
 		return d
 	}
 	defer func() {
 		for k, v := range out {
-			for _, d := range dirs {
-				v = strings.ReplaceAll(v, d, "<dir>")
-			}
+			v = i18ntest.Dirs(v, dirs)
 			out[k] = portRe.ReplaceAllString(durationRe.ReplaceAllString(v, "<t>"), "127.0.0.1:<p>")
 		}
 	}()
@@ -151,7 +149,8 @@ func (g *getManyStream) Context() context.Context { return g.ctx }
 
 func TestTransferenciasRegresionEs(t *testing.T) {
 	base := transferenciaCasos(t, i18n.WithLocale(context.Background(), "es"))
-	i18ntest.Golden(t, "testdata/transferencias_es.golden.json", base)
+	// «/etc», «/usr/lib» y «/no/existe.txt» no son rutas absolutas en Windows (los cubre fileserve.TestValidateDir).
+	i18ntest.Golden(t, "testdata/transferencias_es.golden.json", base, "servidor_carpeta_sensible", "servidor_recepcion_sensible", "servidor_archivo_no_existe", "get_destino_sensible", "muchos_destino")
 	for _, loc := range []string{"es", "es-MX"} {
 		for k, v := range transferenciaCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {

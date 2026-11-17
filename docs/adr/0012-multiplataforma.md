@@ -30,7 +30,7 @@ Además, hay supuestos que compilan pero fallan en ejecución. Son los más peli
 ### Forma del código
 
 - Lo que cambia por sistema vive en archivos `_linux.go` y `_windows.go`, dentro de los mismos paquetes de hoy: `internal/sys`, `internal/ipc`, `internal/diag`, `internal/diag/serialcon` y `internal/core/power`. La API de cada paquete no cambia; los llamadores no llevan build tags.
-- `golang.org/x/sys/windows` (BSD, el módulo ya es dependencia) solo se importa en esos paquetes y en `ui` (el aviso de WebView2 faltante). Un caso nuevo en archcheck lo hace cumplir, igual que noegress con `net`; mientras dure 43a, `tools/ci/winsys.sh` lo revisa también en los archivos `_windows.go`, que archcheck no carga en Linux.
+- `golang.org/x/sys/windows` (BSD, el módulo ya es dependencia) solo se importa en esos paquetes y en `ui` (el aviso de WebView2 faltante). Un caso nuevo en archcheck lo hace cumplir, igual que noegress con `net`; el job `windows` corre archcheck con `GOOS=windows` sobre `./...`, así que lo revisa también en los archivos `_windows.go`, que archcheck no carga en Linux (`tools/ci/winsys.sh` se borró al cerrar 43a8).
 - Dependencia nueva: `github.com/Microsoft/go-winio` (MIT, la usa Docker), solo para el named pipe; antes de agregarla se lee su LICENSE. El resto de las llamadas sale de `x/sys/windows`.
 - Rutas en Windows (el spec §14 hoy es XDG):
 
@@ -150,7 +150,7 @@ La primera versión de Windows se llama **beta**. No promete paridad. Puede sali
 
 Limitaciones de una beta sin firma. Van en las notas del release y en el README, dichas tal cual:
 
-- **Smart App Control** de Windows 11, si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. Desactivarlo no tiene vuelta atrás sin reinstalar Windows, así que esa decisión es del usuario. No la tomamos ni la recomendamos por él.
+- **Smart App Control** de Windows 11, si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. Según la versión de Windows 11, desactivarlo puede no tener vuelta atrás sin reinstalar Windows, así que esa decisión es del usuario. No la tomamos ni la recomendamos por él.
 - **SmartScreen** muestra «Windows protegió su PC». Se sigue con «Más información → Ejecutar de todas formas», y en cada versión nueva vuelve a aparecer.
 - **Defender** puede marcar como falso positivo un binario Go sin firma. Se reporta a Microsoft como falso positivo y se avisa en el release.
 

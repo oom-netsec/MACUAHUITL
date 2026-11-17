@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -66,7 +66,7 @@ func newBrowseBridge(t *testing.T, f fakeBrowse) (*Bridge, *recorder) {
 	t.Helper()
 	d, _ := os.MkdirTemp("", "brg")
 	t.Cleanup(func() { os.RemoveAll(d) })
-	sock := filepath.Join(d, "core.sock")
+	sock := ipctest.Addr(d)
 	l, _ := ipc.Listen(sock)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

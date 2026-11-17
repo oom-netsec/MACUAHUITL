@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 // outFile nunca sigue un enlace ni reabre un archivo ajeno: si el nombre ya existe (archivo, enlace plantado),
@@ -43,7 +44,7 @@ func TestOutFileNoSigueEnlacesNiReusaNombres(t *testing.T) {
 	if g.Name() == f.Name() {
 		t.Fatalf("dos aperturas dieron el mismo archivo: %s", g.Name())
 	}
-	if fi, _ := g.Stat(); fi.Mode().Perm() != 0o600 {
+	if fi, _ := g.Stat(); !testperm.Private(fi, 0o600) {
 		t.Errorf("permisos %v", fi.Mode().Perm())
 	}
 }
