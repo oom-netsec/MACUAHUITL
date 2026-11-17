@@ -18,19 +18,23 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
   const [text, setText] = useState("");
   const [pass, setPass] = useState("");
   const [needPass, setNeedPass] = useState(false);
+  const [badPass, setBadPass] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<(VaultImportKeyResult & { label: string }) | null>(null);
   const passRef = useRef<HTMLInputElement>(null);
-  useEffect(() => () => { setText(""); setPass(""); }, []); // al desmontar
-  useEffect(() => { if (needPass) passRef.current?.focus(); }, [needPass]);
+  useEffect(() => { if (needPass || badPass) passRef.current?.focus(); }, [needPass, badPass]);
 
   const reasonText = (e: unknown) => {
     const i = errInfo(e);
     switch (i?.reason) {
       case "vault.err.key_passphrase_wrong": return t("vault.import.err.passWrong");
       case "vault.err.key_import_invalid": return t("vault.import.err.invalid", { format: i.metadata.format ?? "?" });
-      case "vault.err.key_import_unsupported": return t("vault.import.err.unsupported", { type: i.metadata.type ?? "?" }) + (i.metadata.format === "pkcs8-encrypted" ? " " + t("vault.import.err.pkcs8") : "");
+      case "vault.err.key_import_unsupported": {
+        if (i.metadata.format === "pkcs8-encrypted") return t("vault.import.err.unsupportedPkcs8");
+        const ty = i.metadata.type;
+        return t("vault.import.err.unsupported", { type: ty === "rsa-small" || ty === "rsa-large" || ty === "ecdsa-p224" || ty === "ssh-dss" || ty === "other" ? t(`vault.import.type.${ty}`) : ty ?? "?" });
+      }
       case "vault.err.field_too_long": return t("vault.import.err.tooLong");
       default: return errorText(e);
     }
@@ -41,13 +45,15 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
     if (!user) return setErr(t("vault.err.userRequired"));
     if (!path && !text.trim()) return setErr(t("vault.import.needSource"));
     if (!path && tooBig) return setErr(t("vault.import.tooBig"));
-    setErr(""); setNeedPass(false); setBusy(true);
+    setErr(""); setNeedPass(false); setBadPass(false); setBusy(true);
     try {
       const r = await core.vaultImportKey({ label, username: user, ...(path ? { path } : { privateKey: text }), ...(pass ? { passphrase: pass } : {}) });
       setRes({ ...r, label: label || user }); setLabel(""); setUser(""); setPath("");
       onDone();
     } catch (x) {
-      if (errInfo(x)?.reason === "vault.err.key_passphrase_required") { setNeedPass(true); setErr(t("vault.import.err.passRequired")); } else setErr(reasonText(x));
+      const reason = errInfo(x)?.reason;
+      if (reason === "vault.err.key_passphrase_required") { setNeedPass(true); setErr(t(path ? "vault.import.err.passRequiredFile" : "vault.import.err.passRequired")); }
+      else { setBadPass(reason === "vault.err.key_passphrase_wrong"); setErr(reasonText(x)); }
     } finally {
       setText(""); setPass(""); setBusy(false);
     }
@@ -77,7 +83,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
         </div>
         <div className="actions">
           <button type="button" onClick={pick}>{t("vault.import.pick")}</button>
-          {path && <span className="meta">{t("vault.import.fileChosen", { path })}</span>}
+          {path && <><span className="meta">{t("vault.import.fileChosen", { path })}</span><button type="button" onClick={() => setPath("")}>{t("vault.import.unpick")}</button></>}
         </div>
         <div className="field">
           <label htmlFor="vault-import-text">{t("vault.import.pasteLabel")}</label>
@@ -87,11 +93,11 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
         </div>
         <div className="field" data-w="md">
           <label htmlFor="vault-import-pass">{t("vault.import.pass")}</label>
-          <input id="vault-import-pass" ref={passRef} type="password" value={pass} autoComplete="off" spellCheck={false} aria-invalid={needPass || undefined}
-            aria-describedby={needPass ? "vault-import-pass-e" : undefined} onChange={(e) => setPass(e.target.value)} />
-          {needPass && <div id="vault-import-pass-e" className="field-error">{t("vault.import.err.passRequired")}</div>}
+          <input id="vault-import-pass" ref={passRef} type="password" value={pass} autoComplete="off" spellCheck={false} aria-invalid={needPass || badPass || undefined}
+            aria-describedby={needPass || badPass ? "vault-import-pass-e" : undefined} onChange={(e) => setPass(e.target.value)} />
+          {(needPass || badPass) && <div id="vault-import-pass-e" className="field-error" role={badPass ? "alert" : undefined}>{err}</div>}
         </div>
-        {err && !needPass && <Notice kind="error">{err}</Notice>}
+        {err && !needPass && !badPass && <Notice kind="error">{err}</Notice>}
         <div className="actions">
           <button type="submit" aria-busy={busy} disabled={busy}>{t("vault.import.submit")}</button>
           <button type="button" onClick={onClose}>{t("common.cancel")}</button>

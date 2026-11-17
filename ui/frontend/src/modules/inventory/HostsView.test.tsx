@@ -437,6 +437,15 @@ test("la credencial de solo llave se ofrece solo con linux o windows, y la orden
   expect(screen.getByText(/queda en la auditoría y en la grabación/)).toBeVisible();
 });
 
+test("la credencial de solo llave también se ofrece con windows", async () => {
+  const key = { ...cred, id: "k".repeat(32), label: "llave pi", kind: "key" as const, hasSshKey: true };
+  setup({ listCredentials: vi.fn(async () => [cred, key]) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "windows");
+  expect(within(screen.getByLabelText("Credencial de la bóveda")).getAllByRole("option").some((o) => /llave pi/.test(o.textContent ?? ""))).toBe(true);
+});
+
 test("un error del núcleo con metadata.field startup_command marca el campo de la orden", async () => {
   const err = Object.assign(new Error("orden inválida"), { cause: { code: "InvalidArgument", reason: "hosts.invalid_startup_command", metadata: { field: "startup_command" } } });
   setup({ saveHost: vi.fn(async () => { throw err; }) });

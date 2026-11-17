@@ -33,7 +33,7 @@ export interface VaultAPI {
   credentialPublicKey(id: string): Promise<string>;
   // Otra llave para la misma credencial (conserva el id) y su pública nueva. confirm es obligatorio: la pública vieja deja de servir en cada
   // authorized_keys, así que va en true solo tras preguntar. Solo credenciales de tipo llave.
-  regenerateKeyCredential(id: string, confirm: boolean): Promise<string>;
+  regenerateKeyCredential(id: string, confirm: boolean): Promise<{ publicKey: string; previousOrigin: "generated" | "imported" | "" }>;
   // Devuelve cuántas credenciales guardó. La frase tiene 12 caracteres o más y es distinta de la maestra; confirm es la confirmación explícita.
   exportVaultBackup(path: string, passphrase: string, overwrite: boolean, confirm: boolean): Promise<VaultBackupExport>;
   // Borra el archivo vacío que dejó pickSavePath si el export falló: solo un archivo regular de 0 bytes en esa ruta exacta.

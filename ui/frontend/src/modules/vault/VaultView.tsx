@@ -81,9 +81,10 @@ export function VaultView({ core }: { core: CoreAPI }) {
           }} onRegenerate={async (c) => {
             lastView.current = c.id;
             try {
-              const publicKey = await core.regenerateKeyCredential(c.id, true); // la confirmación la dio la persona en el botón
-              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") + (c.origin === "imported" ? " " + t("vault.key.regenImported") : "") }); return; } // la persona ya miró otra credencial: no se la pisa
-              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true, wasImported: c.origin === "imported" });
+              const { publicKey, previousOrigin } = await core.regenerateKeyCredential(c.id, true);
+              changed(); // el origen pasa a «generated» // la confirmación la dio la persona en el botón
+              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") + (previousOrigin === "imported" ? " " + t("vault.key.regenImported") : "") }); return; } // la persona ya miró otra credencial: no se la pisa
+              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true, wasImported: previousOrigin === "imported" });
               setMsg(null);
             } catch (e) { fail(e); }
           }} onDelete={async (id) => {
@@ -168,7 +169,7 @@ function CredentialList({ creds, onDelete, onViewKey, onRegenerate }: { creds: C
       render: (c) => <>{c.kind === "key" && <Badge>{t("vault.kind.key")}</Badge>}{c.hasEnable && <Badge>{t("vault.hasEnable")}</Badge>}{c.hasSshKey && c.kind !== "key" && <Badge>{t("vault.hasSshKey")}</Badge>}{c.origin && <Badge>{t(c.origin === "imported" ? "vault.origin.imported" : "vault.origin.generated")}</Badge>}</> },
     // 480: caben «Ver llave pública», «Confirmar regenerar» y «Confirmar eliminación» armados a la vez (medido en WebKitGTK, ~472 px en español).
     { id: "actions", header: t("vault.col.actions"), value: () => "", width: 480,
-      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t("vault.key.regen.confirm", { label: c.label })} confirmText={t("vault.key.regen.confirmShort")} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} confirmText={t("common.confirmDelete")} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
+      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t(c.origin === "imported" ? "vault.key.regen.confirmImported" : "vault.key.regen.confirm", { label: c.label })} confirmText={t(c.origin === "imported" ? "vault.key.regen.confirmImportedShort" : "vault.key.regen.confirmShort")} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} confirmText={t("common.confirmDelete")} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
   ];
   return (
     <Section title={t("vault.creds")}>

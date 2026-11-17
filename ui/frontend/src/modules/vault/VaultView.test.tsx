@@ -388,7 +388,7 @@ test("borrar la credencial cuya pública está a la vista la quita de la pantall
 
 test("regenerar la llave pide confirmar, manda confirm=true y muestra la pública nueva con el aviso de autorizarla otra vez", async () => {
   const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
-  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), regenerateKeyCredential: vi.fn(async () => NEW) });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), regenerateKeyCredential: vi.fn(async () => ({ publicKey: NEW, previousOrigin: "generated" as const })) });
   render(<VaultView core={core} />);
   await screen.findByText("llave lab");
   expect(screen.getAllByRole("button", { name: /Regenerar la llave de/ })).toHaveLength(1); // solo la de llave
@@ -404,10 +404,10 @@ test("regenerar la llave pide confirmar, manda confirm=true y muestra la públic
 test("si mientras regenera se abre la pública de otra credencial, la respuesta tardía no la pisa y queda el aviso de éxito", async () => {
   const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
   const key2 = { ...keyCred, id: "k2", label: "llave dos" };
-  let done: (v: string) => void = () => {};
+  let done: (v: { publicKey: string; previousOrigin: "generated" }) => void = () => {};
   const core = fakeCore({
     listCredentials: vi.fn(async () => [keyCred, key2]), credentialPublicKey: vi.fn(async () => PUB),
-    regenerateKeyCredential: vi.fn(() => new Promise<string>((r) => { done = r; })),
+    regenerateKeyCredential: vi.fn(() => new Promise<{ publicKey: string; previousOrigin: "generated" }>((r) => { done = r; })),
   });
   render(<VaultView core={core} />);
   await screen.findByText("llave lab");
@@ -415,7 +415,7 @@ test("si mientras regenera se abre la pública de otra credencial, la respuesta 
   await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
   await userEvent.click(screen.getByRole("button", { name: /Ver llave pública.*llave dos/ }));
   expect(await screen.findByText(PUB)).toBeInTheDocument();
-  await act(async () => { done(NEW); });
+  await act(async () => { done({ publicKey: NEW, previousOrigin: "generated" as const }); });
   expect(screen.getByText(PUB)).toBeInTheDocument();
   expect(screen.queryByText(NEW)).not.toBeInTheDocument();
   expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
@@ -423,7 +423,7 @@ test("si mientras regenera se abre la pública de otra credencial, la respuesta 
 
 test("regenerar la misma credencial con la pública a la vista remonta el cuadro y le devuelve el foco", async () => {
   const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
-  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => PUB), regenerateKeyCredential: vi.fn(async () => NEW) });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => PUB), regenerateKeyCredential: vi.fn(async () => ({ publicKey: NEW, previousOrigin: "generated" as const })) });
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /Ver llave pública/ }));
   await screen.findByText(PUB);
@@ -508,7 +508,7 @@ test("tras un error el textarea y la frase quedan vacíos; llave inválida muest
   await userEvent.type(keyBox(), "INVALID");
   await userEvent.type(screen.getByLabelText("Frase de la llave (si está cifrada)"), "zzz");
   await send();
-  expect(await screen.findByRole("alert")).toHaveTextContent(/formato: pem/);
+  expect(await screen.findByRole("alert")).toHaveTextContent(/formato: other/);
   expect(keyBox()).toHaveValue("");
   expect(screen.getByLabelText("Frase de la llave (si está cifrada)")).toHaveValue("");
 });
@@ -527,7 +527,7 @@ test("frase requerida: enfoca el campo y lo marca; frase incorrecta; no soportad
   expect(await screen.findByRole("alert")).toHaveTextContent("La frase no es correcta.");
   await userEvent.type(keyBox(), "DSA-KEY");
   await send();
-  expect(await screen.findByRole("alert")).toHaveTextContent("Tipo de llave no admitido: ssh-dss.");
+  expect(await screen.findByRole("alert")).toHaveTextContent(/Tipo de llave no admitido: DSA/);
 });
 
 test("tope de 64 KiB en el cliente: no llama al núcleo", async () => {
@@ -576,14 +576,87 @@ test("el aviso de RSA débil menciona RHEL/Fedora", async () => {
   expect(await screen.findByText(/RHEL/)).toBeInTheDocument();
 });
 
-test("regenerar una llave importada avisa que se reemplaza por una generada", async () => {
+test("regenerar una importada: la confirmación avisa antes; el aviso sale de previousOrigin y la lista se recarga", async () => {
   const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
   const imp = { ...keyCred, origin: "imported" as const };
-  const core = fakeCore({ listCredentials: vi.fn(async () => [imp]), regenerateKeyCredential: vi.fn(async () => NEW) });
+  const list = vi.fn(async () => [imp]);
+  const core = fakeCore({ listCredentials: list, regenerateKeyCredential: vi.fn(async () => ({ publicKey: NEW, previousOrigin: "imported" as const })) });
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /Regenerar la llave de/ }));
-  await userEvent.click(await screen.findByRole("button", { name: /Confirmar: regenerar/ }));
+  const conf = await screen.findByRole("button", { name: /destruir la privada importada/ });
+  expect(conf).toHaveTextContent(/destruir la privada importada/); // WCAG 2.5.3: lo visible está en el nombre accesible
+  const n = list.mock.calls.length;
+  await userEvent.click(conf);
   expect(await screen.findByText(/importada se reemplazó/)).toBeInTheDocument();
+  await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(n));
+});
+
+test("regenerar una generada no avisa de importada aunque la lista diga imported (manda previousOrigin)", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...keyCred, origin: "imported" as const }]), regenerateKeyCredential: vi.fn(async () => ({ publicKey: NEW, previousOrigin: "generated" as const })) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Regenerar la llave de/ }));
+  await userEvent.click(await screen.findByRole("button", { name: /destruir la privada importada/ }));
+  await screen.findByText(NEW);
+  expect(screen.queryByText(/importada se reemplazó/)).toBeNull();
+});
+
+test("tipos no soportados se traducen y PKCS#8 cifrada no muestra «other»", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "DSA-KEY");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Tipo de llave no admitido: DSA. Se aceptan ed25519, ECDSA P-256/384/521 y RSA 1024-16384.");
+  await userEvent.type(keyBox(), "PKCS8-ENC");
+  await send();
+  const a = await screen.findByRole("alert");
+  expect(a).toHaveTextContent(/ssh-keygen -p -f/);
+  expect(a).not.toHaveTextContent(/other/);
+});
+
+test("frase requerida con archivo: texto aparte, conserva la ruta y reenvía con ella; frase mala enfoca y marca", async () => {
+  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/enc") });
+  vi.mocked(core.vaultImportKey).mockRejectedValueOnce(Object.assign(new Error("x"), { cause: { code: "FailedPrecondition", reason: "vault.err.key_passphrase_required", metadata: {} } }));
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  await send();
+  const pass = screen.getByLabelText("Frase de la llave (si está cifrada)");
+  await waitFor(() => expect(pass).toHaveFocus());
+  expect(screen.getByText(/el archivo elegido se conserva/)).toBeInTheDocument();
+  expect(screen.queryByText(/vuelve a pegarla/)).toBeNull();
+  expect(screen.getByText(/Archivo: \/home\/u\/.ssh\/enc/)).toBeInTheDocument();
+  await userEvent.type(pass, "correcta");
+  await send();
+  await waitFor(() => expect(core.vaultImportKey).toHaveBeenLastCalledWith({ label: "pi", username: "root", path: "/home/u/.ssh/enc", passphrase: "correcta" }));
+});
+
+test("frase incorrecta enfoca el campo y lo marca inválido", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "ENCRYPTED");
+  await userEvent.type(screen.getByLabelText("Frase de la llave (si está cifrada)"), "mala");
+  await send();
+  const pass = screen.getByLabelText("Frase de la llave (si está cifrada)");
+  await waitFor(() => expect(pass).toHaveFocus());
+  expect(pass).toBeInvalid();
+});
+
+test("Quitar archivo permite volver a pegar", async () => {
+  await openImport({ pickPath: vi.fn(async () => "/x/id") });
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  expect(keyBox()).toBeDisabled();
+  await userEvent.click(screen.getByRole("button", { name: "Quitar archivo" }));
+  expect(keyBox()).toBeEnabled();
+  expect(screen.queryByRole("button", { name: "Quitar archivo" })).toBeNull();
+});
+
+test("Cancelar con la petición en curso cierra el formulario sin romper nada", async () => {
+  let done!: (v: never) => void;
+  const core = await openImport({ vaultImportKey: vi.fn(() => new Promise((r) => { done = r as never; })) });
+  await userEvent.type(keyBox(), "PRIVADA");
+  await send();
+  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(screen.queryByLabelText("O pega la llave privada")).toBeNull();
+  await act(async () => { done({ id: "i1", publicKey: "k", fingerprint: "f", algorithm: "a", bits: 256, weak: false } as never); });
+  expect(screen.getByRole("button", { name: "Importar llave existente" })).toBeInTheDocument();
+  expect(core.vaultImportKey).toHaveBeenCalledTimes(1);
 });
 
 test("la lista marca Importada o Generada según origin y nada sin origin", async () => {
