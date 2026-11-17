@@ -169,6 +169,14 @@ type xfer struct {
 	peer    net.Addr
 	timeout time.Duration
 	tries   int
+	buf     []byte // uno por transferencia: exchange y awaitData se llaman una vez por bloque
+}
+
+func (x *xfer) readBuf() []byte {
+	if x.buf == nil {
+		x.buf = make([]byte, maxDatagram)
+	}
+	return x.buf
 }
 
 // maxDatagram es el máximo de un datagrama UDP: con un búfer menor Linux trunca en silencio pero Windows falla la
@@ -178,7 +186,7 @@ const maxDatagram = 65535
 // exchange envía pkt y espera el ACK del bloque indicado; reenvía al vencer el plazo.
 // Los ACK duplicados se ignoran sin reenviar (síndrome del aprendiz de brujo, RFC 1123).
 func (x *xfer) exchange(pkt []byte, block uint16) error {
-	buf := make([]byte, maxDatagram)
+	buf := x.readBuf()
 	for try := 0; try < x.tries; try++ {
 		if _, err := x.conn.WriteTo(pkt, x.peer); err != nil {
 			return err
@@ -306,7 +314,7 @@ func ackPacket(block uint16) []byte { return binary.BigEndian.AppendUint16([]byt
 // awaitData envía pkt (ACK u OACK) y espera el DATA del bloque indicado; reenvía pkt al
 // vencer el plazo. Un DATA más largo que blk viola el acuerdo y aborta.
 func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
-	buf := make([]byte, maxDatagram) // un DATA mayor que 4+blk se detecta por n
+	buf := x.readBuf() // un DATA mayor que 4+blk se detecta por n
 	for try := 0; try < x.tries; try++ {
 		if _, err := x.conn.WriteTo(pkt, x.peer); err != nil {
 			return nil, err

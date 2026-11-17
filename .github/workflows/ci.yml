@@ -12,13 +12,13 @@ jobs:
   # Agregador: conserva el nombre «go» (check requerido de la protección de main).
   # if: always() + comprobación explícita, porque un job saltado cuenta como éxito.
   go:
-    needs: [go-race-core, go-race-rest, go-race-mask, go-checks]
+    needs: [go-race-core, go-race-rest, go-race-mask, go-checks, windows]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: todos los jobs de Go en verde
         run: |
-          [[ "${{ needs.go-race-core.result }}" == success && "${{ needs.go-race-rest.result }}" == success && "${{ needs.go-race-mask.result }}" == success && "${{ needs.go-checks.result }}" == success ]]
+          [[ "${{ needs.go-race-core.result }}" == success && "${{ needs.go-race-rest.result }}" == success && "${{ needs.go-race-mask.result }}" == success && "${{ needs.go-checks.result }}" == success && "${{ needs.windows.result }}" == success ]]
 
   go-race-core:
     runs-on: ubuntu-latest

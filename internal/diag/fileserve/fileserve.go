@@ -318,6 +318,7 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
 		}
+		// shortcut: decide por sistema y no por finalPath; si otro sistema llega a devolver la ruta del handle, cambiar a esa condición.
 		if goos == "windows" { // en otros sistemas finalPath no devuelve nada: abrir de más no sirve
 			h, err := sys.OpenRegular(real) // la ruta real del handle: una junction intermedia no la ve EvalSymlinks
 			if err != nil {
