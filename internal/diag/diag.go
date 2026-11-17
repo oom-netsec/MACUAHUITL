@@ -296,7 +296,7 @@ func (r Runner) exec(ctx context.Context, req Request, path string, argv []strin
 	// pcap en el archivo (-w) y el progreso en stderr; stdout queda vacío.
 	so, se := &lineWriter{emit: emit}, &lineWriter{emit: emit}
 	cmd.Stdout, cmd.Stderr = so, se
-	sink := out // el que discard cierra y borra si el hijo no arranca
+	sink := out                         // el que discard cierra y borra si el hijo no arranca
 	if req.Tool == Pcap && out != nil { // el pcap sale por stdout directo al archivo; el progreso (stderr) no se le mezcla
 		cmd.Stdout, out = out, nil
 	}

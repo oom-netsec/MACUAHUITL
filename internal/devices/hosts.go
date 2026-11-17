@@ -78,18 +78,28 @@ func NameKey(n string) string { return strings.ToLower(strings.ToUpper(n)) }
 // Key identifica un host por dirección y puerto (la dirección ya canónica, ver Clean).
 func Key(h Host) string { return h.Address + ":" + strconv.Itoa(h.Port) }
 
-// hasControl: con allowNL (notas) solo los controles que no son salto ni tab; sin él (nombre de host, etiqueta de credencial) la regla de
-// badStartupRune: también formato Unicode (bidi, ancho cero) y separadores de línea y de párrafo, que disfrazan lo que se ve.
+// hasControl: con allowNL (notas) solo los controles que no son salto ni tab; sin él (nombre de host, etiqueta de credencial)
+// también los separadores de línea y de párrafo y los caracteres que disfrazan lo que se ve (hiddenRune).
 func hasControl(s string, allowNL bool) bool {
-	if !allowNL {
-		return badStartupRune(s)
-	}
 	for _, r := range s {
 		if unicode.IsControl(r) && !(allowNL && (r == '\n' || r == '\t')) {
 			return true
 		}
+		if !allowNL && (hiddenRune(r) || unicode.In(r, unicode.Zl, unicode.Zp)) {
+			return true
+		}
 	}
 	return false
+}
+
+// hiddenRune: control de dirección del texto (bidi: U+202A-202E, U+2066-2069, U+200E, U+200F, U+061C) o ancho cero (U+200B, U+2060,
+// U+FEFF). No cuenta el resto de \p{Cf}: U+200D y U+200C (necesarios en persa, hindi y emoji) ni el guion blando U+00AD.
+func hiddenRune(r rune) bool {
+	switch {
+	case r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069:
+		return true
+	}
+	return r == 0x200E || r == 0x200F || r == 0x061C || r == 0x200B || r == 0x2060 || r == 0xFEFF
 }
 
 // FieldError es un campo inválido de un host: Field es el nombre del campo en el archivo de import (name, address…).
