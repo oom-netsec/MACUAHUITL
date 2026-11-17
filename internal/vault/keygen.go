@@ -1,12 +1,12 @@
 package vault
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/pem"
 	"os"
 	"strings"
 
@@ -48,7 +48,8 @@ func (p PublicKey) AuthorizedKey() string {
 }
 
 // newKeyPair genera una ed25519 con crypto/rand y devuelve la privada en formato OpenSSH sin frase (openssh-key-v1, el que lee
-// transport con ssh.ParsePrivateKey) ya en memoria bloqueada, más la pública. Los intermedios (privada, cuerpo y PEM) se ponen en ceros.
+// transport con ssh.ParsePrivateKey) ya en memoria bloqueada, más la pública. La privada, el cuerpo, el binario y el PEM se arman
+// en búferes de medida exacta (ninguno realoca, así no quedan copias huérfanas) y se ponen en ceros; secret.New pone en ceros el PEM.
 func newKeyPair() (*secret.Secret, PublicKey, error) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -61,7 +62,10 @@ func newKeyPair() (*secret.Secret, PublicKey, error) {
 	}
 	w := wirePub(pub)
 	// Sección privada: checkint ×2, tipo, pública, privada (semilla ‖ pública), comentario vacío y relleno 1,2,3… a múltiplo de 8.
-	body := append(append([]byte(nil), chk[:]...), chk[:]...)
+	n := 8 + 4 + len(keyType) + 4 + len(pub) + 4 + len(priv) + 4
+	n += (8 - n%8) % 8
+	body := make([]byte, 0, n)
+	body = append(append(body, chk[:]...), chk[:]...)
 	body = sshString(body, []byte(keyType))
 	body = sshString(body, pub)
 	body = sshString(body, priv)
@@ -70,7 +74,10 @@ func newKeyPair() (*secret.Secret, PublicKey, error) {
 		body = append(body, i)
 	}
 	defer wipe(body)
-	out := append([]byte("openssh-key-v1\x00"), 0, 0, 0, 4)
+	const magic = "openssh-key-v1\x00"
+	out := make([]byte, 0, len(magic)+4+4+4+4+8+4+len(w)+4+len(body))
+	out = append(out, magic...)
+	out = append(out, 0, 0, 0, 4)
 	out = append(out, "none"...)
 	out = append(out, 0, 0, 0, 4)
 	out = append(out, "none"...)
@@ -78,17 +85,60 @@ func newKeyPair() (*secret.Secret, PublicKey, error) {
 	out = sshString(out, w)
 	out = sshString(out, body)
 	defer wipe(out)
-	return secret.New(pem.EncodeToMemory(&pem.Block{Type: "OPENSSH PRIVATE KEY", Bytes: out})), w, nil // secret.New pone en ceros el PEM
+	return secret.New(armor(out)), w, nil // secret.New pone en ceros el PEM
 }
 
-// pubOf deriva la pública de una privada openssh-key-v1 ed25519 sin frase; cualquier otra cosa da ErrKeyUnsupported.
-func pubOf(pemBytes []byte) (PublicKey, error) {
-	blk, _ := pem.Decode(pemBytes)
-	if blk == nil {
+const (
+	pemBegin = "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+	pemEnd   = "-----END OPENSSH PRIVATE KEY-----\n"
+)
+
+// armor es el PEM de der con líneas de 64 columnas, en un búfer de medida exacta (pem.EncodeToMemory crece un bytes.Buffer y deja copias).
+func armor(der []byte) []byte {
+	n := base64.StdEncoding.EncodedLen(len(der))
+	out := make([]byte, len(pemBegin)+n+(n+63)/64+len(pemEnd))
+	o := copy(out, pemBegin)
+	for len(der) > 0 {
+		c := min(len(der), 48)
+		base64.StdEncoding.Encode(out[o:], der[:c])
+		o += base64.StdEncoding.EncodedLen(c)
+		out[o] = '\n'
+		o++
+		der = der[c:]
+	}
+	copy(out[o:], pemEnd)
+	return out
+}
+
+// unarmor decodifica el PEM de una privada OpenSSH sin pasar por encoding/pem (que deja copias del base64 sin poder borrarlas).
+// El resultado lo pone en ceros quien llama; cualquier otra cosa da error.
+func unarmor(pemBytes []byte) ([]byte, error) {
+	lines := bytes.Split(bytes.TrimSpace(pemBytes), []byte("\n"))
+	if len(lines) < 3 || string(bytes.TrimSpace(lines[0])) != strings.TrimSpace(pemBegin) || string(bytes.TrimSpace(lines[len(lines)-1])) != strings.TrimSpace(pemEnd) {
 		return nil, ErrKeyUnsupported
 	}
-	defer wipe(blk.Bytes)
-	b := blk.Bytes
+	b64 := make([]byte, 0, len(pemBytes))
+	defer wipe(b64)
+	for _, l := range lines[1 : len(lines)-1] {
+		b64 = append(b64, bytes.TrimSpace(l)...)
+	}
+	der := make([]byte, base64.StdEncoding.DecodedLen(len(b64)))
+	n, err := base64.StdEncoding.Decode(der, b64)
+	if err != nil {
+		wipe(der)
+		return nil, ErrKeyUnsupported
+	}
+	return der[:n], nil
+}
+
+// pubOf deriva la pública de una privada openssh-key-v1 ed25519 sin frase y exige que las tres copias coincidan (la de la cabecera,
+// la de la sección privada y la derivada de la semilla, que es la que firma); cualquier otra cosa da ErrKeyUnsupported.
+func pubOf(pemBytes []byte) (PublicKey, error) {
+	b, err := unarmor(pemBytes)
+	if err != nil {
+		return nil, err
+	}
+	defer wipe(b)
 	const magic = "openssh-key-v1\x00"
 	if len(b) < len(magic) || string(b[:len(magic)]) != magic {
 		return nil, ErrKeyUnsupported
@@ -115,7 +165,7 @@ func pubOf(pemBytes []byte) (PublicKey, error) {
 		return nil, ErrKeyUnsupported
 	}
 	b = b[4:]
-	next() // pública en el encabezado
+	hdr := next() // pública en el encabezado
 	b = next()
 	if len(b) < 8 {
 		return nil, ErrKeyUnsupported
@@ -125,10 +175,17 @@ func pubOf(pemBytes []byte) (PublicKey, error) {
 		return nil, ErrKeyUnsupported
 	}
 	pub := next()
-	if len(pub) != ed25519.PublicKeySize {
+	priv := next()
+	if len(pub) != ed25519.PublicKeySize || len(priv) != ed25519.PrivateKeySize {
 		return nil, ErrKeyUnsupported
 	}
-	return wirePub(pub), nil
+	derived := ed25519.NewKeyFromSeed(priv[:ed25519.SeedSize])
+	defer wipe(derived)
+	w := wirePub(pub)
+	if !bytes.Equal(hdr, w) || !bytes.Equal(priv[ed25519.SeedSize:], pub) || !bytes.Equal(derived[ed25519.SeedSize:], pub) {
+		return nil, ErrKeyUnsupported
+	}
+	return w, nil
 }
 
 // GenerateKey crea una credencial "key" (solo llave ed25519, sin contraseña ni enable) y devuelve su id y su pública.
@@ -147,15 +204,28 @@ func (v *Vault) GenerateKey(label, user string) (string, PublicKey, error) {
 	return id, pub, nil
 }
 
-// PublicKey deriva la pública de la privada guardada (también de una llave importada antes de la fase 44).
+// PublicKey deriva la pública de la privada guardada. Solo sirve con una ed25519 OpenSSH sin frase; las demás (RSA, ECDSA, PKCS#8,
+// cifradas, de antes de la fase 44) dan ErrKeyUnsupported. Va bajo v.mu y exige la bóveda abierta: una ventana de trabajo no basta.
 func (v *Vault) PublicKey(id string) (PublicKey, error) {
-	c, err := v.Get(id)
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return nil, err
+	}
+	i, err := v.find(id)
+	if err != nil {
+		return nil, err
+	}
+	c, err := v.decrypt(v.entries[i])
 	if err != nil {
 		return nil, err
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	defer c.SSHKey.Destroy()
+	if Reserved(c.Label) {
+		return nil, ErrReserved
+	}
 	if c.SSHKey.Empty() {
 		return nil, ErrNoKey
 	}
@@ -163,7 +233,7 @@ func (v *Vault) PublicKey(id string) (PublicKey, error) {
 }
 
 // RegenerateKey cambia la llave de una credencial "key" conservando id, etiqueta y usuario, en una sola persistencia, y destruye
-// la vieja. Devuelve la pública vieja y la nueva (la auditoría guarda ambas huellas).
+// la vieja. Devuelve la pública vieja (nil si la llave no era una ed25519 OpenSSH sin frase) y la nueva (la auditoría guarda ambas huellas).
 func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, err error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -190,8 +260,7 @@ func (v *Vault) RegenerateKey(id string) (oldPub, newPub PublicKey, err error) {
 	}
 	old, err := pubOf(c.SSHKey.Bytes())
 	if err != nil {
-		c.SSHKey.Destroy()
-		return nil, nil, err
+		old = nil // llave de antes de la fase 44 (RSA, ECDSA, cifrada…): se reemplaza igual, sin huella vieja
 	}
 	k, pub, err := newKeyPair()
 	if err != nil {

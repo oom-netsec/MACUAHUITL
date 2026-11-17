@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 )
@@ -187,5 +188,96 @@ func TestPublicKeyDeLlaveAjenaNoSoportada(t *testing.T) {
 	id, _ := v.Put(Credential{Label: "x", Username: "u", SSHKey: secret.New([]byte("-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"))})
 	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
 		t.Fatalf("quería ErrKeyUnsupported, vino %v", err)
+	}
+}
+
+func TestRegenerateKeyReemplazaLlaveAnteriorALaFase44(t *testing.T) {
+	v, p := newVault(t)
+	rsa := "-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"
+	id, _ := v.Put(Credential{Label: "vieja", Username: "u", SSHKey: secret.New([]byte(rsa))})
+	if _, err := v.PublicKey(id); !errors.Is(err, ErrKeyUnsupported) {
+		t.Fatalf("PublicKey: %v", err)
+	}
+	old, pub, err := v.RegenerateKey(id)
+	if err != nil || old != nil || len(pub) == 0 {
+		t.Fatalf("RegenerateKey: old=%v err=%v", old, err)
+	}
+	got, err := reopen(t, p).PublicKey(id)
+	if err != nil || !bytes.Equal(got, pub) {
+		t.Fatalf("no quedó la nueva con el mismo id: %v", err)
+	}
+	if infos, _ := v.List(); len(infos) != 1 || infos[0].Label != "vieja" || !infos[0].IsKey() {
+		t.Fatalf("info: %+v", infos)
+	}
+}
+
+func TestPublicKeyBovedaArmadaYCerrada(t *testing.T) {
+	v, clk, _, _ := armedVault(t)
+	id, _, _ := v.GenerateKey("pi", "pi")
+	if err := v.Arm("j", clk.t.Add(time.Hour), []string{id}); err != nil {
+		t.Fatal(err)
+	}
+	v.Lock()
+	if _, err := v.PublicKey(id); !errors.Is(err, ErrLocked) {
+		t.Fatalf("PublicKey con la bóveda cerrada: %v", err)
+	}
+}
+
+// Una .mcvault armada a mano no puede mostrar una pública que no es la que firma.
+func TestPublicKeyPublicasQueNoCoinciden(t *testing.T) {
+	v, _ := newVault(t)
+	_, pub, _ := v.GenerateKey("pi", "pi")
+	raw := []byte(pub)[len(pub)-32:]
+	c, _ := v.Get(mustID(t, v))
+	good := append([]byte(nil), c.SSHKey.Bytes()...)
+	c.SSHKey.Destroy()
+	if _, err := pubOf(good); err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < 3; n++ { // 0: cabecera, 1: pública de la sección privada, 2: segunda mitad de la privada
+		der, err := unarmor(good)
+		if err != nil {
+			t.Fatal(err)
+		}
+		at, from := -1, 0
+		for i := 0; i <= n; i++ {
+			at = bytes.Index(der[from:], raw) + from
+			from = at + 1
+		}
+		der[at+31] ^= 1
+		if _, err := pubOf(armor(der)); !errors.Is(err, ErrKeyUnsupported) {
+			t.Errorf("copia %d alterada: %v", n, err)
+		}
+	}
+}
+
+func mustID(t *testing.T, v *Vault) string {
+	t.Helper()
+	infos, err := v.List()
+	if err != nil || len(infos) != 1 {
+		t.Fatal(err)
+	}
+	return infos[0].ID
+}
+
+func TestPutUnlessKeyNoReemplazaUnaKey(t *testing.T) {
+	v, _ := newVault(t)
+	kid, _, _ := v.GenerateKey("pi", "pi")
+	if _, err := v.PutUnlessKey(Credential{ID: kid, Label: "pi", Username: "u", Password: secret.New([]byte("x"))}); !errors.Is(err, ErrKeyCredential) {
+		t.Fatalf("reemplazo: %v", err)
+	}
+	if _, err := v.PublicKey(kid); err != nil {
+		t.Fatalf("la key cambió: %v", err)
+	}
+	pid, _ := v.Put(cred("x", "pw", "en"))
+	if _, err := v.PutUnlessKey(Credential{ID: pid, Label: "x", Username: "u", Password: secret.New([]byte("y"))}); err != nil {
+		t.Fatalf("password: %v", err)
+	}
+	if _, err := v.PutUnlessKey(cred("nueva", "p", "")); err != nil {
+		t.Fatalf("nueva: %v", err)
+	}
+	v.Lock()
+	if _, err := v.PutUnlessKey(Credential{ID: kid, Label: "pi"}); !errors.Is(err, ErrLocked) {
+		t.Fatalf("cerrada: %v", err)
 	}
 }

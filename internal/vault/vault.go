@@ -36,6 +36,7 @@ var (
 	ErrReserved      = i18n.New("vault.err.reserved", nil)
 	ErrNoKey         = i18n.New("vault.err.no_key", nil)
 	ErrNotKey        = i18n.New("vault.err.not_key_credential", nil)
+	ErrKeyCredential = i18n.New("vault.err.key_credential", nil)
 )
 
 // ReservedPrefix marca las entradas que guarda el sistema (por ejemplo la llave de las fichas de respaldo): no salen en List, Get las rechaza
@@ -82,6 +83,9 @@ type Info struct {
 	HasEnable, HasSSHKey bool
 	HasPassword          bool
 }
+
+// IsKey dice si la credencial es de tipo "key" (como Info.IsKey, pero con los secretos a la vista).
+func (c Credential) IsKey() bool { return !c.SSHKey.Empty() && c.Password.Empty() && c.Enable.Empty() }
 
 // IsKey dice si la credencial es de tipo "key": llave sin contraseña ni enable. Se calcula, no se guarda.
 func (i Info) IsKey() bool { return i.HasSSHKey && !i.HasPassword && !i.HasEnable }
@@ -318,6 +322,38 @@ func (v *Vault) guardReserved(i int) error {
 // Put crea (ID vacío) o reemplaza una credencial y persiste de inmediato.
 func (v *Vault) Put(c Credential) (string, error) {
 	ids, err := v.PutBatch([]Credential{c})
+	if err != nil {
+		return "", err
+	}
+	return ids[0], nil
+}
+
+// PutUnlessKey es Put que no reemplaza una credencial de tipo "key" (ErrKeyCredential: esas cambian con RegenerateKey). La comprobación
+// y la escritura van en la misma sección crítica.
+func (v *Vault) PutUnlessKey(c Credential) (string, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return "", err
+	}
+	if c.ID != "" {
+		i, err := v.find(c.ID)
+		if err != nil {
+			return "", err
+		}
+		old, err := v.decrypt(v.entries[i])
+		if err != nil {
+			return "", err
+		}
+		isKey := old.IsKey()
+		old.Password.Destroy()
+		old.Enable.Destroy()
+		old.SSHKey.Destroy()
+		if isKey {
+			return "", ErrKeyCredential
+		}
+	}
+	ids, err := v.putBatchLocked([]Credential{c}, false)
 	if err != nil {
 		return "", err
 	}

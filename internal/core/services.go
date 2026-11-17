@@ -150,22 +150,13 @@ func (s *vaultSvc) PutCredential(ctx context.Context, r *v1.PutCredentialRequest
 		clear(r.SshPrivateKey)
 		return nil, service.Err(ctx, codes.InvalidArgument, "vault.err.no_key_import", nil)
 	}
-	if r.Id != "" {
-		if infos, err := v.List(); err == nil {
-			for _, i := range infos {
-				if i.ID == r.Id && i.IsKey() {
-					return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.key_credential", nil)
-				}
-			}
-		}
-	}
 	// secret.New pone en ceros los bytes recibidos; el búfer de gRPC del cable no se puede borrar.
 	c := vault.Credential{ID: r.Id, Label: r.Label, Username: r.Username,
 		Password: secret.New(r.Password), Enable: secret.New(r.EnableSecret), SSHKey: secret.New(r.SshPrivateKey)}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	defer c.SSHKey.Destroy()
-	id, err := v.Put(c)
+	id, err := v.PutUnlessKey(c) // la bóveda rechaza reemplazar una key (vault.err.key_credential)
 	if err != nil {
 		return nil, service.VaultErr(ctx, err)
 	}
@@ -224,7 +215,11 @@ func (s *vaultSvc) RegenerateKeyCredential(ctx context.Context, r *v1.Regenerate
 	if err != nil {
 		return nil, service.VaultErr(ctx, err)
 	}
-	s.c.audit("credential.keyrotate", r.Id, "old="+old.Fingerprint()+" new="+pub.Fingerprint())
+	oldFp := "unsupported" // llave de antes de la fase 44: no hay huella vieja que auditar
+	if old != nil {
+		oldFp = old.Fingerprint()
+	}
+	s.c.audit("credential.keyrotate", r.Id, "old="+oldFp+" new="+pub.Fingerprint())
 	return &v1.RegenerateKeyCredentialResponse{PublicKey: pub.AuthorizedKey()}, nil
 }
 

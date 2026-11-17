@@ -86,29 +86,24 @@ func WriteBackupWarn(src *Vault, dst string, phrase []byte, overwrite bool) (int
 
 // WriteBackupKeys es WriteBackupWarn que además dice cuántas de las credenciales guardadas llevan llave privada SSH (viajan cifradas
 // en el respaldo, ADR 0013).
-func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (n, keys int, noPerms bool, err error) {
-	n, noPerms, keys, err = writeBackup(src, dst, phrase, overwrite)
-	return n, keys, noPerms, err
-}
-
-func writeBackup(src *Vault, dst string, phrase []byte, overwrite bool) (int, bool, int, error) {
+func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (int, int, bool, error) {
 	defer wipe(phrase)
 	// Primero la bóveda abierta: cerrada, la frase ni se evalúa y no hay forma de probar la maestra sin el registro de un unlock fallido.
 	if !src.Unlocked() {
-		return 0, false, 0, ErrLocked
+		return 0, 0, false, ErrLocked
 	}
 	if !backupParamsOK(src.Params()) {
-		return 0, false, 0, ErrBackupParams
+		return 0, 0, false, ErrBackupParams
 	}
 	if utf8.RuneCount(phrase) < MinBackupPhrase {
-		return 0, false, 0, ErrShortPhrase
+		return 0, 0, false, ErrShortPhrase
 	}
 	if src.Matches(phrase) {
-		return 0, false, 0, ErrSamePhrase
+		return 0, 0, false, ErrSamePhrase
 	}
 	infos, err := src.List()
 	if err != nil {
-		return 0, false, 0, err
+		return 0, 0, false, err
 	}
 	creds := make([]Credential, 0, len(infos))
 	keys := 0
@@ -122,7 +117,7 @@ func writeBackup(src *Vault, dst string, phrase []byte, overwrite bool) (int, bo
 	for _, i := range infos {
 		c, err := src.Get(i.ID)
 		if err != nil {
-			return 0, false, 0, err
+			return 0, 0, false, err
 		}
 		c.ID = "" // el respaldo asigna IDs propios
 		if !c.SSHKey.Empty() {
@@ -132,22 +127,22 @@ func writeBackup(src *Vault, dst string, phrase []byte, overwrite bool) (int, bo
 	}
 	dir, err := os.MkdirTemp(filepath.Dir(dst), ".respaldo-*") // 0700; se lleva también el .bak de la bóveda temporal
 	if err != nil {
-		return 0, false, 0, fmt.Errorf("vault: %w", err)
+		return 0, 0, false, fmt.Errorf("vault: %w", err)
 	}
 	defer os.RemoveAll(dir)
 	tmp := filepath.Join(dir, "respaldo.mcvault")
 	b, err := create(tmp, phrase, src.Params(), true) // tolera un sistema de archivos sin permisos
 	if err != nil {
-		return 0, false, 0, err
+		return 0, 0, false, err
 	}
 	defer b.LockAll()
 	if _, err := b.PutBatch(creds); err != nil {
-		return 0, false, 0, err
+		return 0, 0, false, err
 	}
 	if err := place(tmp, dst, overwrite); err != nil {
-		return 0, false, 0, err
+		return 0, 0, false, err
 	}
-	return len(creds), b.noPerms, keys, nil
+	return len(creds), keys, b.noPerms, nil
 }
 
 // place mueve tmp a dst. Sin overwrite reserva dst con O_EXCL|O_NOFOLLOW (no pisa nada ni sigue enlaces) y lo reemplaza con rename; con overwrite solo reemplaza un archivo regular (o un enlace, no su destino).

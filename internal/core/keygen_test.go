@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
 func codeOf(err error) codes.Code { return status.Code(err) }
@@ -265,5 +267,28 @@ func TestRespaldoLlevaLaLlave(t *testing.T) {
 	}
 	if a := h.auditText(t); !strings.Contains(a, "ssh_keys_included=1") {
 		t.Fatalf("auditoría del export:\n%s", a)
+	}
+}
+
+func TestRegenerarLlaveAnteriorALaFase44(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	id, err := h.core.vault.Put(vault.Credential{Label: "vieja", Username: "u", SSHKey: secret.New([]byte("-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----\n"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: id}); codeOf(err) != codes.FailedPrecondition {
+		t.Fatalf("pubkey de una RSA: %v", err)
+	}
+	r, err := h.vault.RegenerateKeyCredential(ctx(t), &v1.RegenerateKeyCredentialRequest{Id: id, Confirm: true})
+	if err != nil || !strings.HasPrefix(r.PublicKey, "ssh-ed25519 ") {
+		t.Fatalf("regenerar: %v", err)
+	}
+	g, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: id})
+	if err != nil || fp(t, g.PublicKey) != fp(t, r.PublicKey) {
+		t.Fatalf("la nueva no persistió con el mismo id: %v", err)
+	}
+	if a := h.auditText(t); !strings.Contains(a, "old=unsupported new="+fp(t, r.PublicKey)) {
+		t.Fatalf("auditoría:\n%s", a)
 	}
 }
