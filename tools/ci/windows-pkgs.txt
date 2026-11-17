@@ -142,3 +142,4 @@
 ./tools/packaging/mpack-keygen
 ./tools/packaging/mpack-sign
 ./ui/bridge
+./internal/sshkey
