@@ -1,6 +1,8 @@
 package ipc
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -54,6 +56,38 @@ func TestCheckServer(t *testing.T) {
 	} {
 		if err := checkServer(c.owner, c.sid, c.own); (err == nil) != c.ok {
 			t.Errorf("%s: checkServer = %v, quería ok=%v", c.name, err, c.ok)
+		}
+	}
+}
+
+func TestServerTrusted(t *testing.T) {
+	const medio, bajo, alto = 0x2000, 0x1000, 0x3000
+	cliente := tokenFacts{IL: medio}
+	for _, c := range []struct {
+		name   string
+		server tokenFacts
+		client tokenFacts
+		ok     bool
+	}{
+		{"igual", tokenFacts{IL: medio}, cliente, true},
+		{"mayor", tokenFacts{IL: alto}, cliente, true},
+		{"menor", tokenFacts{IL: bajo}, cliente, false},
+		{"AppContainer", tokenFacts{IL: medio, AppContainer: true}, cliente, false},
+		{"restringido", tokenFacts{IL: medio, Restricted: true}, cliente, false},
+		{"error leyendo el servidor", tokenFacts{IL: alto, Err: errors.New("acceso denegado")}, cliente, false},
+		{"error leyendo el cliente", tokenFacts{IL: alto}, tokenFacts{Err: errors.New("x")}, false},
+		{"integridad 0 del servidor", tokenFacts{}, cliente, false},
+	} {
+		if err := serverTrusted(c.server, c.client); (err == nil) != c.ok {
+			t.Errorf("%s: serverTrusted = %v, quería ok=%v", c.name, err, c.ok)
+		}
+	}
+}
+
+func TestMensajePipeIntegridad(t *testing.T) {
+	for _, loc := range []string{"es", "en"} {
+		if m := i18n.Msg(loc, "ipc.err.pipe_low_integrity", i18n.A("name", "x")); m == "" || strings.HasPrefix(m, "ipc.err") {
+			t.Errorf("%s: sin texto (%q)", loc, m)
 		}
 	}
 }

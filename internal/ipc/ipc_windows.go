@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
@@ -132,6 +133,49 @@ func pipeOwner(c net.Conn) (string, error) {
 	return o.String(), nil
 }
 
+const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; x/sys no la define
+
+// factsOf lee integridad, AppContainer y restricción de un token abierto con TOKEN_QUERY. Cualquier fallo va en Err.
+func factsOf(tok windows.Token) tokenFacts {
+	var f tokenFacts
+	var n uint32
+	var buf [256]byte
+	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], uint32(len(buf)), &n); err != nil {
+		f.Err = err
+		return f
+	}
+	sid := (*windows.Tokenmandatorylabel)(unsafe.Pointer(&buf[0])).Label.Sid
+	if sid == nil || sid.SubAuthorityCount() == 0 {
+		f.Err = errors.New("sin SID de integridad")
+		return f
+	}
+	f.IL = sid.SubAuthority(uint32(sid.SubAuthorityCount()) - 1)
+	var ac uint32
+	if err := windows.GetTokenInformation(tok, tokenIsAppContainer, (*byte)(unsafe.Pointer(&ac)), 4, &n); err != nil {
+		f.Err = err
+		return f
+	}
+	f.AppContainer = ac != 0
+	r, err := tok.IsRestricted()
+	f.Restricted, f.Err = r, err
+	return f
+}
+
+// pidFacts abre el token del proceso pid (PROCESS_QUERY_LIMITED_INFORMATION + TOKEN_QUERY) y lo resume.
+func pidFacts(pid uint32) tokenFacts {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+	if err != nil {
+		return tokenFacts{Err: err}
+	}
+	defer windows.CloseHandle(h)
+	var tok windows.Token
+	if err := windows.OpenProcessToken(h, windows.TOKEN_QUERY, &tok); err != nil {
+		return tokenFacts{Err: err}
+	}
+	defer tok.Close()
+	return factsOf(tok)
+}
+
 func pidSID(pid uint32) (string, error) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
@@ -175,6 +219,10 @@ func dialPipe(ctx context.Context, name string) (net.Conn, uint32, error) {
 	if err := errors.Join(oerr, perr, serr); err != nil || checkServer(owner, sid, own) != nil {
 		c.Close()
 		return nil, 0, i18n.New("ipc.err.pipe_not_user", i18n.A("name", name))
+	}
+	if serverTrusted(pidFacts(pid), factsOf(windows.GetCurrentProcessToken())) != nil {
+		c.Close()
+		return nil, 0, i18n.New("ipc.err.pipe_low_integrity", i18n.A("name", name))
 	}
 	return c, pid, nil
 }

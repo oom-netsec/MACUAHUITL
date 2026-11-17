@@ -166,3 +166,18 @@ func TestDialPipeRechazaDuenoAjeno(t *testing.T) {
 		t.Fatal("dialPipe aceptó un pipe de otro dueño")
 	}
 }
+
+// El token real de este proceso (mismo que tendría el núcleo) se acepta como servidor, y sus datos son plausibles.
+// Un servidor Low IL no se prueba aquí (sin hijo de token rebajado en CI): paso manual en la VM, ver el PR.
+func TestServerTrustedConTokenPropio(t *testing.T) {
+	own := factsOf(windows.GetCurrentProcessToken())
+	if own.Err != nil || own.IL < 0x1000 || own.AppContainer || own.Restricted {
+		t.Fatalf("token propio inesperado: %+v", own)
+	}
+	if err := serverTrusted(pidFacts(uint32(os.Getpid())), own); err != nil {
+		t.Fatalf("el propio proceso debe aceptarse: %v", err)
+	}
+	if err := serverTrusted(pidFacts(0xFFFFFFF0), own); err == nil {
+		t.Fatal("un PID que no se puede abrir debe rechazarse")
+	}
+}

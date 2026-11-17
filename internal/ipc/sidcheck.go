@@ -21,3 +21,23 @@ func checkServer(owner, sid, own string) error {
 	}
 	return nil
 }
+
+// tokenFacts son los datos del token de un proceso que importan para confiar en el servidor de un pipe. Err != nil
+// significa que no se pudieron leer (falla cerrado).
+type tokenFacts struct {
+	IL           uint32 // RID del nivel de integridad (0x1000 bajo, 0x2000 medio, 0x3000 alto, 0x4000 sistema)
+	AppContainer bool
+	Restricted   bool
+	Err          error
+}
+
+// serverTrusted decide si el servidor del pipe es tan confiable como el cliente: mismo usuario no basta, un proceso del
+// mismo usuario con integridad baja, en AppContainer o con token restringido no debe recibir la contraseña maestra.
+// Exige integridad del servidor >= la del cliente. Decisión pura; Windows la alimenta con los tokens reales.
+func serverTrusted(server, client tokenFacts) error {
+	if server.Err != nil || client.Err != nil || server.IL == 0 || client.IL == 0 ||
+		server.AppContainer || server.Restricted || server.IL < client.IL {
+		return i18n.New("ipc.err.server_low_integrity", nil)
+	}
+	return nil
+}

@@ -14,6 +14,8 @@ func init() {
 		"ipc.err.pipe_no_owner":           e("ipc: el pipe no tiene dueño", "ipc: the pipe has no owner"),
 		"ipc.err.pipe_not_user":           e("ipc: el pipe {name} no lo atiende un proceso de este usuario", "ipc: the pipe {name} is not served by a process of this user", "name"),
 		"ipc.err.pipe_bad_pid":            e("ipc: el pipe {name} devolvió un PID inválido", "ipc: the pipe {name} returned an invalid PID", "name"),
+		"ipc.err.server_low_integrity":    e("el servidor del pipe tiene menos integridad que este proceso, es AppContainer o tiene token restringido", "the pipe server has lower integrity than this process, is an AppContainer or has a restricted token"),
+		"ipc.err.pipe_low_integrity":      e("ipc: el pipe {name} lo atiende un proceso de menor integridad, AppContainer o con token restringido", "ipc: the pipe {name} is served by a lower-integrity, AppContainer or restricted-token process", "name"),
 		"ipc.err.server_not_user":         e("el servidor del pipe no es de este usuario", "the pipe server does not belong to this user"),
 		"mctl.err.elevated":               e("mctl no habla con el núcleo desde una terminal elevada (el núcleo corre sin elevar); abre una terminal normal", "mctl does not talk to the core from an elevated terminal (the core runs unelevated); open a normal terminal"),
 		"sys.err.log_not_regular":         e("{path}: no es un archivo regular", "{path}: is not a regular file", "path"),
