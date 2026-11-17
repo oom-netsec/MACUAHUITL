@@ -116,7 +116,7 @@ func (s *svc) libraryEN() ([]dom.Script, map[string]dom.Texto, error) {
 }
 
 // hiddenSets son los playbooks y scripts que el usuario ocultó de sus paquetes (ver pack.HiddenSets).
-func (s *svc) hiddenSets() (pbs, ids map[string]bool, err error) {
+func (s *svc) hiddenSets(q querier) (pbs, ids map[string]bool, err error) {
 	if s.packs == nil {
 		return map[string]bool{}, map[string]bool{}, nil
 	}
@@ -124,7 +124,7 @@ func (s *svc) hiddenSets() (pbs, ids map[string]bool, err error) {
 	if s.userIDs != nil {
 		shadowed = s.userIDs()
 	}
-	return pack.HiddenSets(s.d.DB(), s.packs.Snapshot(), shadowed)
+	return pack.HiddenSets(q, s.packs.Snapshot(), shadowed)
 }
 
 // in da el script en el idioma de la llamada: los de fábrica con su nombre y descripción en inglés; los del usuario, tal cual.
@@ -260,7 +260,7 @@ func (s *svc) ListScripts(ctx context.Context, r *v1.ListScriptsRequest) (*v1.Li
 	if err != nil {
 		return nil, internal(err)
 	}
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}

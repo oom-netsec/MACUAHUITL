@@ -2,8 +2,10 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
@@ -225,5 +227,61 @@ func TestMigracionFavoritosALaColeccion(t *testing.T) {
 	defer db2.Close()
 	if err := db2.QueryRow(`SELECT count(*) FROM script_collections WHERE id = 'favoritos' AND position = 0`).Scan(&n); err != nil || n != 1 {
 		t.Errorf("base nueva: favoritos = %d %v", n, err)
+	}
+}
+
+// Una sola conexión: nadie debe quitarlo sin darse cuenta (el bloqueo de escritura de SQLite no es justo).
+func TestOpenUnaSolaConexion(t *testing.T) {
+	db, err := Open(filepath.Join(systest.TempDir(t), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if n := db.Stats().MaxOpenConnections; n != 1 {
+		t.Fatalf("MaxOpenConnections = %d, quiero 1", n)
+	}
+}
+
+// Varias goroutines escriben (Exec y transacciones) y leen a la vez sobre el mismo *sql.DB: ninguna falla con BUSY.
+func TestEscrituraConcurrenteSinBusy(t *testing.T) {
+	db, err := Open(filepath.Join(systest.TempDir(t), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	const workers, each = 8, 50
+	errs := make(chan error, workers*each*3)
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < each; i++ {
+				k := fmt.Sprintf("k%d-%d", w, i)
+				if _, err := db.Exec(`INSERT OR REPLACE INTO preferences(key,value,updated_at) VALUES(?,?,?)`, k, "v", "t"); err != nil {
+					errs <- err
+				}
+				tx, err := db.Begin()
+				if err != nil {
+					errs <- err
+					continue
+				}
+				if _, err := tx.Exec(`UPDATE preferences SET value = 'w' WHERE key = ?`, k); err != nil {
+					errs <- err
+				}
+				if err := tx.Commit(); err != nil {
+					errs <- err
+				}
+				var n int
+				if err := db.QueryRow(`SELECT count(*) FROM preferences`).Scan(&n); err != nil {
+					errs <- err
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("%v", err)
 	}
 }

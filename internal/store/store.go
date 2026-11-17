@@ -36,6 +36,9 @@ func Open(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
+	// Una sola conexión: el bloqueo de escritura de SQLite no es justo (en Windows un escritor insistente deja sin turno al que sondea) y el núcleo es el único proceso que abre la base, así que se serializa aquí en vez de competir.
+	// Con una sola conexión, no se usa db mientras una tx o unas rows abiertas la tengan tomada: se interbloquea.
+	db.SetMaxOpenConns(1)
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, err
