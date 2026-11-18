@@ -7,10 +7,13 @@ export function splitListen(addr: string): { host: string; port: number } {
   return { host: addr.slice(0, i).replace(/^\[|\]$/g, ""), port: Number(addr.slice(i + 1)) };
 }
 
+// Un nombre con controles (salto de línea, ESC…) o de formato (bidi, ancho cero) pegaría una línea de más o una distinta de la que se lee en IOS: no se genera orden para él.
+export const unsafeName = (n: string): boolean => /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(n);
+
 export function iosCommands(r: Pick<TransferReady, "protocol" | "listening" | "user" | "password" | "files">, write: boolean, ph: { ip: string; file: string }): string[] {
   const { host: h, port } = splitListen(r.listening);
   const ip = /^(0\.0\.0\.0|::)$/.test(h) ? ph.ip : h.includes(":") ? `[${h}]` : h;
-  const names = r.files?.length ? r.files : [ph.file];
+  const names = (r.files?.length ? r.files : [ph.file]).filter((n) => !unsafeName(n));
   const out: string[] = [];
   const url = (path: string) => {
     switch (r.protocol) {

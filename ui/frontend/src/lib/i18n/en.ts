@@ -3002,4 +3002,10 @@ export const en: Record<Key, string> = {
   "vault.import.label": "Imported key label",
   "vault.import.user": "Imported key user",
   "vault.key.regen.confirmImportedShort": "Confirm: replace",
+  "paths.err.unc": "On Windows, network paths (\\\\server\\share) and device paths (\\\\?\\, \\\\.\\) are not accepted: use a local folder with a drive letter, like C:\\data.",
+  "paths.err.ads": "The path has a \":\" after the drive: it points to an alternate data stream (file:stream), which directory listings do not show. Remove that part.",
+  "paths.err.nt": "That path uses the internal Windows namespace (\\??\\, \\GLOBALROOT): it is not accepted. Use a folder with a drive letter, like C:\\data.",
+  "paths.err.rel": "Enter the full path with a drive letter, like C:\\data. A relative path (folder\\a, \\a or C:a) depends on the current folder.",
+  "paths.err.reserved": "That name is reserved by Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$), with or without an extension: pick another.",
+  "transfer.ios.skipped": "{n} file(s) have line breaks, control or invisible characters in their name: no IOS command is generated for them, because pasting it would change what the device runs.",
 };

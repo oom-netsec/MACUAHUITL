@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { showHidden } from "../../lib/safeText";
 import { Terminal } from "../../components/Terminal";
 import { CopyButton, RelativeTime } from "../../components/Data";
 import { DataTable, type Column } from "../../components/DataTable";
@@ -112,7 +113,7 @@ function Diff({ core, job, device, head }: { core: CoreAPI; job: string; device:
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!q.data && !q.error && <NoRun />}
       {q.data?.devices.map((d) => (
-        <ResultPanel key={d.device} title={d.device}>
+        <ResultPanel key={d.device} title={showHidden(d.device)}>
           <div className="panel-body">
             {d.uptime && (d.uptime.reset
               ? <Notice kind="warn">{t("analysis.reloaded", { from: d.uptime.from, to: d.uptime.to })}</Notice>

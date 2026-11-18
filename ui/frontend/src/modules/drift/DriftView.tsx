@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { showHidden } from "../../lib/safeText";
 import type { CoreAPI, DriftReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
@@ -39,7 +40,7 @@ export function DriftView({ core }: { core: CoreAPI }) {
           {rep.masked && <Notice kind="warn">{t("drift.masked")}</Notice>}
           {rep.unmasked && <Notice kind="warn">{t("evidence.unmasked")}</Notice>}
           {rep.devices.map((d) => (
-            <ResultPanel key={d.device} title={d.device} meta={t("drift.rounds", { to: d.to, from: d.from })}
+            <ResultPanel key={d.device} title={showHidden(d.device)} meta={t("drift.rounds", { to: d.to, from: d.from })}
               status={d.changes.length ? { tone: "warn", label: t("drift.status.changed") } : { tone: "ok", label: t("drift.none") }}>
               {(d.changes.length > 0 || d.ignored.length > 0) && (
                 <div className="panel-body">

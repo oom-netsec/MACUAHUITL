@@ -25,3 +25,13 @@ test("csvCell neutraliza fórmulas y entrecomilla CR; los números van tal cual"
   expect(csvCell(-5)).toBe("-5");
   expect(csvCell("Gi1/0/1")).toBe("Gi1/0/1");
 });
+
+test("csvCell neutraliza cada disparador de fórmula: = + - @ tab y CR (y no toca lo que no empieza con ellos)", () => {
+  for (const c of ["=", "+", "-", "@", "\t"]) expect(csvCell(`${c}cmd|' /C calc'!A0`), JSON.stringify(c)).toMatch(/^"?'/);
+  expect(csvCell("-1+1")).toBe("'-1+1");
+  expect(csvCell("@x")).toBe("'@x");
+  expect(csvCell("\tx")).toBe("'\tx");
+  expect(csvCell("\rx")).toBe('"\'\rx"'); // CR además obliga a entrecomillar
+  expect(csvCell("a-b=c@d+e")).toBe("a-b=c@d+e"); // solo importa el primer carácter
+  expect(tableCsv(["=h"], [["-x", "@y"]])).toBe("'=h\n'-x,'@y"); // encabezado y celdas por el mismo camino
+});

@@ -152,9 +152,31 @@ test("en Windows el origen local acepta «\\» y la raíz de la unidad; en Linux
   try {
     expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin" })).src).toBeUndefined();
     expect(clientErrors(f({ dir: "put", src: "C:\\x\\" })).src).toBe("transfer.err.srcPath");
-    for (const src of ["\\f.bin", "C:f.bin", "\\\\srv\\f.bin"]) expect(clientErrors(f({ dir: "put", src })).src, src).toBe("transfer.err.srcPath");
+    for (const src of ["\\f.bin", "C:f.bin", "rel\\f.bin"]) expect(clientErrors(f({ dir: "put", src })).src, src).toBe("transfer.err.srcPath");
     expect(putParams(f({ dir: "put", src: "C:\\x\\f.bin", proto: "tftp" }))).toMatchObject({ fromDir: "C:\\x", name: "f.bin" });
     expect(putParams(f({ dir: "put", src: "C:\\f.bin", proto: "tftp" }))).toMatchObject({ fromDir: "C:\\", name: "f.bin" });
   } finally { setOSForTests(undefined); }
   expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin" })).src).toBe("transfer.err.srcPath");
+});
+
+test("en Windows el origen de envío rechaza UNC, \\?\\ y ADS con su mensaje; en Linux los deja pasar", () => {
+  setOSForTests("windows");
+  try {
+    expect(clientErrors(f({ dir: "put", src: "\\\\srv\\share\\f.bin" })).src).toBe("paths.err.unc");
+    expect(clientErrors(f({ dir: "put", src: "\\\\?\\C:\\x\\f.bin" })).src).toBe("paths.err.unc");
+    expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin:flujo" })).src).toBe("paths.err.ads");
+  } finally { setOSForTests(undefined); }
+  expect(clientErrors(f({ dir: "put", src: "/home/u/f.bin:flujo" })).src).toBeUndefined();
+});
+
+test("destDir: en Windows una carpeta de destino rechazada es error de clientErrors (bloquea); vacía o en Linux no", () => {
+  setOSForTests("windows");
+  try {
+    expect(clientErrors(f({ dir: "get", destDir: "\\\\srv\\s\\d" })).destDir).toBe("paths.err.unc");
+    expect(clientErrors(f({ dir: "get", destDir: "C:\\d:ads" })).destDir).toBe("paths.err.ads");
+    expect(clientErrors(f({ dir: "get", destDir: "C:\\d" })).destDir).toBeUndefined();
+    expect(clientErrors(f({ dir: "get", destDir: "" })).destDir).toBeUndefined();
+    expect(clientErrors(f({ dir: "put", src: "C:\\x\\f", destDir: "\\\\srv\\s" })).destDir).toBeUndefined(); // al enviar no se usa
+  } finally { setOSForTests(undefined); }
+  expect(clientErrors(f({ dir: "get", destDir: "\\\\srv\\s\\d" })).destDir).toBeUndefined();
 });

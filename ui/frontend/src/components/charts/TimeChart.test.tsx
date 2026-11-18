@@ -104,3 +104,7 @@ test("hasGaps detecta series con huecos (puntos aislados deben verse)", async ()
   expect(hasGaps([null, 4, null])).toBe(true);
   expect(hasGaps([1, 2, 3])).toBe(false);
 });
+
+test("toCSV neutraliza el nombre de una serie que empieza como fórmula (viene del equipo)", () => {
+  expect(toCSV(times.slice(0, 1), [{ label: "=HYPERLINK(\"http://x\")", values: [1] }, { label: "@a", values: [2] }]).split("\n")[0]).toBe("hora,\"'=HYPERLINK(\"\"http://x\"\")\",'@a");
+});

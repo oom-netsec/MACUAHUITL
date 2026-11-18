@@ -8,10 +8,11 @@ import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { LivePanel } from "./LivePanel";
-import { iosCommands, splitListen } from "./ios";
+import { iosCommands, splitListen, unsafeName } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import { isWindows } from "../../lib/platform";
 import { useBatch } from "../../lib/useBatch";
+import { showHidden } from "../../lib/safeText";
 
 const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
 import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
@@ -32,7 +33,7 @@ function Log({ lines }: { lines: TransferLine[] }) {
         {lines.map((l, i) => (
           <tr key={i}>
             <td>{l.Client}</td>
-            <td>{l.File} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
+            <td>{showHidden(l.File)} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
             <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {l.Error}</td>
@@ -53,6 +54,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
     if (r.protocol !== "http") core.transferHint(r.protocol, host, port).then(setHint).catch(() => {});
   }, [core, r.protocol, host, port]);
   const cmds = iosCommands(r, !!r.recvDir, { ip: t("transfer.ios.ip"), file: t("transfer.ios.file") }).join("\n");
+  const skipped = (r.files ?? []).filter(unsafeName).length; // sin orden: su nombre trae controles o caracteres invisibles
   const label = r.protocol.toUpperCase();
   return (
     <div role="group" aria-label={`${label} ${r.listening}`}>
@@ -71,6 +73,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       </dl>
       {r.user && <p className="hint">{t("transfer.cred.note")}</p>}
       {r.fingerprints?.map((fp, i) => <p key={fp} className="meta">{t("transfer.fingerprint", { n: i + 1 })}: <code>{fp}</code> <CopyButton value={fp} label={t("transfer.fingerprint", { n: i + 1 })} /></p>)}
+      {skipped > 0 && !s.done && <Notice kind="warn">{t("transfer.ios.skipped", { n: skipped })}</Notice>}
       {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
       {hint?.nftables && ( /* sin regla (Linux ya en el puerto estándar): nada que redirigir ni abrir */
         <>
@@ -80,7 +83,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
         </>
       )}
-      {hint && !hint.nftables && !isWindows() && !s.done && (
+      {hint && !hint.nftables && !isWindows() && !s.done && nftLeftoverCmd(r.protocol, host, port) && (
         /* Sin privilegios no se puede ver si quedó una tabla nft vieja que se lleve el tráfico del puerto estándar: se explica y se da la orden. */
         <>
           <p className="hint">{t("transfer.nftLeftover")}</p>

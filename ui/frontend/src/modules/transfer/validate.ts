@@ -1,5 +1,6 @@
 import type { Key } from "../../lib/i18n/es";
 import type { TransferProto } from "./api";
+import { pathProblem } from "../../lib/paths";
 
 // Puerto estándar del protocolo por omisión (IOS no deja elegir otro). Si el sistema niega el bind, el núcleo explica cómo permitirlo.
 const defaultPort: Record<TransferProto, string> = { tftp: "69", ftp: "21", scp: "22", sftp: "22", http: "80" };
@@ -11,6 +12,8 @@ const oldHighPort: Record<string, number> = { tftp: 6969, ftp: 2121, scp: 2222, 
 export function nftLeftoverCmd(proto: string, host: string, port: number): string {
   const fam = host.includes(":") && !/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(host) ? "ip6" : "ip";
   const protos = proto === "scp" || proto === "sftp" ? ["scp", "sftp"] : [proto];
+  // El nombre de la tabla nunca se arma con algo que no sea [a-z0-9]: un «;» o un espacio sacarían otra orden. Sin orden segura, vacío.
+  if (!protos.every((p) => /^[a-z0-9]+$/.test(p)) || !Number.isInteger(port)) return "";
   return protos.map((p) => `sudo nft delete table ${fam} macuahuitl_${p}_${oldHighPort[p] ?? port}`).join("\n");
 }
 
@@ -23,6 +26,8 @@ export interface ServeForm { proto: TransferProto; any: boolean; listen: string;
 
 // Primer problema del formulario (clave de i18n) o null. El puerto bajo lo decide el bind del núcleo, no la UI.
 export function serveProblem(f: ServeForm): Key | null {
+  const pp = (f.fromDir && pathProblem(f.fromDir)) || (f.write && f.recvDir && pathProblem(f.recvDir));
+  if (pp) return pp;
   if (!f.any && !f.listen) return "transfer.err.listen";
   const port = Number(f.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return "transfer.err.port";

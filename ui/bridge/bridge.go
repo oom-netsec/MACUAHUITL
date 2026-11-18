@@ -415,6 +415,7 @@ func (b *Bridge) CreateJob(specJSON string) (string, error) {
 	if err := protojson.Unmarshal([]byte(specJSON), &spec); err != nil {
 		return "", wrapErr(err)
 	}
+	spec.Kind = "" // el tipo del trabajo lo pone cada servicio (adhoc, backup, change); un patrol desde la UI siempre es el vacío
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewPatrolServiceClient(c).CreateJob(ctx, &v1.CreateJobRequest{Spec: &spec})
 		if err != nil {

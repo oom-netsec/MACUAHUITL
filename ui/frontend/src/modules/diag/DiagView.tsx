@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { useBatch } from "../../lib/useBatch";
+import { showHidden, stripAnsi } from "../../lib/safeText";
 import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "../../lib/core";
 import { Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
@@ -85,7 +86,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       runRef.current = "";
       setRunId("");
     } else if (e.line !== undefined) {
-      batch.push(e.line);
+      batch.push(showHidden(stripAnsi(e.line).replace(/\r$/, ""))); // sin ESC; lo demás oculto (bidi, controles) se ve como código
     }
   };
   const applyRef = useRef(apply); // el suscriptor se crea una vez: sin esto se quedaría con el t del primer render

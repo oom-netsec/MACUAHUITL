@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { showHidden } from "../../lib/safeText";
 import type { CoreAPI } from "../../lib/core";
 import { cleanOnFail } from "../../lib/cleanOnFail";
 import { Check, ConfirmButton, Field, Notice, Select, errorText } from "../../components/Field";
@@ -151,7 +152,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
         </div>
         <div ref={detail}>
           {sel ? (
-            <ResultPanel title={sel.name} pad
+            <ResultPanel title={showHidden(sel.name)} pad
               actions={
                 <>
                   {needsCopy(sel)

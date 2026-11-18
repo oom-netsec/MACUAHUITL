@@ -1,3 +1,4 @@
+import { pathProblem } from "../../lib/paths";
 import { useEffect, useState } from "react";
 import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
@@ -71,6 +72,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"]] as const)
       .filter(([m]) => m).map(([, k]) => t(`patrol.missing.${k}` as Key));
     if (missing.length) return setErr(t("patrol.missing", { list: missing.join(", ") }));
+    if (pathProblem(out.trim())) return setErr(t(pathProblem(out.trim())!)); // también junto al campo (PathField)
     if (noVal.length) return setErr(t("patrol.param.check"));
     if (!/^\d+$/.test(rounds.trim())) return setRoundsErr(t("patrol.rounds.invalid")); // vacío no es 0: 0 es hasta el fin de la ventana
     setRoundsErr("");

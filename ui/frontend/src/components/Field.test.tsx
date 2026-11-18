@@ -1,6 +1,8 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
+import { setOSForTests } from "../lib/platform";
+import { I18nProvider } from "../lib/i18n";
 import { ConfirmButton, Console, Field, Notice, PathField, Select } from "./Field";
 
 test("la ayuda de un campo queda asociada como descripción", () => {
@@ -69,4 +71,22 @@ test("si copiar falla, la consola no dice «Copiado» ni deja un rechazo sin atr
   await userEvent.click(screen.getByRole("button", { name: "Copiar" }));
   expect(copy).toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Copiado" })).toBeNull();
+});
+
+test("PathField muestra junto al campo el rechazo de una ruta de Windows (UNC, \\?\\, ADS) y su descripción lo anuncia; el error de la pantalla manda", async () => {
+  setOSForTests("windows");
+  try {
+    const { rerender } = render(<I18nProvider><PathField label="Ruta" value={"\\\\srv\\share\\f"} onChange={() => {}} pick={async () => ""} /></I18nProvider>);
+    const input = screen.getByLabelText("Ruta");
+    expect(input).toBeInvalid();
+    expect(input).toHaveAccessibleDescription(/rutas de red/);
+    rerender(<I18nProvider><PathField label="Ruta" value={"C:\\x\\a.txt:s"} onChange={() => {}} pick={async () => ""} /></I18nProvider>);
+    expect(screen.getByLabelText("Ruta")).toHaveAccessibleDescription(/flujo de datos alterno/);
+    rerender(<I18nProvider><PathField label="Ruta" error="error del núcleo" value={"C:\\x\\a.txt:s"} onChange={() => {}} pick={async () => ""} /></I18nProvider>);
+    expect(screen.getByLabelText("Ruta")).toHaveAccessibleDescription("error del núcleo");
+    rerender(<I18nProvider><PathField label="Ruta" value={"C:\\x\\a.txt"} onChange={() => {}} pick={async () => ""} /></I18nProvider>);
+    expect(screen.getByLabelText("Ruta")).toBeValid();
+  } finally { setOSForTests(undefined); }
+  render(<PathField label="Linux" value="/x/a.txt:s" onChange={() => {}} pick={async () => ""} />);
+  expect(screen.getByLabelText("Linux")).toBeValid();
 });

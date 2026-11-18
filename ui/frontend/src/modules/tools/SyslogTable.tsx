@@ -1,4 +1,5 @@
 // Syslog en vivo: tabla virtualizada con filtro rápido por severidad, pausa del desplazamiento automático y mensajes por minuto.
+import { showHidden } from "../../lib/safeText";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SeverityBadge } from "../../components/Data";
 import { DataTable, type Column } from "../../components/DataTable";
@@ -36,7 +37,7 @@ export function SyslogTable({ msgs }: { msgs: SysMsg[] }) {
     { id: "from", header: t("syslog.col.source"), value: (m) => m.from, mono: true, width: 150, minWidth: 110 },
     { id: "sev", header: t("syslog.col.sev"), value: (m) => m.sev, render: (m) => (m.sev < 0 ? "—" : <SeverityBadge sev={m.sev} />), width: 180, minWidth: 170 },
     { id: "mnemonic", header: t("syslog.col.mnemonic"), value: (m) => m.mnemonic, mono: true, width: 270, minWidth: 110 },
-    { id: "text", header: t("syslog.col.message"), value: (m) => m.text, mono: true, minWidth: 280 },
+    { id: "text", header: t("syslog.col.message"), value: (m) => m.text, render: (m) => showHidden(m.text), mono: true, minWidth: 280 },
   ], [t, lang]);
   return (
     <div ref={wrap}>
