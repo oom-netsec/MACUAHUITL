@@ -9,12 +9,11 @@ import { Terminal } from "../../components/Terminal";
 import { DiffView } from "../../components/DiffView";
 import { CopyButton } from "../../components/Data";
 import { DownloadButton } from "../../components/Files";
-import { parseTargets } from "../patrol/PatrolView";
+import { parseTarget, parseTargets } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { assistOwner } from "../../app/useShellStatus";
 
 const noop = () => {};
-import { parseTarget } from "../adhoc/AdhocView";
 import type { BackupDiff, BackupEntry, BackupList } from "./api";
 import { RestorePanel } from "./RestorePanel";
 import { BackupTimeline } from "./BackupTimeline";

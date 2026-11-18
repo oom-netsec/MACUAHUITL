@@ -8,7 +8,7 @@ import { ExportMenu } from "../../components/Files";
 import { AdhocMatrix } from "./AdhocMatrix";
 import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
-import { parseTargets } from "../patrol/PatrolView";
+import { parseTarget, parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
@@ -20,15 +20,6 @@ import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 const views = ["matrix", "host", "table", "csv", "markdown"] as const;
 type ViewName = (typeof views)[number];
-
-// "host", "host:puerto" (un solo ':') o "[ipv6]:puerto" / "[ipv6]"; una IPv6 sin corchetes va sin puerto.
-export function parseTarget(s: string): { address: string; port: number } {
-  const b = /^\[([^\]]+)\](?::(\d+))?$/.exec(s);
-  if (b) return { address: b[1], port: b[2] ? Number(b[2]) : 0 };
-  const i = s.lastIndexOf(":");
-  if (i > 0 && s.indexOf(":") === i && /^\d+$/.test(s.slice(i + 1))) return { address: s.slice(0, i), port: Number(s.slice(i + 1)) };
-  return { address: s, port: 0 };
-}
 
 // maxWaitMs: tope de la espera del resultado; pasado, se deja de preguntar (el trabajo sigue en Patrol).
 export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {

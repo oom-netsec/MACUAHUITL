@@ -8,7 +8,7 @@ import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResu
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
-import { parseTargets } from "../patrol/PatrolView";
+import { parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { hostKeysFromLogin, type AcceptedKey } from "../../lib/hostkeys";
 import { HostKeyTrust } from "../../components/HostKeyTrust";

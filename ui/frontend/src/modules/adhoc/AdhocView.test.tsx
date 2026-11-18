@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AdhocView, parseTarget } from "./AdhocView";
+import { AdhocView } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
@@ -9,15 +9,6 @@ const report = { commands: ["show clock"], devices: 2, rows: [
   { device: "SW1", address: "192.0.2.1", command: "show clock", ok: true, output: "10:00:00" },
   { device: "SW2", address: "192.0.2.2", command: "show clock", ok: false, output: "", note: "tiempo agotado" },
 ] };
-
-test("el destino acepta host y host:puerto", () => {
-  expect(parseTarget("192.0.2.1")).toEqual({ address: "192.0.2.1", port: 0 });
-  expect(parseTarget("sw1:2222")).toEqual({ address: "sw1", port: 2222 });
-  expect(parseTarget("2001:db8::1")).toEqual({ address: "2001:db8::1", port: 0 });
-  // IPv6 con puerto: la forma entre corchetes.
-  expect(parseTarget("[2001:db8::1]:2222")).toEqual({ address: "2001:db8::1", port: 2222 });
-  expect(parseTarget("[2001:db8::1]")).toEqual({ address: "2001:db8::1", port: 0 });
-});
 
 test("ejecuta el lote, espera el resultado y muestra por equipo, tabla, CSV y Markdown", async () => {
   const adhocResult = vi.fn().mockResolvedValueOnce({ state: "armed", done: false, report: null, text: "", csv: "", markdown: "" })

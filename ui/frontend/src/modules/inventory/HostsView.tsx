@@ -10,7 +10,7 @@ import { CredentialSelect, useCredentials } from "../../components/CredentialSel
 import type { Host, KnownDevice } from "./api";
 import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
 import { hostsChanged, useHostsVersion } from "./signal";
-import { addrPort } from "./HostPicker";
+import { addrPort } from "../../lib/targets";
 import "./hosts.css";
 
 const platformName = (p: string) => PLATFORMS.find(([v]) => v === p)?.[1] ?? p;

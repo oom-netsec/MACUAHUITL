@@ -3,7 +3,8 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
+import { planTarget } from "../../lib/targets";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import type { PortsPlanResult } from "../ports/api";
@@ -29,7 +30,7 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
-    const req: CredRotateRequest = { target: targetOf(equipo, credId), user: user.trim(), writeMemory: true }; // obligatorio en la rotación
+    const req: CredRotateRequest = { target: planTarget(equipo, credId), user: user.trim(), writeMemory: true }; // obligatorio en la rotación
     if (!generate) req.newSecret = secret;
     if (update) req.updateCredentialId = update;
     const accepted = fps.split(/[\s,]+/).filter(Boolean);

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -45,7 +46,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const readPorts = (extra: AcceptedKey[] = []) => {
     setHk(null);
     return front.run(async () => {
-      const d = targetOf(equipo, credId);
+      const d = planTarget(equipo, credId);
       const keys = [...(pairs(d).acceptedKeys ?? []), ...extra];
       try {
         return await core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...(keys.length ? { acceptedKeys: keys } : {}) });
@@ -60,7 +61,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
     const req: PortsRequest = {
-      target: targetOf(equipo, credId),
+      target: planTarget(equipo, credId),
       interfaces: ifaces.split(/[\s,]+/).filter(Boolean),
     };
     if (vlan) req.vlan = Number(vlan);

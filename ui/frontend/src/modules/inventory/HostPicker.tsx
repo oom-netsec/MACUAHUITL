@@ -4,14 +4,10 @@ import { Field } from "../../components/Field";
 import { useT } from "../../lib/i18n";
 import type { Host } from "./api";
 import { groupByFolder } from "./hostForm";
+import { addrPort } from "../../lib/targets";
 import { useHostsVersion } from "./signal";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-
-// «host», «host:puerto» o «[ipv6]:puerto» como lo entiende parseTarget en el campo Equipo de la terminal; el puerto nunca se pierde.
-// Dirección con puerto para mostrar: IPv6 entre corchetes.
-export const addrPort = (h: Pick<Host, "address" | "port">) => (h.address.includes(":") ? `[${h.address}]:${h.port}` : `${h.address}:${h.port}`);
-export const targetOf = (h: Pick<Host, "address" | "port">) => (h.port === 22 || !h.port ? h.address : addrPort(h));
 
 // Elegir un host de la libreta (búsqueda + lista agrupada por carpeta) para rellenar equipo y credencial. Escribir a mano sigue valiendo.
 export function HostPicker({ core, onPick }: { core: CoreAPI; onPick: (h: Host) => void }) {

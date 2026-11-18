@@ -3,7 +3,8 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
+import { planTarget } from "../../lib/targets";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -78,8 +79,8 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     const accepted = fps.split(/[\s,]+/).filter(Boolean);
     try {
       const res = await core.planTemplateSnippet({
-        target: targetOf(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
-        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted, acceptedHostKeys: resolveAccepted(fps, [targetOf(equipo, credId)]).keys } : {}),
+        target: planTarget(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
+        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted, acceptedHostKeys: resolveAccepted(fps, [planTarget(equipo, credId)]).keys } : {}),
       });
       if (mine === seq.current) setPlan(res);
     } catch (e) {

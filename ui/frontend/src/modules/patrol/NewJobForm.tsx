@@ -15,15 +15,11 @@ import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
 import { NoPacks } from "../../components/NoPacks";
 import { useNav } from "../../app/activity";
+import { parseTargets } from "../../lib/targets";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
 const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"].includes(k);
-
-// Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
-export function parseTargets(text: string): string[] {
-  return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
-}
 
 // Crea el trabajo; el Login Test y el armado se hacen después, desde el detalle del trabajo.
 export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; creds: Credential[]; vault: VaultGate; onCreated: (id: string) => void }) {

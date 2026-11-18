@@ -13,7 +13,6 @@ import { JobDetail } from "./JobDetail";
 import "./patrol.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
-export { parseTargets } from "./NewJobForm";
 
 const active = isLive;
 // El núcleo no garantiza orden: activos, luego creados, luego terminados; dentro, lo más reciente arriba.

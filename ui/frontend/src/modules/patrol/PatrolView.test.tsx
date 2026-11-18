@@ -1,7 +1,7 @@
 import { findPb } from "./pbTestUtil";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PatrolView, parseTargets } from "./PatrolView";
+import { PatrolView } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
 import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
@@ -9,11 +9,6 @@ import type { RunDevice } from "../../lib/core";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { NavContext } from "../../app/activity";
-
-test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
-  expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
-  expect(parseTargets("  \n , ")).toEqual([]);
-});
 
 test("elapsed resume duraciones de forma legible", () => {
   const t = (s: number) => elapsed(s * 1000);

@@ -3,7 +3,8 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
 import { Advanced } from "../../components/Advanced";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
@@ -56,7 +57,7 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setRefused([]); setReason("");
-    const req: RestoreRequest = { target: targetOf(equipo, credId), backupId: entry.id, allowPartial: partial, writeMemory: writeMem };
+    const req: RestoreRequest = { target: planTarget(equipo, credId), backupId: entry.id, allowPartial: partial, writeMemory: writeMem };
     if (mgmt.trim()) req.managementInterface = mgmt.trim();
     const n = Number(maxLines);
     if (n > 0) req.maxLines = n;
