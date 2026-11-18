@@ -190,8 +190,9 @@ func TestCloseEsperaLaPasadaAntesDeCerrarLaBase(t *testing.T) {
 	var errOut bytes.Buffer
 	c.o.ErrOut = &errOut
 	entro, suelta := make(chan struct{}), make(chan struct{})
-	var once sync.Once
-	c.addPinned(func() []service.PinnedJob { // se consulta en medio de la pasada
+	var once, soltar sync.Once
+	t.Cleanup(func() { soltar.Do(func() { close(suelta) }) }) // si la prueba falla antes, la pasada y Close no quedan colgados
+	c.addPinned(func() []service.PinnedJob {                  // se consulta en medio de la pasada
 		once.Do(func() { close(entro); <-suelta })
 		return nil
 	})
@@ -208,7 +209,7 @@ func TestCloseEsperaLaPasadaAntesDeCerrarLaBase(t *testing.T) {
 		t.Fatal("Close no esperó la pasada en curso")
 	case <-time.After(300 * time.Millisecond):
 	}
-	close(suelta)
+	soltar.Do(func() { close(suelta) })
 	select {
 	case <-cerrado:
 	case <-time.After(10 * time.Second):
@@ -225,5 +226,18 @@ func TestCloseEsperaLaPasadaAntesDeCerrarLaBase(t *testing.T) {
 	db.QueryRow(`SELECT count(*) FROM audit_log WHERE action='job.pruned'`).Scan(&p)
 	if n != 0 || p != 1 || strings.Contains(errOut.String(), "closed") {
 		t.Fatalf("jobs=%d pruned=%d", n, p)
+	}
+}
+
+// Un job creado en esta corrida (sin reiniciar) ya tiene createdAt: sin él, un created nunca se podaría hasta reabrir.
+func TestCreateJobFijaCreatedAtEnMemoria(t *testing.T) {
+	h := newHarness(t, nil)
+	antes := time.Now()
+	id := h.creados(t, h.ready(t), 1)[0]
+	h.core.mu.Lock()
+	ca := h.core.jobs[id].createdAt
+	h.core.mu.Unlock()
+	if ca.Before(antes.Add(-time.Second)) || ca.After(time.Now().Add(time.Second)) {
+		t.Fatalf("createdAt = %v", ca)
 	}
 }

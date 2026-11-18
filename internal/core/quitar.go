@@ -184,7 +184,7 @@ const pruneEvery = time.Hour
 // pruneJobs quita del historial los trabajos quitables con 7 días o más; devuelve cuántos quitó. Idempotente.
 // Elige candidatos bajo c.mu y lo suelta: removeJobs revalida y hace el DELETE sin sostener c.mu.
 func (c *Core) pruneJobs() int {
-	now := c.o.Now()
+	now := c.o.Now().Round(0) // sin lectura monotónica: esa no avanza con el equipo suspendido y la poda llegaría tarde
 	var ids []string
 	c.mu.Lock()
 	for id, j := range c.jobs {
@@ -199,6 +199,11 @@ func (c *Core) pruneJobs() int {
 		}
 	}
 	c.mu.Unlock()
+	select {
+	case <-c.stop: // el núcleo está cerrando: Close no espera una pasada que aún no tocó la base
+		return 0
+	default:
+	}
 	if len(ids) == 0 {
 		return 0
 	}
