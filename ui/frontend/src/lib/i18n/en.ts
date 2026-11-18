@@ -3040,4 +3040,5 @@ export const en: Record<Key, string> = {
   "settings.storage.err.sin_unidad": "On Windows the folder must start with a drive letter (C:\\...); network and device paths are not accepted.",
   "transfer.recvDirOpen.cmd": "Command to remove the others' write access (copy it and run it yourself; the app never applies it)",
   "transfer.warn.cmd": "Command to fix the folder",
+  "diag.skipDiscovery": "Skip host discovery (-Pn)",
 };

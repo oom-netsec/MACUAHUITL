@@ -3039,6 +3039,7 @@ export const es = {
   "settings.storage.err.sin_unidad": "En Windows la carpeta debe empezar con una letra de unidad (C:\\...); no se aceptan rutas de red ni de dispositivo.",
   "transfer.recvDirOpen.cmd": "Orden para quitar la escritura ajena (cópiala y córrela tú; la app nunca la aplica)",
   "transfer.warn.cmd": "Orden para corregir la carpeta",
+  "diag.skipDiscovery": "Omitir descubrimiento de hosts (-Pn)",
 };
 
 export type Key = keyof typeof es;
