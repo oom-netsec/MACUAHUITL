@@ -1617,7 +1617,7 @@ export const en: Record<Key, string> = {
   "transfer.minutes": "Duration (minutes)",
   "transfer.fromDir": "Folder to serve (optional)",
   "transfer.fromDir.hint": "Only top-level files are served, by name.",
-  "transfer.files": "Files (absolute paths, comma-separated)",
+  "transfer.files": "Files (absolute paths, separated by comma, semicolon or new line)",
   "transfer.files.hint": "Instead of, or in addition to, the folder to serve.",
   "transfer.write": "Allow uploads (device → this computer)",
   "transfer.recvDir": "Receive folder",
@@ -3119,4 +3119,5 @@ export const en: Record<Key, string> = {
   "vault.backup.modeExport": "Export backup",
   "vault.backup.modeImport": "Import backup",
   "vault.add.kind": "Credential type",
+  "transfer.log.duration": "Duration",
 };

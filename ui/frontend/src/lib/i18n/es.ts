@@ -1615,7 +1615,7 @@ export const es = {
   "transfer.minutes": "Duración (minutos)",
   "transfer.fromDir": "Carpeta de envío (opcional)",
   "transfer.fromDir.hint": "Se publican solo los archivos de su primer nivel, por su nombre.",
-  "transfer.files": "Archivos sueltos (rutas absolutas, separadas por coma)",
+  "transfer.files": "Archivos sueltos (rutas absolutas, separadas por coma, punto y coma o salto de línea)",
   "transfer.files.hint": "Alternativa o complemento a la carpeta de envío.",
   "transfer.write": "Permitir recibir (el equipo puede copiar archivos hacia esta máquina)",
   "transfer.recvDir": "Carpeta de recepción",
@@ -3118,6 +3118,7 @@ export const es = {
   "vault.backup.modeExport": "Exportar respaldo",
   "vault.backup.modeImport": "Importar respaldo",
   "vault.add.kind": "Tipo de credencial",
+  "transfer.log.duration": "Duración",
 };
 
 export type Key = keyof typeof es;

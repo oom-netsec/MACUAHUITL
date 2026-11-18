@@ -3,10 +3,10 @@ import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
-import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
+import { Check, Console, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import type { CoreAPI, NetInterface } from "../../lib/core";
 import { Badge, EmptyState, ResultPanel, Section } from "../../components/Page";
-import { CopyButton } from "../../components/Data";
+import { CopyButton, formatDuration } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
@@ -34,13 +34,14 @@ function Log({ lines }: { lines: TransferLine[] }) {
     <div className="table-wrap flat">
     <table>
       <caption>{t("transfer.log")}</caption>
-      <thead><tr><th>{t("transfer.log.client")}</th><th>{t("transfer.log.file")}</th><th>{t("transfer.log.bytes")}</th><th>SHA-256</th><th>{t("transfer.log.result")}</th></tr></thead>
+      <thead><tr><th>{t("transfer.log.client")}</th><th>{t("transfer.log.file")}</th><th>{t("transfer.log.bytes")}</th><th>{t("transfer.log.duration")}</th><th>SHA-256</th><th>{t("transfer.log.result")}</th></tr></thead>
       <tbody>
         {lines.map((l, i) => (
           <tr key={i}>
             <td>{l.Client}</td>
             <td>{showHidden(l.File)} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
+            <td className="num">{formatDuration(l.Duration / 1e6)}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
             <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {l.Error}</td>
           </tr>
@@ -203,7 +204,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
         <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />
-        <Field label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} />
+        <TextArea label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} rows={2} />
         <Check label={t("transfer.write")} checked={write} onChange={setWrite} />
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
