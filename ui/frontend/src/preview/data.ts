@@ -47,11 +47,12 @@ export function sample(): Partial<CoreAPI> {
       { target: "192.0.2.14:22", state: "DEVICE_STATE_PARTIAL", detail: "", cutCommands: 2, reconnects: 1 },
     ],
     auditVerify: async () => ({ intact: true, firstBroken: 0, head: "7f3a9c01d4e2b685a0c7e1f93b24d86a5c10e7ab9d3f2468c1b05e7a94d3c2f8" }),
-    listJobs: async () => [
+    listJobs: async (_o?: { includePast?: boolean }) => [
       { id: "j0", name: "Nightly core backup", state: "armed", armedAt: ago(135), round: 3, rounds: 6, devicesTotal: 24, devicesOk: 21, devicesFailed: 1, devicesPartial: 1, outputDir: "/home/u/evidence/nightly-core",
         phases: [{ at: ago(140), kind: "JOB_PHASE_KIND_CREATED" }, { at: ago(135), kind: "JOB_PHASE_KIND_ARMED", detail: "24 devices" }] },
-      { id: "j9", name: "TAC case 6942", state: "completed", round: 1, rounds: 1, devicesTotal: 3, devicesOk: 3, devicesFailed: 0, outputDir: "/home/u/evidence/tac-case-6942",
+      { id: "j9", name: "TAC case 6942", state: "completed", finishedAt: ago(900), round: 1, rounds: 1, devicesTotal: 3, devicesOk: 3, devicesFailed: 0, outputDir: "/home/u/evidence/tac-case-6942",
         phases: [{ at: ago(900), kind: "JOB_PHASE_KIND_COMPLETED", detail: "1 round" }] },
+      { id: "j8", name: "Edge audit (last week)", state: "completed", finishedAt: ago(3 * 1440), past: true, round: 1, rounds: 1, devicesTotal: 5, devicesOk: 5, devicesFailed: 0, outputDir: "/home/u/evidence/edge-audit", phases: [] },
     ],
     // Tools, Cleaner, Fleet, Forensics, ACL and Runs (network utilities).
     toolsPcap: async () => pcapSample,

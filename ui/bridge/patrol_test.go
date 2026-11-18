@@ -120,16 +120,16 @@ func TestJobDTOAndPhaseEvent(t *testing.T) {
 		v1.RegisterPatrolServiceServer(r, fakePatrol{})
 		v1.RegisterEventServiceServer(r, fakePhaseEvents{})
 	})
-	jobs, err := b.ListJobs()
+	jobs, err := b.ListJobs(ListJobsOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := `[{"id":"j1","name":"caso-1","state":"armed","nextRoundAt":"2026-11-04T19:00:00Z","armedAt":"2026-11-04T18:00:00Z",` +
 		`"windowEndsAt":"2026-11-04T22:00:00Z","round":1,"rounds":3,"devicesTotal":4,"devicesOk":3,"devicesFailed":1,"devicesPartial":2,"outputDir":"/o/caso-1_x","kind":"backup",` +
 		`"phases":[{"at":"2026-11-04T18:00:00Z","kind":"JOB_PHASE_KIND_ARMED","round":0,"detail":"4 equipos"},` +
-		`{"at":"2026-11-04T18:01:00Z","kind":"JOB_PHASE_KIND_ROUND_FINISHED","round":1,"detail":"3 correctos, 1 con fallas"}]},` +
+		`{"at":"2026-11-04T18:01:00Z","kind":"JOB_PHASE_KIND_ROUND_FINISHED","round":1,"detail":"3 correctos, 1 con fallas"}],"finishedAt":"","past":false},` +
 		`{"id":"j2","name":"nuevo","state":"created","nextRoundAt":"","armedAt":"","windowEndsAt":"","round":0,"rounds":1,` +
-		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"devicesPartial":0,"outputDir":"","kind":"","phases":[]}]`
+		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"devicesPartial":0,"outputDir":"","kind":"","phases":[],"finishedAt":"","past":false}]`
 	if s := jsonOf(t, jobs); s != want {
 		t.Fatalf("json =\n%s\nwant\n%s", s, want)
 	}

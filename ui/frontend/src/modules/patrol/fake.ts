@@ -1,6 +1,7 @@
 // Doble del módulo para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { CoreEvent, PlaybookInfo } from "./api";
+import type { CoreEvent, Job, PlaybookInfo, RemoveSel } from "./api";
+import { isLive } from "./states";
 import type { DeviceMetrics, InterfaceSeries, JobMetrics } from "../metrics/api";
 
 const MiB = 1024 * 1024;
@@ -54,7 +55,9 @@ export const samplePlaybooks: PlaybookInfo[] = [
   { id: "ios-xe/l2-vlan-troncales", platform: "ios-xe", name: "L2 · VLAN y troncales", commands: ["show vlan brief", "show interfaces trunk", "show vtp status"], params: [], pack: "" },
 ];
 
-export function fakePatrol() {
+// Con `initial`, listJobs y removeJobs trabajan sobre esa lista: quitar un trabajo lo hace desaparecer de verdad.
+export function fakePatrol(initial: Job[] = []) {
+  let jobs = [...initial];
   const events = new Set<(e: CoreEvent) => void>();
   return {
     getRun: vi.fn(async () => [] as { target: string; state: string; detail: string; cutCommands?: number; reconnects?: number }[]),
@@ -63,7 +66,14 @@ export function fakePatrol() {
     loginTest: vi.fn(async () => []),
     armJob: vi.fn(async () => ({ windowEndsAt: "2026-11-04T10:00:00Z", missingInhibitors: [] })),
     cancelJob: vi.fn(async () => {}),
-    listJobs: vi.fn(async () => []),
+    listJobs: vi.fn(async (o?: { includePast?: boolean }) => jobs.filter((j) => o?.includePast || !j.past)),
+    removeJobs: vi.fn(async (sel: RemoveSel) => {
+      const mine = jobs.filter((j) => sel.jobIds.includes(j.id));
+      const skipped = mine.filter(isLive).map((j) => ({ jobId: j.id, reason: "active" }));
+      const removedIds = mine.filter((j) => !isLive(j)).map((j) => j.id);
+      jobs = jobs.filter((j) => !removedIds.includes(j.id));
+      return { removed: removedIds.length, removedIds, skipped };
+    }),
     subscribe: vi.fn(async () => {}),
     listPlaybooks: vi.fn(async () => samplePlaybooks),
     emitEvent: (e: CoreEvent) => events.forEach((cb) => cb(e)),

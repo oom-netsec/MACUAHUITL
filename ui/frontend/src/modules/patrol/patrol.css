@@ -95,3 +95,10 @@ tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
 .pb-cmds { margin: 4px 0 6px 28px; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--text-2); }
 .pb-count { margin: 0 0 10px; }
 .login-test label { overflow-wrap: anywhere; } /* la huella SHA256 (~50 caracteres) se parte en vez de ensanchar la tabla */
+
+/* Historial: sección plegable de días anteriores y lista de carpetas del diálogo de quitar. */
+.jobs-past { margin-top: var(--s-4); }
+.jobs-past summary { cursor: pointer; font-weight: 600; margin-bottom: var(--s-2); }
+.jobs-head { flex-wrap: wrap; }
+.remove-dirs { list-style: none; margin: 0 0 var(--s-4); padding: 0; max-height: 240px; overflow: auto; display: grid; gap: var(--s-2); }
+.remove-dirs .mono { overflow-wrap: anywhere; }

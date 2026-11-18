@@ -8,13 +8,14 @@ import { useT } from "../../lib/i18n";
 import { errInfo } from "../../lib/coreError";
 import { NewJobForm } from "./NewJobForm";
 import { JobsPanel } from "./JobsPanel";
+import { isLive } from "./states";
 import { JobDetail } from "./JobDetail";
 import "./patrol.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
 export { parseTargets } from "./NewJobForm";
 
-const active = (j: Job) => j.state === "armed" || j.state === "arming";
+const active = isLive;
 // El núcleo no garantiza orden: activos, luego creados, luego terminados; dentro, lo más reciente arriba.
 const rank = (j: Job) => (active(j) ? 0 : j.state === "created" ? 1 : 2);
 const lastActivity = (j: Job) => Math.max(0, ...(j.phases ?? []).map((p) => Date.parse(p.at)), j.armedAt ? Date.parse(j.armedAt) : 0);
@@ -57,7 +58,8 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   const refreshJobs = useCallback(async () => {
     const n = ++listSeq.current;
     try {
-      const js = await core.listJobs();
+      // Siempre con includePast: un solo pedido, el núcleo ya poda a los 7 días (la lista no crece sin límite) y así no hay segundo pedido ni estado al abrir «Past jobs».
+      const js = await core.listJobs({ includePast: true });
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
       // Solo los activos: el manifest y el zip se hacen mientras el trabajo sigue armado, y suscribir a los ya cerrados abriría un stream y
@@ -97,6 +99,11 @@ export function PatrolView({ core }: { core: CoreAPI }) {
     if (e.phaseAdded || e.jobStateChanged) refreshJobs();
   }), [core, refreshJobs]);
 
+  // Tras quitar con éxito el diálogo se desmonta (y devuelve el foco a un botón que ya no existe): el foco va a «Nuevo trabajo».
+  const [focusTick, setFocusTick] = useState(0);
+  const focusNew = () => setFocusTick((n) => n + 1);
+  useEffect(() => { if (focusTick) document.getElementById("patrol-new-job")?.focus(); }, [focusTick]);
+
   const job = jobs.find((j) => j.id === selected);
   const phases = job ? [...(job.phases ?? []), ...(livePhases[job.id] ?? []).filter((p) => !(job.phases ?? []).some((q) => samePhase(p, q)))] : [];
 
@@ -112,10 +119,16 @@ export function PatrolView({ core }: { core: CoreAPI }) {
             </Notice>
           )}
           {job
-            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} subscribe={subscribeJobs} />
+            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} onRemoved={async () => { await refreshJobs(); setSelected(null); focusNew(); }} subscribe={subscribeJobs} />
             : <NewJobForm core={core} creds={creds} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
         </div>
-        <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)} />
+        <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)}
+          onClearFinished={async (ids) => {
+            const r = await core.removeJobs({ jobIds: ids });
+            await refreshJobs();
+            // Si el elegido se quitó, `job` ya no se encuentra y vuelve el formulario solo.
+            return r;
+          }} onCleared={focusNew} />
       </div>
     </Page>
   );

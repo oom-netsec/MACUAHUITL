@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isLive } from "../modules/patrol/states";
 import type { CoreAPI, VaultState } from "../lib/core";
 import type { AssistRunInfo } from "../modules/ports/api";
 import { onVaultChanged, vaultChanged } from "../lib/vaultSignal";
@@ -28,7 +29,7 @@ export function useShellStatus(core: CoreAPI, everyMs = 15_000): ShellStatus {
       seen.current = v.state;
       setS((p) => ({ ...p, vault: v.state }));
     }).catch(() => {});
-    core.listJobs().then((js) => setS((p) => ({ ...p, patrolArmed: js.filter((j) => j.state === "armed" || j.state === "arming").length }))).catch(() => {});
+    core.listJobs().then((js) => setS((p) => ({ ...p, patrolArmed: js.filter(isLive).length }))).catch(() => {});
     core.assistListRuns().then((rs) => setS((p) => ({ ...p, assist: rs.find((r) => r.active) ?? null }))).catch(() => {});
   }, [core]);
 
