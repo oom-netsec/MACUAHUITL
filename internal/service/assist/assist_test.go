@@ -402,7 +402,8 @@ func TestExecReadRefusesNonASCII(t *testing.T) {
 // Hallazgo 1: si el ingeniero tarda más que el exec-timeout del equipo, la sesión muere; la reversa
 // confirmada debe reconectar por el guard y restaurar el equipo.
 func TestRollbackReconnectsAfterIdleSessionDies(t *testing.T) {
-	r := newRig(t, simulator.Config{IdleTimeout: 300 * time.Millisecond})
+	h := &simulator.Hangup{}
+	r := newRig(t, simulator.Config{Hangup: h})
 	res, err := r.plan(&v1.PlanPortsRequest{Vlan: 20, WriteMemory: true})
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +414,11 @@ func TestRollbackReconnectsAfterIdleSessionDies(t *testing.T) {
 	if s := r.waitState(run, "waiting-confirm"); s.Pending.Id != "save-1" {
 		t.Fatalf("pendiente = %+v", s.Pending)
 	}
-	time.Sleep(700 * time.Millisecond) // la sesión del equipo ya expiró
+	// El exec-timeout del equipo, a mano: un timer de 300 ms también vencía, en un runner cargado,
+	// la sesión nueva que abre la reconexión antes de la reversa.
+	if h.Now() == 0 {
+		t.Fatal("no había sesión abierta que cortar")
+	}
 	if _, err := r.svc.Rollback(context.Background(), &v1.RollbackRequest{RunId: run}); err != nil {
 		t.Fatal(err)
 	}
@@ -421,6 +426,9 @@ func TestRollbackReconnectsAfterIdleSessionDies(t *testing.T) {
 	r.confirm(run, "rollback-1")
 	r.waitState(run, "rolled-back")
 	r.waitDone(run)
+	if !strings.Contains(r.d.AuditText(), "assist.reconnect") {
+		t.Fatalf("la reversa no reconectó: %s", r.d.AuditText())
+	}
 	again, err := r.plan(&v1.PlanPortsRequest{Vlan: 20})
 	if err != nil || !reflect.DeepEqual(again.Plan.Devices[0].Rollback, res.Plan.Devices[0].Rollback) {
 		t.Fatalf("el equipo no quedó restaurado: %v %v", err, again)

@@ -48,6 +48,7 @@ type Config struct {
 	SlowConfigLine                       string        // esta línea de configuración tarda SlowDelay en terminar (el prompt llega tarde)
 	WriteMemoryOutput                    string        // si no está vacío, es la respuesta de write memory
 	IdleTimeout                          time.Duration // cierra la sesión si pasa este tiempo sin recibir una línea (exec-timeout)
+	Hangup                               *Hangup       // si no es nil, la prueba corta a mano los shells abiertos (un exec-timeout sin depender del reloj)
 	// Modo configuración (fase 16a). Interfaces da el cuerpo inicial de cada interfaz y hace que
 	// "show running-config interface X" refleje lo aplicado; ConfigErrors responde con ese texto
 	// a la línea de configuración indicada (sin aplicarla); Commands suma salidas estáticas;
@@ -331,10 +332,59 @@ func serve(conn net.Conn, cfg *ssh.ServerConfig, c Config, outputs map[string]st
 		case <-done:
 			continue // un exec ya cerró su canal; la conexión sigue para otro
 		}
+		ended := c.Hangup.add(ch)
 		(&session{ch: ch, c: c, outputs: outputs, dev: dev, priv: c.StartPrivileged, paging: true}).run()
 		ch.Close()
+		c.Hangup.done(ch, ended)
 		return
 	}
+}
+
+// Hangup corta los shells abiertos cuando la prueba lo pide: el exec-timeout del equipo sin un timer
+// que, en un runner cargado, también vence la sesión nueva que abre la reconexión.
+type Hangup struct {
+	mu   sync.Mutex
+	open map[ssh.Channel]chan struct{}
+}
+
+func (h *Hangup) add(ch ssh.Channel) chan struct{} {
+	if h == nil {
+		return nil
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.open == nil {
+		h.open = map[ssh.Channel]chan struct{}{}
+	}
+	ended := make(chan struct{})
+	h.open[ch] = ended
+	return ended
+}
+
+func (h *Hangup) done(ch ssh.Channel, ended chan struct{}) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	delete(h.open, ch)
+	h.mu.Unlock()
+	close(ended)
+}
+
+// Now cierra los shells abiertos y espera a que cada uno reciba el cierre de vuelta del cliente
+// (su lectura termina solo entonces); devuelve cuántos cortó.
+func (h *Hangup) Now() int {
+	h.mu.Lock()
+	open := make([]chan struct{}, 0, len(h.open))
+	for ch, ended := range h.open {
+		ch.Close()
+		open = append(open, ended)
+	}
+	h.mu.Unlock()
+	for _, ended := range open {
+		<-ended
+	}
+	return len(open)
 }
 
 type session struct {
