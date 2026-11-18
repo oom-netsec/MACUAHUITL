@@ -1,4 +1,5 @@
 import { plural } from "../../lib/plural";
+import { RunButton } from "../../components/RunButton";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
@@ -6,7 +7,7 @@ import { Field, Notice } from "../../components/Field";
 import { ResultPanel, Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { CounterJump, FlapRow, FlappingReport } from "./api";
-import { FirstRun, Intro, SourcePicker, Warnings, emptySource, runKbd, toSource, type SourceState } from "./shared";
+import { FirstRun, Intro, SourcePicker, Warnings, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 import { FlapLanes } from "./FlapLanes";
 
@@ -51,7 +52,7 @@ export function FlapSection({ core }: { core: CoreAPI }) {
           <Field label={t("forensic.flap.delta")} type="number" value={delta} onChange={setDelta} w="sm" />
         </div>
       </Advanced>
-      <div className="actions"><button className="primary" disabled={!source || q.busy} aria-busy={q.busy} onClick={run}>{t("forensic.flap.btn")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={q.busy} onClick={run} missing={[sourceMissing(t, src)]}>{t("forensic.flap.btn")}</RunButton></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.flap" />}
       {rep && (

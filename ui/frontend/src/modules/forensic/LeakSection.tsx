@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
 import { ResultPanel, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { LeakRow, LeaksReport } from "./api";
-import { FirstRun, Intro, Warnings, runKbd } from "./shared";
+import { FirstRun, Intro, Warnings } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 import { Sparkline } from "../../components/charts/Mini";
 
@@ -44,8 +45,8 @@ export function LeakSection({ core }: { core: CoreAPI }) {
       </div>
       </Advanced>
       <div className="actions">
-        <button className="primary" disabled={!job.trim() || q.busy} aria-busy={q.busy}
-          onClick={() => q.run(() => core.forensicLeaks(job.trim(), device.trim(), Number(rounds) || 0, Number(growth) || 0))}>{t("forensic.leak.btn")}{runKbd}</button>
+        <RunButton primary kbd busy={q.busy} missing={[!job.trim() && t("need.job")]}
+          onClick={() => q.run(() => core.forensicLeaks(job.trim(), device.trim(), Number(rounds) || 0, Number(growth) || 0))}>{t("forensic.leak.btn")}</RunButton>
       </div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.leak" />}

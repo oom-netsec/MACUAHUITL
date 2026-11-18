@@ -334,3 +334,29 @@ test("syslog en vivo: oculta la subpestaña no relee; al volver, sí", async () 
     expect(core.forensicPatterns).toHaveBeenCalledTimes(2);
   } finally { vi.useRealTimers(); }
 });
+
+test("Analizar, Agrupar, Filtrar, Buscar flapping y Buscar fugas nombran lo que falta", async () => {
+  render(<ForensicView core={fakeCore()} />);
+  const tab = (n: string) => userEvent.click(screen.getByRole("tab", { name: n }));
+  const btn = (n: string) => screen.getByRole("button", { name: n });
+  await tab("Crashinfo");
+  expect(btn("Analizar")).toHaveAccessibleDescription("Falta: pegar el texto a analizar o indicar un archivo.");
+  await userEvent.type(screen.getByLabelText("Texto del crashinfo"), "x");
+  expect(btn("Analizar")).toBeEnabled();
+  expect(btn("Analizar")).not.toHaveAccessibleDescription();
+  await tab("Syslog");
+  expect(btn("Agrupar")).toHaveAccessibleDescription("Falta: pegar el texto a analizar.");
+  await userEvent.selectOptions(screen.getByLabelText("Fuente"), "job");
+  expect(btn("Agrupar")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.selectOptions(screen.getByLabelText("Fuente"), "capture");
+  expect(btn("Agrupar")).toBeEnabled();
+  await tab("Flapping");
+  expect(btn("Buscar flapping")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await tab("Debugs");
+  expect(btn("Filtrar")).toHaveAccessibleDescription("Falta: pegar el texto a analizar o indicar un archivo.");
+  await tab("Memoria");
+  expect(btn("Buscar fugas")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.type(screen.getByLabelText("Trabajo o carpeta"), "j1");
+  expect(btn("Buscar fugas")).toBeEnabled();
+  expect(btn("Buscar fugas")).not.toHaveAccessibleDescription();
+});

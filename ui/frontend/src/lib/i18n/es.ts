@@ -3083,6 +3083,16 @@ export const es = {
   "need.oids": "indicar los OID",
   "need.profile": "elegir al menos un perfil",
   "need.paths": "indicar las rutas gNMI",
+  "need.textOrPath": "pegar el texto a analizar o indicar un archivo",
+  "need.bandwidth": "indicar el ancho de banda",
+  "need.rtt": "indicar el RTT",
+  "need.wcValue": "indicar el prefijo, la máscara o el wildcard",
+  "need.opticsTx": "indicar la Tx mínima",
+  "need.opticsRx": "indicar la sensibilidad Rx",
+  "need.km": "indicar la distancia",
+  "need.layers": "agregar al menos una capa",
+  "need.network": "indicar la red",
+  "need.vlsmNeeds": "indicar las necesidades de hosts",
 };
 
 export type Key = keyof typeof es;

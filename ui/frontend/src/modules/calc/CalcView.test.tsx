@@ -193,3 +193,34 @@ test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
   await userEvent.click(screen.getByRole("tab", { name: "Subred" }));
   expect(screen.getByLabelText(/^Prefijo/)).toHaveValue("10.0.0.1/31");
 });
+
+test("TCP, Wildcard, MTU, Óptica y VLSM nombran lo que falta y lo callan al completarlo", async () => {
+  render(<CalcView core={fakeCore()} />);
+  const tab = (n: string) => userEvent.click(screen.getByRole("tab", { name: n }));
+  const btn = (n: string) => screen.getByRole("button", { name: n });
+  await tab("VLSM");
+  expect(btn("Repartir")).toHaveAccessibleDescription("Falta: indicar la red, indicar las necesidades de hosts.");
+  await userEvent.type(screen.getByLabelText("Red"), "10.0.0.0/24");
+  await userEvent.type(screen.getByLabelText(/^Necesidades/), "20");
+  expect(btn("Repartir")).toBeEnabled();
+  expect(btn("Repartir")).not.toHaveAccessibleDescription();
+  await tab("MTU/MSS");
+  expect(btn("Calcular MTU")).toHaveAccessibleDescription("Falta: agregar al menos una capa.");
+  await userEvent.click(btn("Agregar capa"));
+  expect(btn("Calcular MTU")).toBeEnabled();
+  expect(btn("Calcular MTU")).not.toHaveAccessibleDescription();
+  await tab("Óptica");
+  expect(btn("Calcular presupuesto")).toHaveAccessibleDescription("Falta: indicar la Tx mínima, indicar la sensibilidad Rx, indicar la distancia.");
+  await userEvent.type(screen.getByLabelText("Tx mínima (dBm)"), "-8");
+  expect(btn("Calcular presupuesto")).toHaveAccessibleDescription("Falta: indicar la sensibilidad Rx, indicar la distancia.");
+  await tab("TCP");
+  expect(btn("Calcular rendimiento")).toHaveAccessibleDescription("Falta: indicar el ancho de banda, indicar el RTT.");
+  await userEvent.type(screen.getByLabelText(/^Ancho de banda/), "1g");
+  await userEvent.type(screen.getByLabelText("RTT (ms)"), "20");
+  expect(btn("Calcular rendimiento")).toBeEnabled();
+  expect(btn("Calcular rendimiento")).not.toHaveAccessibleDescription();
+  await tab("Wildcard");
+  expect(btn("Analizar")).toHaveAccessibleDescription("Falta: indicar el prefijo, la máscara o el wildcard.");
+  await userEvent.type(screen.getByLabelText(/^Prefijo, máscara/), "/24");
+  expect(btn("Analizar")).toBeEnabled();
+});

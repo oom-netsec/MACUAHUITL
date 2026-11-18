@@ -1,4 +1,5 @@
 import { plural } from "../../lib/plural";
+import { RunButton } from "../../components/RunButton";
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
@@ -7,7 +8,7 @@ import { Badge, ResultPanel, Section } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import type { PatternsReport } from "./api";
-import { FirstRun, Intro, SourcePicker, Warnings, emptySource, runKbd, toSource, type SourceState } from "./shared";
+import { FirstRun, Intro, SourcePicker, Warnings, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
 
 // Con el modo en vivo se relee a lo más esto del final de la captura.
 const LIVE_KIB = 4096;
@@ -60,7 +61,7 @@ export function PatternsSection({ core, active = true, refreshMs = 10_000 }: { c
           <Field label={t("forensic.pat.win")} type="number" value={win} onChange={setWin} w="sm" />
         </div>
       </Advanced>
-      <div className="actions"><button className="primary" disabled={!source || busy} aria-busy={busy} onClick={run}>{t("forensic.pat.btn")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={busy} onClick={run} missing={[sourceMissing(t, src)]}>{t("forensic.pat.btn")}</RunButton></div>
       {err && <Notice kind="error">{err}</Notice>}
       {!rep && !err && <FirstRun what="forensic.empty.patterns" />}
       {rep && (

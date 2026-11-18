@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, TextArea } from "../../components/Field";
 import { ResultPanel, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { CrashReport } from "./api";
-import { FirstRun, Intro, MsgCard, Warnings, runKbd } from "./shared";
+import { FirstRun, Intro, MsgCard, Warnings } from "./shared";
 
 // Analizador de crashinfo de IOS e IOS-XE (texto). Un core binario solo se identifica.
 export function CrashSection({ core }: { core: CoreAPI }) {
@@ -22,8 +23,8 @@ export function CrashSection({ core }: { core: CoreAPI }) {
         <Field label={t("forensic.orPath")} value={path} onChange={setPath} w="full" mono />
       </div>
       <div className="actions">
-        <button className="primary" disabled={(!text.trim() && !path.trim()) || q.busy} aria-busy={q.busy}
-          onClick={() => q.run(() => core.forensicCrashinfo(path.trim() ? "" : text, path.trim()))}>{t("forensic.crash.btn")}{runKbd}</button>
+        <RunButton primary kbd busy={q.busy} missing={[!text.trim() && !path.trim() && t("need.textOrPath")]}
+          onClick={() => q.run(() => core.forensicCrashinfo(path.trim() ? "" : text, path.trim()))}>{t("forensic.crash.btn")}</RunButton>
       </div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.crash" />}
