@@ -43,6 +43,14 @@ test("bidi y controles en el nombre de archivo se muestran como código visible"
   expect(row.textContent).not.toMatch(/[‮⁦⁩\u0007\u001b\u0000]/);
 });
 
+test("bidi y controles en el error de una transferencia también se muestran como código visible", async () => {
+  const core = await openServer();
+  act(() => core.emitTransfer({ runId: "r1", ready: ready() }));
+  act(() => core.emitTransfer({ runId: "r1", line: { ...line("a.bin"), Result: "error", Error: "x‮y\u001b[2J" } }));
+  const row = (await screen.findAllByRole("row"))[1];
+  expect(row.textContent).toContain("x⟦U+202E⟧y⟦U+001B⟧[2J");
+});
+
 test("la orden de sysctl sale exactamente como la manda el núcleo, en el Console y al copiar", async () => {
   const cmd = "echo 'net.ipv4.ip_unprivileged_port_start=21' | sudo tee /etc/sysctl.d/60-x.conf && sudo sysctl --system # $(id) `id` <b>x</b> \"q\"  doble  espacio ";
   const denied = Object.assign(new Error("Linux no deja abrir el puerto 69"), { cause: { code: "FailedPrecondition", reason: "fileserve.err.port_denied", metadata: { port: "69", cmd } } });

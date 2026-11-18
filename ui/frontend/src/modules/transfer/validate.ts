@@ -21,6 +21,8 @@ export const isIP = (s: string) =>
   (/^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split(".").every((n) => Number(n) <= 255)) || (s.includes(":") && /^[0-9a-f:.]+$/i.test(s) && (s.match(/:/g) ?? []).length >= 2);
 
 export const splitList = (s: string) => s.split(/[\s,;]+/).filter(Boolean);
+// Rutas: sin cortar en el espacio («C:\Users\Juan Pérez\…» es una sola ruta); coma, punto y coma o salto de línea.
+export const splitPaths = (s: string) => s.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
 
 export interface ServeForm { proto: TransferProto; any: boolean; listen: string; port: string; write: boolean; recvDir: string; fromDir: string; files: string; allow: string; minutes: string }
 
@@ -31,7 +33,7 @@ export function serveProblem(f: ServeForm): Key | null {
   if (!f.any && !f.listen) return "transfer.err.listen";
   const port = Number(f.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return "transfer.err.port";
-  if (!f.write && !f.fromDir && splitList(f.files).length === 0) return "transfer.err.nothing";
+  if (!f.write && !f.fromDir && splitPaths(f.files).length === 0) return "transfer.err.nothing";
   if (!splitList(f.allow).every(isIP)) return "transfer.err.allow";
   const none = splitList(f.allow).length === 0;
   if (f.any && none) return "transfer.err.anyAllow"; // todas las interfaces: siempre con la lista de IP

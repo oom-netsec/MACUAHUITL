@@ -535,6 +535,15 @@ test("los archivos sueltos aceptan coma, punto y coma y saltos de línea", async
   expect(screen.getByLabelText(/salto de línea/)).toBeInTheDocument();
 });
 
+test("una ruta con espacios es un solo archivo (Windows: C:\\Users\\Juan Pérez\\…)", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.type(screen.getByLabelText(/Archivos sueltos/), "/home/juan pérez/c9300.bin, /tmp/b.bin");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ files: ["/home/juan pérez/c9300.bin", "/tmp/b.bin"] }));
+});
+
 test("el registro del servidor muestra la duración de cada transferencia", async () => {
   const core = await openServer(setup());
   act(() => {
