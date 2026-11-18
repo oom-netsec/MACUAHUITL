@@ -5,6 +5,8 @@
 name: gc-windows
 
 on:
+  schedule:
+    - cron: '41 9 * * *' # cada noche: checkptr y el GC estricto atrapan punteros colgantes de Windows antes que un usuario
   push:
     branches: ["caza-gc/**"] # para correrlo desde una rama sin esperar a que esté en main
   workflow_dispatch:
@@ -18,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   gccheck:
@@ -54,6 +57,16 @@ jobs:
           COUNT: ${{ inputs.count || '20' }}
           PKGS: ${{ inputs.pkgs || './cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/...' }}
         run: go test -p 1 -tags=storewatch -count="$COUNT" -timeout 110m $PKGS
+      - name: abrir issue si falla (solo la corrida nocturna)
+        if: (failure() || cancelled()) && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "gc-windows: falló el job ${{ github.job }} ($(date -u +%F))" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Corrupción de memoria o checkptr en código de Windows (ver el volcado del job)."
 
   race:
     runs-on: windows-latest
@@ -77,3 +90,13 @@ jobs:
         env:
           PKGS: ${{ inputs.pkgs || './cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/...' }}
         run: go test -race -tags=storewatch -count=3 -timeout 110m $PKGS
+      - name: abrir issue si falla (solo la corrida nocturna)
+        if: (failure() || cancelled()) && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "gc-windows: falló el job ${{ github.job }} ($(date -u +%F))" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Corrupción de memoria o checkptr en código de Windows (ver el volcado del job)."
