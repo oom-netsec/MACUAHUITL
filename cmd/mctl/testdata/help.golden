@@ -22,8 +22,9 @@ usage: mctl <command>
   diag  ping|traceroute|nmap|iperf3|pcap [TARGET] [-o key=value]... [--out FOLDER]
         --out: the folder must exist and have mode 0700, like the one in Settings → Storage
         interfaces   (local interfaces, no network traffic)
-        ping -o: count (1-100; 1-5 with sweep), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255), df, source,
-        family (4|6), interval (0.2-60, Linux only), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, at most 100 sizes)
+        ping -o: count (1-100; 1-5 with sweep), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255, Linux only: Windows ping has no ToS), df, source,
+        family (4|6), interval (0.2-60, Linux only: Windows ping has no interval), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, at most 100 sizes)
+        On Windows these do not work: tos, interval, source by interface name, df with IPv6
         (continuous runs until Ctrl-C, which stops it and shows the summary; another Ctrl-C cuts it now. Sweep with table and estimated MTU:
          mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)
         nmap -o: scan, ports, timing, service_detection, skip_discovery

@@ -179,8 +179,9 @@ func interfaces(c *cli.Env, args []string) error {
 const help = `  diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
         --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento
         interfaces   (interfaces locales, sin tráfico de red)
-        ping -o: count (1-100; 1-5 con barrido), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255), df, source,
-        family (4|6), interval (0.2-60, solo Linux), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, máximo 100 tamaños)
+        ping -o: count (1-100; 1-5 con barrido), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255, solo Linux: el ping de Windows no tiene ToS), df, source,
+        family (4|6), interval (0.2-60, solo Linux: el ping de Windows no tiene intervalo), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, máximo 100 tamaños)
+        En Windows no van: tos, interval, source con nombre de interfaz, df con IPv6
         (continuous corre hasta Ctrl-C, que detiene y muestra el resumen; otro Ctrl-C corta ya. Barrido con tabla y MTU estimado:
          mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)
         nmap -o: scan, ports, timing, service_detection, skip_discovery`
