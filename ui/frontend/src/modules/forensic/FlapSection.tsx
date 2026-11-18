@@ -1,6 +1,7 @@
 import { plural } from "../../lib/plural";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
 import { ResultPanel, Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -43,13 +44,13 @@ export function FlapSection({ core }: { core: CoreAPI }) {
       <Section title={t("forensic.section.source")}>
         <SourcePicker value={src} onChange={setSrc} />
       </Section>
-      <Section title={t("forensic.section.thresholds")}>
+      <Advanced label={t("forensic.section.thresholds")} changed={Number(count !== "3") + Number(win !== "60") + Number(delta !== "3")}>
         <div className="field-row">
           <Field label={t("forensic.flap.count")} type="number" value={count} onChange={setCount} w="sm" />
           <Field label={t("forensic.flap.win")} type="number" value={win} onChange={setWin} w="sm" />
           <Field label={t("forensic.flap.delta")} type="number" value={delta} onChange={setDelta} w="sm" />
         </div>
-      </Section>
+      </Advanced>
       <div className="actions"><button className="primary" disabled={!source || q.busy} aria-busy={q.busy} onClick={run}>{t("forensic.flap.btn")}{runKbd}</button></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.flap" />}
