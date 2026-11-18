@@ -148,7 +148,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     const mine = b.filter((x) => x.runId === s.runId);
     return mine.length ? { ...s, lines: s.lines.concat(mine.map((x) => x.line)).slice(-500) } : s;
   })), 2000);
-  // Montado siempre (como Campo): cambiar de pestaña no pierde servidores ni su registro.
+  // Montado siempre: cambiar de pestaña no pierde servidores ni su registro.
   useEffect(() => core.onTransfer((e) => {
     if (e.ready) {
       seen.current.add(e.runId);

@@ -20,7 +20,7 @@ import { visibilityWails, type VisibilityAPI } from "../modules/visibility/api";
 import { analysisWails, type AnalysisAPI } from "../modules/analysis/api";
 import { calcWails, type CalcAPI } from "../modules/calc/api";
 import { consoleWails, type ConsoleAPI } from "../modules/console/api";
-import { fieldWails, type FieldAPI } from "../modules/field/api";
+import { hashWails, type HashAPI } from "../modules/hash/api";
 import { fleetWails, type FleetAPI } from "../modules/fleet/api";
 import { adhocWails, type AdhocAPI } from "../modules/adhoc/api";
 import { driftWails, type DriftAPI } from "../modules/drift/api";
@@ -50,7 +50,7 @@ export type * from "../modules/change/api";
 export type * from "../modules/visibility/api";
 export type * from "../modules/analysis/api";
 export type * from "../modules/calc/api";
-export type * from "../modules/field/api";
+export type * from "../modules/hash/api";
 export type * from "../modules/console/api";
 export type * from "../modules/fleet/api";
 export type * from "../modules/adhoc/api";
@@ -104,7 +104,7 @@ export interface CoreAPI extends
   VisibilityAPI,
   AnalysisAPI,
   CalcAPI,
-  FieldAPI,
+  HashAPI,
   ConsoleAPI,
   FleetAPI,
   AdhocAPI,
@@ -202,7 +202,7 @@ export const wailsCore: CoreAPI = {
   ...visibilityWails(call),
   ...analysisWails(call),
   ...calcWails(call),
-  ...fieldWails(call),
+  ...hashWails(call),
   ...consoleWails(call),
   ...fleetWails(call),
   ...adhocWails(call),

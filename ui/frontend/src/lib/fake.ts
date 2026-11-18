@@ -17,7 +17,7 @@ import { fakeVisibility } from "../modules/visibility/fake";
 import { fakeAnalysis } from "../modules/analysis/fake";
 import { fakeCalc } from "../modules/calc/fake";
 import { fakeConsole } from "../modules/console/fake";
-import { fakeField } from "../modules/field/fake";
+import { fakeHash } from "../modules/hash/fake";
 import { fakeFleet } from "../modules/fleet/fake";
 import { fakeAdhoc } from "../modules/adhoc/fake";
 import { fakeDrift } from "../modules/drift/fake";
@@ -64,7 +64,7 @@ export function fakeCore(over: Partial<CoreAPI> = {}) {
     ...fakeVisibility(),
     ...fakeAnalysis(),
     ...fakeCalc(),
-    ...fakeField(),
+    ...fakeHash(),
     ...fakeConsole(),
     ...fakeFleet(),
     ...fakeAdhoc(),
