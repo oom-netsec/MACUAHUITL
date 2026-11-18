@@ -113,7 +113,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
         <>
           <button type="button" className="primary" data-back="new" onClick={() => { back.current = "new"; setForm({}); }}><Icon name="plus" />{t("scripts.new")}</button>
           <button type="button" onClick={() => void imp.start()}><Icon name="upload" />{t("scripts.import")}</button>
-          <RunButton missing={[picked.length === 0 && t("need.pickScripts")]} onClick={exportPicked}><Icon name="download" />{t("scripts.export", { n: String(picked.length) })}</RunButton>
+          <RunButton quiet missing={[picked.length === 0 && t("need.pickScripts")]} onClick={exportPicked}><Icon name="download" />{t("scripts.export", { n: String(picked.length) })}</RunButton>
         </>
       )}>
       {origin === "colecciones" ? <CollectionsPanel core={core} onChanged={() => { scriptsChanged(); reload(); }} /> : <>

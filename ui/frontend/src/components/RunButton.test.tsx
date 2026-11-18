@@ -25,3 +25,9 @@ test("ocupado deshabilita sin explicar y un disabled extra no inventa faltantes"
   expect(screen.getByRole("button")).toBeDisabled();
   expect(screen.getByRole("button")).not.toHaveAccessibleDescription();
 });
+
+test("quiet: el motivo sigue en la descripción accesible pero no se pinta como pista", () => {
+  render(<RunButton quiet missing={["elegir un script"]} onClick={() => {}}>Exportar</RunButton>);
+  expect(screen.getByRole("button")).toHaveAccessibleDescription("Falta: elegir un script.");
+  expect(document.querySelector(".hint.need")).toBeNull();
+});

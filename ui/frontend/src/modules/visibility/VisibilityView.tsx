@@ -219,7 +219,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
         <Check label={t("visibility.snmp.bulk")} checked={bulk} onChange={setBulk} />
         <div className="actions">
           <RunButton primary kbd busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpGet(target(), words(oids)))}>Get</RunButton>
-          <RunButton busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpWalk(target(), words(oids)[0], bulk))}>Walk</RunButton>
+          <RunButton quiet busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpWalk(target(), words(oids)[0], bulk))}>Walk</RunButton>
         </div>
         <Report r={r} />
       </Section>
