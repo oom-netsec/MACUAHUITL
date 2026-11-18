@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -60,5 +61,17 @@ func TestOutputsRelativaSinApiCruda(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// ca_written imprime la carpeta limpia y absoluta, sin «/» pegada al final: en Windows saldría «…\ca/».
+func TestCaWrittenUnaBarra(t *testing.T) {
+	startCore(t)
+	wd := t.TempDir()
+	t.Chdir(wd)
+	out := mustRaw(t, "capw\ncapw\n", "--lang", "en", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
+	want := "CA in " + filepath.Join(wd, "ca") + " (ca.crt.pem, sealed ca.key.pem)"
+	if !strings.Contains(out, want) {
+		t.Fatalf("%q no contiene %q", out, want)
 	}
 }
