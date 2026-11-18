@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"crypto/ed25519"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -234,5 +237,34 @@ func TestHangupCortaSoloLasSesionesAbiertas(t *testing.T) {
 	}
 	if n := h.Now(); n != 0 {
 		t.Fatalf("sin sesiones abiertas cortó %d", n)
+	}
+}
+
+// TestOTPDosPreguntas: con Config.OTP el keyboard-interactive hace una sola ronda MFA con dos preguntas;
+// una respuesta mala es un fallo por ronda (como sshd).
+func TestOTPDosPreguntas(t *testing.T) {
+	var attempts atomic.Int32
+	addr, _ := Start(t, Config{Hostname: "SW", Username: "admin", Password: "pw", OTP: "123456", Attempts: &attempts, Transcripts: transcripts(t, "ios-xe")})
+	dial := func(pass, code string) ([]string, error) {
+		var seen []string
+		kb := ssh.KeyboardInteractive(func(name, instr string, qs []string, echo []bool) ([]string, error) {
+			seen = append(seen, name, instr, strings.Join(qs, "|"), fmt.Sprint(echo))
+			return []string{pass, code}, nil
+		})
+		c, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "admin", Auth: []ssh.AuthMethod{kb}, HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 3 * time.Second})
+		if err == nil {
+			c.Close()
+		}
+		return seen, err
+	}
+	seen, err := dial("pw", "000000")
+	if err == nil || attempts.Load() != 1 {
+		t.Fatalf("código malo: err=%v attempts=%d, quería fallo y 1", err, attempts.Load())
+	}
+	if want := []string{"MFA", "Enter password and code", "Password: |Verification code: ", "[false true]"}; !slices.Equal(seen, want) {
+		t.Fatalf("callback = %q, quería %q", seen, want)
+	}
+	if _, err := dial("pw", "123456"); err != nil {
+		t.Fatalf("par bueno: %v", err)
 	}
 }
