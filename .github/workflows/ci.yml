@@ -159,6 +159,13 @@ jobs:
         run: |
           set -o pipefail
           grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -tags=storewatch -count=1 -timeout 25m
+      # checkptr (lo activa -race) atrapa punteros a memoria de Windows mal mantenida (búferes que Windows llena con
+      # punteros a sí mismos, uintptr guardados): el «found pointer to free object» de factsOf salió así.
+      - name: ipc y sys con -race (checkptr)
+        if: always()
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race -count=1 -timeout 15m ./internal/ipc/... ./internal/sys/...
       - name: noegress
         if: always()
         run: go run ./tools/noegress/cmd/noegress ./...
