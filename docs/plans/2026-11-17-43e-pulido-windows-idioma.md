@@ -202,9 +202,15 @@ Cada uno un PR chico con `./dev.sh test` y el job windows verde; prueba roja pri
 - 43e-6 punto 5: espacio solo donde no llega a un shell remoto.
 - Pruebas con tiempos o carga: una suite a la vez, `-p 2`, `GOMAXPROCS=4`.
 
-## Preguntas para Release
+## Respuestas de Release (valen como del dueño)
 
-1. 43e-2: ¿qué comando exacto dio el error con «GetFileAttributesEx» y la ruta relativa? El código admite varios (`prefs outputs set`, ruta de `--out`, `ilegible` con `err` crudo); sin el comando no se fija la prueba.
-2. 43e-6 punto 1: ¿el pie con «remove it:» vacío salió en Windows o en Linux, y con qué `--listen` (IP real o 127.0.0.1)? Por el código solo imprime con `Cleanup` no vacío.
-3. 43e-6 punto 4: ¿un IOS real acepta `%20` en `copy tftp://…`? Si no, el aviso es «renombra el archivo» y no se escapa.
-4. Fase 46: ¿se agrega «46c2» (cancelar el job y quitar el `lote-*` vacío al fallar `ArmJob`) a esa fase o a 43e? Este plan lo deja fuera de 43e.
+1. 43e-2: el QA no anotó el comando (VM Windows, mctl v1.2.0, ruta relativa). La prueba cubre las tres variantes
+   (`mctl prefs set --outputs` relativa y `--dir`/`--out` relativos de transfer y diag): la relativa se rechaza con un
+   mensaje del catálogo antes de cualquier Stat.
+2. 43e-6 punto 1: salió en Windows, `mctl transfer serve --proto tftp` en 172.30.0.2:69 y en 127.0.0.1, al cerrar por
+   `--duration`. En Windows no hay regla de redirección: ese pie no sale; en Linux, solo si se sugirió una regla.
+3. 43e-6 punto 4: IOS no decodifica `%20` en `copy tftp://` y en flash los nombres no llevan espacios. Aviso: «el nombre
+   tiene espacios: IOS no puede pedirlo por TFTP; renómbralo»; el copy sugerido solo para nombres sin espacios.
+4. 46c2 va en la fase 46.
+
+El resto del plan queda aprobado, incluidos `target_id` y las claves estables.
