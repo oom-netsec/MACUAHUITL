@@ -24,3 +24,9 @@ export function planTarget(equipo: string, credentialId: string) {
 export const addrPort = (h: Pick<Host, "address" | "port">) => (h.address.includes(":") ? `[${h.address}]:${h.port}` : `${h.address}:${h.port}`);
 // «host», «host:puerto» o «[ipv6]:puerto» como lo entiende parseTarget; el puerto nunca se pierde.
 export const targetOf = (h: Pick<Host, "address" | "port">) => (h.port === 22 || !h.port ? h.address : addrPort(h));
+
+// Destino para un trabajo: dirección y puerto separados (el núcleo no parte «host:puerto»); sin puerto escrito no se manda port.
+export function targetSpec(s: string): { address: string; port?: number } {
+  const t = parseTarget(s);
+  return t.port ? t : { address: t.address };
+}

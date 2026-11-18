@@ -8,7 +8,7 @@ import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResu
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
-import { parseTargets } from "../../lib/targets";
+import { parseTargets, targetSpec } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { type AcceptedKey, hostKeysFromLogin } from "../../lib/hostkeys";
 import { TargetsField } from "../inventory/TargetField";
@@ -67,7 +67,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
     }
   };
   const create = () => guard(async () => {
-    const id = await core.changeCreate({ name, targets: parseTargets(targets).map((address) => ({ address })), defaultCredentialId: cred, outputDir: out });
+    const id = await core.changeCreate({ name, targets: parseTargets(targets).map(targetSpec), defaultCredentialId: cred, outputDir: out });
     setCurrent(id); setLogin([]); setDevices(null);
     setMsg({ kind: "info", text: t("change.created", { id }) });
     await refresh();

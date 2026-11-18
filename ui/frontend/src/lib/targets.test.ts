@@ -1,4 +1,4 @@
-import { addrPort, parseTarget, parseTargets, planTarget, targetOf } from "./targets";
+import { addrPort, parseTarget, parseTargets, planTarget, targetOf, targetSpec } from "./targets";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
   expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
@@ -31,4 +31,10 @@ test("el destino conserva el puerto también en IPv6 (forma entre corchetes)", (
 test("la dirección con puerto que se muestra pone IPv6 entre corchetes", () => {
   expect(addrPort({ address: "10.0.0.1", port: 22 })).toBe("10.0.0.1:22");
   expect(addrPort({ address: "fe80::1", port: 22 })).toBe("[fe80::1]:22");
+});
+
+test("targetSpec separa dirección y puerto; sin puerto no manda port", () => {
+  expect(targetSpec("10.9.0.1")).toEqual({ address: "10.9.0.1" });
+  expect(targetSpec("ap1.lab:2222")).toEqual({ address: "ap1.lab", port: 2222 });
+  expect(targetSpec("[fe80::1]:2222")).toEqual({ address: "fe80::1", port: 2222 });
 });

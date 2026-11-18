@@ -15,7 +15,7 @@ import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
 import { NoPacks } from "../../components/NoPacks";
 import { useNav } from "../../app/activity";
-import { parseTargets } from "../../lib/targets";
+import { parseTargets, targetSpec } from "../../lib/targets";
 import { TargetsField } from "../inventory/TargetField";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
@@ -88,7 +88,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
     if (repeat && !/^\d+$/.test(rounds.trim())) return setRoundsErr(t("patrol.rounds.invalid")); // vacío no es 0: 0 es hasta el fin de la ventana
     setRoundsErr("");
     const spec: JobSpec = {
-      name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
+      name, targets: devices.map((a) => ({ ...targetSpec(a), deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: zip !== "ZIP_POLICY_NONE" && delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
       windowHours: winHours,
       schedule: schedule(),

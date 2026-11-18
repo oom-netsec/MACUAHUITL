@@ -805,6 +805,6 @@ test("equipos de la libreta: etiqueta común, rellena campo y credencial, y el t
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   await waitFor(() => expect(core.createJob).toHaveBeenCalled());
   const spec = vi.mocked(core.createJob).mock.calls[0][0];
-  expect(spec.targets.map((t: { address: string }) => t.address)).toEqual(["10.9.0.1", "ap1.lab:2222"]);
+  expect(spec.targets).toEqual([{ address: "10.9.0.1", deviceId: "10.9.0.1" }, { address: "ap1.lab", port: 2222, deviceId: "ap1.lab:2222" }]); // el puerto va aparte, no dentro de address
   expect(spec.defaultCredentialId).toBe(BOOK_CRED);
 });

@@ -324,5 +324,5 @@ test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se e
   expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
   expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
   await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
-  await waitFor(() => expect(core.changeCreate).toHaveBeenCalledWith({ name: "CRQ-2", targets: [{ address: "10.9.0.1" }, { address: "ap1.lab:2222" }], defaultCredentialId: BOOK_CRED, outputDir: "" }));
+  await waitFor(() => expect(core.changeCreate).toHaveBeenCalledWith({ name: "CRQ-2", targets: [{ address: "10.9.0.1" }, { address: "ap1.lab", port: 2222 }], defaultCredentialId: BOOK_CRED, outputDir: "" }));
 });
