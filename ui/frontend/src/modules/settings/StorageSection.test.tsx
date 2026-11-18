@@ -282,3 +282,29 @@ describe("Windows", () => {
     expect(screen.getByRole("button", { name: /Copy the chmod command/ })).toBeVisible();
   });
 });
+
+test("los valores por defecto de captura van plegados, cuentan los llenos y se siguen guardando", async () => {
+  const core = fakeCore();
+  view(core);
+  const mb = await screen.findByRole("textbox", { name: "Rotar cada (MB)" });
+  const det = mb.closest("details")!;
+  expect(det.open).toBe(false);
+  expect(det.querySelector("summary")).toHaveTextContent("Valores por defecto de captura");
+  expect(det).toContainElement(screen.getByRole("textbox", { name: "Archivos que se conservan" }));
+  expect(det).toContainElement(screen.getByRole("combobox", { name: "Formato" }));
+  expect(det).not.toContainElement(await folder());
+  expect(det).not.toContainElement(screen.getByRole("button", { name: "Guardar" }));
+  await typeIn(mb, "50");
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Formato" }), "jsonl");
+  expect(det.querySelector("summary")).toHaveTextContent("cambiadas: 2");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(core.setCorePrefs).toHaveBeenCalledWith(expect.objectContaining({ rotateMb: 50, format: "jsonl" }));
+});
+
+test("un error en un valor plegado abre el grupo", async () => {
+  view();
+  const mb = await screen.findByRole("textbox", { name: "Rotar cada (MB)" });
+  expect(mb.closest("details")!.open).toBe(false);
+  await typeIn(mb, "2000");
+  expect(mb.closest("details")!.open).toBe(true);
+});

@@ -1,6 +1,7 @@
 import { pathProblem } from "../../lib/paths";
 import { useCallback, useEffect, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Notice, PathField, Select, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { RANGES, emptyForm, validateOpts, type NumKey, type SyslogFormat } from "../../components/ingest/ingestOpts";
@@ -84,8 +85,8 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       <p className="hint">{t("settings.storage.rules")}</p>
       <p className="hint">{t("settings.storage.newOnly")}</p>
 
-      <fieldset className="storage-group">
-        <legend>{t("settings.storage.defaults")}</legend>
+      <Advanced label={t("settings.storage.defaults")} forceOpen={Object.keys(errs).length > 0} changed={[form.rotateMb, form.rotateMinutes, form.maxFiles, form.format].filter(Boolean).length}>
+      <div className="storage-group">
         <p className="hint">{t("settings.storage.defaults.what")}</p>
         <div className="grid-2">
           {NUMS.map((k) => {
@@ -98,7 +99,8 @@ export function StorageSection({ core }: { core: CoreAPI }) {
           <Select label={t("syslog.opt.format")} value={form.format} onChange={(v) => set("format", v)} hint={t("settings.storage.format.hint")}
             options={[["", t("settings.storage.format.factory")], ...FORMATS.map((f): [CorePrefs["format"], string] => [f, t(`syslog.fmtName.${f}` as Key)])]} />
         </div>
-      </fieldset>
+      </div>
+      </Advanced>
 
       {(!!state.note || fellBack) && <Notice kind="warn">{noteText}</Notice>}
       {saveErr && !parsedErr && <Notice kind="error">{saveErr.msg}</Notice>}
