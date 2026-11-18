@@ -1,3 +1,4 @@
+import { Advanced } from "../../components/Advanced";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useBatch } from "../../lib/useBatch";
 import { showHidden, stripAnsi } from "../../lib/safeText";
@@ -153,13 +154,21 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       <div className="field-row">
         {needsTarget && <Field label={t("diag.target")} hint={t("diag.target.hint")} value={target} onChange={setTarget} w="lg" mono />}
         {tool === "ping" && <Field label={t("diag.count")} type="number" value={count} onChange={(count) => setP({ count })} w="sm" disabled={pf.continuous} error={ping.errors.count ? t(ping.errors.count) : undefined} />}
-        {tool === "traceroute" && <Field label={t("diag.hops")} type="number" value={hops} onChange={setHops} w="sm" />}
         {tool === "nmap" && scan !== "ping" && <Field label={t("diag.ports")} hint={t("diag.ports.hint")} value={ports} onChange={setPorts} w="md" mono />}
         {tool === "iperf3" && <Select label={t("diag.mode")} value={mode} onChange={setMode} options={[["client", t("diag.mode.client")], ["server", t("diag.mode.server")]]} w="md" />}
         {((tool === "iperf3" && !server) || tool === "pcap") && <Field label={t("diag.seconds")} type="number" value={seconds} onChange={setSeconds} w="sm" />}
         {server && binds.length > 0 && <Select label={t("diag.bind")} value={bindIP} onChange={setBind} options={binds.map((a) => [a, a] as [string, string])} w="md" />}
-        {server && <Field label={t("diag.port")} hint={t("diag.port.hint")} value={port} onChange={setPort} error={portOk ? undefined : t("diag.port.invalid")} inputMode="numeric" w="sm" mono />}
       </div>
+      {tool === "traceroute" && (
+        <Advanced changed={hops !== "30" ? 1 : 0}>
+          <Field label={t("diag.hops")} type="number" value={hops} onChange={setHops} w="sm" />
+        </Advanced>
+      )}
+      {server && (
+        <Advanced forceOpen={!portOk} changed={port !== "5201" ? 1 : 0}>
+          <Field label={t("diag.port")} hint={t("diag.port.hint")} value={port} onChange={setPort} error={portOk ? undefined : t("diag.port.invalid")} inputMode="numeric" w="sm" mono />
+        </Advanced>
+      )}
       {server && ifState !== "loading" && binds.length === 0 && <Notice kind="warn">{t(ifState === "error" ? "diag.bind.error" : "diag.bind.none")}</Notice>}
       {tool === "ping" && <PingOptions form={pf} set={setP} errors={ping.errors} active={ping.active} ifaces={ifaces} disabled={!!runId} />}
       {tool === "nmap" && (
@@ -176,8 +185,10 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
               ["any", t("diag.iface.any")],
               ...ifaces.map((i) => [i.name, !i.up ? `${i.name} · ${t("diag.iface.down")}` : i.addresses.length ? `${i.name} · ${i.addresses.join(", ")}` : i.name] as [string, string]),
             ]} />
-            <Field label={t("diag.filter")} hint={t("diag.filter.hint")} value={filter} onChange={setFilter} w="lg" mono />
           </div>
+          <Advanced changed={filter ? 1 : 0}>
+            <Field label={t("diag.filter")} hint={t("diag.filter.hint")} value={filter} onChange={setFilter} w="lg" mono />
+          </Advanced>
           <p className="hint">{t("diag.pcap.req")}</p>
         </>
       )}
