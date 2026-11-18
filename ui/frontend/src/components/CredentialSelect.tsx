@@ -4,22 +4,26 @@ import type { CoreAPI } from "../lib/core";
 import { useT } from "../lib/i18n";
 import { useVaultVersion } from "../lib/vaultSignal";
 import { passwordCreds, type Credential } from "../modules/vault/api";
-import { Notice, Select, type Width } from "./Field";
+import { Notice, Select, errorText, type Width } from "./Field";
 
-// loading: aún sin respuesta; absent/locked: no hay lista que ofrecer; open: la lista se leyó (puede estar vacía).
-export type VaultGate = "loading" | "absent" | "locked" | "open";
+// loading: aún sin respuesta; absent/locked: no hay lista que ofrecer; open: la lista se leyó (puede estar vacía);
+// error: el núcleo no respondió (el texto va en `error` del hook; no es lo mismo que una bóveda cerrada).
+export type VaultGate = "loading" | "absent" | "locked" | "open" | "error";
 
 // Credenciales de la bóveda, con recarga cuando la bóveda cambia. Por omisión solo las de contraseña; con `keys` también las de llave.
-export function useCredentials(core: CoreAPI, { keys }: { keys?: boolean } = {}): { creds: Credential[]; vault: VaultGate } {
+export function useCredentials(core: CoreAPI, { keys }: { keys?: boolean } = {}): { creds: Credential[]; vault: VaultGate; error: string } {
   const vv = useVaultVersion();
-  const [s, setS] = useState<{ creds: Credential[]; vault: VaultGate }>({ creds: [], vault: "loading" });
+  const [s, setS] = useState<{ creds: Credential[]; vault: VaultGate; error: string }>({ creds: [], vault: "loading", error: "" });
   useEffect(() => {
     let live = true; // una respuesta vieja no pisa a una nueva
-    core.listCredentials().then(
-      (l) => { if (live) setS({ creds: keys ? l : passwordCreds(l), vault: "open" }); },
-      // La lista falló: el estado dice si la bóveda no existe o está cerrada; si ni eso responde, se trata como cerrada.
-      () => core.vaultStatus().then((v) => v.state, () => "locked").then((st) => { if (live) setS({ creds: [], vault: st === "absent" ? "absent" : "locked" }); }),
-    );
+    // El estado dice si la bóveda no existe o está cerrada; si ni eso responde (núcleo caído), queda en error.
+    core.vaultStatus().then(async (v) => {
+      if (v.state !== "unlocked") return live ? setS({ creds: [], vault: v.state === "absent" ? "absent" : "locked", error: "" }) : undefined;
+      try {
+        const l = await core.listCredentials();
+        if (live) setS({ creds: keys ? l : passwordCreds(l), vault: "open", error: "" });
+      } catch { if (live) setS({ creds: [], vault: "locked", error: "" }); } // se cerró entre el estado y la lista
+    }, (e) => { if (live) setS({ creds: [], vault: "error", error: errorText(e) }); });
     return () => { live = false; };
   }, [core, vv, keys]);
   return s;

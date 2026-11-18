@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CoreAPI, Credential } from "../../lib/core";
+import type { CoreAPI } from "../../lib/core";
 import { ConfirmButton, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
 import { Badge, EmptyState, Page, Section } from "../../components/Page";
 import { Icon } from "../../components/Icon";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
-import { useVaultVersion } from "../../lib/vaultSignal";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { Host, KnownDevice } from "./api";
 import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
 import { hostsChanged, useHostsVersion } from "./signal";
@@ -20,11 +20,10 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
 export function HostsView({ core }: { core: CoreAPI }) {
   const t = useT();
   const hv = useHostsVersion();
-  const vv = useVaultVersion();
   const [hosts, setHosts] = useState<Host[] | null>(null);
   const [found, setFound] = useState<KnownDevice[]>([]);
-  const [creds, setCreds] = useState<Credential[]>([]);
-  const [vaultOpen, setVaultOpen] = useState(false); // la última lista de credenciales se pudo leer: la bóveda está abierta
+  const { creds, vault } = useCredentials(core, { keys: true });
+  const vaultOpen = vault === "open"; // la última lista de credenciales se pudo leer
   const [folderList, setFolderList] = useState<{ name: string; count: number }[]>([]);
   const [fedit, setFedit] = useState<{ old?: string; name: string; err: string } | null>(null); // alta o renombrado de carpeta
   const [stale, setStale] = useState<{ name: string; n: string } | null>(null); // borrado de carpeta que el núcleo exige reconfirmar
@@ -57,11 +56,6 @@ export function HostsView({ core }: { core: CoreAPI }) {
     core.listDevices().then((l) => { if (live) setFound(l.devices.filter((d) => !d.sources.includes("manual") && d.address)); }, () => { if (live) setFound([]); });
     return () => { live = false; };
   }, [core, hv]);
-  useEffect(() => {
-    let live = true;
-    core.listCredentials().then((l) => { if (live) { setCreds(l); setVaultOpen(true); } }, () => { if (live) { setCreds([]); setVaultOpen(false); } }); // bóveda cerrada: sin lista
-    return () => { live = false; };
-  }, [core, vv]);
 
   const folders = useMemo(() => [...new Set([...folderList.map((x) => x.name), ...(hosts ?? []).map((h) => h.folder).filter(Boolean)])].sort((a, b) => a.localeCompare(b)), [folderList, hosts]);
   const shown = useMemo(() => {
@@ -171,9 +165,9 @@ export function HostsView({ core }: { core: CoreAPI }) {
   };
   const f = editing?.form;
   // Con la bóveda cerrada la credencial guardada no está en la lista: se conserva como opción para no perderla al guardar.
-  const credOptions: [string, string][] = [["", t("hosts.cred.none")], ...creds.filter((c) => c.kind !== "key" || hasStartCommand(f?.platform ?? "") || c.id === f?.credentialId).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])];
+  const credList = creds.filter((c) => c.kind !== "key" || hasStartCommand(f?.platform ?? "") || c.id === f?.credentialId);
   const missing = () => t(vaultOpen ? "hosts.cred.gone" : "hosts.cred.hidden"); // abierta y sin esa credencial = borrada; cerrada = solo no se puede ver
-  if (f && f.credentialId && !creds.some((c) => c.id === f.credentialId)) credOptions.push([f.credentialId, missing()]);
+  const credExtra: [string, string] | undefined = f && f.credentialId && !creds.some((c) => c.id === f.credentialId) ? [f.credentialId, missing()] : undefined;
 
   const form = editing && f && (
     <Section title={editing.title}>
@@ -191,8 +185,8 @@ export function HostsView({ core }: { core: CoreAPI }) {
           <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />
         </div>
         <div className="field-row">
-          <Select label={t("hosts.f.cred")} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
-            hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} options={credOptions} />
+          <CredentialSelect creds={credList} vault={editing.hiddenCred ? undefined : vault} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
+            hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} optional extra={credExtra} />
         </div>
         {hasStartCommand(f.platform) && (
           <Field label={t("hosts.f.start")} hint={t("hosts.f.start.hint")} error={errs.startCommand} value={f.startCommand} onChange={(v) => set("startCommand", v)} w="full" mono />

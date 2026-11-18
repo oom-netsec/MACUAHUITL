@@ -51,7 +51,7 @@ test("crear: valida en línea sin llamar al núcleo y luego guarda con puerto 22
   await userEvent.clear(screen.getByLabelText("Dirección (IP o nombre DNS)"));
   await userEvent.type(screen.getByLabelText("Dirección (IP o nombre DNS)"), "10.0.0.9");
   await userEvent.type(screen.getByLabelText("Etiquetas"), "core, dc-1");
-  await userEvent.selectOptions(screen.getByLabelText("Credencial de la bóveda"), cred.id);
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
   expect(inv.saveHost).toHaveBeenCalledWith({ name: "NUEVO", address: "10.0.0.9", port: 22, platform: "", folder: "", tags: ["core", "dc-1"], credentialId: cred.id, notes: "", startCommand: "" });
   expect(await screen.findByText("Host «NUEVO» guardado.")).toBeVisible();
@@ -212,7 +212,7 @@ test("con reason el campo sale de metadata.field y el texto del núcleo se muest
   await userEvent.click(screen.getByRole("button", { name: "Save host" }));
   expect(await screen.findByText("the credential is not in the vault")).toBeVisible();
   expect(screen.getByLabelText("Name")).not.toBeInvalid();
-  expect(screen.getByLabelText("Vault credential")).toBeInvalid(); // el error va al campo que dice metadata.field
+  expect(screen.getByLabelText("Credential")).toBeInvalid(); // el error va al campo que dice metadata.field
 });
 
 // ---- Fase 44: carpetas, mover y orden de inicio ----
@@ -426,7 +426,7 @@ test("la credencial de solo llave se ofrece solo con linux o windows, y la orden
   setup({ listCredentials: vi.fn(async () => [cred, key]) });
   await screen.findByRole("table", { name: "Hosts de la libreta" });
   await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
-  const sel = screen.getByLabelText("Credencial de la bóveda");
+  const sel = screen.getByLabelText("Credencial");
   const names = () => within(sel).getAllByRole("option").map((o) => o.textContent);
   expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(false); // sin plataforma
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "ios-xe");
@@ -443,7 +443,7 @@ test("la credencial de solo llave también se ofrece con windows", async () => {
   await screen.findByRole("table", { name: "Hosts de la libreta" });
   await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "windows");
-  expect(within(screen.getByLabelText("Credencial de la bóveda")).getAllByRole("option").some((o) => /llave pi/.test(o.textContent ?? ""))).toBe(true);
+  expect(within(screen.getByLabelText("Credencial")).getAllByRole("option").some((o) => /llave pi/.test(o.textContent ?? ""))).toBe(true);
 });
 
 test("un error del núcleo con metadata.field startup_command marca el campo de la orden", async () => {
@@ -465,5 +465,5 @@ test("una credencial de llave importada se ofrece al registrar un host linux", a
   await screen.findByRole("table", { name: "Hosts de la libreta" });
   await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
-  expect(within(screen.getByLabelText("Credencial de la bóveda")).getAllByRole("option").some((o) => /llave importada/.test(o.textContent ?? ""))).toBe(true);
+  expect(within(screen.getByLabelText("Credencial")).getAllByRole("option").some((o) => /llave importada/.test(o.textContent ?? ""))).toBe(true);
 });

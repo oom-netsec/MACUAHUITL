@@ -69,7 +69,7 @@ test("los errores salen junto a cada campo y no se llama al núcleo", async () =
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
   expect(screen.getByLabelText("Puerto remoto")).toHaveAccessibleDescription(/entre 1 y 65535/);
   expect(screen.getByLabelText("Ruta remota")).toHaveAccessibleDescription(/Escribe la ruta/);
-  expect(screen.getByLabelText("Credencial de la bóveda")).toHaveAccessibleDescription(/Elige la credencial/);
+  expect(screen.getByLabelText("Credencial")).toHaveAccessibleDescription(/Elige la credencial/);
   expect(screen.getByLabelText("Equipo remoto")).not.toHaveAttribute("aria-invalid");
   expect(core.transferGet).not.toHaveBeenCalled();
 });
@@ -79,7 +79,7 @@ test("la descarga manda credencial, huellas, tiempo, tamaño, hash por largo y S
   await userEvent.click(proto("SCP"));
   await userEvent.type(screen.getByLabelText("Equipo remoto"), "192.0.2.1");
   await userEvent.type(screen.getByLabelText("Ruta remota"), "/c4.bin");
-  await userEvent.selectOptions(await screen.findByRole("option", { name: /lab/ }).then(() => screen.getByLabelText("Credencial de la bóveda")), "c1");
+  await userEvent.selectOptions(await screen.findByRole("option", { name: /lab/ }).then(() => screen.getByLabelText("Credencial")), "c1");
   await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
   await userEvent.type(screen.getByLabelText("Tamaño máximo (MB, opcional)"), "2");
   await userEvent.type(screen.getByLabelText("Tiempo límite (minutos, opcional)"), "3");

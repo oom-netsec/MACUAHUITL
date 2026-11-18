@@ -33,6 +33,13 @@ test("el hook distingue bóveda inexistente, cerrada y abierta pero vacía", asy
   }
 });
 
+test("si el núcleo no responde, el hook dice error con el texto y no aparenta bóveda cerrada", async () => {
+  const c = { vaultStatus: vi.fn(async () => { throw new Error("sin núcleo"); }), listCredentials: vi.fn() } as never;
+  const { result } = renderHook(() => useCredentials(c));
+  await waitFor(() => expect(result.current.vault).toBe("error"));
+  expect(result.current.error).toContain("sin núcleo");
+});
+
 test("el hook vuelve a listar cuando la bóveda cambia", async () => {
   const c = core("unlocked");
   renderHook(() => useCredentials(c));
