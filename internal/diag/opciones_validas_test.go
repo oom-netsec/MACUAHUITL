@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -37,7 +38,7 @@ func casos() []caso {
 		{"nmap", mk(Nmap, nil, "192.0.2.1")},
 		{"iperf3/client", mk(Iperf3, map[string]string{"mode": "client"}, "192.0.2.1")},
 		{"iperf3/server", mk(Iperf3, map[string]string{"mode": "server", "bind": "192.0.2.9"})},
-		{"pcap", mk(Pcap, map[string]string{"interface": "eth0"})},
+		{"pcap", mk(Pcap, map[string]string{"interface": pcapIface()})},
 	}
 }
 
@@ -55,7 +56,7 @@ func TestOpcionDesconocidaListaValidas(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s: se esperaba diag.err.option, llegó %v", c.name, err)
 		}
-		want := strings.Join(validOptions[c.name], ", ")
+		want := strings.Join((&opts{tool: c.name, win: runtime.GOOS == "windows"}).validKeys(), ", ") // en Windows ping sin tos ni interval
 		for _, loc := range []string{i18n.Es, i18n.En} {
 			if got := ie.Localize(loc); !strings.Contains(got, want) || !strings.Contains(got, "zzz") {
 				t.Errorf("%s/%s: %q no lista %q", c.name, loc, got, want)
@@ -162,4 +163,12 @@ func TestTosEnWindowsMencionaWindows(t *testing.T) {
 			t.Errorf("%s: no menciona Windows: %q", loc, ie.Localize(loc))
 		}
 	}
+}
+
+// pcapIface es una interfaz válida en el sistema donde corre la prueba (en Windows, un número de dumpcap -D).
+func pcapIface() string {
+	if runtime.GOOS == "windows" {
+		return "1"
+	}
+	return "eth0"
 }
