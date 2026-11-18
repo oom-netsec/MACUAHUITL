@@ -615,3 +615,55 @@ func TestVentanaDelTrabajoArmadoTarde(t *testing.T) {
 		t.Error("dentro del Until real del trabajo: debía aceptarse")
 	}
 }
+
+// Los trabajos que el respaldo vigila están «en uso» hasta que los suelta (46c).
+func TestPinnedBackupVigilados(t *testing.T) {
+	s := newSvc(jobDeps{servicetest.New(t), &service.JobInfo{}})
+	s.jobs["j1"] = &tracked{}
+	if p := s.pinned(); len(p) != 1 || p[0] != (service.PinnedJob{ID: "j1", Reason: "backup_import"}) {
+		t.Fatalf("pinned = %v", p)
+	}
+	s.forget("j1", nil, false)
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("pinned = %v", p)
+	}
+}
+
+// pinned no espera a un collect en curso: s.mu lo retiene durante toda la carga y el mapa va con jobsMu (46c).
+func TestPinnedBackupNoEsperaAUnCollect(t *testing.T) {
+	s := newSvc(jobDeps{servicetest.New(t), &service.JobInfo{State: "completed"}})
+	s.jobs["j1"] = &tracked{}
+	s.mu.Lock() // como un collect largo
+	defer s.mu.Unlock()
+	done := make(chan []service.PinnedJob, 1)
+	go func() { done <- s.pinned() }()
+	select {
+	case p := <-done:
+		if len(p) != 1 {
+			t.Fatalf("pinned = %v", p)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("pinned espera a s.mu")
+	}
+}
+
+// Un trabajo que nunca se armó (ArmJob falló en StartBackup) no queda fijado.
+func TestPinnedBackupNuncaArmadoNoSeFija(t *testing.T) {
+	s := newSvc(jobDeps{servicetest.New(t), &service.JobInfo{State: "created"}})
+	s.jobs["j1"] = &tracked{}
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("pinned = %v", p)
+	}
+}
+
+// Un trabajo terminado sin carpeta (cancelado antes de armar) se suelta: collect volvía antes de forget.
+func TestCollectTerminalSinCarpetaSueltaElTrabajo(t *testing.T) {
+	s := newSvc(jobDeps{servicetest.New(t), &service.JobInfo{State: "cancelled"}})
+	s.jobs["j1"] = &tracked{}
+	if _, err := s.collect(context.Background(), "j1", 0); err != nil {
+		t.Fatal(err)
+	}
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("sigue fijado: %v", p)
+	}
+}

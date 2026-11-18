@@ -112,7 +112,9 @@ func inside(p, dir string) bool {
 
 // RecordJobRoot guarda la carpeta de corrida de un trabajo en job_roots (idempotente), para que sobreviva
 // a quitar el trabajo del historial. Una ruta vacía o relativa (trabajo sin carpeta propia) no se guarda.
-func RecordJobRoot(db *sql.DB, dir string) error {
+func RecordJobRoot(db interface {
+	Exec(string, ...any) (sql.Result, error)
+}, dir string) error { // *sql.DB, o la *sql.Tx de quien quita el trabajo
 	if !filepath.IsAbs(dir) {
 		return nil
 	}

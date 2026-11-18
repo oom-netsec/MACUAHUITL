@@ -240,9 +240,28 @@ func (s *changeSvc) CheckCompliance(ctx context.Context, r *v1.CheckComplianceRe
 	return &v1.CheckComplianceResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
-// Module registra el servicio Change.
-type Module struct{}
+// pinned son los PRE de un cambio que aún no tiene POST: el reporte los necesita por id.
+func (s *changeSvc) pinned() []service.PinnedJob {
+	s.mu.Lock()
+	var out []service.PinnedJob
+	for _, rec := range s.changes {
+		if pre := rec.jobs[v1.ChangePhase_CHANGE_PHASE_PRE]; pre != "" && rec.jobs[v1.ChangePhase_CHANGE_PHASE_POST] == "" {
+			out = append(out, service.PinnedJob{ID: pre, Reason: "change_pre"})
+		}
+	}
+	s.mu.Unlock()
+	return service.ArmedOnly(context.Background(), s.d, out)
+}
 
-func (Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterChangeServiceServer(s, &changeSvc{d: d, changes: map[string]*changeRec{}})
+// Module registra el servicio Change. Pinned, si no es nil, recibe de dónde leer los trabajos que no se deben quitar.
+type Module struct {
+	Pinned func(func() []service.PinnedJob)
+}
+
+func (m Module) Register(s ipc.Registrar, d service.Deps) {
+	svc := &changeSvc{d: d, changes: map[string]*changeRec{}}
+	if m.Pinned != nil {
+		m.Pinned(svc.pinned)
+	}
+	v1.RegisterChangeServiceServer(s, svc)
 }

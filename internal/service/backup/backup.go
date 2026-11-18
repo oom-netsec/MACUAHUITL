@@ -65,6 +65,7 @@ type backupSvc struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 	mu     sync.Mutex // serializa collect: el vigilante y Collect no importan a la vez
+	jobsMu sync.Mutex // protege solo el mapa jobs (no su contenido, que va bajo mu): pinned no espera a un collect
 	jobs   map[string]*tracked
 	final  map[string]collected // resultado final de los últimos trabajos propios: quien llega segundo lo recibe igual
 	order  []string
@@ -148,9 +149,9 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	}
 	now := s.d.Now()
 	win := time.Duration(spec.WindowHours)*time.Hour + 5*time.Minute // margen por si el reloj se mueve
-	s.mu.Lock()
+	s.jobsMu.Lock()
 	s.jobs[cj.JobId] = &tracked{masked: !r.IncludeSecrets, keep: keep, lote: lote, root: out, from: now.Add(-time.Minute), until: now.Add(win)}
-	s.mu.Unlock()
+	s.jobsMu.Unlock()
 	s.d.Audit("backup.start", cj.JobId, fmt.Sprintf("devices=%d startup=%v keep=%d interval=%ds rounds=%d masked=%v", len(r.Targets), r.Startup, keep, r.IntervalSeconds, r.Rounds, !r.IncludeSecrets))
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
@@ -267,7 +268,9 @@ func (s *backupSvc) collect(ctx context.Context, job string, keep int) (collecte
 	if f, ok := s.final[job]; ok {
 		return f, nil
 	}
+	s.jobsMu.Lock()
 	own := s.jobs[job] != nil
+	s.jobsMu.Unlock()
 	res, err := s.collectLocked(ctx, job, keep)
 	if err == nil && res.done && own {
 		if s.final == nil {
@@ -289,7 +292,9 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 	}
 	res := collected{state: j.State, Saved: []string{}, Warnings: []string{}}
 	terminal := j.State == "completed" || j.State == "cancelled"
+	s.jobsMu.Lock()
 	tr := s.jobs[job]
+	s.jobsMu.Unlock()
 	if keep == 0 {
 		keep = backup.DefaultKeep
 		if tr != nil {
@@ -298,6 +303,9 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 	}
 	res.done = terminal
 	if j.Dir == "" {
+		if terminal {
+			s.forget(job, tr, false) // terminó sin carpeta (cancelado antes de armar): nada que importar ni fijar
+		}
 		return res, nil
 	}
 	observed := map[string]fstat{}
@@ -482,7 +490,9 @@ func (s *backupSvc) auditWarnings(job string, tr *tracked, ws []string, ts []i18
 
 // forget suelta el trabajo; con clean borra su carpeta de Patrol (ya copiada), solo si la creó este servicio.
 func (s *backupSvc) forget(job string, tr *tracked, clean bool) {
+	s.jobsMu.Lock()
 	delete(s.jobs, job)
+	s.jobsMu.Unlock()
 	delete(s.seen, job)
 	if clean && tr != nil && filepath.Dir(tr.lote) == filepath.Join(s.outputs(tr), "respaldos", trabajos) {
 		os.RemoveAll(tr.lote)
@@ -553,11 +563,28 @@ func firstNonEmpty(ss ...string) string {
 	return ""
 }
 
-// Module registra el servicio Backup y, al cerrarse el núcleo, detiene a sus vigilantes.
-type Module struct{}
+// pinned son los trabajos que el respaldo todavía vigila o importa (s.jobs).
+func (s *backupSvc) pinned() []service.PinnedJob {
+	s.jobsMu.Lock()
+	var out []service.PinnedJob
+	for id := range s.jobs {
+		out = append(out, service.PinnedJob{ID: id, Reason: "backup_import"})
+	}
+	s.jobsMu.Unlock()
+	return service.ArmedOnly(context.Background(), s.d, out)
+}
 
-func (Module) Register(r ipc.Registrar, d service.Deps) {
+// Module registra el servicio Backup y, al cerrarse el núcleo, detiene a sus vigilantes. Pinned, si no es nil,
+// recibe de dónde leer los trabajos que no se deben quitar.
+type Module struct {
+	Pinned func(func() []service.PinnedJob)
+}
+
+func (m Module) Register(r ipc.Registrar, d service.Deps) {
 	s := newSvc(d)
 	d.OnClose(s.close)
+	if m.Pinned != nil {
+		m.Pinned(s.pinned)
+	}
 	v1.RegisterBackupServiceServer(r, s)
 }

@@ -140,9 +140,26 @@ func (s *adhocSvc) forget(job string) {
 	s.mu.Unlock()
 }
 
-// Module registra el servicio Adhoc.
-type Module struct{}
+// pinned son los lotes cuyo resultado nadie ha leído: AdhocResult los saca de s.cmds al entregarlos.
+func (s *adhocSvc) pinned() []service.PinnedJob {
+	s.mu.Lock()
+	var out []service.PinnedJob
+	for id := range s.cmds {
+		out = append(out, service.PinnedJob{ID: id, Reason: "adhoc_unread"})
+	}
+	s.mu.Unlock()
+	return service.ArmedOnly(context.Background(), s.d, out)
+}
 
-func (Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterAdhocServiceServer(s, &adhocSvc{d: d, cmds: map[string][]string{}})
+// Module registra el servicio Adhoc. Pinned, si no es nil, recibe de dónde leer los trabajos que no se deben quitar.
+type Module struct {
+	Pinned func(func() []service.PinnedJob)
+}
+
+func (m Module) Register(s ipc.Registrar, d service.Deps) {
+	svc := &adhocSvc{d: d, cmds: map[string][]string{}}
+	if m.Pinned != nil {
+		m.Pinned(svc.pinned)
+	}
+	v1.RegisterAdhocServiceServer(s, svc)
 }
