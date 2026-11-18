@@ -412,7 +412,7 @@ func (r TimelineReport) TextIn(loc string) string {
 	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	fmt.Fprintf(&b, "%s\n", r.Dir)
 	if !r.Around.IsZero() {
-		fmt.Fprintf(&b, "%s\n", m("analyze.text.window", "around", r.Around.Format(time.RFC3339), "window", r.Window))
+		fmt.Fprintf(&b, "%s\n", m("analyze.text.window", "around", i18n.FmtLocal(r.Around, i18n.LocalSec), "window", r.Window))
 	}
 	for _, e := range r.Events {
 		dev := e.Device
@@ -423,7 +423,7 @@ func (r TimelineReport) TextIn(loc string) string {
 		if e.Severity != "" {
 			sev = "[" + m("analyze.sev."+e.Severity) + "] "
 		}
-		fmt.Fprintf(&b, "%s  %-10s %-20s %s%s", e.At.Format("2006-01-02 15:04:05.000"), e.Source, dev, sev, e.Text)
+		fmt.Fprintf(&b, "%s  %-10s %-20s %s%s", i18n.FmtLocal(e.At, i18n.LocalMs), e.Source, dev, sev, e.Text)
 		if e.Note != "" {
 			fmt.Fprintf(&b, "  (%s)", e.Note)
 		}

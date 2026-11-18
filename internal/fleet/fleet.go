@@ -469,25 +469,25 @@ func read[T any](w *ws, d *Dev, cmd string, p func(string) ([]T, bool)) ([]T, Ev
 	if fe, fok := d.filtered(cmd); fok {
 		switch {
 		case !ok:
-			w.tx("fleet.warn.only_filtered", "dev", d.Name, "cmd", cmd, "at", fe.At.Format("2006-01-02 15:04Z"))
+			w.tx("fleet.warn.only_filtered", "dev", d.Name, "cmd", cmd, "at", i18n.FmtLocal(fe.At, i18n.LocalMin))
 		case fe.At.After(e.At):
-			w.tx("fleet.warn.newer_filtered", "dev", d.Name, "cmd", cmd, "at", fe.At.Format("2006-01-02 15:04Z"), "full", e.At.Format("2006-01-02 15:04Z"))
+			w.tx("fleet.warn.newer_filtered", "dev", d.Name, "cmd", cmd, "at", i18n.FmtLocal(fe.At, i18n.LocalMin), "full", i18n.FmtLocal(e.At, i18n.LocalMin))
 		}
 	}
 	if !ok {
 		return nil, e, false
 	}
 	if e.Truncated {
-		w.tx("fleet.warn.truncated", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
+		w.tx("fleet.warn.truncated", "dev", d.Name, "cmd", cmd, "at", i18n.FmtLocal(e.At, i18n.LocalMin))
 		return nil, e, false
 	}
 	if rejected(e) {
-		w.reject(d.Name, cmd, e.At.Format("2006-01-02 15:04Z"), d.IP)
+		w.reject(d.Name, cmd, i18n.FmtLocal(e.At, i18n.LocalMin), d.IP)
 		return nil, e, false
 	}
 	rows, ok := p(e.Text)
 	if !ok {
-		w.tx("fleet.warn.format", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
+		w.tx("fleet.warn.format", "dev", d.Name, "cmd", cmd, "at", i18n.FmtLocal(e.At, i18n.LocalMin))
 		return nil, e, false
 	}
 	return rows, e, true
@@ -524,7 +524,7 @@ func AgoIn(loc string, now, at time.Time) string {
 
 // Stamp: hora de la evidencia con su antigüedad; avisa si pasa de un día.
 func (f *Fleet) Stamp(at time.Time) string {
-	s := at.UTC().Format("2006-01-02 15:04Z") + " (" + AgoIn(f.loc, f.Now, at) + ")"
+	s := i18n.FmtLocal(at, i18n.LocalMin) + " (" + AgoIn(f.loc, f.Now, at) + ")"
 	if f.Now.Sub(at) > 24*time.Hour {
 		s += " " + f.t("fleet.stale")
 	}

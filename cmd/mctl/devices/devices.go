@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -43,7 +42,7 @@ func list(c *cli.Env, args []string) error {
 	for _, d := range r.Devices {
 		seen := cli.T("mctl.devices.never")
 		if d.LastSeenMs > 0 {
-			seen = time.UnixMilli(d.LastSeenMs).UTC().Format("2006-01-02 15:04")
+			seen = cli.Time(d.LastSeenMs)
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", d.GetTarget().GetAddress(), d.Hostname, d.Platform, seen, strings.Join(d.Sources, ","))
 	}

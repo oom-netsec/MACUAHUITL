@@ -125,7 +125,7 @@ func jobArm(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(c.Out, cli.T("mctl.patrol.armed", "until", r.WindowEndsAt.AsTime().Local().Format("2006-01-02 15:04")))
+	fmt.Fprintln(c.Out, cli.T("mctl.patrol.armed", "until", cli.TimeOf(r.WindowEndsAt.AsTime())))
 	if len(r.MissingInhibitors) > 0 {
 		fmt.Fprintln(c.Out, cli.T("mctl.patrol.armed_warn", "list", strings.Join(r.MissingInhibitors, ", ")))
 	}
@@ -155,7 +155,7 @@ func jobList(c *cli.Env, args []string) error {
 	for _, j := range r.Jobs {
 		fin := "-" // activo o creado: aún no termina
 		if j.FinishedAt != nil {
-			fin = j.FinishedAt.AsTime().Local().Format("2006-01-02 15:04:05")
+			fin = cli.TimeSecOf(j.FinishedAt.AsTime())
 		}
 		fmt.Fprintf(c.Out, "%s  %s  %s  %s\n", j.JobId, j.Name, j.State, fin)
 	}
@@ -258,7 +258,7 @@ func jobWatch(c *cli.Env, args []string) error {
 		if err != nil {
 			return err
 		}
-		t := e.At.AsTime().Local().Format("15:04:05")
+		t := cli.TimeSecOf(e.At.AsTime())
 		switch ev := e.Event.(type) {
 		case *v1.SubscribeResponse_DeviceStateChanged:
 			fmt.Fprintf(c.Out, "%s  %s  %s  %s\n", t, ev.DeviceStateChanged.DeviceId, strings.TrimPrefix(ev.DeviceStateChanged.State.String(), "DEVICE_STATE_"), ev.DeviceStateChanged.Detail)

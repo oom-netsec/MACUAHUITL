@@ -49,7 +49,7 @@ func StateLine(st *v1.AssistRunState) string {
 		live = T("mctl.run.live")
 	}
 	return T("mctl.run.state_line", "id", st.RunId, "state", fmt.Sprintf("%-15s", st.State), "live", live,
-		"devices", strings.Join(st.Devices, ","), "changed", ch, "start", time.Unix(st.StartedUnix, 0).Format("2006-01-02 15:04:05"))
+		"devices", strings.Join(st.Devices, ","), "changed", ch, "start", TimeSecOf(time.Unix(st.StartedUnix, 0)))
 }
 
 func PrintPlan(w io.Writer, p *v1.AssistPlan) {

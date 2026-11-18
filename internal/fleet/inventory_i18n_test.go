@@ -58,10 +58,10 @@ func TestTextoDeFlotaEnIngles(t *testing.T) {
 	if !strings.Contains(texts["find"], "Search \"10.1.10.20\"") || !strings.Contains(texts["summary"], "Dashboard:") || !strings.Contains(texts["cap"], "Flash: 1.0 GiB needed") && !strings.Contains(texts["cap"], "needed") {
 		t.Errorf("faltan encabezados en inglés:\n%s\n%s\n%s", texts["find"], texts["summary"], texts["cap"])
 	}
-	if s := en.Stamp(now.Add(-30 * time.Hour)); s != "2026-11-04 03:00Z (30 h ago) OLD DATA" {
+	if s := en.Stamp(now.Add(-30 * time.Hour)); s != "2026-11-04 03:00 UTC (30 h ago) OLD DATA" {
 		t.Errorf("stamp: %q", s)
 	}
-	if es := f.Stamp(now.Add(-30 * time.Hour)); es != "2026-11-04 03:00Z (hace 30 h) DATO VIEJO" {
+	if es := f.Stamp(now.Add(-30 * time.Hour)); es != "2026-11-04 03:00 UTC (hace 30 h) DATO VIEJO" {
 		t.Errorf("stamp es: %q", es)
 	}
 	r := f.Inventory()

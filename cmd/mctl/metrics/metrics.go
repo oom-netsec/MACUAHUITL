@@ -215,7 +215,7 @@ func portsStatus(c *cli.Env, args []string) error {
 		fmt.Fprintln(c.Out, string(b))
 		return nil
 	}
-	fmt.Fprintf(c.Out, "%s (%s) · %s · %s\n", r.Hostname, r.Address, r.Source, ts(r.AtMs))
+	fmt.Fprintln(c.Out, portsHead(r))
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, cli.T("mctl.metrics.ports_header"))
 	for _, p := range r.Ports {
@@ -253,4 +253,13 @@ func Area() cli.Area {
 		{Name: "job metrics", Run: jobMetrics},
 		{Name: "ports status", Run: portsStatus},
 	}}
+}
+
+// portsHead es el encabezado de `ports status`: sin hora (AtMs == 0, leído de una carpeta) no imprime fecha.
+func portsHead(r *v1.GetPortStatusResponse) string {
+	s := fmt.Sprintf("%s (%s) · %s", r.Hostname, r.Address, r.Source)
+	if r.AtMs != 0 {
+		s += " · " + cli.Time(r.AtMs)
+	}
+	return s
 }
