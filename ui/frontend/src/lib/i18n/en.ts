@@ -3128,4 +3128,7 @@ export const en: Record<Key, string> = {
   "need.diagTool": "tick Ping or Traceroute",
   "device.ping": "Ping",
   "device.traceroute": "Traceroute",
+  "diag.stopTool": "Stop {tool}",
+  "diag.cancelTool": "Cancel {tool}",
+  "diag.clearTool": "Clear {tool}",
 };

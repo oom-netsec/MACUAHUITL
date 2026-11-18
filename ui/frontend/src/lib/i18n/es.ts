@@ -3127,6 +3127,9 @@ export const es = {
   "need.diagTool": "marcar Ping o Traceroute",
   "device.ping": "Ping",
   "device.traceroute": "Traceroute",
+  "diag.stopTool": "Detener {tool}",
+  "diag.cancelTool": "Cancelar {tool}",
+  "diag.clearTool": "Limpiar {tool}",
 };
 
 export type Key = keyof typeof es;

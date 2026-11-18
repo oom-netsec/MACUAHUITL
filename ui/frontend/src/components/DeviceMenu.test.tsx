@@ -24,6 +24,7 @@ test("el botón ⋯ abre las acciones del equipo y lleva al módulo con la direc
   expect(screen.getAllByRole("menuitem")[0]).toHaveFocus();
   await userEvent.keyboard("{ArrowDown}{ArrowDown}{Enter}");
   expect(go).toHaveBeenCalledWith("ping", "10.20.3.11");
+  expect(go).toHaveBeenCalledWith("ping", "ping", "ping-tool");
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });
 

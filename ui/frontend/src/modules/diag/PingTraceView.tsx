@@ -35,10 +35,11 @@ function ToolPanel({ tool, run }: { tool: "ping" | "traceroute"; run: Run }) {
       <ResultPanel title={t(`diag.title.${tool}`)} status={status} error={err || (result && !result.ok && !result.canceled ? result.text : "")}
         meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : result?.canceled ? result.text : undefined}
         actions={<>
-          {/* Un ping continuo se detiene con resumen; lo demás se corta. */}
-          <button className="sm" onClick={stoppable ? run.stop : run.cancel} disabled={!runId}>{t("diag.stop")}</button>
+          {/* Un ping continuo se detiene con resumen (Detener) y además se puede cortar (Cancelar); lo demás solo se corta. */}
+          <button className="sm" onClick={stoppable ? run.stop : run.cancel} disabled={!runId} aria-label={t("diag.stopTool", { tool })}>{t("diag.stop")}</button>
+          {stoppable && <button className="sm" onClick={run.cancel} disabled={!runId} aria-label={t("diag.cancelTool", { tool })}>{t("common.cancel")}</button>}
           {lines.length > 0 && <CopyButton value={lines.join("\n")} label={t(`diag.title.${tool}`)} />}
-          <button className="quiet sm" disabled={!lines.length || !!runId} onClick={() => run.setLines([])}>{t("common.clear")}</button>
+          <button className="quiet sm" disabled={!lines.length || !!runId} onClick={() => run.setLines([])} aria-label={t("diag.clearTool", { tool })}>{t("common.clear")}</button>
         </>}>
         <Terminal text={lines.join("\n")} role="log" aria-label={t(`diag.title.${tool}`)} />
       </ResultPanel>
@@ -63,8 +64,10 @@ export function PingTraceView({ core }: { core: CoreAPI }) {
   useInbox("ping-tool", (tool) => { setDoPing(tool === "ping"); setDoTrace(tool === "traceroute"); });
   useEffect(() => { void core.listInterfaces().then((l) => setIfaces(l ?? []), () => setIfaces([])); }, [core]);
 
+  const [ran, setRan] = useState({ ping: false, trace: false }); // herramientas de la última ejecución: lo de la otra ya no es de este destino
   const busy = !!pingRun.runId || !!traceRun.runId;
   const run = () => {
+    setRan({ ping: doPing, trace: doTrace });
     if (doPing) void pingRun.start(() => ({
       tool: "ping", targets: [target], options: ping.options, stoppable: !!(ping.options.continuous || ping.options.duration),
       fam: (ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?"), interval: Number(ping.options.interval) || 1,
@@ -72,7 +75,7 @@ export function PingTraceView({ core }: { core: CoreAPI }) {
     if (doTrace) void traceRun.start(() => ({ tool: "traceroute", targets: [target], options: { max_hops: hops } }));
   };
   // Si ping y traceroute resolvieron distinto (p. ej. familias distintas) se muestran las dos; el nombre igual a la IP no se resolvió nada.
-  const res: [string, ResolvedTarget][] = ([["ping", pingRun.resolved], ["traceroute", traceRun.resolved]] as const)
+  const res: [string, ResolvedTarget][] = ([["ping", ran.ping && pingRun.resolved], ["traceroute", ran.trace && traceRun.resolved]] as const)
     .filter((x): x is readonly ["ping" | "traceroute", ResolvedTarget] => !!x[1] && x[1].name !== x[1].ip).map(([k, r]) => [k, r]);
   const same = res.length === 2 && res[0][1].ip === res[1][1].ip;
   const shown = same ? res.slice(0, 1) : res;
@@ -102,9 +105,9 @@ export function PingTraceView({ core }: { core: CoreAPI }) {
           {shown.map(([k, r]) => <span key={k}>{shown.length > 1 && `${t(k === "ping" ? "diag.title.ping" : "diag.title.traceroute")}: `}{t("diag.resolved", { name: r.name, ip: r.ip, family: famName(r.family) })} </span>)}
         </p>
       )}
-      {!pingRun.started && !traceRun.started && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}
-      {pingRun.started && <ToolPanel tool="ping" run={pingRun} />}
-      {traceRun.started && <ToolPanel tool="traceroute" run={traceRun} />}
+      {!(ran.ping && pingRun.started) && !(ran.trace && traceRun.started) && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}
+      {ran.ping && pingRun.started && <ToolPanel tool="ping" run={pingRun} />}
+      {ran.trace && traceRun.started && <ToolPanel tool="traceroute" run={traceRun} />}
     </Page>
   );
 }

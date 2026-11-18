@@ -53,8 +53,8 @@ export function DeviceMenu({ name, address, children }: { name: string; address:
   };
   // Ping y traceroute son una sola vista («ping»): el destino va a su buzón y la herramienta al buzón «ping-tool».
   const pick = (id: string) => {
-    if (id !== "traceroute") return go(id, address);
-    go("ping", address); go("ping", id, "ping-tool");
+    if (id !== "traceroute" && id !== "ping") return go(id, address);
+    go("ping", address); go("ping", id, "ping-tool"); // siempre la herramienta: «Ping» tras «Traceroute» tiene que desmarcar Traceroute
   };
   const label = t("device.actions", { name });
   return (
