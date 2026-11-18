@@ -109,7 +109,7 @@ func (h *harness) esperaEvento(t *testing.T, job string, ok func(*v1.SubscribeRe
 	for {
 		e, err := h.subs[job].Recv()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("esperaba un evento del trabajo %s y el stream terminó: %v", job, err)
 		}
 		h.siguienteRonda(e)
 		if ok(e) {

@@ -62,7 +62,7 @@ func TestWindowSchedUntilNoCortaRondaEnCurso(t *testing.T) {
 
 // El fin de la ventana sí corta al equipo a medias, con patrol.err.window_ended.
 func TestWindowFinCortaRondaEnCurso(t *testing.T) {
-	h, cred := lentoHarness(t, 20) // el comando dura ~5 s de reloj real; el corte llega por el reloj manual
+	h, cred := lentoHarness(t, 20) // el comando dura ~5 s de reloj real; corta el temporizador de windowCtx (1 s tras empezar la ronda 2)
 	spec := h.spec(cred)
 	spec.CustomCommands = "show memory summary\n"
 	spec.Schedule = &v1.Schedule{IntervalSeconds: 5, Rounds: 2}
