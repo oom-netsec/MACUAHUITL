@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Check, Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -21,6 +22,8 @@ const toRoute = (r: RouteForm) => Object.fromEntries(Object.entries({
   med: num(r.med), ebgp: r.ebgp, igpMetric: num(r.igp), routerId: r.rid.trim(), originatorId: r.originator.trim(),
   clusterListLength: num(r.cluster), neighbor: r.nbr.trim(), ageSeconds: num(r.age), nextHopUnreachable: r.unreachable,
 }).filter(([, v]) => v !== undefined && v !== "" && v !== false));
+
+const moreKeys: (keyof RouteForm)[] = ["igp", "cluster", "age", "rid", "originator", "nbr", "local", "ebgp", "unreachable"];
 
 interface BgpForm { routes: RouteForm[]; acm: boolean; dmed: boolean; relax: boolean; maxPaths: string }
 const initial: BgpForm = { routes: [newRoute(0), newRoute(1)], acm: false, dmed: false, relax: false, maxPaths: "" };
@@ -47,6 +50,9 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
             </div>
             <div className="field-row end">
               <Field label="AS_PATH" value={r.asPath} onChange={set(i, "asPath")} w="md" mono />
+            </div>
+            <Advanced label={t("calc.bgp.more")} changed={moreKeys.filter((k) => r[k] !== newRoute(i)[k]).length}>
+            <div className="field-row end">
               <Field label={t("calc.bgp.igp")} type="number" value={r.igp} onChange={set(i, "igp")} w="sm" mono />
               <Field label={t("calc.bgp.cluster")} type="number" value={r.cluster} onChange={set(i, "cluster")} w="sm" mono />
               <Field label={t("calc.bgp.age")} type="number" value={r.age} onChange={set(i, "age")} w="xs" mono />
@@ -60,23 +66,28 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
               <Check label={t("calc.bgp.local")} checked={r.local} onChange={set(i, "local")} />
               <Check label="eBGP" checked={r.ebgp} onChange={set(i, "ebgp")} />
               <Check label={t("calc.bgp.unreachable")} checked={r.unreachable} onChange={set(i, "unreachable")} />
+            </div>
+            </Advanced>
+            <div className="route-flags">
               <button className="quiet sm" disabled={routes.length <= 2} aria-label={t("calc.bgp.removeRoute", { n: i + 1 })} onClick={() => setRoutes(routes.filter((_, j) => j !== i))}>{t("calc.mtu.remove")}</button>
             </div>
           </fieldset>
         ))}
         <div className="actions"><button onClick={() => setRoutes([...routes, newRoute(routes.length)])}>{t("calc.bgp.addRoute")}</button></div>
       </Section>
-      <Section title={t("calc.bgp.secOptions")}>
-        <Check label={t("calc.bgp.acm")} checked={acm} onChange={setForm("acm")} />
-        <Check label={t("calc.bgp.dmed")} checked={dmed} onChange={setForm("dmed")} />
-        <Check label={t("calc.bgp.relax")} checked={relax} onChange={setForm("relax")} />
-        <Field label={t("calc.bgp.maxPaths")} type="number" value={maxPaths} onChange={setForm("maxPaths")} w="md" mono />
+      <div className="section">
+        <Advanced label={t("calc.bgp.secOptions")} changed={[acm, dmed, relax, maxPaths !== ""].filter(Boolean).length}>
+          <Check label={t("calc.bgp.acm")} checked={acm} onChange={setForm("acm")} />
+          <Check label={t("calc.bgp.dmed")} checked={dmed} onChange={setForm("dmed")} />
+          <Check label={t("calc.bgp.relax")} checked={relax} onChange={setForm("relax")} />
+          <Field label={t("calc.bgp.maxPaths")} type="number" value={maxPaths} onChange={setForm("maxPaths")} w="md" mono />
+        </Advanced>
         <div className="actions">
           <button className="primary" disabled={c.busy} aria-busy={c.busy} onClick={() => c.run("bgp", { routes: routes.map(toRoute), alwaysCompareMed: acm, deterministicMed: dmed, multipathRelax: relax, maximumPaths: Number(maxPaths) || 0 })}>
             {t("calc.bgp.btn")}{kbd}
           </button>
         </div>
-      </Section>
+      </div>
       {c.view}
     </>
   );
