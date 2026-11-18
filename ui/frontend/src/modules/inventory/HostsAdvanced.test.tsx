@@ -60,3 +60,12 @@ test("host: un puerto inválido abre Avanzado en cada intento fallido, aunque se
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
   expect(d.open).toBe(true);
 });
+
+test("al editar, «cambiadas» compara con lo guardado: un host con puerto, etiquetas y notas propios abre en 0", async () => {
+  setup();
+  await userEvent.click(await screen.findByRole("button", { name: "Editar LAB-CORE" }));
+  const d = screen.getByLabelText("Puerto").closest("details")!;
+  expect(d.querySelector("summary")).toHaveTextContent(/^Opciones avanzadas$/);
+  await userEvent.type(screen.getByLabelText("Notas"), " sur");
+  expect(d.querySelector("summary")).toHaveTextContent("cambiadas: 1");
+});

@@ -92,7 +92,7 @@ test("los parámetros serie van plegados en Avanzado, cuentan y se siguen envian
   const det = screen.getByLabelText("Velocidad").closest("details")!;
   expect(det.open).toBe(false);
   for (const l of ["Bits de datos", "Paridad", "Bits de parada", "Control de flujo"]) expect(det).toContainElement(screen.getByLabelText(l));
-  expect(det).toContainElement(screen.getByText(/^Cisco: 9600 8N1/));
+  expect(det).not.toContainElement(screen.getByText(/^Cisco: 9600 8N1/)); // a la vista: trae el remedio de permisos
   expect(det).not.toContainElement(screen.getByLabelText("Puerto"));
   expect(det).not.toContainElement(screen.getByRole("button", { name: "Abrir" }));
   await userEvent.selectOptions(screen.getByLabelText("Velocidad"), "115200");

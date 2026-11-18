@@ -84,8 +84,8 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
           <Select label={t("console.stopBits")} value={stopBits} onChange={setStopBits} w="sm" options={[["1", "1"], ["2", "2"]]} />
           <Select label={t("console.flow")} value={flow} onChange={setFlow} w="md" options={[["none", t("console.flow.none")], ["rtscts", "RTS/CTS"], ["xonxoff", "XON/XOFF"]]} />
         </div>
-        <p className="hint defaults">{t("console.defaults")}</p>
         </Advanced>
+        <p className="hint defaults">{t("console.defaults")}</p>{/* a la vista: trae el remedio de permisos (dialout) para cuando abrir falla */}
         <div className="actions">
           <button className="primary" disabled={!!runId || starting || !port} onClick={open}>{t("console.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
           <button disabled={!runId} onClick={() => send("\x03")}>Ctrl-C</button>

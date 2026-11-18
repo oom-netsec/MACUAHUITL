@@ -7,11 +7,13 @@ import { useForm } from "../../lib/useForm";
 import { kbd, num, useCalc } from "./shared";
 
 interface RouteForm {
+  key: number;
   name: string; weight: string; localPref: string; asPath: string; origin: string; med: string; igp: string; rid: string;
   originator: string; cluster: string; nbr: string; age: string; local: boolean; ebgp: boolean; unreachable: boolean;
 }
+let routeSeq = 0; // clave estable por ruta: al quitar una, el estado de su «Más atributos» no pasa a la siguiente
 const newRoute = (i: number): RouteForm => ({
-  name: String.fromCharCode(65 + (i % 26)), weight: "", localPref: "", asPath: "", origin: "i", med: "", igp: "", rid: "",
+  key: ++routeSeq, name: String.fromCharCode(65 + (i % 26)), weight: "", localPref: "", asPath: "", origin: "i", med: "", igp: "", rid: "",
   originator: "", cluster: "", nbr: "", age: "", local: false, ebgp: false, unreachable: false,
 });
 const origins: [string, string][] = [["i", "IGP (i)"], ["e", "EGP (e)"], ["?", "incomplete (?)"]];
@@ -23,6 +25,7 @@ const toRoute = (r: RouteForm) => Object.fromEntries(Object.entries({
   clusterListLength: num(r.cluster), neighbor: r.nbr.trim(), ageSeconds: num(r.age), nextHopUnreachable: r.unreachable,
 }).filter(([, v]) => v !== undefined && v !== "" && v !== false));
 
+const blankRoute = newRoute(0);
 const moreKeys: (keyof RouteForm)[] = ["igp", "cluster", "age", "rid", "originator", "nbr", "local", "ebgp", "unreachable"];
 
 interface BgpForm { routes: RouteForm[]; acm: boolean; dmed: boolean; relax: boolean; maxPaths: string }
@@ -39,7 +42,7 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
     <>
       <Section title={t("calc.bgp.secRoutes")} description={t("calc.bgp.hint")}>
         {routes.map((r, i) => (
-          <fieldset key={i} className="box route">
+          <fieldset key={r.key} className="box route">
             <legend>{t("calc.bgp.route", { n: i + 1 })}</legend>
             <div className="field-row end">
               <Field label={t("calc.bgp.name")} value={r.name} onChange={set(i, "name")} w="xs" />
@@ -51,7 +54,7 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
             <div className="field-row end">
               <Field label="AS_PATH" value={r.asPath} onChange={set(i, "asPath")} w="md" mono />
             </div>
-            <Advanced label={t("calc.bgp.more")} changed={moreKeys.filter((k) => r[k] !== newRoute(i)[k]).length}>
+            <Advanced label={t("calc.bgp.more")} changed={moreKeys.filter((k) => r[k] !== blankRoute[k]).length}>
             <div className="field-row end">
               <Field label={t("calc.bgp.igp")} type="number" value={r.igp} onChange={set(i, "igp")} w="sm" mono />
               <Field label={t("calc.bgp.cluster")} type="number" value={r.cluster} onChange={set(i, "cluster")} w="sm" mono />

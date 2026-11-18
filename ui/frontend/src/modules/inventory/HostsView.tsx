@@ -41,7 +41,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   const [fs, setFs] = useState({ open: 0, close: 0, target: "" });
   const [q, setQ] = useState("");
   const [folder, setFolder] = useState("");
-  const [editing, setEditing] = useState<{ id?: string; title: string; form: HostForm; hiddenCred?: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; title: string; form: HostForm; base: HostForm; hiddenCred?: string } | null>(null); // base: lo guardado, para «cambiadas»
   const [advTry, setAdvTry] = useState(0); // intentos fallidos con error dentro de Avanzado: cada uno lo vuelve a abrir
   const [errs, setErrs] = useState<Partial<Record<HostField, string>>>({});
   const [coreDetail, setCoreDetail] = useState("");
@@ -89,7 +89,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   }, [seq.close, seq.saved]);
   const closeForm = (saved = false) => { setEditing(null); setSeq((q) => ({ ...q, close: q.close + 1, saved })); };
 
-  const open = (title: string, form: HostForm, id?: string, hiddenCred = "", found = false) => { origin.current = { el: document.activeElement as HTMLElement | null, found }; setSeq((q) => ({ ...q, open: q.open + 1 })); setEditing({ id, title, form, hiddenCred }); setErrs({}); setAdvTry(0); setCoreDetail(""); setMsg(""); setErr(""); setWarns([]); };
+  const open = (title: string, form: HostForm, id?: string, hiddenCred = "", found = false) => { origin.current = { el: document.activeElement as HTMLElement | null, found }; setSeq((q) => ({ ...q, open: q.open + 1 })); setEditing({ id, title, form, base: form, hiddenCred }); setErrs({}); setAdvTry(0); setCoreDetail(""); setMsg(""); setErr(""); setWarns([]); };
   const edit = (h: Host) => open(t("hosts.form.edit", { name: h.name }), formOf(h), h.id, h.credentialId);
   const fromFound = (d: KnownDevice) => open(t("hosts.form.new"), { ...emptyForm, name: d.hostname, address: d.address, platform: hostPlatformOf(d.platform) }, undefined, "", true);
   const set = <K extends HostField>(k: K, v: HostForm[K]) => editing && setEditing({ ...editing, form: { ...editing.form, [k]: v } });
@@ -194,7 +194,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
         )}
         {hasStartCommand(f.platform) && <Notice kind="info">{t("hosts.f.start.audit")}</Notice>}
         {!hasStartCommand(f.platform) && creds.some((c) => c.kind === "key") && <p className="hint">{t("hosts.cred.keyOnlyGeneric")}</p>}
-        <Advanced forceOpen={advTry} changed={Number(f.port !== emptyForm.port) + Number(f.tags !== "") + Number(f.notes !== "")}>
+        <Advanced forceOpen={advTry} changed={Number((f.port || "22") !== (editing.base.port || "22")) + Number(f.tags !== editing.base.tags) + Number(f.notes !== editing.base.notes)}>
           <div className="field-row">
             <Field label={t("hosts.f.port")} error={errs.port} value={f.port} onChange={(v) => set("port", v)} w="xs" mono inputMode="numeric" />
             <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />

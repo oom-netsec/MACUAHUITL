@@ -7,3 +7,4 @@
 
 /* Aviso de bóveda del selector de credencial: ocupa su propia fila dentro de .field-row. */
 .cred-notice { flex-basis: 100%; }
+.adv-error { color: var(--danger); }

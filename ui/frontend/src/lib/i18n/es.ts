@@ -3046,6 +3046,7 @@ export const es = {
   "calc.bgp.more": "Más atributos",
   "change.upgrade.integrity": "Verificar integridad (opcional)",
   "packs.export.meta": "Metadatos (opcional)",
+  "common.advanced.error": "hay un error dentro",
 };
 
 export type Key = keyof typeof es;

@@ -3047,4 +3047,5 @@ export const en: Record<Key, string> = {
   "calc.bgp.more": "More attributes",
   "change.upgrade.integrity": "Verify integrity (optional)",
   "packs.export.meta": "Metadata (optional)",
+  "common.advanced.error": "there is an error inside",
 };
