@@ -347,7 +347,7 @@ test("write memory y huellas aceptadas siguen yendo en la petición", async () =
   await userEvent.type(screen.getByLabelText(/huellas|fingerprint/i), "SHA256:abc");
   await userEvent.click(planBtn());
   expect(core.planTemplateSnippet).toHaveBeenCalledWith({
-    target, id: "speed-duplex", values: { interfaces: "Gi1/0/1", speed: "", duplex: "" }, writeMemory: true, acceptedHostKeyFingerprints: ["SHA256:abc"],
+    target, id: "speed-duplex", values: { interfaces: "Gi1/0/1", speed: "", duplex: "" }, writeMemory: true, acceptedHostKeyFingerprints: ["SHA256:abc"], acceptedHostKeys: [{ host: "10.0.0.5", fingerprint: "SHA256:abc" }],
   });
 });
 

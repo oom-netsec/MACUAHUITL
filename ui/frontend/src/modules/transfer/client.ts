@@ -1,6 +1,6 @@
 // Formulario del cliente de transferencias: la URL se arma desde los campos y la petición al núcleo sale del mismo estado.
 import type { Key } from "../../lib/i18n/es";
-import { parseFingerprints } from "../../lib/hostkeys";
+import { parseFingerprints, resolveAccepted, type AcceptedKey } from "../../lib/hostkeys";
 import { baseName, dirName, isAbsWindows, pathProblem } from "../../lib/paths";
 import { isWindows } from "../../lib/platform";
 import type { TransferGetParams, TransferPutParams } from "./api";
@@ -88,10 +88,16 @@ function limits(f: ClientForm): { maxBytes?: number; seconds?: number } {
   };
 }
 
+// El destino del par: la dirección del formulario con su puerto SSH (el 22 va sin puerto).
+function sshKeys(f: ClientForm): { acceptedKeys?: AcceptedKey[] } {
+  const keys = usesSsh(f.proto) ? resolveAccepted(f.accepted, [{ address: f.host.trim().replace(/^\[|\]$/g, ""), port: Number(portOf(f)) }]).keys : [];
+  return keys.length ? { acceptedKeys: keys } : {};
+}
+
 export function getParams(f: ClientForm): TransferGetParams {
   const h = expectedHash(f.hash);
   return {
-    url: buildURL(f), destDir: f.destDir, credentialId: usesCred(f.proto) ? f.cred : "", acceptedHostKeys: usesSsh(f.proto) ? parseFingerprints(f.accepted) : [],
+    url: buildURL(f), destDir: f.destDir, credentialId: usesCred(f.proto) ? f.cred : "", acceptedHostKeys: usesSsh(f.proto) ? parseFingerprints(f.accepted) : [], ...sshKeys(f),
     insecure: f.proto === "https" && f.insecure, legacySsh: usesSsh(f.proto) && f.legacy,
     ...(f.name.trim() ? { name: f.name.trim() } : {}), ...limits(f), ...(h ? { [h.kind]: h.value } : {}),
   };
@@ -100,6 +106,6 @@ export function getParams(f: ClientForm): TransferGetParams {
 export function putParams(f: ClientForm): TransferPutParams {
   return {
     url: buildURL(f), fromDir: dirName(f.src), name: baseName(f.src), credentialId: usesCred(f.proto) ? f.cred : "",
-    acceptedHostKeys: usesSsh(f.proto) ? parseFingerprints(f.accepted) : [], legacySsh: usesSsh(f.proto) && f.legacy, ...limits(f),
+    acceptedHostKeys: usesSsh(f.proto) ? parseFingerprints(f.accepted) : [], ...sshKeys(f), legacySsh: usesSsh(f.proto) && f.legacy, ...limits(f),
   };
 }

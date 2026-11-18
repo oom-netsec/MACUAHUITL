@@ -11,6 +11,31 @@ export function parseFingerprints(text: string): string[] {
   return [...new Set(out)];
 }
 
+// Huella aceptada atada al equipo que la mostró: lo que el núcleo espera en acceptedHostKeys.
+export interface AcceptedKey { host: string; fingerprint: string }
+
+// La dirección tal como el núcleo la normaliza: sin puerto o con 22 va sola; una IPv6 va entre corchetes.
+export function hostOfTarget(t: { address: string; port?: number }): string {
+  const a = t.address.includes(":") ? `[${t.address}]` : t.address;
+  return t.port && t.port !== 22 ? `${a}:${t.port}` : a;
+}
+
+// Con varios equipos una huella sin equipo no se manda: valdría para cualquiera. Acepta «HUELLA», «EQUIPO=HUELLA» o
+// «EQUIPO:PUERTO=HUELLA» (la sintaxis de mctl --accept), separadas por espacios, comas o punto y coma.
+// Con un solo equipo la huella sola se empareja con él. ambiguous = hay huellas sueltas y no hay un único equipo.
+export function resolveAccepted(text: string, targets: { address: string; port?: number }[]): { keys: AcceptedKey[]; ambiguous: boolean } {
+  const keys: AcceptedKey[] = [];
+  let loose = false;
+  for (const tok of text.split(/[\s,;]+/).filter(Boolean)) {
+    const eq = tok.indexOf("=");
+    const whole = parseFingerprints(tok)[0];
+    if (whole) { loose = true; if (targets.length === 1) keys.push({ host: hostOfTarget(targets[0]), fingerprint: whole }); continue; }
+    const fp = eq > 0 ? parseFingerprints(tok.slice(eq + 1))[0] : undefined;
+    if (fp) keys.push({ host: tok.slice(0, eq), fingerprint: fp });
+  }
+  return { keys, ambiguous: loose && targets.length !== 1 };
+}
+
 // Huella del error del núcleo cuando la llave del equipo es nueva o cambió: del reason (transport.hostkey.*) si viene;
 // si no, del texto, que el núcleo manda en español o en inglés según el idioma de la interfaz.
 export interface HostKeyInfo { fp: string; changed: boolean; keyType?: string; host?: string }

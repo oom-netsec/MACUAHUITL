@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
+import { resolveAccepted } from "../../lib/hostkeys";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
@@ -32,6 +33,8 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
     if (update) req.updateCredentialId = update;
     const accepted = fps.split(/[\s,]+/).filter(Boolean);
     if (accepted.length) req.acceptedHostKeyFingerprints = accepted;
+    const keys = resolveAccepted(fps, [req.target]).keys;
+    if (keys.length) req.acceptedHostKeys = keys;
     setSecret(""); // el secreto no se queda en la pantalla: se manda una vez y se borra
     try {
       setPlan(await core.assistPlanCredRotate(req));

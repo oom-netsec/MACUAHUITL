@@ -11,6 +11,7 @@ export interface SnippetRequest {
   template?: { id: string; values: Record<string, string> };
   writeMemory?: boolean;
   acceptedHostKeyFingerprints?: string[];
+  acceptedHostKeys?: { host: string; fingerprint: string }[];
 }
 
 // Catálogo de plantillas (fase 28b). protojson omite los ceros: min/max/required/pattern/choices/defaultValue/help pueden faltar.
@@ -37,6 +38,7 @@ export interface TemplateSnippetRequest {
   values: Record<string, string>;
   writeMemory?: boolean;
   acceptedHostKeyFingerprints?: string[];
+  acceptedHostKeys?: { host: string; fingerprint: string }[];
 }
 
 export interface SnippetsAPI {

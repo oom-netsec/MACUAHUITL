@@ -171,7 +171,7 @@ test("arranque fallido: estado «No arrancó», motivo de la última fase y Arma
   expect(detail.getByRole("button", { name: "Ejecutar Login Test" })).toBeInTheDocument();
   expect(detail.getByRole("button", { name: "Quitar del historial" })).toBeInTheDocument();
   await userEvent.click(detail.getByRole("button", { name: "Armar trabajo" }));
-  await waitFor(() => expect(armJob).toHaveBeenCalledWith("jf", [], []));
+  await waitFor(() => expect(armJob).toHaveBeenCalledWith("jf", [], [], []));
 });
 
 test("arranque fallido sin motivo: texto de respaldo, sin «: .»; el aviso se oculta mientras se reintenta", async () => {

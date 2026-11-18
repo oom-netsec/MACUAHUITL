@@ -10,7 +10,7 @@ import type { PortStatus } from "../metrics/api";
 import { toFront } from "./front";
 import { FrontPanel } from "./FrontPanel";
 import "./ports.css";
-import { parseFingerprints } from "../../lib/hostkeys";
+import { parseFingerprints, resolveAccepted } from "../../lib/hostkeys";
 
 type Shut = "" | "shut" | "noshut";
 
@@ -26,6 +26,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const [shut, setShut] = useState<Shut>("");
   const [writeMem, setWriteMem] = useState(false);
   const [fps, setFps] = useState("");
+  const pairs = (d: { address: string; port?: number }) => { const acceptedKeys = resolveAccepted(fps, [d]).keys; return acceptedKeys.length ? { acceptedKeys } : {}; };
   const [plan, setPlan] = useState<PortsPlanResult | null>(null);
   const [err, setErr] = useState("");
   const [active, setActive] = useState(false);
@@ -49,6 +50,8 @@ export function PortsView({ core }: { core: CoreAPI }) {
     if (writeMem) req.writeMemory = true;
     const accepted = parseFingerprints(fps);
     if (accepted.length) req.acceptedHostKeyFingerprints = accepted;
+    const keys = resolveAccepted(fps, [req.target]).keys;
+    if (keys.length) req.acceptedHostKeys = keys;
     try {
       setPlan(await core.assistPlanPorts(req));
     } catch (e) {
@@ -69,7 +72,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>
         <div className="actions">
-          <button disabled={!equipo.trim() || !credId || front.busy} aria-busy={front.busy} onClick={() => front.run(() => { const d = targetOf(equipo, credId); return core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps) }); })}>{t("ports.read")}</button>
+          <button disabled={!equipo.trim() || !credId || front.busy} aria-busy={front.busy} onClick={() => front.run(() => { const d = targetOf(equipo, credId); return core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...pairs(d) }); })}>{t("ports.read")}</button>
         </div>
         {front.error && <Notice kind="error">{front.error}</Notice>}
         {front.data?.warnings.map((w) => <Notice key={w} kind="warn">{w}</Notice>)}

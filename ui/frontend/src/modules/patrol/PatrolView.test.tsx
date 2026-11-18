@@ -103,7 +103,7 @@ test("crear y ejecutar el Login Test son pasos separados; armar con avisos", asy
   await userEvent.click(within(row).getByLabelText("Confiar en SHA256:abc"));
   expect(screen.getByText(/permanecerá en memoria/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Armar trabajo" }));
-  await waitFor(() => expect(core.armJob).toHaveBeenCalledWith("j1", ["SHA256:abc"], []));
+  await waitFor(() => expect(core.armJob).toHaveBeenCalledWith("j1", [], [{ host: "10.0.0.1:22", fingerprint: "SHA256:abc" }], []));
   expect(await screen.findByText(/podría suspenderse/)).toBeInTheDocument();
   expect(core.subscribe).toHaveBeenCalledWith(["j1"]);
 });
@@ -649,4 +649,24 @@ test("DeviceGrid marca el búfer como escuchando al montar y lo suelta al desmon
   expect(within(screen.getByRole("row", { name: /10\.0\.0\.8:22/ })).getByText("Completado")).toBeInTheDocument();
   unmount();
   expect(early.live).toBe(false);
+});
+
+// Seguridad: dos equipos pueden mostrar la misma huella; confirmar una no confirma la otra. Cada huella viaja con su equipo.
+test("armar manda solo la huella del equipo confirmado, atada a ese equipo", async () => {
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    listJobs: vi.fn(async () => [{ id: "j1", name: "caso-1", state: "created", phases: [] }]),
+    loginTest: vi.fn(async () => [
+      { target: "10.0.0.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same" },
+      { target: "10.0.0.2:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same" },
+    ]),
+    armJob: vi.fn(async () => ({ windowEndsAt: "2026-11-04T10:00:00Z", missingInhibitors: [] })),
+  });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /caso-1/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "Ejecutar Login Test" }));
+  const row = await screen.findByRole("row", { name: /10\.0\.0\.2:22/ });
+  await userEvent.click(within(row).getByLabelText("Confiar en SHA256:same"));
+  await userEvent.click(screen.getByRole("button", { name: "Armar trabajo" }));
+  await waitFor(() => expect(core.armJob).toHaveBeenCalledWith("j1", [], [{ host: "10.0.0.2:22", fingerprint: "SHA256:same" }], []));
 });

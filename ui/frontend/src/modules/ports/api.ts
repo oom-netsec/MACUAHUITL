@@ -10,6 +10,7 @@ export interface PortsRequest {
   shutdown?: boolean;
   writeMemory?: boolean;
   acceptedHostKeyFingerprints?: string[];
+  acceptedHostKeys?: { host: string; fingerprint: string }[];
 }
 export interface PlanExpect { command: string; line: string; present?: boolean; prefix?: boolean }
 // Un aviso del plan como clave del catálogo del núcleo (assist.note.*) con sus argumentos; mismo orden que notes (fase 30c).

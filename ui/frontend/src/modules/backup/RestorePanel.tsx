@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
+import { resolveAccepted } from "../../lib/hostkeys";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, errorText } from "../../components/Field";
@@ -59,6 +60,8 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
     if (n > 0) req.maxLines = n;
     const accepted = fps.split(/[\s,]+/).filter(Boolean);
     if (accepted.length) req.acceptedHostKeyFingerprints = accepted;
+    const keys = resolveAccepted(fps, [req.target]).keys;
+    if (keys.length) req.acceptedHostKeys = keys;
     try {
       const r = await core.assistPlanRestore(req);
       setRefused(r.refused ?? []);

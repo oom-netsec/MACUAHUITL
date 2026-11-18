@@ -1,5 +1,6 @@
 // Contrato del módulo Respaldos con el puente (ui/bridge/backup.go). Solo lectura: un trabajo de Patrol. Restaurar (fase 16c) planea con el
 // puente del modo asistido (ui/bridge/assist.go) y ejecuta con el contrato de Puertos.
+import type { AcceptedKey } from "../../lib/hostkeys";
 import type { AssistPlan } from "../ports/api";
 
 export interface BackupEntry { id: string; device: string; kind: "running" | "startup"; at: string; bytes: number; sha256?: string; masked: boolean; job?: string; round?: number }
@@ -7,7 +8,7 @@ export interface BackupList { backups: BackupEntry[]; masked: boolean }
 export interface BackupStartRequest {
   targets: { address: string; port: number }[]; credentialId: string; startup: boolean; keep: number;
   // 0 = una sola vez; con intervalo, rounds veces.
-  intervalSeconds: number; rounds: number; secrets: boolean; accept: string[];
+  intervalSeconds: number; rounds: number; secrets: boolean; accept: string[]; acceptedKeys: AcceptedKey[];
 }
 export interface BackupStart { jobId: string; armed: boolean; detail: string }
 export interface BackupCollect { state: string; done: boolean; error?: string; saved: string[]; skipped: number; pruned: number; warnings: string[] }
@@ -24,6 +25,7 @@ export interface RestoreRequest {
   allowPartial?: boolean;
   writeMemory?: boolean;
   acceptedHostKeyFingerprints?: string[];
+  acceptedHostKeys?: { host: string; fingerprint: string }[];
 }
 export interface RestoreRefusal { path?: string; line?: string; why?: string }
 // planId vacío = el plan se rechazó (reason) y refused lista lo que hay que hacer a mano; con planId, refused es lo que el plan parcial deja fuera.
@@ -42,7 +44,7 @@ type Call = <T>(method: string, ...args: unknown[]) => Promise<T>;
 
 export const backupWails = (call: Call): BackupAPI => ({
   assistPlanRestore: async (r) => JSON.parse(await call<string>("AssistPlanRestore", JSON.stringify(r))),
-  backupStart: (r) => call("BackupStart", r.targets, r.credentialId, r.startup, r.keep, r.intervalSeconds, r.rounds, r.secrets, r.accept),
+  backupStart: (r) => call("BackupStart", r.targets, r.credentialId, r.startup, r.keep, r.intervalSeconds, r.rounds, r.secrets, r.accept, r.acceptedKeys),
   backupCollect: async (j) => {
     const r = await call<{ state: string; done: boolean; error: string; json: string }>("BackupCollect", j);
     const rep = r.json ? JSON.parse(r.json) : {};

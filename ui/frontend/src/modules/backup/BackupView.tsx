@@ -19,7 +19,7 @@ import { BackupTimeline } from "./BackupTimeline";
 import { useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import "./backup.css";
-import { parseFingerprints } from "../../lib/hostkeys";
+import { resolveAccepted } from "../../lib/hostkeys";
 
 // Respaldos: running-config (y startup-config) de cada equipo en outputs/respaldos/, con permisos 0600.
 // Respaldar es solo lectura (un trabajo de Patrol). Restaurar (fase 16c) planea desde aquí y ejecuta con el modo asistido.
@@ -61,12 +61,17 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
 
   const scheduled = Number(every) > 0;
   const run = async () => {
-    setErr(""); setNote(null); setBusy(true);
+    setErr(""); setNote(null);
+    const targets = parseTargets(devices).map(parseTarget);
+    // Con varios equipos una huella sin equipo no se manda: valdría para cualquiera. El campo viejo ya no se usa.
+    const keys = resolveAccepted(accept, targets);
+    if (keys.ambiguous) { setErr(t("fps.needHost")); return; }
+    setBusy(true);
     try {
       const st = await core.backupStart({
-        targets: parseTargets(devices).map(parseTarget), credentialId: cred, startup, keep: Number(keep) || 0,
+        targets, credentialId: cred, startup, keep: Number(keep) || 0,
         intervalSeconds: Math.round(Number(every) * 60), rounds: scheduled ? Number(rounds) : 0, secrets,
-        accept: parseFingerprints(accept),
+        accept: [], acceptedKeys: keys.keys,
       });
       if (!st.armed) { setNote({ kind: "warn", text: t("backup.notArmed", { job: st.jobId, detail: st.detail }) }); return; }
       if (scheduled) { setNote({ kind: "info", text: t("backup.scheduled", { job: st.jobId }) }); return; }
@@ -117,7 +122,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
           <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
           {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
-          <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />
+          <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
         </div>
         <div className="actions">
           <button className="primary" disabled={busy || !cred || !devices.trim()} aria-busy={busy} onClick={run}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>

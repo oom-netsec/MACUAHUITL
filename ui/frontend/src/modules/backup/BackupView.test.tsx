@@ -185,3 +185,20 @@ test("una restauración viva retomada muestra el aviso rojo del modo asistido", 
     expect(await screen.findByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
   } finally { localStorage.removeItem("macuahuitl.assist.r7"); }
 });
+
+// Seguridad: con varios equipos una huella sin equipo valdría para cualquiera; no se manda y se pide EQUIPO=HUELLA.
+test("con varios equipos una huella sola no se manda; con EQUIPO=HUELLA sí", async () => {
+  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "Login Test falló" })) });
+  render(<BackupView core={core} pollMs={1} />);
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1 sw2:2222");
+  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
+  await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
+  expect(await screen.findByText(/EQUIPO=HUELLA/)).toBeInTheDocument();
+  expect(core.backupStart).not.toHaveBeenCalled();
+  await userEvent.clear(screen.getByLabelText(/Huellas SHA256 aceptadas/));
+  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "192.0.2.1=SHA256:abc sw2:2222=SHA256:def");
+  await userEvent.click(screen.getByRole("button", { name: "Respaldar ahora" }));
+  await waitFor(() => expect(core.backupStart).toHaveBeenCalledWith(expect.objectContaining({
+    accept: [], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }, { host: "sw2:2222", fingerprint: "SHA256:def" }],
+  })));
+});
