@@ -1,8 +1,8 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useBatch } from "../../lib/useBatch";
 import { showHidden, stripAnsi } from "../../lib/safeText";
 import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "../../lib/core";
-import { Field, Notice, Select, errorText } from "../../components/Field";
+import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { Icon } from "../../components/Icon";
@@ -35,6 +35,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [hops, setHops] = useState("30");
   const [ports, setPorts] = useState("");
   const [scan, setScan] = useState<"connect" | "syn" | "udp" | "ping">("connect");
+  const [skipDisc, setSkipDisc] = useState(false);
+  const pnWhy = useId();
   const [mode, setMode] = useState<"client" | "server">("client");
   const [seconds, setSeconds] = useState("10");
   const [iface, setIface] = useState("any");
@@ -113,7 +115,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     switch (tool) {
       case "ping": Object.assign(options, ping.options); targets = [target]; setStoppable(!!(ping.options.continuous || ping.options.duration)); setFam((ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?")); setInterval_(Number(ping.options.interval) || 1); break;
       case "traceroute": options.max_hops = hops; targets = [target]; break;
-      case "nmap": options.scan = scan; if (ports) options.ports = ports; targets = [target]; break;
+      case "nmap": options.scan = scan; if (ports) options.ports = ports; if (skipDisc && scan !== "ping") options.skip_discovery = "true"; targets = [target]; break; // -Pn con scan=ping: diag.err.skip_with_ping
       case "iperf3": options.mode = mode; if (mode === "client") { options.seconds = seconds; targets = [target]; } else { options.bind = bindIP; options.port = port; } break;
       case "pcap": options.interface = iface; options.seconds = seconds; if (filter) options.filter = filter; break;
     }
@@ -165,6 +167,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
           options={([["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]] as [typeof scan, string][])
             .filter(([v]) => v !== "syn" || !isWindows())} />
       )}
+      {tool === "nmap" && <Check label={t("diag.skipDiscovery")} checked={skipDisc && scan !== "ping"} onChange={setSkipDisc} disabled={scan === "ping"} describedBy={scan === "ping" ? pnWhy : undefined} />}
+      {tool === "nmap" && scan === "ping" && <p className="hint" id={pnWhy}>{t("diag.skipDiscovery.ping")}</p>}
       {tool === "pcap" && (
         <>
           <div className="field-row">

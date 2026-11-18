@@ -392,3 +392,20 @@ test("500 líneas seguidas llegan en orden y done no pierde las pendientes del l
   expect(rows[499]).toBe("fila-499");
   expect(await screen.findByText(/Listo|Terminó|código/i)).toBeInTheDocument();
 });
+
+// 43e-4: -Pn para hosts que no responden al descubrimiento (el núcleo sugiere la opción con 0 hosts up).
+test("nmap: «Omitir descubrimiento (-Pn)» manda skip_discovery; con scan=ping se deshabilita y no se manda", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="nmap" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  const pn = screen.getByLabelText("Omitir descubrimiento de hosts (-Pn)");
+  await userEvent.click(pn);
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "connect", skip_discovery: "true" }));
+  await userEvent.selectOptions(screen.getByLabelText("Tipo de escaneo"), "ping");
+  expect(pn).toBeDisabled();
+  expect(pn).toHaveAccessibleDescription("No aplica con «Solo descubrimiento de hosts».");
+  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0 }));
+  await userEvent.click(await screen.findByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "ping" }));
+});
