@@ -221,9 +221,7 @@ export const es = {
   "patrol.commands.hint": "Un comando por línea.",
   "patrol.outDir": "Carpeta de salida",
   "patrol.interval": "Intervalo (minutos)",
-  "patrol.interval.hint": "0: una sola ronda.",
   "patrol.cron": "Expresión cron",
-  "patrol.cron.hint": "Opcional. Reemplaza al intervalo.",
   "patrol.rounds": "Rondas",
   "patrol.rounds.hint": "0: hasta el fin de la ventana.",
   "patrol.window": "Ventana (horas)",
@@ -3104,6 +3102,13 @@ export const es = {
   "visibility.snmp.mode.query": "Consulta puntual",
   "visibility.snmp.mode.poll": "Sondeo continuo",
   "visibility.snmp.mode.locked": "Detén el sondeo para cambiar de opción.",
+  "patrol.sched.mode": "¿Cuándo corre?",
+  "patrol.sched.once": "Una vez",
+  "patrol.sched.repeat": "Repetir",
+  "patrol.sched.kind": "Repetir con",
+  "patrol.sched.every": "Cada N minutos",
+  "patrol.missing.interval": "intervalo en minutos (mayor que 0)",
+  "patrol.missing.cron": "expresión cron",
 };
 
 export type Key = keyof typeof es;

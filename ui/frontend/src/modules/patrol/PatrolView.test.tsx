@@ -462,6 +462,7 @@ test("el rechazo de la carpeta de salida se ve traducido, con la orden chmod", a
 test("Rondas vacío o no entero no crea el trabajo (0 significa hasta el fin de la ventana y debe ser explícito)", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
   await userEvent.clear(screen.getByLabelText("Rondas"));
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   expect(await screen.findByText("Escribe un entero de 0 en adelante (0: hasta el fin de la ventana).")).toBeInTheDocument();
@@ -678,6 +679,7 @@ test("las opciones de salida, ventana y seguridad van plegadas; cuentan los camb
   const det = mask.closest("details")!;
   expect(det.open).toBe(false);
   for (const l of ["Archivos de salida", "Empaquetado .zip", /Eliminar archivos sueltos/, /Ventana/, /Aceptar llaves de host/]) expect(det).toContainElement(screen.getByLabelText(l));
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
   for (const l of ["Nombre del trabajo", "Carpeta de salida", /Intervalo/, "Rondas"]) expect(det).not.toContainElement(screen.getByLabelText(l));
   expect(det.querySelector("summary")).toHaveTextContent(/^Opciones avanzadas$/);
   await userEvent.click(mask);
@@ -686,4 +688,63 @@ test("las opciones de salida, ventana y seguridad van plegadas; cuentan los camb
   expect(det.open).toBe(false);
   for (const a of screen.getAllByRole("alert")) expect(det).not.toContainElement(a);
   expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(2);
+});
+
+// PR 6: «Una vez» / «Repetir» y, dentro, «Cada N minutos» / «Expresión cron»; lo oculto no viaja.
+const sched = () => vi.mocked(createJobOf).mock.calls.at(-1)![0].schedule;
+let createJobOf: ReturnType<typeof fakeCore>["createJob"];
+const crear = async () => {
+  const n = vi.mocked(createJobOf).mock.calls.length;
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  await waitFor(() => expect(createJobOf).toHaveBeenCalledTimes(n + 1));
+};
+
+test("programación: por omisión es una sola ronda y no se ven intervalo, cron ni rondas", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  createJobOf = core.createJob;
+  await fillForm(core);
+  expect(screen.getByRole("radio", { name: "Una vez" })).toBeChecked();
+  for (const l of [/Intervalo/, "Rondas"]) expect(screen.queryByLabelText(l)).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "Expresión cron" })).toBeNull();
+  await crear();
+  expect(sched()).toEqual({ intervalSeconds: 0, rounds: 1 });
+});
+
+test("programación: Repetir por intervalo no manda cron y por cron no manda intervalo; lo escrito se conserva", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  createJobOf = core.createJob;
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  expect(screen.getByRole("radio", { name: "Cada N minutos" })).toBeChecked();
+  expect(screen.queryByRole("textbox", { name: "Expresión cron" })).toBeNull();
+  await userEvent.clear(screen.getByLabelText("Intervalo (minutos)"));
+  await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), "15");
+  await userEvent.clear(screen.getByLabelText("Rondas"));
+  await userEvent.type(screen.getByLabelText("Rondas"), "3");
+  await userEvent.click(screen.getByRole("radio", { name: "Expresión cron" }));
+  expect(screen.queryByLabelText("Intervalo (minutos)")).toBeNull();
+  await userEvent.type(screen.getByRole("textbox", { name: "Expresión cron" }), "*/5 * * * *");
+  await crear();
+  expect(sched()).toEqual({ cron: "*/5 * * * *", rounds: 3 });
+  await userEvent.click(screen.getByRole("radio", { name: "Cada N minutos" }));
+  expect(screen.getByLabelText("Intervalo (minutos)")).toHaveValue(15); // se conserva
+  await crear();
+  expect(sched()).toEqual({ intervalSeconds: 900, rounds: 3 });
+  await userEvent.click(screen.getByRole("radio", { name: "Una vez" })); // lo oculto no se envía
+  await crear();
+  expect(sched()).toEqual({ intervalSeconds: 0, rounds: 1 });
+});
+
+test("programación: Repetir sin cron o sin intervalo positivo no crea el trabajo y lo nombra", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  await userEvent.clear(screen.getByLabelText("Intervalo (minutos)"));
+  await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), "0");
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  expect(await screen.findByText(/Datos incompletos: .*intervalo en minutos/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("radio", { name: "Expresión cron" }));
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  expect(await screen.findByText(/Datos incompletos: .*expresión cron/)).toBeInTheDocument();
+  expect(core.createJob).not.toHaveBeenCalled();
 });
