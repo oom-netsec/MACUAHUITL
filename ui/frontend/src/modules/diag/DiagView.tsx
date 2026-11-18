@@ -7,7 +7,7 @@ import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
-import { Icon } from "../../components/Icon";
+import { CopyButton } from "../../components/Data";
 import { ModuleIdContext, useBusy, useInbox, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { outputsErrorText } from "../../lib/outputsError";
@@ -50,7 +50,6 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [runId, setRunId] = useState("");
   const [lines, setLines] = useState<string[]>([]);
   const [result, setResult] = useState<{ ok: boolean; text: string; code?: number; path?: string; canceled?: boolean } | null>(null);
-  const [copied, setCopied] = useState(false);
   const [t0, setT0] = useState(0); // inicio de la ejecución en segundos Unix: eje de tiempo de las gráficas
   const [err, setErr] = useState("");
   // Eventos que llegan antes de conocer el ID de la ejecución (un fallo inmediato, la primera línea).
@@ -144,7 +143,6 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const stop = () => core.diagStop(runId).catch((e) => { if (!/NotFound/.test(`${errInfo(e)?.code ?? ""} ${String(e)}`)) setErr(errorText(e)); });
   const cancel = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));
 
-  const copy = async () => { try { await core.copyText(lines.join("\n")); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const status = runId ? { tone: "info" as const, label: t("diag.status.running") }
     : result?.canceled ? { tone: "" as const, label: t("diag.status.canceled") }
     : result ? (result.ok ? { tone: "ok" as const, label: t("diag.status.done") } : { tone: "bad" as const, label: t("diag.status.failed") }) : undefined;
@@ -208,7 +206,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
           meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : result?.canceled ? result.text : undefined}
           actions={<>
             {tool === "pcap" && result?.ok && result.path && <button className="primary sm" onClick={() => go("pcap", result.path)}>{t("diag.analyze")}</button>}
-            <button className="quiet sm" disabled={!lines.length} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
+            {lines.length > 0 && <CopyButton value={lines.join("\n")} label={t("common.output")} />}
             <button className="quiet sm" disabled={!lines.length || !!runId} onClick={() => setLines([])}>{t("common.clear")}</button>
           </>}>
           <Terminal text={lines.join("\n")} role="log" aria-label={t("common.output")} />

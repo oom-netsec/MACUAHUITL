@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CoreAPI, SyslogEvent } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, useResult } from "../../components/Page";
-import { Icon } from "../../components/Icon";
+import { CopyButton } from "../../components/Data";
 import { Terminal } from "../../components/Terminal";
 import { useBusy, useInbox } from "../../app/activity";
 import { useT } from "../../lib/i18n";
@@ -30,13 +30,11 @@ import "./tools.css";
 // view: vista gráfica del texto (null si no se reconoce el formato); el texto completo queda en la terminal.
 // El informe estructurado (rep) va dentro del resultado: comparte el seq de useResult y una respuesta vieja no deja datos de otra corrida.
 type Out<R = undefined> = { text: string; rep?: R };
-function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r: ReturnType<typeof useResult<Out<R>>>; empty: ReactNode; view?: (out: Out<R>) => ReactNode }) {
+function TextResult<R = undefined>({ r, empty, view }: { r: ReturnType<typeof useResult<Out<R>>>; empty: ReactNode; view?: (out: Out<R>) => ReactNode }) {
   const t = useT();
-  const [copied, setCopied] = useState(false);
   if (!r.busy && !r.data?.text && !r.error) return <>{empty}</>;
   const status = r.busy ? { tone: "info" as const, label: t("diag.status.running") }
     : r.error ? { tone: "bad" as const, label: t("diag.status.failed") } : { tone: "ok" as const, label: t("diag.status.done") };
-  const copy = async () => { try { await core.copyText(r.data?.text ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const extra = r.data && view ? view(r.data) : null;
   const title = t(extra ? "tools.fullReport" : "common.output");
   return (
@@ -44,7 +42,7 @@ function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r:
     {extra}
     <ResultPanel title={title} status={status} error={r.error}
       actions={<>
-        <button className="quiet sm" disabled={!r.data?.text} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
+        {r.data?.text && <CopyButton value={r.data.text} label={title} />}
         <button className="quiet sm" disabled={r.busy} onClick={r.reset}>{t("common.clear")}</button>
       </>}>
       <Terminal text={r.data?.text ?? ""} role="log" aria-label={title} />
@@ -76,7 +74,7 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
       <div className="actions">
         <button className="primary" disabled={!path || r.busy} aria-busy={r.busy} onClick={() => r.run(run)}>{t("pcap.analyze")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={({ text, rep }) => { const p = rep ? pcapFromReport(rep) : parsePcap(text); return p && <PcapReport p={p} />; }}
+      <TextResult r={r} view={({ text, rep }) => { const p = rep ? pcapFromReport(rep) : parsePcap(text); return p && <PcapReport p={p} />; }}
         empty={<EmptyState icon="pulse" title={t("pcap.empty.title")}>{t("pcap.empty")}</EmptyState>} />
     </Page>
   );
@@ -128,7 +126,7 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
             return d?.text ? { text: d.text, rep: d } : { text: await core.toolsDns(req) };
           })}>{t("dns.query")}</RunButton>
       </div>
-      <TextResult core={core} r={r} view={({ text, rep }) => {
+      <TextResult r={r} view={({ text, rep }) => {
         const tr = mode === "trace" ? parseTrace(rep ? rep.json : text) : null;
         return tr && <DnsTree trace={tr} />; // los Warnings del json ya vienen en el idioma pedido (30d); la traza no trae findings
       }}
@@ -161,7 +159,7 @@ export function TlsPanel({ core }: { core: CoreAPI }) {
           return d?.text ? { text: d.text, rep: d } : { text: await core.toolsTls(host, p, sni) };
         })}>{t("tls.inspect")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={({ text, rep }) => { const i = parseTls(rep ? rep.json : text); return i && <TlsChain info={rep ? { ...i, verifyCode: rep.verifyCode } : i} />; }}
+      <TextResult r={r} view={({ text, rep }) => { const i = parseTls(rep ? rep.json : text); return i && <TlsChain info={rep ? { ...i, verifyCode: rep.verifyCode } : i} />; }}
         empty={<EmptyState icon="pulse" title={t("tls.empty.title")}>{t("tls.empty")}</EmptyState>} />
     </Page>
   );

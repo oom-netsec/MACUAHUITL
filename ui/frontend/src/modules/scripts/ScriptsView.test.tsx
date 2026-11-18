@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ScriptsView } from "./ScriptsView";
 import { fakeCore } from "../../lib/fake";
-import { NavContext } from "../../app/activity";
+import { CoreContext, NavContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 import { sampleImport, sampleScripts } from "./fake";
 import { encodeInsert } from "./text";
 
@@ -11,7 +12,7 @@ const OSPF = sampleScripts[2];
 function setup(over = {}) {
   const core = fakeCore(over);
   const go = vi.fn();
-  render(<NavContext.Provider value={{ go, inbox: {} }}><ScriptsView core={core} /></NavContext.Provider>);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><NavContext.Provider value={{ go, inbox: {} }}><ScriptsView core={core} /></NavContext.Provider></CoreContext.Provider>);
   return { core, go };
 }
 const rows = () => within(screen.getByRole("list", { name: "Scripts" })).getAllByRole("listitem");
@@ -234,8 +235,8 @@ test("un script de configuración de varias líneas no se envía: ofrece Copiar 
   await open("Config · VLAN y puerto de acceso");
   expect(screen.queryByRole("button", { name: "Enviar a la terminal" })).not.toBeInTheDocument();
   expect(screen.getByText(/Los scripts de configuración no se envían a la terminal: cada salto de línea ejecutaría una línea\. Aplícalos con un snippet en modo asistido o pégalos tú\./)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Copiar" }));
-  expect(core.copyText).toHaveBeenCalledWith("configure terminal\nvlan 10\nend");
+  await userEvent.click(screen.getByRole("button", { name: "Copiar los comandos de Config · VLAN y puerto de acceso" }));
+  await waitFor(() => expect(core.copyText).toHaveBeenCalledWith("configure terminal\nvlan 10\nend"));
   expect(go).not.toHaveBeenCalled();
 });
 

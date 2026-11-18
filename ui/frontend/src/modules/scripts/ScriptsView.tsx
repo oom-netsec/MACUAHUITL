@@ -156,9 +156,8 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
             <ResultPanel title={showHidden(sel.name)} pad
               actions={
                 <>
-                  {needsCopy(sel)
-                    ? <button type="button" className="sm" onClick={() => run(async () => { await core.copyText(sel.commands.join("\n")); setMsg(t("common.copied")); })}><Icon name="copy" />{t("scripts.copy")}</button>
-                    : <button type="button" className="sm" title={t("scripts.sendHint")} onClick={() => go("terminal", encodeInsert({ name: sel.name, text: scriptText(sel.commands), readOnly: sel.readOnly }), "terminal-insert")}><Icon name="terminal" />{t("scripts.send")}</button>}
+                  {!needsCopy(sel) &&
+                    <button type="button" className="sm" title={t("scripts.sendHint")} onClick={() => go("terminal", encodeInsert({ name: sel.name, text: scriptText(sel.commands), readOnly: sel.readOnly }), "terminal-insert")}><Icon name="terminal" />{t("scripts.send")}</button>}
                   <button type="button" className="sm" onClick={() => duplicate(sel)}>{t("scripts.dup")}</button>
                   {sel.origin === "usuario" && (
                     <>

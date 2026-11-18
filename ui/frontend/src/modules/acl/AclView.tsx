@@ -3,7 +3,6 @@ import { RunButton } from "../../components/RunButton";
 import type { Acl, AclFinding, CoreAPI } from "../../lib/core";
 import { Notice, Select, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, useResult } from "../../components/Page";
-import { Icon } from "../../components/Icon";
 import { CopyButton } from "../../components/Data";
 import { ExportMenu } from "../../components/Files";
 import { tableCsv, tableMarkdown } from "../../lib/tableExport";
@@ -27,7 +26,6 @@ export function AclView({ core }: { core: CoreAPI }) {
   const [from, setFrom] = useState("ios-xe");
   const [to, setTo] = useState("nx-os");
   const [text, setText] = useState("");
-  const [copied, setCopied] = useState(false);
   const imp = useResult<{ acl: Acl; findings: AclFinding[] }>();
   const gen = useResult<string>();
   const busy = imp.busy || gen.busy;
@@ -48,7 +46,6 @@ export function AclView({ core }: { core: CoreAPI }) {
     return [String(i + 1), r.action, r.protocol, r.source, r.sourcePorts, r.destination, opts(r), f ? `${kind(f.kind)}: ${f.detail}` : ""];
   }) ?? [];
   const exportHead = ["#", t("acl.col.action"), t("acl.col.proto"), t("acl.col.src"), t("acl.col.srcPorts"), t("acl.col.dst"), t("acl.col.dstPorts"), t("acl.col.finding")];
-  const copy = async () => { try { await core.copyText(gen.data ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
 
   return (
     <Page title={t("acl.title")} description={t("acl.desc")}>
@@ -96,7 +93,7 @@ export function AclView({ core }: { core: CoreAPI }) {
           {(gen.data || gen.error) && (
             <ResultPanel title={t("acl.result")} error={gen.error}
               actions={<>
-                <button className="quiet sm" disabled={!gen.data} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
+                {gen.data && <CopyButton value={gen.data} label={t("acl.result")} />}
                 <button className="quiet sm" onClick={gen.reset}>{t("common.clear")}</button>
               </>}>
               <Terminal text={gen.data ?? ""} role="log" aria-label={t("acl.result")} />

@@ -1,3 +1,5 @@
+import { CoreContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CleanerView } from "./CleanerView";
@@ -11,7 +13,7 @@ const result = {
 
 test("limpia, muestra el informe, las huérfanas y el resultado", async () => {
   const core = fakeCore({ cleanerRun: vi.fn(async () => result) });
-  render(<CleanerView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><CleanerView core={core} /></CoreContext.Provider>);
   expect(screen.getByRole("button", { name: "Limpiar" })).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Configuración"), "hostname R1");
   await userEvent.click(screen.getByLabelText(/Ordenar interfaces/));
@@ -21,13 +23,13 @@ test("limpia, muestra el informe, las huérfanas y el resultado", async () => {
   expect(screen.getByText("ACL IN-FALTA no existe (ip access-group)", { selector: "td" })).toBeInTheDocument();
   // El resultado va en una terminal (solo lectura): el texto completo, sin recortar.
   expect(screen.getByRole("log", { name: "Resultado" }).textContent).toBe(result.output);
-  await userEvent.click(screen.getByRole("button", { name: "Copiar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Copiar Resultado" }));
   expect(core.copyText).toHaveBeenCalledWith(result.output);
 });
 
 test("el error del núcleo se muestra como alerta", async () => {
   const core = fakeCore({ cleanerRun: vi.fn(async () => { throw new Error("rpc error: code = InvalidArgument desc = falta la configuración"); }) });
-  render(<CleanerView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><CleanerView core={core} /></CoreContext.Provider>);
   await userEvent.type(screen.getByLabelText("Configuración"), "x");
   await userEvent.click(screen.getByRole("button", { name: "Limpiar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("falta la configuración");
