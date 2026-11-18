@@ -63,6 +63,9 @@ func resolve(p string) string {
 // resolveDir es la parte de CheckOutputs que no mira permisos ni dueño: ruta absoluta sin «..», enlaces resueltos, carpeta real,
 // ni raíz, ni HOME, ni /tmp, ni dentro de (ni conteniendo a) una carpeta reservada. Devuelve la ruta resuelta.
 func resolveDir(dir string, st *CoreSettings) (string, error) {
+	if dir == "" {
+		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
+	}
 	// Una relativa simple (sin barra inicial ni «X:») conserva su motivo propio.
 	if !strings.ContainsAny(dir[:1], `\/`) && !(len(dir) > 1 && dir[1] == ':') && !filepath.IsAbs(dir) {
 		return "", outputsErr("prefs.outputs.relativa", "dir", dir)

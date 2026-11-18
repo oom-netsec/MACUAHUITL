@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"google.golang.org/grpc/codes"
 
@@ -13,11 +14,13 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
+var jobIDRe = regexp.MustCompile(`^[0-9a-f]{16}$`) // lo que genera NewID
+
 // CheckRunDir valida la carpeta de una corrida que el cliente nombra en vez de un id de trabajo (el trabajo ya se quitó del
 // historial). Acepta una ruta arbitraria, así que es estricta: absoluta y sin «..», con los enlaces resueltos, fuera de las
 // carpetas reservadas (la misma regla que CheckOutputs), dentro de Outputs() o de las raíces de los trabajos (JobOutputRoots)
 // y con el manifest.json de la corrida, que prueba que terminó. Devuelve la ruta real y el id del trabajo que dice el manifest
-// (vacío en una corrida vieja que no lo trae).
+// (vacío en una corrida vieja que no lo trae, o si el id no es de fiar).
 func CheckRunDir(ctx context.Context, d Deps, dir string) (real, jobID string, err error) {
 	if real, err = resolveDir(dir, d.Settings()); err != nil {
 		return "", "", ErrFrom(ctx, codes.InvalidArgument, err)
@@ -36,7 +39,13 @@ func CheckRunDir(ctx context.Context, d Deps, dir string) (real, jobID string, e
 	if fi, e := os.Lstat(mp); e != nil || !fi.Mode().IsRegular() {
 		return "", "", Err(ctx, codes.InvalidArgument, "backup.err.dir_sin_manifest", i18n.A("dir", real))
 	}
-	f, e := sys.OpenRegular(mp)
+	// Se abre dentro de la carpeta (os.Root): un enlace cambiado tras el Lstat no puede salir de ella.
+	root, e := os.OpenRoot(real)
+	if e != nil {
+		return "", "", Err(ctx, codes.InvalidArgument, "backup.err.dir_sin_manifest", i18n.A("dir", real))
+	}
+	defer root.Close()
+	f, e := sys.OpenRegularIn(root, "manifest.json")
 	if e != nil {
 		return "", "", Err(ctx, codes.InvalidArgument, "backup.err.dir_sin_manifest", i18n.A("dir", real))
 	}
@@ -46,6 +55,13 @@ func CheckRunDir(ctx context.Context, d Deps, dir string) (real, jobID string, e
 	}
 	if json.NewDecoder(io.LimitReader(f, 8<<20)).Decode(&m) != nil {
 		return "", "", Err(ctx, codes.InvalidArgument, "backup.err.dir_sin_manifest", i18n.A("dir", real))
+	}
+	// El id solo rotula los respaldos: con otro formato que el de NewID, o siendo el de un trabajo que el núcleo conoce, no se usa.
+	if !jobIDRe.MatchString(m.JobID) {
+		return real, "", nil
+	}
+	if _, err := d.Job(ctx, m.JobID); err == nil {
+		return real, "", nil
 	}
 	return real, m.JobID, nil
 }

@@ -5,6 +5,8 @@ package backup
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -427,6 +429,10 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int, dir
 		if at.IsZero() {
 			at = s.d.Now()
 		}
+		if dir != "" && guardadoPorOtro(st, sec.Device, kind, at, sec.Text, job) {
+			res.Skipped++
+			continue
+		}
 		e, created, err := st.Save(backup.Entry{Device: sec.Device, Kind: kind, At: at, Masked: mk, Job: job, Round: sec.Round,
 			Serial: serials[[2]string{sec.Device, strconv.Itoa(sec.Round)}], Truncated: sec.Truncated}, sec.Text)
 		if err != nil {
@@ -619,4 +625,18 @@ func (m Module) Register(r ipc.Registrar, d service.Deps) {
 		m.Pinned(s.pinned)
 	}
 	v1.RegisterBackupServiceServer(r, s)
+}
+
+// guardadoPorOtro: ya hay un respaldo del mismo equipo, tipo, segundo y texto rotulado con otro trabajo. Pasa al recolectar por
+// carpeta una corrida sin job_id que ya se había recolectado por su id (Store.Save deduplica por trabajo y ronda y la duplicaría).
+func guardadoPorOtro(st backup.Store, device string, kind backup.Kind, at time.Time, text, job string) bool {
+	es, err := st.List(backup.Sanitize(device))
+	if err != nil {
+		return false
+	}
+	sum := sha256.Sum256([]byte(text))
+	h, at := hex.EncodeToString(sum[:]), at.UTC().Truncate(time.Second)
+	return slices.ContainsFunc(es, func(e backup.Entry) bool {
+		return e.Kind == kind && e.At.Equal(at) && e.SHA256 == h && e.Job != job
+	})
 }
