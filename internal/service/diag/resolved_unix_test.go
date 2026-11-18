@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -61,5 +62,49 @@ func TestRunResolved(t *testing.T) {
 	st = corre(t, v1.DiagTool_DIAG_TOOL_PING, "mdns.local", func(context.Context, string, string) ([]netip.Addr, error) { return nil, os.ErrNotExist })
 	if st.ev[0].GetResolved() != nil {
 		t.Errorf("no debía haber resolved")
+	}
+}
+
+func TestRunNombreInvalidoNoResuelve(t *testing.T) {
+	for _, n := range []string{"a_b.example", "-c", "x\nAUDIT forged"} {
+		llamado := false
+		old := resolve.Lookup
+		resolve.Lookup = func(context.Context, string, string) ([]netip.Addr, error) { llamado = true; return nil, nil }
+		d := servicetest.New(t)
+		st := &eventos{fakeRun: fakeRun{ctx: context.Background()}}
+		err := (&diagSvc{d: d}).Run(&v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: n}}}, st)
+		resolve.Lookup = old
+		if err == nil || llamado {
+			t.Errorf("%q: err=%v lookup llamado=%v", n, err, llamado)
+		}
+	}
+}
+
+func TestRunAuditaResolvedCitado(t *testing.T) {
+	ok := func(context.Context, string, string) ([]netip.Addr, error) {
+		return []netip.Addr{netip.MustParseAddr("192.0.2.1")}, nil
+	}
+	old := resolve.Lookup
+	resolve.Lookup = ok
+	defer func() { resolve.Lookup = old }()
+	bin := filepath.Join(t.TempDir(), "x")
+	os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755)
+	d := servicetest.New(t)
+	d.Look = func(string) (string, error) { return bin, nil }
+	st := &eventos{fakeRun: fakeRun{ctx: context.Background()}}
+	if err := (&diagSvc{d: d}).Run(&v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: "sw1.example"}}}, st); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(d.AuditText(), `resolved=\"sw1.example\"→192.0.2.1`) {
+		t.Errorf("auditoría sin resolved citado: %s", d.AuditText())
+	}
+}
+
+func TestRunTracerouteLinuxPrefiereV4(t *testing.T) {
+	dual := func(context.Context, string, string) ([]netip.Addr, error) {
+		return []netip.Addr{netip.MustParseAddr("2001:db8::1"), netip.MustParseAddr("192.0.2.1")}, nil
+	}
+	if r := corre(t, v1.DiagTool_DIAG_TOOL_TRACEROUTE, "sw1.example", dual).ev[0].GetResolved(); runtime.GOOS != "windows" && r.GetIp() != "192.0.2.1" {
+		t.Errorf("traceroute con doble pila: %v", r)
 	}
 }

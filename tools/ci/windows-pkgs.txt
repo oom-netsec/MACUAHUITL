@@ -58,6 +58,7 @@
 ./internal/diag/ingest
 ./internal/diag/listen
 ./internal/diag/radiustest
+./internal/diag/resolve
 ./internal/diag/serialcon
 ./internal/diag/snmp
 ./internal/diag/snmp/snmptest

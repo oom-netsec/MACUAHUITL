@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -80,10 +81,14 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	} else {
 		req.OutputDir = dir
 	}
+	// Primero se valida todo con el nombre (target, hostRe): a la red solo llega lo que ya pasó la validación.
+	if _, _, err := diag.Build(req); err != nil {
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
+	}
 	// Se resuelve una sola vez y la herramienta recibe la IP: la que se informa es la que se usa.
 	var resolved *v1.ResolvedTarget
 	if (tool == diag.Ping || tool == diag.Traceroute) && len(req.Targets) == 1 {
-		if ip, ok := resolve.Target(st.Context(), req.Targets[0], req.Options["family"]); ok {
+		if ip, ok := resolve.Target(st.Context(), req.Targets[0], req.Options["family"], preferV4(tool, req.Options, runtime.GOOS)); ok {
 			fam := "ipv4"
 			if a, _ := netip.ParseAddr(ip); a.Is6() {
 				fam = "ipv6"
@@ -107,7 +112,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	}
 	auditSweep := sweep
 	if resolved != nil {
-		auditSweep += fmt.Sprintf(" resolved=%s→%s", resolved.Name, resolved.Ip)
+		auditSweep += fmt.Sprintf(" resolved=%q→%s", resolved.Name, resolved.Ip)
 	}
 	id, live := service.NewID(), &liveRun{stop: make(chan struct{})}
 	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q%s", id, bin, argv, auditSweep))
@@ -181,4 +186,14 @@ func avisoNmap(loc string, tool diag.Tool, opts map[string]string, line string) 
 		return ""
 	}
 	return i18n.Msg(loc, "diag.warn.zero_up", nil)
+}
+
+// preferV4 dice si hay que tomar la primera v4 y no la primera según RFC 6724, para no cambiar lo que cada herramienta
+// habría elegido con el nombre: el traceroute de Linux prefiere IPv4 y ping.exe -f (df) solo vale para IPv4.
+// tracert y ping sin df en Windows, y ping en Linux, toman la primera tal cual.
+func preferV4(tool diag.Tool, o map[string]string, goos string) bool {
+	if goos == "windows" {
+		return tool == diag.Ping && o["df"] == "true"
+	}
+	return tool == diag.Traceroute
 }
