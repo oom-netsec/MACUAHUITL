@@ -120,7 +120,7 @@ func init() {
 		"mctl.security.csr_written":            e("CSR en {prefix}.csr.pem", "CSR in {prefix}.csr.pem"),
 		"mctl.security.missing_name":           e("falta --name", "--name is missing"),
 		"mctl.security.prompt_seal_ca_key":     e("Contraseña para sellar la llave de la CA: ", "Password to seal the CA key: "),
-		"mctl.security.ca_written":             e("CA en {dir}/ (ca.crt.pem, ca.key.pem sellada)", "CA in {dir}/ (ca.crt.pem, sealed ca.key.pem)"),
+		"mctl.security.ca_written":             e("CA en {dir} (ca.crt.pem, ca.key.pem sellada)", "CA in {dir} (ca.crt.pem, sealed ca.key.pem)"),
 		"mctl.security.prompt_ca_key_password": e("Contraseña de la llave de la CA: ", "CA key password: "),
 		"mctl.security.cert_written":           e("certificado en {path}", "certificate in {path}"),
 		"mctl.security.prompt_p12_password":    e("Contraseña del PKCS#12: ", "PKCS#12 password: "),

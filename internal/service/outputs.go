@@ -52,6 +52,23 @@ func outputsErr(code string, kv ...any) error {
 	return i18n.New(code, a)
 }
 
+// noExisteErr: la carpeta no existe; en Windows no se habla de permisos 0700 (allí son ACL, que pone el núcleo).
+func noExisteErr(dir string) error {
+	if OutputsGOOS == "windows" {
+		return outputsErr("prefs.outputs.no_existe_win", "dir", dir)
+	}
+	return outputsErr("prefs.outputs.no_existe", "dir", dir)
+}
+
+// causaSistema deja solo la causa de un *fs.PathError (sin «GetFileAttributesEx», «lstat»… ni la ruta, que el mensaje ya trae).
+func causaSistema(err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Err
+	}
+	return err
+}
+
 // resolve sigue los enlaces si puede; si la ruta no existe devuelve la limpia.
 func resolve(p string) string {
 	if r, err := filepath.EvalSymlinks(p); err == nil {
@@ -85,16 +102,16 @@ func resolveDir(dir string, st *CoreSettings) (string, error) {
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return "", outputsErr("prefs.outputs.no_existe", "dir", dir)
+			return "", noExisteErr(dir)
 		}
-		return "", outputsErr("prefs.outputs.ilegible", "dir", dir, "err", err)
+		return "", outputsErr("prefs.outputs.ilegible", "dir", dir, "err", causaSistema(err))
 	}
 	if noLocalDrive(real) { // un enlace o junction puede llevar a una UNC o a una unidad de red aunque dir parezca local
 		return "", outputsErr("prefs.outputs.sin_unidad", "dir", real)
 	}
 	fi, err := os.Stat(real)
 	if err != nil {
-		return "", outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
+		return "", outputsErr("prefs.outputs.ilegible", "dir", real, "err", causaSistema(err))
 	}
 	if !fi.IsDir() {
 		return "", outputsErr("prefs.outputs.no_directorio", "dir", real)
@@ -157,7 +174,7 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		for a := filepath.Dir(real); ; a = filepath.Dir(a) {
 			mode, uid, err := AncestorInfo(a)
 			if err != nil {
-				return "", outputsErr("prefs.outputs.ilegible_ruta", "dir", a, "err", err)
+				return "", outputsErr("prefs.outputs.ilegible_ruta", "dir", a, "err", causaSistema(err))
 			}
 			if mode&0o022 != 0 && uid != uint32(ProcUID()) {
 				return "", outputsErr("prefs.outputs.ancestro_inseguro", "dir", real, "anc", a, "mode", mode, "uid", uid)
@@ -172,7 +189,7 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	}
 	f, err := CreateTemp(real, ".mcw-")
 	if err != nil {
-		return "", outputsErr("prefs.outputs.no_escribible", "dir", real, "err", err)
+		return "", outputsErr("prefs.outputs.no_escribible", "dir", real, "err", causaSistema(err))
 	}
 	f.Close()
 	os.Remove(f.Name())
@@ -193,7 +210,7 @@ func RealAncestorInfo(p string) (os.FileMode, uint32, error) {
 func windowsOutputsErr(real string, err error) error {
 	var pe *sys.PrivateDirError
 	if !errors.As(err, &pe) {
-		return outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
+		return outputsErr("prefs.outputs.ilegible", "dir", real, "err", causaSistema(err))
 	}
 	switch pe.Reason {
 	case sys.PrivateDirLink:

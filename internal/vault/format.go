@@ -3,6 +3,7 @@ package vault
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // Formato de vault.mcv versión 1; ver docs/security/CRYPTO.md.
@@ -110,3 +111,28 @@ func parseFile(b []byte) (header, []rawEntry, error) {
 	}
 	return h, entries, nil
 }
+
+// wrap antepone «vault: » a un error de sistema o de crypto; si el texto ya lo trae (writeAtomicOpt, un centinela)
+// lo deja como está, para que nunca salga «vault: vault:».
+func wrap(err error) error {
+	if strings.HasPrefix(err.Error(), "vault: ") {
+		return err
+	}
+	return fmt.Errorf("vault: %w", err)
+}
+
+// unprefix da un error con el mismo texto sin el «vault: » del frente; conserva la cadena para errors.Is.
+func unprefix(err error) error {
+	if s, ok := strings.CutPrefix(err.Error(), "vault: "); ok {
+		return textErr{s, err}
+	}
+	return err
+}
+
+type textErr struct {
+	s   string
+	err error
+}
+
+func (e textErr) Error() string { return e.s }
+func (e textErr) Unwrap() error { return e.err }

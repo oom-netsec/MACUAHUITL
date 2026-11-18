@@ -190,8 +190,9 @@ func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]stri
 // Regresión: sin idioma, con es o con uno desconocido, los RPC de Patrol devuelven lo mismo que antes del catálogo.
 func TestPatrolRegresionEs(t *testing.T) {
 	base := patrolCasos(t, "es")
-	// login_cerrado_0 trae el error del sistema («connectex: …» en Windows, «connect: connection refused» en Linux)
-	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base, "login_cerrado_0")
+	// login_cerrado_0 trae el error del sistema («connectex: …» en Windows, «connect: connection refused» en Linux);
+	// crear_salida_no_dir en Windows dice «créala primero» (sin 0700, prefs.outputs.no_existe_win)
+	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base, "login_cerrado_0", "crear_salida_no_dir")
 	fb := failingRun(t, "es", false)
 	i18ntest.Golden(t, "testdata/patrol_parcial_es.golden.json", fb)
 	ff := failingRun(t, "es", true)

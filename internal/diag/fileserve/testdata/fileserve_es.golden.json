@@ -15,7 +15,7 @@
  "dir_archivo": "fileserve: \u003cdir\u003e/f.txt no es una carpeta",
  "dir_enlace": "fileserve: \u003cdir\u003e/enlace es un enlace simbólico; indica la ruta real de la carpeta",
  "dir_home": "fileserve: tu carpeta personal completa no se puede usar (tiene los archivos que el shell y el escritorio cargan solos): elige una subcarpeta",
- "dir_no_existe": "fileserve: la carpeta no existe o no se puede leer: lstat \u003cdir\u003e/no: no such file or directory",
+ "dir_no_existe": "fileserve: la carpeta no existe o no se puede leer: no such file or directory",
  "dir_raiz": "fileserve: la carpeta raíz no se puede usar: elige otra",
  "dir_relativa": "fileserve: la carpeta \"rel\" debe ser una ruta absoluta",
  "dir_sensible": "fileserve: la carpeta /etc es sensible (/etc): elige otra",

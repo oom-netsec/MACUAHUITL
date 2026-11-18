@@ -323,6 +323,9 @@ func pkiCaInit(c *cli.Env, args []string) error {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.Report.Text)
+	if a, err := filepath.Abs(dir); err == nil {
+		dir = a // Abs ya limpia: separadores de un solo tipo
+	}
 	fmt.Fprintln(c.Out, cli.T("mctl.security.ca_written", "dir", dir))
 	return nil
 }

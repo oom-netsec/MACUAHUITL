@@ -2,7 +2,6 @@ package vault
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -108,7 +107,7 @@ func WriteBackupKeys(src *Vault, dst string, phrase []byte, overwrite bool) (int
 	}
 	dir, err := os.MkdirTemp(filepath.Dir(dst), ".respaldo-*") // 0700; se lleva también el .bak de la bóveda temporal
 	if err != nil {
-		return 0, 0, false, fmt.Errorf("vault: %w", err)
+		return 0, 0, false, wrap(err)
 	}
 	defer os.RemoveAll(dir)
 	tmp := filepath.Join(dir, "respaldo.mcvault")
@@ -179,7 +178,7 @@ func place(tmp, dst string, overwrite bool) error {
 			return ErrBackupExists
 		}
 		if err != nil {
-			return fmt.Errorf("vault: %w", err)
+			return wrap(err)
 		}
 		f.Close()
 		reserved = true
@@ -190,7 +189,7 @@ func place(tmp, dst string, overwrite bool) error {
 		if reserved {
 			os.Remove(dst)
 		}
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	return nil
 }
@@ -204,7 +203,7 @@ func OpenBackup(path string, phrase []byte) (*Vault, error) {
 		return nil, ErrNotBackup
 	}
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	defer f.Close()
 	if fi, err := f.Stat(); err == nil && fi.Size() > maxBackupBytes { // sin leer un archivo enorme
@@ -212,7 +211,7 @@ func OpenBackup(path string, phrase []byte) (*Vault, error) {
 	}
 	raw, err := io.ReadAll(io.LimitReader(f, maxBackupBytes+1))
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	if len(raw) > maxBackupBytes {
 		return nil, ErrNotBackup

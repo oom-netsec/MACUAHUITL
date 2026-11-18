@@ -2,6 +2,10 @@ package service
 
 import (
 	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -139,5 +143,54 @@ func TestCheckOutputsWindowsUnidadDeRedMapeadaSeRechaza(t *testing.T) {
 	_, err = CheckOutputs(`C:\no-existe-43d`, NewCoreSettings("fabrica", t.TempDir()), false)
 	if !errors.As(err, &e) || e.Code == "prefs.outputs.sin_unidad" {
 		t.Fatalf("una unidad local sigue su camino: %v", err)
+	}
+}
+
+// En Windows ningún mensaje de la carpeta de salidas habla de permisos 0700 (no existen: son ACL).
+func TestOutputsWindowsSinCeroSieteCeroCero(t *testing.T) {
+	simulaWindows(t)
+	err := noExisteErr(`C:\salidas`)
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Reason() != "prefs.outputs.no_existe" {
+		t.Fatalf("el reason no cambia: %v", err)
+	}
+	for _, l := range []string{i18n.Es, i18n.En} {
+		if s := i18n.In(l, err); strings.Contains(s, "0700") || !strings.Contains(s, `C:\salidas`) {
+			t.Errorf("%v: %q", l, s)
+		}
+	}
+	OutputsGOOS = "linux"
+	if !strings.Contains(i18n.In(i18n.En, noExisteErr("/x")), "0700") {
+		t.Error("en Linux sigue indicando 0700")
+	}
+}
+
+// El texto de «no se pudo leer» lleva solo la causa del sistema: ni la llamada (GetFileAttributesEx, lstat) ni la ruta repetida.
+func TestOutputsIlegibleSinApiCruda(t *testing.T) {
+	err := causaSistema(&fs.PathError{Op: "GetFileAttributesEx", Path: `C:\x`, Err: errors.New("Access is denied.")})
+	if err.Error() != "Access is denied." {
+		t.Fatalf("got %q", err)
+	}
+	if causaSistema(errors.New("otro")).Error() != "otro" {
+		t.Fatal("un error que no es PathError pasa igual")
+	}
+}
+
+// Por el camino de CheckOutputs: un fallo que no es «no existe» sale sin llamada cruda. En Linux EvalSymlinks devuelve el errno pelado, así que el *PathError de os.Stat (el de Windows) no se alcanza aquí.
+func TestCheckOutputsIlegibleSinLlamadaCruda(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("el error de «no es una carpeta» es otro en Windows")
+	}
+	f := filepath.Join(t.TempDir(), "archivo")
+	if err := os.WriteFile(f, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := CheckOutputs(filepath.Join(f, "sub"), NewCoreSettings("fabrica", t.TempDir()), true)
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "prefs.outputs.ilegible" {
+		t.Fatalf("err = %v", err)
+	}
+	if s := i18n.In(i18n.En, err); strings.Contains(s, "lstat") || strings.Contains(s, "stat ") || !strings.Contains(s, "not a directory") {
+		t.Fatalf("%q", s)
 	}
 }

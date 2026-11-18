@@ -133,7 +133,7 @@ func create(path string, master []byte, p Params, lenient bool) (*Vault, error) 
 	dek := make([]byte, 32)
 	for _, b := range [][]byte{v.hdr.VaultID[:], v.hdr.Salt[:], dek} {
 		if _, err := io.ReadFull(rand.Reader, b); err != nil {
-			return nil, fmt.Errorf("vault: %w", err)
+			return nil, wrap(err)
 		}
 	}
 	if err := v.setDEK(secret.New(dek)); err != nil {
@@ -155,7 +155,7 @@ func create(path string, master []byte, p Params, lenient bool) (*Vault, error) 
 func Open(path string) (*Vault, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	h, entries, err := parseFile(b)
 	if err != nil {
@@ -178,16 +178,16 @@ func newGCM(key []byte) (cipher.AEAD, error) {
 // sealDEK genera una sal nueva y cifra la DEK con la KEK derivada de master.
 func (v *Vault) sealDEK(master []byte) error {
 	if _, err := io.ReadFull(rand.Reader, v.hdr.Salt[:]); err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	if _, err := io.ReadFull(rand.Reader, v.hdr.DEKNonce[:]); err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	kek := deriveFn(master, v.hdr.Salt[:], v.hdr.Params)
 	defer kek.Destroy()
 	g, err := newAEAD(kek.Bytes())
 	if err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	copy(v.hdr.DEKCipher[:], g.Seal(nil, v.hdr.DEKNonce[:], v.dek.Bytes(), v.hdr.aad()))
 	return nil
@@ -201,7 +201,7 @@ func openDEKWith(h header, master []byte) (*secret.Secret, error) {
 	defer kek.Destroy()
 	g, err := newAEAD(kek.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	dek, err := g.Open(nil, h.DEKNonce[:], h.DEKCipher[:], h.aad())
 	if err != nil {
@@ -279,7 +279,7 @@ func (v *Vault) setDEK(dek *secret.Secret) error {
 	g, err := newAEAD(dek.Bytes())
 	if err != nil {
 		dek.Destroy()
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	v.dek, v.aead = dek, g
 	return nil
@@ -458,10 +458,10 @@ func (v *Vault) sealInto(next *[]rawEntry, c Credential, reserved bool) (string,
 		}
 		idx, e.ID = i, v.entries[i].ID
 	} else if _, err := io.ReadFull(rand.Reader, e.ID[:]); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+		return "", wrap(err)
 	}
 	if _, err := io.ReadFull(rand.Reader, e.Nonce[:]); err != nil {
-		return "", fmt.Errorf("vault: %w", err)
+		return "", wrap(err)
 	}
 	plain := encodePlain(c)
 	e.CT = v.aead.Seal(nil, e.Nonce[:], plain, v.entryAAD(e.ID))
@@ -689,7 +689,7 @@ func (v *Vault) persist() error {
 	}
 	if cur, err := os.ReadFile(v.path); err == nil {
 		if err := writeAtomicOpt(v.path+".bak", cur, noPerms); err != nil {
-			return fmt.Errorf("vault: respaldo: %w", err)
+			return wrap(fmt.Errorf("respaldo: %w", unprefix(err)))
 		}
 	}
 	return writeAtomicOpt(v.path, marshalFile(v.hdr, v.entries), noPerms)
@@ -705,7 +705,7 @@ func (v *Vault) persistReplacingBak() error {
 	}
 	data := marshalFile(v.hdr, v.entries)
 	if err := writeAtomicOpt(v.path+".bak", data, noPerms); err != nil {
-		return fmt.Errorf("vault: respaldo: %w", err)
+		return wrap(fmt.Errorf("respaldo: %w", unprefix(err)))
 	}
 	return writeAtomicOpt(v.path, data, noPerms)
 }
@@ -718,13 +718,13 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	dir := filepath.Dir(path)
 	tmp, err := sys.CreateTempPrivate(dir, ".vault-*.tmp")
 	if err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	defer os.Remove(tmp.Name())
 	if err := chmod(tmp, 0o600); err != nil {
 		if noPerms == nil || !(errors.Is(err, os.ErrPermission) || errors.Is(err, errors.ErrUnsupported)) {
 			tmp.Close()
-			return fmt.Errorf("vault: %w", err)
+			return wrap(err)
 		}
 		*noPerms = true
 	}
@@ -734,26 +734,26 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	if err := sys.ProtectNewStrict(tmp.Name()); err != nil {
 		if noPerms == nil || !errors.Is(err, errors.ErrUnsupported) {
 			tmp.Close()
-			return fmt.Errorf("vault: %w", err)
+			return wrap(err)
 		}
 		*noPerms = true
 	}
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	if err := tmp.Sync(); err != nil {
 		tmp.Close()
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	if err := sys.SyncDir(dir); err != nil { // en Windows no hace nada: ver sys.SyncDir
-		return fmt.Errorf("vault: %w", err)
+		return wrap(err)
 	}
 	return nil
 }

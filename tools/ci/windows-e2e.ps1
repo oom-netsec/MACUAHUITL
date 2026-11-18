@@ -135,7 +135,7 @@ try {
 
   # 4) otro usuario no conecta al pipe ajeno.
   $r = Mctl $u2 @('vault', 'status')
-  Must ($r.Code -ne 0 -and $r.Out -notmatch 'unlocked|locked' -and $r.Err -match 'cannot find the file specified') "sin núcleo propio, mctl del usuario 2 falla (su pipe no existe; salida $($r.Code): $($r.Err.Trim()))"
+  Must ($r.Code -ne 0 -and $r.Out -notmatch 'unlocked|locked' -and $r.Err -match 'core is not running|núcleo no está corriendo') "sin núcleo propio, mctl del usuario 2 falla (su pipe no existe; salida $($r.Code): $($r.Err.Trim()))"
   Must ((MctlOk $u1 @('vault', 'status')) -match 'unlocked') 'y el núcleo del usuario 1 sigue bien'
 
   # 4b) el usuario 2 abre DIRECTAMENTE el pipe del usuario 1: la DACL lo niega (no un timeout ni «no existe»).
