@@ -200,3 +200,17 @@ func TestPipeLabelDelPipePropio(t *testing.T) {
 		t.Fatalf("pipeLabel = %#x, %v", lab, err)
 	}
 }
+
+// lastRID lee el RID de integridad igual que x/sys pero sin pasar por GetSidSubAuthority (checkptr): Medium es 0x2000.
+func TestLastRIDDeUnSIDDeIntegridad(t *testing.T) {
+	sid, err := windows.StringToSid("S-1-16-8192")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rid, ok := lastRID(sid); !ok || rid != 0x2000 {
+		t.Fatalf("rid = %#x ok = %v", rid, ok)
+	}
+	if _, ok := lastRID(nil); ok {
+		t.Fatal("nil debe dar ok=false")
+	}
+}
