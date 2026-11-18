@@ -127,7 +127,7 @@ message FlowsRequest {
   // Archivo (solo con save).
   int32 rotate_mb = 12; // rotar al llegar a N MB; default 50, 1–1024
   int32 rotate_minutes = 13; // rotar cada N minutos; 0 = no, 1–10080
-  string name_template = 14; // {fecha} {hora} {origen}; default flujos_{fecha}_{hora}
+  string name_template = 14; // {fecha} {hora} {origen}; default flows_{fecha}_{hora}
   int32 max_files = 15; // archivos que se conservan; default 20, 1–1000
   string format = 16; // texto (default), crudo o jsonl
 }

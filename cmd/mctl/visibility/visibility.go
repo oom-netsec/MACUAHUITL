@@ -298,7 +298,7 @@ func flowsListen(c *cli.Env, args []string) error {
 	var inf cli.IngestFlags
 	if _, err := cli.Flags("flows listen", args, func(fs *flag.FlagSet) {
 		lf.register(fs)
-		inf.Register(fs, "flujos_{fecha}_{hora}")
+		inf.Register(fs, "flows_{fecha}_{hora}")
 		fs.IntVar(&top, "top", 10, "elementos por tabla")
 		fs.IntVar(&every, "every", 10, "segundos entre resúmenes")
 		fs.BoolVar(&asJSON, "json", false, "resúmenes en JSON")

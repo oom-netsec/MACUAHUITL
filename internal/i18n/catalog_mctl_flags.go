@@ -161,7 +161,7 @@ func init() {
 		"mctl.flag.flows.listen.format":          {Es: "con --save: texto (por defecto), crudo o jsonl", En: "with --save: text (default), raw or jsonl"},
 		"mctl.flag.flows.listen.json":            {Es: "resúmenes en JSON", En: "summaries as JSON"},
 		"mctl.flag.flows.listen.max-files":       {Es: "con --save, archivos que se conservan (20 por defecto; 1-1000)", En: "with --save, files to keep (default 20; 1-1000)"},
-		"mctl.flag.flows.listen.name":            {Es: "con --save, plantilla del nombre con {{fecha}} {{hora}} {{origen}} (flujos_{{fecha}}_{{hora}})", En: "with --save, file name template with {{date}} {{time}} {{source}} (flows_{{date}}_{{time}})"},
+		"mctl.flag.flows.listen.name":            {Es: "con --save, plantilla del nombre con {{fecha}} {{hora}} {{origen}} (flows_{{fecha}}_{{hora}})", En: "with --save, file name template with {{date}} {{time}} {{source}} (flows_{{date}}_{{time}})"},
 		"mctl.flag.flows.listen.rotate-mb":       {Es: "con --save, rotar cada N MB (50 por defecto; 1-1024)", En: "with --save, rotate every N MB (default 50; 1-1024)"},
 		"mctl.flag.flows.listen.rotate-min":      {Es: "con --save, rotar cada N minutos (0 = no; 1-10080)", En: "with --save, rotate every N minutes (0 = never; 1-10080)"},
 		"mctl.flag.flows.listen.save":            {Es: "guardar en outputs", En: "save to outputs"},

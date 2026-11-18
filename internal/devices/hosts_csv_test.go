@@ -247,3 +247,13 @@ func TestImportFormat(t *testing.T) {
 		}
 	}
 }
+
+// 43e-9: la muestra de la plantilla va en inglés (inglés canónico): sin «Oficina» ni «Piso 2».
+func TestPlantillaDeHostsSinEspanol(t *testing.T) {
+	for _, f := range []string{FormatCSV, FormatJSON} {
+		b, _ := Template(f, ahora)
+		if strings.Contains(string(b), "Oficina") || strings.Contains(string(b), "Piso 2") || !strings.Contains(string(b), "Office") || !strings.Contains(string(b), "Floor 2") {
+			t.Errorf("%s:\n%s", f, b)
+		}
+	}
+}

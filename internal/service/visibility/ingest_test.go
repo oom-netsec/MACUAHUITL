@@ -218,7 +218,7 @@ func TestFlowsAuditsConfigRetentionAndDrops(t *testing.T) {
 	dir := filepath.Join(d.Outputs(), "flows")
 	os.MkdirAll(dir, 0o700)
 	old := time.Now().Add(-time.Hour)
-	for _, n := range []string{"flujos_20260101_000000.jsonl", "flujos_20260102_000000.jsonl", "otro.jsonl"} {
+	for _, n := range []string{"flows_20260101_000000.jsonl", "flows_20260102_000000.jsonl", "otro.jsonl", "flujos_20250101_000000.jsonl"} {
 		os.WriteFile(filepath.Join(dir, n), []byte("viejo"), 0o600)
 		os.Chtimes(filepath.Join(dir, n), old, old)
 	}
@@ -251,12 +251,13 @@ func TestFlowsAuditsConfigRetentionAndDrops(t *testing.T) {
 		t.Fatalf("archivos nuevos=%d final=%v drops=%+v", rotated, final, lastDrops)
 	}
 	fs := files(t, dir)
-	if len(fs) != 2 || fs["otro.jsonl"] != "viejo" {
+	// 43e-9: el default nuevo es flows_*; los flujos_* de antes no se tocan (quedan fuera de max_files).
+	if len(fs) != 3 || fs["otro.jsonl"] != "viejo" || fs["flujos_20250101_000000.jsonl"] != "viejo" {
 		t.Fatalf("archivos = %v", fs)
 	}
 	a := d.AuditText()
 	for _, want := range []string{`"action":"visibility.flows"`, "max_files=1 format=jsonl", `"action":"visibility.flows.retencion"`,
-		"flujos_20260101_000000.jsonl", "flujos_20260102_000000.jsonl", `"action":"visibility.flows.done"`, "per_origin="} {
+		"flows_20260101_000000.jsonl", "flows_20260102_000000.jsonl", `"action":"visibility.flows.done"`, "per_origin="} {
 		if !strings.Contains(a, want) {
 			t.Errorf("la auditoría no trae %q:\n%s", want, a)
 		}
