@@ -641,3 +641,43 @@ func TestRespaldoIgualYReemplazoAlMismoDestino(t *testing.T) {
 		t.Fatalf("escribió algo: %v", got)
 	}
 }
+
+// 43e-3: el preview trae target_id (id vivo en la bóveda) en igual y conflicto; vacío en nueva. El id del respaldo sigue valiendo para decidir.
+func TestPreviewTargetIdEnIgualYConflicto(t *testing.T) {
+	_, path := bovedaConRespaldo(t, nil)
+	o := newHarness(t, nil)
+	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
+	o.put(t, "lab", "admin", "MARKER-PW")
+	o.put(t, "core", "USR-CORE", "OTRA")
+	vivo := map[string]string{}
+	infos, err := o.core.vault.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, i := range infos {
+		vivo[i.Label] = i.ID
+	}
+	pr, err := o.preview(t, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range pr.Items {
+		switch it.State {
+		case "igual", "conflicto_etiqueta":
+			if it.TargetId == "" || it.TargetId != vivo[it.Label] || it.TargetId == it.Id {
+				t.Fatalf("%s (%s): id=%q target_id=%q vivo=%q", it.Label, it.State, it.Id, it.TargetId, vivo[it.Label])
+			}
+		case "nueva":
+			if it.TargetId != "" {
+				t.Fatalf("nueva con target_id %q", it.TargetId)
+			}
+		}
+	}
+	if len(pr.Items) < 3 {
+		t.Fatalf("items = %d", len(pr.Items))
+	}
+	// --decision sigue yendo por el id del respaldo.
+	if _, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: itemID(t, pr, "core"), Action: "omitir"}, {Id: itemID(t, pr, "lab"), Action: "omitir"}}}); err != nil {
+		t.Fatal(err)
+	}
+}

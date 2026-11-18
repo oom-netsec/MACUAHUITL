@@ -172,6 +172,24 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 	ruta := filepath.Join(t.TempDir(), "r.mcvault")
 	has(t, "export en", enMust(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"), "backup of 1 credentials in "+ruta)
 	has(t, "import en", enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "LABEL", "STATE", "imported: 0 new, 0 replaced, 0 renamed, 0 skipped, 1 unchanged")
+	for lang, c := range map[string][]string{"en": {"BACKUP ID", "LABEL", "STATE", "VAULT ID"}, "es": {"ID EN EL RESPALDO", "ETIQUETA", "ESTADO", "ID EN LA BÓVEDA"}} {
+		var o string
+		if lang == "en" {
+			o = enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta)
+		} else {
+			o = must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta)
+		}
+		has(t, "import cols "+lang, o, c...)
+		var f []string
+		for _, l := range strings.Split(o, "\n") {
+			if strings.Contains(l, " core ") {
+				f = strings.Fields(l)
+			}
+		}
+		if len(f) != 4 || f[0] == f[3] {
+			t.Fatalf("import %s: fila sin dos ids distintos: %q", lang, f)
+		}
+	}
 	has(t, "import es", must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "ETIQUETA", "importadas: 0 nuevas, 0 reemplazadas, 0 renombradas, 0 omitidas, 1 iguales")
 	_, err = en(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=x")
 	errHas(t, "import all en", err, `--all="x": use rename, replace or skip`)

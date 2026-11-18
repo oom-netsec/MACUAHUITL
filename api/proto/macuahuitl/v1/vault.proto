@@ -173,6 +173,7 @@ message VaultBackupItem {
   string label = 2;
   string username = 3;
   string state = 4;                    // nueva | igual | conflicto_etiqueta | reservada (se omite)
+  string target_id = 5;                // ID de la credencial de la bóveda con la que coincide; solo en igual y conflicto_etiqueta, vacío en los demás
 }
 message PreviewBackupImportResponse {
   string token = 1;                    // vale 10 minutos, se gasta al aplicar y se descarta si la bóveda se cierra

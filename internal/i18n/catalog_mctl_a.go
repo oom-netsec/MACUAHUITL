@@ -99,7 +99,7 @@ func init() {
 		"mctl.vault.phrase_mismatch":          e("las frases no coinciden", "the passphrases do not match"),
 		"mctl.vault.backup_done":              e("respaldo de {n} credenciales en {path}", "backup of {n} credentials in {path}"),
 		"mctl.vault.backup_no_perms":          e("aviso: el sistema de archivos no admitió los permisos 0600; el contenido va cifrado, pero cuida quién puede leer el archivo", "warning: the file system did not accept the 0600 permissions; the content is encrypted, but watch who can read the file"),
-		"mctl.vault.import_header":            e("ID\tETIQUETA\tESTADO", "ID\tLABEL\tSTATE"),
+		"mctl.vault.import_header":            e("ID EN EL RESPALDO\tETIQUETA\tESTADO\tID EN LA BÓVEDA", "BACKUP ID\tLABEL\tSTATE\tVAULT ID"),
 		"mctl.vault.imported":                 e("importadas: {created} nuevas, {replaced} reemplazadas, {renamed} renombradas, {skipped} omitidas, {same} iguales", "imported: {created} new, {replaced} replaced, {renamed} renamed, {skipped} skipped, {same} unchanged"),
 
 		// security
