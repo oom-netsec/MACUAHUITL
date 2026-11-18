@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useBatch } from "../../lib/useBatch";
 import { showHidden, stripAnsi } from "../../lib/safeText";
 import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "../../lib/core";
@@ -36,6 +36,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [ports, setPorts] = useState("");
   const [scan, setScan] = useState<"connect" | "syn" | "udp" | "ping">("connect");
   const [skipDisc, setSkipDisc] = useState(false);
+  const pnWhy = useId();
   const [mode, setMode] = useState<"client" | "server">("client");
   const [seconds, setSeconds] = useState("10");
   const [iface, setIface] = useState("any");
@@ -166,7 +167,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
           options={([["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]] as [typeof scan, string][])
             .filter(([v]) => v !== "syn" || !isWindows())} />
       )}
-      {tool === "nmap" && <Check label={t("diag.skipDiscovery")} checked={skipDisc && scan !== "ping"} onChange={setSkipDisc} disabled={scan === "ping"} />}
+      {tool === "nmap" && <Check label={t("diag.skipDiscovery")} checked={skipDisc && scan !== "ping"} onChange={setSkipDisc} disabled={scan === "ping"} describedBy={scan === "ping" ? pnWhy : undefined} />}
+      {tool === "nmap" && scan === "ping" && <p className="hint" id={pnWhy}>{t("diag.skipDiscovery.ping")}</p>}
       {tool === "pcap" && (
         <>
           <div className="field-row">

@@ -404,6 +404,7 @@ test("nmap: «Omitir descubrimiento (-Pn)» manda skip_discovery; con scan=ping 
   await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "connect", skip_discovery: "true" }));
   await userEvent.selectOptions(screen.getByLabelText("Tipo de escaneo"), "ping");
   expect(pn).toBeDisabled();
+  expect(pn).toHaveAccessibleDescription("No aplica con «Solo descubrimiento de hosts».");
   act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0 }));
   await userEvent.click(await screen.findByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "ping" }));

@@ -3040,6 +3040,7 @@ export const es = {
   "transfer.recvDirOpen.cmd": "Orden para quitar la escritura ajena (cópiala y córrela tú; la app nunca la aplica)",
   "transfer.warn.cmd": "Orden para corregir la carpeta",
   "diag.skipDiscovery": "Omitir descubrimiento de hosts (-Pn)",
+  "diag.skipDiscovery.ping": "No aplica con «Solo descubrimiento de hosts».",
 };
 
 export type Key = keyof typeof es;

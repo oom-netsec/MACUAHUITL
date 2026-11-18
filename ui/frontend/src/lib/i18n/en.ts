@@ -3041,4 +3041,5 @@ export const en: Record<Key, string> = {
   "transfer.recvDirOpen.cmd": "Command to remove the others' write access (copy it and run it yourself; the app never applies it)",
   "transfer.warn.cmd": "Command to fix the folder",
   "diag.skipDiscovery": "Skip host discovery (-Pn)",
+  "diag.skipDiscovery.ping": "Not available with “Host discovery only”.",
 };
