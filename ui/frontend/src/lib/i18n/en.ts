@@ -3101,4 +3101,8 @@ export const en: Record<Key, string> = {
   "transfer.mode": "What do you want to do?",
   "transfer.mode.send": "Send files to the device",
   "transfer.mode.recv": "Receive files from the device",
+  "visibility.snmp.mode": "What do you want to do?",
+  "visibility.snmp.mode.query": "One-off query",
+  "visibility.snmp.mode.poll": "Continuous polling",
+  "visibility.snmp.mode.locked": "Stop the poll to switch options.",
 };

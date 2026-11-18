@@ -3100,6 +3100,10 @@ export const es = {
   "transfer.mode": "¿Qué vas a hacer?",
   "transfer.mode.send": "Enviar archivos al equipo",
   "transfer.mode.recv": "Recibir archivos del equipo",
+  "visibility.snmp.mode": "¿Qué vas a hacer?",
+  "visibility.snmp.mode.query": "Consulta puntual",
+  "visibility.snmp.mode.poll": "Sondeo continuo",
+  "visibility.snmp.mode.locked": "Detén el sondeo para cambiar de opción.",
 };
 
 export type Key = keyof typeof es;
