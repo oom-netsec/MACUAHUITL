@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -103,12 +104,21 @@ func writeNew(path string, data []byte) error {
 	if err != nil {
 		return err
 	}
+	return fill(f, path, data)
+}
+
+// fill escribe y cierra f; si algo falla quita path, que creó esta llamada.
+func fill(f *os.File, path string, data []byte) error {
 	if _, err := f.Write(data); err != nil {
 		f.Close()
-		os.Remove(path) // lo creó esta llamada
+		os.Remove(path)
 		return err
 	}
-	return f.Close()
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 func radiusTest(c *cli.Env, args []string) error {
@@ -336,8 +346,15 @@ func pkiCaInit(c *cli.Env, args []string) error {
 	if name == "" {
 		return cli.Err("mctl.security.missing_name")
 	}
-	if _, err := os.Lstat(dir); err == nil { // se comprueba antes de preguntar; la carpeta se crea hasta tener la respuesta del núcleo
-		return &os.PathError{Op: "mkdir", Path: dir, Err: os.ErrExist}
+	// se comprueba antes de preguntar; la carpeta se crea hasta tener la respuesta del núcleo
+	if _, err := os.Lstat(dir); err == nil {
+		return cli.Err("mctl.security.exists", "path", dir)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		var pe *fs.PathError
+		if errors.As(err, &pe) {
+			err = pe.Err // sin la llamada del sistema ni la ruta
+		}
+		return err
 	}
 	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_ca_key"))
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -125,8 +126,12 @@ func TestCaInitCarpetaPreexistenteIntacta(t *testing.T) {
 	if err := os.WriteFile(filepath.Join("ca", "mio.txt"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := mctlRaw(t, "capw\ncapw\n", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca"); err == nil {
-		t.Fatal("debía fallar")
+	// stdin vacío: si pidiera la contraseña saldría el error de stdin, no el de la carpeta
+	for lang, want := range map[string]string{"en": "ca already exists", "es": "ca ya existe"} {
+		_, err := mctlRaw(t, "", "--lang", lang, "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
+		if err == nil || err.Error() != want {
+			t.Errorf("%s: err = %v, quería %q", lang, err, want)
+		}
 	}
 	if b, err := os.ReadFile(filepath.Join("ca", "mio.txt")); err != nil || string(b) != "x" {
 		t.Fatalf("mio.txt: %q %v", b, err)
@@ -137,10 +142,31 @@ func TestCaInitCarpetaPreexistenteIntacta(t *testing.T) {
 func TestStdinEOFLegible(t *testing.T) {
 	startCore(t)
 	t.Chdir(t.TempDir())
-	for lang, want := range map[string]string{"en": "no password arrived on stdin", "es": "no llegó la contraseña por stdin"} {
+	for lang, want := range map[string]string{"en": "no \"Password to seal the CA key\" arrived on stdin", "es": "no llegó «Contraseña para sellar la llave de la CA» por stdin"} {
 		_, err := mctlRaw(t, "", "--lang", lang, "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
 		if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "EOF") {
 			t.Errorf("%s: err = %v, quería %q sin EOF", lang, err, want)
 		}
+	}
+}
+
+// Si Lstat falla por otra cosa que «no existe» (permisos), el error sale antes de pedir la contraseña y sin la llamada del sistema.
+func TestCaInitLstatFallaLimpio(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("necesita permisos POSIX y no ser root")
+	}
+	startCore(t)
+	wd := t.TempDir()
+	t.Chdir(wd)
+	if err := os.Mkdir("cerrada", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod("cerrada", 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod("cerrada", 0o700)
+	_, err := mctlRaw(t, "", "pki", "ca", "init", "--name", "Lab CA", "--out", filepath.Join("cerrada", "ca"))
+	if err == nil || err.Error() != "permission denied" {
+		t.Fatalf("err = %v", err)
 	}
 }
