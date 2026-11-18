@@ -5,6 +5,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -105,5 +106,53 @@ func TestArmJobFallidoDejaLaFaseArmFailed(t *testing.T) {
 		if _, ok := ph.Args[c.arg]; c.arg != "" && !ok {
 			t.Errorf("%s: sin arg %s: %v", c.nombre, c.arg, ph.Args)
 		}
+	}
+}
+
+func ultimaFase46c2(t *testing.T, h *harness, job string) (*v1.JobPhase, []*v1.JobPhase) {
+	t.Helper()
+	s := h.summary(t, job)
+	return s.Phases[len(s.Phases)-1], s.Phases
+}
+
+// Un cancel durante el armado fallido cierra el trabajo como cancelled: la última fase es CANCELLED y no hay ARM_FAILED (46c2).
+func TestCancelDuranteArmadoFallidoNoDejaArmFailed(t *testing.T) {
+	h := newHarness(t, nil)
+	job, fp := h.created(t, h.ready(t), nil)
+	h.core.mu.Lock()
+	h.core.jobs[job].cancelReq = true // lo que deja un CancelJob llegado durante el armado
+	h.core.mu.Unlock()
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}, ExcludedDeviceIds: []string{h.target.Address}}); err == nil {
+		t.Fatal("ArmJob debía fallar")
+	}
+	ult, fases := ultimaFase46c2(t, h, job)
+	if ult.Kind != v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED {
+		t.Fatalf("última fase = %v", ult.Kind)
+	}
+	for _, p := range fases {
+		if p.Kind == v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED {
+			t.Fatalf("no debía haber ARM_FAILED: %+v", fases)
+		}
+	}
+}
+
+// Un fallo sin código del catálogo (aquí NewWriter, con la carpeta de salida bajo un archivo) deja ARM_FAILED sin reason
+// y con el texto en inglés en el detalle (46c2).
+func TestArmJobFallidoSinCodigoDejaDetalleEnIngles(t *testing.T) {
+	h := newHarness(t, nil)
+	job, fp := h.created(t, h.ready(t), nil)
+	archivo := filepath.Join(t.TempDir(), "archivo")
+	if err := os.WriteFile(archivo, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.core.mu.Lock()
+	h.core.jobs[job].spec.OutputDir = filepath.Join(archivo, "sub") // MkdirAll falla: no es carpeta
+	h.core.mu.Unlock()
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}}); err == nil {
+		t.Fatal("ArmJob debía fallar")
+	}
+	ult, _ := ultimaFase46c2(t, h, job)
+	if ult.Kind != v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED || ult.Reason != "" || ult.Detail == "" || !strings.Contains(ult.Detail, "patrol:") {
+		t.Fatalf("última fase = %+v", ult)
 	}
 }
