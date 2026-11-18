@@ -3,6 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, VaultBackupAction, VaultBackupPreview, VaultBackupResult, VaultBackupState } from "../../lib/core";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Badge, ResultPanel, Section, type Tone } from "../../components/Page";
+import { Segmented } from "../../components/Segmented";
 import { Icon } from "../../components/Icon";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
@@ -17,6 +18,7 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
   core: CoreAPI; sshKeys: number; setMsg: (m: Msg) => void; onImported: () => void; onPreview: (open: boolean) => void; onClosed: () => void;
 }) {
   const t = useT();
+  const [mode, setMode] = useState<"export" | "import">("export");
   const [f1, setF1] = useState("");
   const [f2, setF2] = useState("");
   const [sure, setSure] = useState(false);
@@ -72,6 +74,9 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
 
   return (
     <Section title={t("vault.backup")} description={t("vault.backup.desc")}>
+      <Segmented legend={t("vault.backup.mode")} value={mode} onChange={setMode} options={[["export", t("vault.backup.modeExport")], ["import", t("vault.backup.modeImport")]]} />
+      {mode === "export" ? (
+        <>
       <div className="field-row">
         <Field label={t("vault.backup.phrase")} hint={t("vault.backup.phraseHint")} type="password" value={f1} onChange={setF1} autoComplete="new-password" w="md" />
         <Field label={t("vault.backup.phrase2")} type="password" value={f2} onChange={setF2} autoComplete="new-password" w="md" />
@@ -81,12 +86,17 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
       <div className="actions">
         <RunButton busy={busy} missing={[!sure && t("need.backupSure")]} onClick={exportBackup}><Icon name="download" />{t("vault.backup.export")}</RunButton>
       </div>
+        </>
+      ) : (
+        <>
       <div className="field-row">
         <Field label={t("vault.backup.import.phrase")} type="password" value={imp} onChange={setImp} autoComplete="off" w="md" />
       </div>
       <div className="actions">
         <RunButton busy={busy} missing={[!imp && t("need.backupPhrase")]} onClick={importBackup}><Icon name="upload" />{t("vault.backup.import")}</RunButton>
       </div>
+        </>
+      )}
       {preview && <PreviewPanel core={core} preview={preview} onClose={end} onExpired={expired} onClosed={() => { setPreview(null); onClosed(); }} setMsg={setMsg} />}
     </Section>
   );
