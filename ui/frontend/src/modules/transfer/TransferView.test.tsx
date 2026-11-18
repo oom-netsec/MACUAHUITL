@@ -49,7 +49,7 @@ test("el puerto cambia con el protocolo y uno fuera de rango se rechaza", async 
 
 test("las carpetas se eligen con el diálogo nativo", async () => {
   const core = setup({ pickPath: vi.fn(async () => "/home/u/recibidos") });
-  await userEvent.click(screen.getByLabelText("Permitir recibir (el equipo puede copiar archivos hacia esta máquina)"));
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
   await userEvent.click(screen.getByRole("button", { name: /Examinar.*Carpeta de recepción/ }));
   expect(core.pickPath).toHaveBeenCalledWith({ title: "Carpeta de recepción", directory: true });
   expect(screen.getByLabelText("Carpeta de recepción", { selector: "input" })).toHaveValue("/home/u/recibidos");
@@ -312,7 +312,7 @@ test("recibir por TFTP exige la lista de IP y avisa que en UDP no autentica", as
   const core = setup();
   await screen.findByRole("option", { name: /192.0.2.10/ });
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
-  await userEvent.click(screen.getByLabelText(/Permitir recibir/));
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
   expect(screen.getAllByText(/En UDP la lista de IP no autentica/).length).toBeGreaterThan(0);
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Recibir por TFTP exige la lista de IP permitidas");
@@ -324,7 +324,7 @@ test("recibir por TFTP exige la lista de IP y avisa que en UDP no autentica", as
 
 test("la carpeta de recepción avisa de lo que no se acepta", async () => {
   setup();
-  await userEvent.click(screen.getByLabelText(/Permitir recibir/));
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
   expect(screen.getByText(/tu carpeta personal completa/)).toBeInTheDocument();
   expect(screen.getByText(/nombres que empiezan con punto/)).toBeInTheDocument();
 });
@@ -508,7 +508,7 @@ test("servidor: puerto, duración, todas las interfaces e IP permitidas van pleg
 test("servidor: recibir por TFTP deja «IP permitidas» a la vista, fuera de Avanzado", async () => {
   setup();
   await screen.findByRole("option", { name: /192.0.2.10/ });
-  await userEvent.click(screen.getByLabelText(/Permitir recibir/));
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
   expect(screen.getByLabelText(/IP permitidas/).closest("details")).toBeNull();
 });
 
@@ -516,10 +516,10 @@ test("Abrir servidor nombra la IP y los archivos que faltan y deja de hacerlo al
   setup();
   const go = () => screen.getByRole("button", { name: "Abrir servidor" });
   expect(go()).toBeDisabled();
-  expect(go()).toHaveAccessibleDescription("Falta: indicar la dirección de escucha (o elegir cualquiera), elegir los archivos o la carpeta a servir (o activar recibir).");
+  expect(go()).toHaveAccessibleDescription("Falta: indicar la dirección de escucha (o elegir cualquiera), elegir los archivos o la carpeta a servir.");
   await screen.findByRole("option", { name: /192.0.2.10/ });
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
-  expect(go()).toHaveAccessibleDescription("Falta: elegir los archivos o la carpeta a servir (o activar recibir).");
+  expect(go()).toHaveAccessibleDescription("Falta: elegir los archivos o la carpeta a servir.");
   await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
   expect(go()).toBeEnabled();
   expect(go()).not.toHaveAccessibleDescription();
@@ -555,4 +555,39 @@ test("el registro del servidor muestra la duración de cada transferencia", asyn
   const table = within(card).getByRole("table");
   expect(within(table).getByRole("columnheader", { name: "Duración" })).toBeInTheDocument();
   expect(within(table).getAllByRole("row")[1]).toHaveTextContent("3 s"); // 2,5 s redondeado por formatDuration
+});
+
+// PR 6: «¿Qué vas a hacer?» elige enviar o recibir; lo que no se ve no se envía y lo escrito se conserva al volver.
+test("servidor: enviar solo muestra envío y recibir solo recepción; cada modo envía lo suyo", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  expect(screen.getByRole("radio", { name: "Enviar archivos al equipo" })).toBeChecked();
+  expect(screen.queryByLabelText("Carpeta de recepción", { selector: "input" })).toBeNull();
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  await userEvent.type(screen.getByLabelText(/Archivos sueltos/), "/srv/a.bin");
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
+  expect(screen.queryByLabelText(/Carpeta de envío/)).toBeNull();
+  expect(screen.queryByLabelText(/Archivos sueltos/)).toBeNull();
+  await userEvent.type(screen.getByLabelText("Carpeta de recepción", { selector: "input" }), "/srv/rx");
+  await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.1");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenLastCalledWith(expect.objectContaining({ write: true, recvDir: "/srv/rx", fromDir: "", files: [] }));
+  await userEvent.click(screen.getByRole("radio", { name: "Enviar archivos al equipo" }));
+  expect(screen.getByLabelText(/Carpeta de envío/, { selector: "input" })).toHaveValue("/srv/img"); // se conserva
+  expect(screen.getByLabelText(/Archivos sueltos/)).toHaveValue("/srv/a.bin");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenLastCalledWith(expect.objectContaining({ write: false, recvDir: "", fromDir: "/srv/img", files: ["/srv/a.bin"] }));
+});
+
+test("servidor: recibir no pide carpeta de envío y una ruta inválida oculta no bloquea", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "a‮b");
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
+  await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.1");
+  expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeEnabled();
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ write: true, fromDir: "" }));
 });
