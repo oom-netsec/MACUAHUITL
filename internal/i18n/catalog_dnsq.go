@@ -41,6 +41,7 @@ func init() {
 		"dns.parse.err.dot_name":      e("dnsq: DoT necesita el nombre del certificado: tls://IP#nombre", "dnsq: DoT needs the certificate name: tls://IP#name"),
 		"dns.parse.err.port_zero":     e("dnsq: puerto 0 inválido", "dnsq: invalid port 0"),
 		"dns.parse.err.type":          e("dnsq: tipo de registro desconocido {type:q}", "dnsq: unknown record type {type:q}", "type"),
+		"dns.err.no_resolvers":        e("no se encontró un resolver del sistema; pasa uno con -s IP", "no system resolver found; pass one with -s IP"),
 		"dns.parse.err.no_nameserver": e("dnsq: {path} no tiene nameserver", "dnsq: {path} has no nameserver", "path"),
 
 		"dns.exch.transport":      e("transporte {transport:q} desconocido", "unknown transport {transport:q}", "transport"),

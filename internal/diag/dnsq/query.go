@@ -11,8 +11,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/netip"
@@ -414,6 +416,9 @@ func ParseType(s string) (uint16, error) {
 // SystemResolvers lee los nameserver de un resolv.conf (normalmente /etc/resolv.conf).
 func SystemResolvers(path string) ([]Server, error) {
 	cc, err := dns.ClientConfigFromFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, i18n.New("dns.err.no_resolvers", nil)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("dnsq: %w", err)
 	}

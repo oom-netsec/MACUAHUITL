@@ -11,12 +11,14 @@ import (
 	mdns "github.com/miekg/dns"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/dnsq"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd/syslogdtest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tlsinspect"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -284,6 +286,36 @@ func TestErroresDeValidacionEnYEs(t *testing.T) {
 			if !ok {
 				t.Errorf("%s/%s: sin reason %s", c.name, loc, c.reason)
 			}
+		}
+	}
+}
+
+// 43e-1: sin -s, el resolver sale del seam (en Windows, los adaptadores), no de /etc/resolv.conf.
+func TestSystemResolversSinSFallaSinArchivo(t *testing.T) {
+	old := systemResolvers
+	systemResolvers = func() ([]dnsq.Server, error) {
+		return []dnsq.Server{{Transport: "udp", Host: "192.0.2.53", Port: 53}}, nil
+	}
+	t.Cleanup(func() { systemResolvers = old })
+	d := servicetest.New(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	(&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_QUERY, Name: "example.com", TimeoutMs: 200})
+	if txt := d.AuditText(); !strings.Contains(txt, "192.0.2.53") {
+		t.Fatalf("no consultó al resolver del seam:\n%s", txt)
+	}
+}
+
+func TestSinResolversPideS(t *testing.T) {
+	old := systemResolvers
+	systemResolvers = func() ([]dnsq.Server, error) { return nil, i18n.New("dns.err.no_resolvers", nil) }
+	t.Cleanup(func() { systemResolvers = old })
+	for _, loc := range []string{"es", "en"} {
+		ctx := i18n.WithLocale(context.Background(), loc)
+		_, err := (&toolsSvc{d: servicetest.New(t)}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_QUERY, Name: "example.com"})
+		st, _ := status.FromError(err)
+		if st.Code() != codes.FailedPrecondition || !strings.Contains(st.Message(), "-s") || strings.Contains(st.Message(), "dns.err") {
+			t.Fatalf("%s: %v", loc, err)
 		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/dnsq"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tlsinspect"
@@ -27,6 +29,21 @@ type toolsSvc struct {
 }
 
 var resolvConf = "/etc/resolv.conf" // las pruebas lo apuntan a un archivo propio
+
+// systemResolvers es la costura de los resolvers del sistema: resolv.conf en Linux, los adaptadores activos en Windows.
+var systemResolvers = func() ([]dnsq.Server, error) {
+	if runtime.GOOS != "windows" {
+		return dnsq.SystemResolvers(resolvConf)
+	}
+	var out []dnsq.Server
+	for _, h := range diag.SystemDNSHosts() {
+		out = append(out, dnsq.Server{Transport: "udp", Host: h, Port: 53})
+	}
+	if len(out) == 0 {
+		return nil, i18n.New("dns.err.no_resolvers", nil)
+	}
+	return out, nil
+}
 
 func (s *toolsSvc) AnalyzePcap(ctx context.Context, r *v1.AnalyzePcapRequest) (*v1.AnalyzePcapResponse, error) {
 	s.d.MarkActive()
@@ -77,7 +94,7 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	case r.Deep: // los públicos son terceros: solo con autorización explícita
 		servers = append(servers, dnsq.PublicResolvers...)
 	default:
-		if servers, err = dnsq.SystemResolvers(resolvConf); err != nil {
+		if servers, err = systemResolvers(); err != nil {
 			return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
 	}
