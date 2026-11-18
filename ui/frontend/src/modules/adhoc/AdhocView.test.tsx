@@ -154,7 +154,7 @@ test("el bucle de consulta tiene tope de tiempo y lo dice", async () => {
 });
 
 test("Ejecutar lote nombra lo que falta y deja de hacerlo al completarlo", async () => {
-  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred, { ...cred, id: "c2", label: "otra" }]) }); // con una sola se preelige
   render(<AdhocView core={core} />);
   await screen.findByRole("option", { name: "lab (admin)" });
   const run = () => screen.getByRole("button", { name: "Ejecutar lote" });
