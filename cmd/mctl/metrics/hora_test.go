@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"strings"
 	"testing"
 	"time"
@@ -9,9 +10,9 @@ import (
 )
 
 func TestPortsStatusSinFechaCero(t *testing.T) {
-	old := time.Local
-	time.Local = time.FixedZone("CST", -6*3600)
-	defer func() { time.Local = old }()
+	old := i18n.DisplayZone
+	i18n.DisplayZone = time.FixedZone("CST", -6*3600)
+	defer func() { i18n.DisplayZone = old }()
 	r := &v1.GetPortStatusResponse{Hostname: "sw1", Address: "192.0.2.1", Source: "dir"}
 	if got := portsHead(r); strings.Contains(got, "1970") || strings.Contains(got, "·  ·") || got != "sw1 (192.0.2.1) · dir" {
 		t.Errorf("sin hora: %q", got)

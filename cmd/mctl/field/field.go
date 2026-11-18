@@ -211,13 +211,7 @@ func serve(proto string) func(*cli.Env, []string) error {
 				fmt.Fprintf(c.Out, "%s\n%s", cli.T("mctl.field.serving", "listen", r.Listening, "proto", proto), r.Hint)
 				continue
 			}
-			var t struct {
-				Client, File, Result, Error string
-				Bytes                       int64
-				Duration                    time.Duration
-			}
-			json.Unmarshal([]byte(r.TransferJson), &t)
-			fmt.Fprintf(c.Out, "%s  %s  %s  %d bytes  %s  %s %s\n", cli.TimeSecOf(time.Now()), t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error)
+			printTransfer(c, r.TransferJson)
 		}
 	}
 }
@@ -273,4 +267,15 @@ func Area() cli.Area {
 		{Name: "serve http", Run: serve("http")},
 		{Name: "hash", Run: hash},
 	}}
+}
+
+// printTransfer imprime un traspaso con la hora local y la zona.
+func printTransfer(c *cli.Env, js string) {
+	var t struct {
+		Client, File, Result, Error string
+		Bytes                       int64
+		Duration                    time.Duration
+	}
+	json.Unmarshal([]byte(js), &t)
+	fmt.Fprintf(c.Out, "%s  %s  %s  %d bytes  %s  %s %s\n", cli.TimeSecOf(time.Now()), t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error)
 }

@@ -2,15 +2,16 @@ package analyze
 
 import (
 	"encoding/json"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestTimelineEnHoraLocal(t *testing.T) {
-	old := time.Local
-	time.Local = time.FixedZone("CST", -6*3600)
-	defer func() { time.Local = old }()
+	old := i18n.DisplayZone
+	i18n.DisplayZone = time.FixedZone("CST", -6*3600)
+	defer func() { i18n.DisplayZone = old }()
 	at := time.Date(2026, 11, 18, 4, 13, 9, 7e6, time.UTC)
 	got := TimelineReport{Dir: "d", Events: []Event{{At: at, Source: "log", Text: "x"}}}.TextIn("en")
 	if !strings.Contains(got, "2026-11-17 22:13:09.007 CST") {

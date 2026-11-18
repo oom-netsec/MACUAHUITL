@@ -8,9 +8,9 @@ import (
 // mx fija la zona local de la prueba, igual en Linux y Windows.
 func mx(t *testing.T) {
 	t.Helper()
-	old := time.Local
-	time.Local = time.FixedZone("CST", -6*3600)
-	t.Cleanup(func() { time.Local = old })
+	old := DisplayZone
+	DisplayZone = time.FixedZone("CST", -6*3600)
+	t.Cleanup(func() { DisplayZone = old })
 }
 
 func TestHoraLocalConZona(t *testing.T) {
@@ -26,8 +26,14 @@ func TestHoraLocalConZona(t *testing.T) {
 	if got := FmtLocal(time.Time{}, LocalMin); got != "-" {
 		t.Errorf("hora cero: %q", got)
 	}
-	time.Local = time.FixedZone("Central Standard Time", -6*3600)
+	DisplayZone = time.FixedZone("Central Standard Time", -6*3600)
 	if got := FmtLocal(u, LocalMin); got != "2026-11-17 22:13 -06:00" {
 		t.Errorf("zona larga: %q", got)
+	}
+}
+
+func TestHoraUnixCeroEsGuion(t *testing.T) {
+	if got := FmtLocal(time.Unix(0, 0), LocalMin); got != "-" {
+		t.Errorf("epoch 0: %q", got)
 	}
 }

@@ -57,7 +57,7 @@ func TestStatusConRechazos(t *testing.T) {
 func TestLineaDeServeIdioma(t *testing.T) {
 	t.Cleanup(func() { cli.SetLang("") })
 	tr := transferEvent{Proto: "tftp", Dir: "lectura", DirCode: "read", Client: "172.30.0.2:49989", File: "c3560-test.bin", Bytes: 30, Result: "ok"}
-	at := time.Date(2026, 1, 2, 8, 9, 59, 0, time.Local)
+	at := time.Date(2026, 1, 2, 8, 9, 59, 0, time.UTC)
 	for lang, want := range map[string]string{
 		"":   "2026-01-02 08:09:59 UTC  tftp read 172.30.0.2:49989  c3560-test.bin  30 bytes  0s  ok ",
 		"es": "2026-01-02 08:09:59 UTC  tftp lectura 172.30.0.2:49989  c3560-test.bin  30 bytes  0s  ok ",
