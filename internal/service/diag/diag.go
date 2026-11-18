@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ifaces"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/resolve"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -78,6 +80,18 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	} else {
 		req.OutputDir = dir
 	}
+	// Se resuelve una sola vez y la herramienta recibe la IP: la que se informa es la que se usa.
+	var resolved *v1.ResolvedTarget
+	if (tool == diag.Ping || tool == diag.Traceroute) && len(req.Targets) == 1 {
+		if ip, ok := resolve.Target(st.Context(), req.Targets[0], req.Options["family"]); ok {
+			fam := "ipv4"
+			if a, _ := netip.ParseAddr(ip); a.Is6() {
+				fam = "ipv6"
+			}
+			resolved = &v1.ResolvedTarget{Name: req.Targets[0], Ip: ip, Family: fam}
+			req.Targets[0] = ip
+		}
+	}
 	bin, argv, err := diag.Build(req)
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
@@ -91,8 +105,12 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if p, err := diag.Plan(req); err == nil && p.Sweep != nil {
 		sweep = fmt.Sprintf(" sweep=%d-%d/%d", p.Sweep.Start, p.Sweep.End, p.Sweep.Step)
 	}
+	auditSweep := sweep
+	if resolved != nil {
+		auditSweep += fmt.Sprintf(" resolved=%s→%s", resolved.Name, resolved.Ip)
+	}
 	id, live := service.NewID(), &liveRun{stop: make(chan struct{})}
-	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q%s", id, bin, argv, sweep))
+	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q%s", id, bin, argv, auditSweep))
 	s.mu.Lock()
 	if s.runs == nil {
 		s.runs = map[string]*liveRun{}
@@ -104,7 +122,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 		delete(s.runs, id)
 		s.mu.Unlock()
 	}()
-	if err := st.Send(&v1.RunResponse{RunId: id}); err != nil {
+	if err := st.Send(&v1.RunResponse{RunId: id, Resolved: resolved}); err != nil {
 		return err
 	}
 	run := diag.Runner{LookPath: s.d.DiagLookPath(), Stop: live.stop, OnSweep: func(p diag.SweepPoint) {

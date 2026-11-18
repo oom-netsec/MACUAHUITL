@@ -157,6 +157,7 @@ type RunResponse struct {
 	RunId         string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                   // solo en el primer evento: id para StopRun (distinto de cualquier id del cliente)
 	PingSummary   *PingSummary           `protobuf:"bytes,6,opt,name=ping_summary,json=pingSummary,proto3" json:"ping_summary,omitempty"` // ping: en el evento final (done=true), también tras StopRun o duration
 	SweepPoint    *SweepPoint            `protobuf:"bytes,7,opt,name=sweep_point,json=sweepPoint,proto3" json:"sweep_point,omitempty"`    // ping con barrido: un evento por tamaño terminado
+	Resolved      *ResolvedTarget        `protobuf:"bytes,8,opt,name=resolved,proto3" json:"resolved,omitempty"`                          // solo en el primer evento (el de run_id), en ping y traceroute; ausente si el nombre no resolvió
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -240,6 +241,74 @@ func (x *RunResponse) GetSweepPoint() *SweepPoint {
 	return nil
 }
 
+func (x *RunResponse) GetResolved() *ResolvedTarget {
+	if x != nil {
+		return x.Resolved
+	}
+	return nil
+}
+
+// La IP que el núcleo resolvió y le pasó a la herramienta (por construcción, la que se usa de verdad).
+type ResolvedTarget struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`     // lo que escribió la persona; igual a ip si ya era una IP
+	Ip            string                 `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`         // con zona si la traía (fe80::1%eth0)
+	Family        string                 `protobuf:"bytes,3,opt,name=family,proto3" json:"family,omitempty"` // "ipv4" o "ipv6"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolvedTarget) Reset() {
+	*x = ResolvedTarget{}
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolvedTarget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolvedTarget) ProtoMessage() {}
+
+func (x *ResolvedTarget) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolvedTarget.ProtoReflect.Descriptor instead.
+func (*ResolvedTarget) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ResolvedTarget) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ResolvedTarget) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *ResolvedTarget) GetFamily() string {
+	if x != nil {
+		return x.Family
+	}
+	return ""
+}
+
 // Resumen de un ping, calculado por el núcleo a partir de las respuestas (igual en Linux y en Windows).
 type PingSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -256,7 +325,7 @@ type PingSummary struct {
 
 func (x *PingSummary) Reset() {
 	*x = PingSummary{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +337,7 @@ func (x *PingSummary) String() string {
 func (*PingSummary) ProtoMessage() {}
 
 func (x *PingSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,7 +350,7 @@ func (x *PingSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PingSummary.ProtoReflect.Descriptor instead.
 func (*PingSummary) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PingSummary) GetSent() int64 {
@@ -346,7 +415,7 @@ type SweepPoint struct {
 
 func (x *SweepPoint) Reset() {
 	*x = SweepPoint{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +427,7 @@ func (x *SweepPoint) String() string {
 func (*SweepPoint) ProtoMessage() {}
 
 func (x *SweepPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +440,7 @@ func (x *SweepPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SweepPoint.ProtoReflect.Descriptor instead.
 func (*SweepPoint) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SweepPoint) GetSize() int32 {
@@ -411,7 +480,7 @@ type StopRunRequest struct {
 
 func (x *StopRunRequest) Reset() {
 	*x = StopRunRequest{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -423,7 +492,7 @@ func (x *StopRunRequest) String() string {
 func (*StopRunRequest) ProtoMessage() {}
 
 func (x *StopRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -436,7 +505,7 @@ func (x *StopRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRunRequest.ProtoReflect.Descriptor instead.
 func (*StopRunRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StopRunRequest) GetRunId() string {
@@ -454,7 +523,7 @@ type StopRunResponse struct {
 
 func (x *StopRunResponse) Reset() {
 	*x = StopRunResponse{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +535,7 @@ func (x *StopRunResponse) String() string {
 func (*StopRunResponse) ProtoMessage() {}
 
 func (x *StopRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +548,7 @@ func (x *StopRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRunResponse.ProtoReflect.Descriptor instead.
 func (*StopRunResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{6}
 }
 
 type ListInterfacesRequest struct {
@@ -490,7 +559,7 @@ type ListInterfacesRequest struct {
 
 func (x *ListInterfacesRequest) Reset() {
 	*x = ListInterfacesRequest{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +571,7 @@ func (x *ListInterfacesRequest) String() string {
 func (*ListInterfacesRequest) ProtoMessage() {}
 
 func (x *ListInterfacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +584,7 @@ func (x *ListInterfacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInterfacesRequest.ProtoReflect.Descriptor instead.
 func (*ListInterfacesRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{7}
 }
 
 type NetInterface struct {
@@ -532,7 +601,7 @@ type NetInterface struct {
 
 func (x *NetInterface) Reset() {
 	*x = NetInterface{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -544,7 +613,7 @@ func (x *NetInterface) String() string {
 func (*NetInterface) ProtoMessage() {}
 
 func (x *NetInterface) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -557,7 +626,7 @@ func (x *NetInterface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetInterface.ProtoReflect.Descriptor instead.
 func (*NetInterface) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *NetInterface) GetName() string {
@@ -605,7 +674,7 @@ type ListInterfacesResponse struct {
 
 func (x *ListInterfacesResponse) Reset() {
 	*x = ListInterfacesResponse{}
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -617,7 +686,7 @@ func (x *ListInterfacesResponse) String() string {
 func (*ListInterfacesResponse) ProtoMessage() {}
 
 func (x *ListInterfacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_diag_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_diag_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -630,7 +699,7 @@ func (x *ListInterfacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInterfacesResponse.ProtoReflect.Descriptor instead.
 func (*ListInterfacesResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_diag_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListInterfacesResponse) GetInterfaces() []*NetInterface {
@@ -654,7 +723,7 @@ const file_macuahuitl_v1_diag_proto_rawDesc = "" +
 	"output_dir\x18\x04 \x01(\tR\toutputDir\x1a:\n" +
 	"\fOptionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x92\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcd\x02\n" +
 	"\vRunResponse\x12\x1f\n" +
 	"\voutput_line\x18\x01 \x01(\tR\n" +
 	"outputLine\x12\x12\n" +
@@ -665,7 +734,12 @@ const file_macuahuitl_v1_diag_proto_rawDesc = "" +
 	"\x06run_id\x18\x05 \x01(\tR\x05runId\x12=\n" +
 	"\fping_summary\x18\x06 \x01(\v2\x1a.macuahuitl.v1.PingSummaryR\vpingSummary\x12:\n" +
 	"\vsweep_point\x18\a \x01(\v2\x19.macuahuitl.v1.SweepPointR\n" +
-	"sweepPoint\"\xb6\x01\n" +
+	"sweepPoint\x129\n" +
+	"\bresolved\x18\b \x01(\v2\x1d.macuahuitl.v1.ResolvedTargetR\bresolved\"L\n" +
+	"\x0eResolvedTarget\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x0e\n" +
+	"\x02ip\x18\x02 \x01(\tR\x02ip\x12\x16\n" +
+	"\x06family\x18\x03 \x01(\tR\x06family\"\xb6\x01\n" +
 	"\vPingSummary\x12\x12\n" +
 	"\x04sent\x18\x01 \x01(\x03R\x04sent\x12\x1a\n" +
 	"\breceived\x18\x02 \x01(\x03R\breceived\x12\x19\n" +
@@ -719,39 +793,41 @@ func file_macuahuitl_v1_diag_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_diag_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_diag_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_macuahuitl_v1_diag_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_macuahuitl_v1_diag_proto_goTypes = []any{
 	(DiagTool)(0),                  // 0: macuahuitl.v1.DiagTool
 	(*RunRequest)(nil),             // 1: macuahuitl.v1.RunRequest
 	(*RunResponse)(nil),            // 2: macuahuitl.v1.RunResponse
-	(*PingSummary)(nil),            // 3: macuahuitl.v1.PingSummary
-	(*SweepPoint)(nil),             // 4: macuahuitl.v1.SweepPoint
-	(*StopRunRequest)(nil),         // 5: macuahuitl.v1.StopRunRequest
-	(*StopRunResponse)(nil),        // 6: macuahuitl.v1.StopRunResponse
-	(*ListInterfacesRequest)(nil),  // 7: macuahuitl.v1.ListInterfacesRequest
-	(*NetInterface)(nil),           // 8: macuahuitl.v1.NetInterface
-	(*ListInterfacesResponse)(nil), // 9: macuahuitl.v1.ListInterfacesResponse
-	nil,                            // 10: macuahuitl.v1.RunRequest.OptionsEntry
-	(*Target)(nil),                 // 11: macuahuitl.v1.Target
+	(*ResolvedTarget)(nil),         // 3: macuahuitl.v1.ResolvedTarget
+	(*PingSummary)(nil),            // 4: macuahuitl.v1.PingSummary
+	(*SweepPoint)(nil),             // 5: macuahuitl.v1.SweepPoint
+	(*StopRunRequest)(nil),         // 6: macuahuitl.v1.StopRunRequest
+	(*StopRunResponse)(nil),        // 7: macuahuitl.v1.StopRunResponse
+	(*ListInterfacesRequest)(nil),  // 8: macuahuitl.v1.ListInterfacesRequest
+	(*NetInterface)(nil),           // 9: macuahuitl.v1.NetInterface
+	(*ListInterfacesResponse)(nil), // 10: macuahuitl.v1.ListInterfacesResponse
+	nil,                            // 11: macuahuitl.v1.RunRequest.OptionsEntry
+	(*Target)(nil),                 // 12: macuahuitl.v1.Target
 }
 var file_macuahuitl_v1_diag_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.RunRequest.tool:type_name -> macuahuitl.v1.DiagTool
-	11, // 1: macuahuitl.v1.RunRequest.targets:type_name -> macuahuitl.v1.Target
-	10, // 2: macuahuitl.v1.RunRequest.options:type_name -> macuahuitl.v1.RunRequest.OptionsEntry
-	3,  // 3: macuahuitl.v1.RunResponse.ping_summary:type_name -> macuahuitl.v1.PingSummary
-	4,  // 4: macuahuitl.v1.RunResponse.sweep_point:type_name -> macuahuitl.v1.SweepPoint
-	8,  // 5: macuahuitl.v1.ListInterfacesResponse.interfaces:type_name -> macuahuitl.v1.NetInterface
-	1,  // 6: macuahuitl.v1.DiagService.Run:input_type -> macuahuitl.v1.RunRequest
-	7,  // 7: macuahuitl.v1.DiagService.ListInterfaces:input_type -> macuahuitl.v1.ListInterfacesRequest
-	5,  // 8: macuahuitl.v1.DiagService.StopRun:input_type -> macuahuitl.v1.StopRunRequest
-	2,  // 9: macuahuitl.v1.DiagService.Run:output_type -> macuahuitl.v1.RunResponse
-	9,  // 10: macuahuitl.v1.DiagService.ListInterfaces:output_type -> macuahuitl.v1.ListInterfacesResponse
-	6,  // 11: macuahuitl.v1.DiagService.StopRun:output_type -> macuahuitl.v1.StopRunResponse
-	9,  // [9:12] is the sub-list for method output_type
-	6,  // [6:9] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	12, // 1: macuahuitl.v1.RunRequest.targets:type_name -> macuahuitl.v1.Target
+	11, // 2: macuahuitl.v1.RunRequest.options:type_name -> macuahuitl.v1.RunRequest.OptionsEntry
+	4,  // 3: macuahuitl.v1.RunResponse.ping_summary:type_name -> macuahuitl.v1.PingSummary
+	5,  // 4: macuahuitl.v1.RunResponse.sweep_point:type_name -> macuahuitl.v1.SweepPoint
+	3,  // 5: macuahuitl.v1.RunResponse.resolved:type_name -> macuahuitl.v1.ResolvedTarget
+	9,  // 6: macuahuitl.v1.ListInterfacesResponse.interfaces:type_name -> macuahuitl.v1.NetInterface
+	1,  // 7: macuahuitl.v1.DiagService.Run:input_type -> macuahuitl.v1.RunRequest
+	8,  // 8: macuahuitl.v1.DiagService.ListInterfaces:input_type -> macuahuitl.v1.ListInterfacesRequest
+	6,  // 9: macuahuitl.v1.DiagService.StopRun:input_type -> macuahuitl.v1.StopRunRequest
+	2,  // 10: macuahuitl.v1.DiagService.Run:output_type -> macuahuitl.v1.RunResponse
+	10, // 11: macuahuitl.v1.DiagService.ListInterfaces:output_type -> macuahuitl.v1.ListInterfacesResponse
+	7,  // 12: macuahuitl.v1.DiagService.StopRun:output_type -> macuahuitl.v1.StopRunResponse
+	10, // [10:13] is the sub-list for method output_type
+	7,  // [7:10] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_diag_proto_init() }
@@ -766,7 +842,7 @@ func file_macuahuitl_v1_diag_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_diag_proto_rawDesc), len(file_macuahuitl_v1_diag_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

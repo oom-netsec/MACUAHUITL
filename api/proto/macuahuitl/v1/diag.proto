@@ -41,6 +41,14 @@ message RunResponse {
   string run_id = 5;             // solo en el primer evento: id para StopRun (distinto de cualquier id del cliente)
   PingSummary ping_summary = 6;  // ping: en el evento final (done=true), también tras StopRun o duration
   SweepPoint sweep_point = 7;    // ping con barrido: un evento por tamaño terminado
+  ResolvedTarget resolved = 8;   // solo en el primer evento (el de run_id), en ping y traceroute; ausente si el nombre no resolvió
+}
+
+// La IP que el núcleo resolvió y le pasó a la herramienta (por construcción, la que se usa de verdad).
+message ResolvedTarget {
+  string name = 1;    // lo que escribió la persona; igual a ip si ya era una IP
+  string ip = 2;      // con zona si la traía (fe80::1%eth0)
+  string family = 3;  // "ipv4" o "ipv6"
 }
 
 // Resumen de un ping, calculado por el núcleo a partir de las respuestas (igual en Linux y en Windows).
