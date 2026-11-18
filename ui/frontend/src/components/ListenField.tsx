@@ -31,9 +31,11 @@ export function ListenField({ label, hint, value, onChange, any, onAny, ips, por
   const t = useT();
   return (
     <>
-      <Select label={label} hint={hint} w={w} keepUnknown value={any ? ALL : value}
+      <Select label={label} hint={hint} w={w} value={any ? ALL : value}
         onChange={(v) => (v === ALL ? onAny(true) : (onAny(false), onChange(v)))}
-        options={[...(value || any ? [] : [["", t("common.select")] as [string, string]]), ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string]), [ALL, t("listen.all")]]} />
+        options={[...(value || any ? [] : [["", t("common.select")] as [string, string]]), ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string]),
+          ...(value && !any && !ips.some(([ip]) => ip === value) ? [[value, value] as [string, string]] : []), // una dirección escrita antes o fuera de la lista se conserva
+          [ALL, t("listen.all")]]} />
       {port !== undefined && onPort && <Field label={t("transfer.port")} value={port} onChange={onPort} w="xs" mono inputMode="numeric" error={portError} />}
     </>
   );

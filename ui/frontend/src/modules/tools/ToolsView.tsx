@@ -1,4 +1,5 @@
 import { Advanced } from "../../components/Advanced";
+import { ListenField, joinListen, useLocalIPs } from "../../components/ListenField";
 import { RunButton } from "../../components/RunButton";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CoreAPI, SyslogEvent } from "../../lib/core";
@@ -167,7 +168,9 @@ export function TlsPanel({ core }: { core: CoreAPI }) {
 
 export function SyslogPanel({ core }: { core: CoreAPI }) {
   const t = useT();
-  const [addr, setAddr] = useState("127.0.0.1:5514");
+  const [host, setHost] = useState("127.0.0.1");
+  const [port, setPort] = useState("5514");
+  const { ips } = useLocalIPs(core);
   const [proto, setProto] = useState<"udp" | "tcp">("udp");
   const [any, setAny] = useState(false);
   const [save, setSave] = useState(false);
@@ -232,7 +235,7 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
     pending.current = [];
     starting.current = true;
     try {
-      const id = await core.syslogStart(addr, proto, any, save, opts);
+      const id = await core.syslogStart(joinListen(any ? "0.0.0.0" : host, port), proto, any, save, opts);
       runRef.current = id;
       o.started();
       setRunId(id);
@@ -252,10 +255,9 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
     <Page title={t("syslog.title")} description={t("syslog.desc")}>
       <Section title={t("syslog.section.listen")}>
         <div className="field-row">
-          <Field label={t("syslog.addr")} value={addr} onChange={(v) => { setAddr(v); touch("addr"); }} w="lg" mono error={o.errors.addr} />
+          <ListenField label={t("syslog.addr")} value={host} onChange={(v) => { setHost(v); touch("addr"); }} any={any} onAny={setAny} ips={ips} port={port} onPort={(v) => { setPort(v); touch("addr"); }} portError={o.errors.addr} />
           <Select label={t("syslog.proto")} value={proto} onChange={setProto} options={[["udp", "UDP"], ["tcp", "TCP"]]} w="xs" />
         </div>
-        <Check label={t("syslog.any")} checked={any} onChange={setAny} />
         <Check label={t("syslog.save")} checked={save} onChange={setSave} disabled={!!runId} />
         {runId && <p className="hint">{t("syslog.locked")}</p>}
         <p className="hint">{t("syslog.hint")}</p>

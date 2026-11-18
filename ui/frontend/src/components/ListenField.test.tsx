@@ -32,6 +32,7 @@ test("elegir «Todas» marca any y conserva la IP elegida antes; volver a una IP
 test("un valor que no está en la lista se conserva como opción", () => {
   render(<Host start="10.9.9.9" />);
   expect(screen.getByLabelText("Escuchar en")).toHaveValue("10.9.9.9");
+  expect(screen.getAllByRole("option").map((x) => x.textContent)).toEqual(["192.0.2.10 · eth0", "127.0.0.1 · lo", "10.9.9.9", "Todas las interfaces (0.0.0.0)"]);
 });
 
 test("con port muestra el campo de puerto y lo edita", async () => {

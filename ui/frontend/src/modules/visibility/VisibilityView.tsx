@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ListenField, joinListen, useLocalIPs } from "../../components/ListenField";
 import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { Segmented } from "../../components/Segmented";
@@ -289,8 +290,10 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
 function TrapsPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
-  const [addr, setAddr] = useState("127.0.0.1:1162");
+  const [host, setHost] = useState("127.0.0.1");
+  const [port, setPort] = useState("1162");
   const [any, setAny] = useState(false);
+  const { ips } = useLocalIPs(core);
   const [save, setSave] = useState(false);
   const [cred, setCred] = useState("");
   const [auth, setAuth] = useState("SHA");
@@ -315,14 +318,14 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
     if (!o.check()) { live.setErr(t("syslog.err.fix")); return; }
     batch.reset(); setTraps([]); setReceived(0);
     const opts = o.begin();
-    live.start(() => core.trapsStart(addr, any, save, cred, cred ? auth : "", cred ? priv : "", opts));
+    live.start(() => core.trapsStart(joinListen(any ? "0.0.0.0" : host, port), any, save, cred, cred ? auth : "", cred ? priv : "", opts));
   };
   const clear = () => { batch.reset(); setTraps([]); setReceived(0); };
   return (
     <>
       <Section title={t("visibility.sec.listen")} description={t("visibility.traps.note")}>
         <div className="field-row">
-          <Field label={t("visibility.listenAddr")} value={addr} onChange={(v) => { setAddr(v); o.touch("addr"); }} w="lg" mono error={o.errors.addr} />
+          <ListenField label={t("visibility.listenAddr")} value={host} onChange={(v) => { setHost(v); o.touch("addr"); }} any={any} onAny={setAny} ips={ips} port={port} onPort={(v) => { setPort(v); o.touch("addr"); }} portError={o.errors.addr} />
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} label={t("visibility.traps.user")} optional w="lg" />
           {cred && (
             <>
@@ -331,7 +334,6 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
             </>
           )}
         </div>
-        <Check label={t("visibility.anyIf")} checked={any} onChange={setAny} />
         <Check label={t("visibility.traps.save")} checked={save} onChange={setSave} disabled={!!live.runId} />
         {live.runId && <p className="hint">{t("syslog.locked")}</p>}
         <IngestOptionsBox kind="traps" form={o.form} onChange={o.setOpt} save={save} errors={o.errors} open={o.open} onOpen={o.setOpen} disabled={!!live.runId} />
@@ -373,8 +375,10 @@ function CounterTable({ title, rows }: { title: string; rows?: Counter[] }) {
 
 function FlowsPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
-  const [addr, setAddr] = useState("127.0.0.1:2055");
+  const [host, setHost] = useState("127.0.0.1");
+  const [port, setPort] = useState("2055");
   const [any, setAny] = useState(false);
+  const { ips } = useLocalIPs(core);
   const [save, setSave] = useState(false);
   const [top, setTop] = useState("10");
   const [snap, setSnap] = useState<Snap | null>(null);
@@ -389,18 +393,17 @@ function FlowsPanel({ core, active, onRun }: PanelProps) {
     if (!o.check()) { live.setErr(t("syslog.err.fix")); return; }
     batch.reset(); setSnap(null);
     const opts = o.begin();
-    live.start(() => core.flowsStart(addr, any, save, Number(top) || 10, opts));
+    live.start(() => core.flowsStart(joinListen(any ? "0.0.0.0" : host, port), any, save, Number(top) || 10, opts));
   };
   return (
     <>
       <Section title={t("visibility.sec.listen")} description={t("visibility.flows.note")}>
         <div className="field-row">
-          <Field label={t("visibility.listenAddr")} value={addr} onChange={(v) => { setAddr(v); o.touch("addr"); }} w="lg" mono error={o.errors.addr} />
+          <ListenField label={t("visibility.listenAddr")} value={host} onChange={(v) => { setHost(v); o.touch("addr"); }} any={any} onAny={setAny} ips={ips} port={port} onPort={(v) => { setPort(v); o.touch("addr"); }} portError={o.errors.addr} />
         </div>
         <Advanced changed={top !== "10" ? 1 : 0}>
           <Field label={t("visibility.flows.top")} type="number" value={top} onChange={setTop} w="sm" mono />
         </Advanced>
-        <Check label={t("visibility.anyIf")} checked={any} onChange={setAny} />
         <Check label={t("visibility.flows.save")} checked={save} onChange={setSave} disabled={!!live.runId} />
         {live.runId && <p className="hint">{t("syslog.locked")}</p>}
         <IngestOptionsBox kind="flows" form={o.form} onChange={o.setOpt} save={save} errors={o.errors} open={o.open} onOpen={o.setOpen} disabled={!!live.runId} />
