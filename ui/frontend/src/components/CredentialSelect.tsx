@@ -47,12 +47,13 @@ type Props = {
 export function CredentialSelect({ creds, value, onChange, label, hint, error, w = "md", optional, vault, vaultError, notice = true, extra }: Props) {
   const t = useT();
   const go = useNav();
-  // Regla única del valor por defecto: se conserva el actual si sigue disponible; si no, la primera credencial (o «ninguna» con optional).
+  // Regla única del valor por defecto: se conserva el actual si sigue disponible; si no, solo se preelige cuando hay UNA credencial.
+  // Con varias queda vacío y el usuario elige: probar la equivocada contra N equipos bloquea cuentas (TACACS) o cambia configuración.
   // Mientras carga, o con la bóveda cerrada, no se sabe si el valor existe: no se toca (editar un host no pierde su credencial).
   useEffect(() => {
     if (vault !== "open") return;
     if (value && (creds.some((c) => c.id === value) || extra?.[0] === value)) return;
-    const d = optional ? "" : creds[0]?.id ?? "";
+    const d = !optional && creds.length === 1 ? creds[0].id : "";
     if (d !== value) onChange(d);
   }, [vault, creds, value, optional, extra, onChange]);
   const closed = notice && (vault === "absent" || vault === "locked");
@@ -60,7 +61,7 @@ export function CredentialSelect({ creds, value, onChange, label, hint, error, w
   const kept: [string, string][] = vault !== "open" && value && !creds.some((c) => c.id === value) && extra?.[0] !== value ? [[value, t("hosts.cred.hidden")]] : [];
   return (
     <>
-      <Select label={label ?? t("assist.cred")} hint={hint} error={error} w={w} value={value} onChange={onChange}
+      <Select label={label ?? t("assist.cred")} hint={hint} error={error} w={w} value={value} onChange={onChange} placeholder={optional ? undefined : t("cred.pick")}
         options={[...(optional ? [["", t("cred.none")] as [string, string]] : []), ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), ...(extra ? [extra] : []), ...kept]} />
       {notice && vault === "error" && <div className="cred-notice"><Notice kind="error">{t("cred.vault.error", { error: vaultError ?? "" })}</Notice></div>}
       {closed && (

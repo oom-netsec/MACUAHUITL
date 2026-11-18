@@ -388,6 +388,9 @@ test("cambiar write memory, equipo, credencial, huellas o plataforma después de
   };
   const gone = () => expect(screen.queryByRole("region", { name: "Reversa" })).not.toBeInTheDocument();
   await open({ listCredentials: vi.fn(async () => [...creds, { ...creds[0], id: "c2", label: "otra" }]) } as never);
+  await screen.findByRole("option", { name: "otra (admin)" });
+  expect(screen.getByLabelText("Credencial")).toHaveValue(""); // con dos no se preelige ninguna
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await fillSpeed();
   await plan();
   await userEvent.click(screen.getByLabelText(/write memory/));

@@ -3039,4 +3039,5 @@ export const en: Record<Key, string> = {
   "cred.vault.locked": "The vault is locked.",
   "visibility.snmp.credHint": "v2c: password = community; v3: password = auth, enable = priv",
   "cred.vault.error": "Could not read the vault: {error}",
+  "cred.pick": "Choose a credential",
 };

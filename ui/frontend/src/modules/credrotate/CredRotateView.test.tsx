@@ -14,6 +14,9 @@ async function open(core: ReturnType<typeof fakeCore>) {
   render(<CredRotateView core={core} />);
   await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
   await userEvent.type(screen.getByLabelText("Usuario a rotar"), "tech");
+  await screen.findAllByRole("option", { name: "tech (tech)" });
+  expect(screen.getByLabelText("Credencial")).toHaveValue(""); // con dos no se preelige ninguna: se elige a mano
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
 }
 
 const planBtn = () => screen.getByRole("button", { name: "Planear (solo lectura)" });

@@ -59,12 +59,16 @@ test("etiqueta «Credencial» por omisión, opciones «etiqueta (usuario)» y ay
   expect(screen.getByRole("option", { name: "a (u-a)" })).toBeInTheDocument();
 });
 
-test("regla de valor por defecto: se conserva el actual si sigue en la lista; si no, la primera", async () => {
+test("regla de valor por defecto: se conserva el actual; si no, se preelige solo cuando hay UNA credencial", async () => {
   const { unmount } = render(<Host creds={[cred("a"), cred("b")]} initial="b" />);
   await waitFor(() => expect(screen.getByTestId("v")).toHaveTextContent("b"));
   unmount();
-  render(<Host creds={[cred("a"), cred("b")]} initial="borrada" />);
-  await waitFor(() => expect(screen.getByTestId("v")).toHaveTextContent("a"));
+  const two = render(<Host creds={[cred("a"), cred("b")]} initial="borrada" />);
+  await waitFor(() => expect(screen.getByTestId("v")).toHaveTextContent(/^$/)); // dos: no se elige por el usuario
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Elige una credencial");
+  two.unmount();
+  render(<Host creds={[cred("a")]} />);
+  await waitFor(() => expect(screen.getByTestId("v")).toHaveTextContent("a")); // una sola: se preelige
 });
 
 test("sin credenciales el valor queda vacío", async () => {

@@ -3038,6 +3038,7 @@ export const es = {
   "cred.vault.locked": "La bóveda está cerrada.",
   "visibility.snmp.credHint": "v2c: contraseña = comunidad; v3: contraseña = auth, enable = priv",
   "cred.vault.error": "No se pudo leer la bóveda: {error}",
+  "cred.pick": "Elige una credencial",
 };
 
 export type Key = keyof typeof es;
