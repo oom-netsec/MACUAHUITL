@@ -13,7 +13,7 @@ func SystemDNSHosts() []string { return ResolverHosts(realDNSAdapters()) }
 func realDNSAdapters() []DNSAdapter {
 	size := uint32(15000)
 	for range 3 {
-		buf := make([]byte, size)
+		buf := selfPtrBuf(int(size)) // IP_ADAPTER_ADDRESSES enlaza nodos dentro del mismo búfer: tiene que estar en el heap
 		aa := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
 		err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, windows.GAA_FLAG_SKIP_ANYCAST|windows.GAA_FLAG_SKIP_MULTICAST|windows.GAA_FLAG_SKIP_UNICAST, 0, aa, &size)
 		if err == windows.ERROR_BUFFER_OVERFLOW {
@@ -36,3 +36,10 @@ func realDNSAdapters() []DNSAdapter {
 	}
 	return nil
 }
+
+// selfPtrBuf da un búfer para estructuras que Windows llena con punteros a sí mismas (Next, FirstDnsServerAddress… de
+// IP_ADAPTER_ADDRESSES). Tiene que vivir en el heap: en el stack, al crecer, Go movería el búfer sin corregir esos
+// punteros (están dentro de un []byte). Salir de una función que no se expande en línea lo hace escapar por diseño.
+//
+//go:noinline
+func selfPtrBuf(n int) []byte { return make([]byte, n) }

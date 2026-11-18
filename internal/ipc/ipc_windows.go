@@ -185,9 +185,14 @@ func pipeLabel(c net.Conn) (uint32, error) {
 
 const aceMandatoryLabel = 0x11 // SYSTEM_MANDATORY_LABEL_ACE_TYPE; x/sys no la define
 
-// heapMin es el tamaño mínimo de un búfer que Windows llena con punteros a sí mismo: por encima de 32 bytes, un make de
-// tamaño variable nunca va al stack (ver factsOf).
-const heapMin = 64
+// selfPtrBuf da un búfer para estructuras que Windows llena con punteros a sí mismas (TOKEN_MANDATORY_LABEL.Label.Sid).
+// Tiene que vivir en el heap: en el stack, al crecer, Go movería el búfer sin corregir esos punteros (están dentro de un
+// []byte), que quedarían apuntando al stack viejo ya liberado («found pointer to free object»; checkptr lo detecta con
+// -race). Que el búfer salga de una función que no se expande en línea lo hace escapar por diseño, sin depender del
+// tamaño a partir del cual el compilador deja de ponerlo en el stack.
+//
+//go:noinline
+func selfPtrBuf(n int) []byte { return make([]byte, n) }
 
 const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; x/sys no la define
 
@@ -195,16 +200,13 @@ const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; 
 func factsOf(tok windows.Token) tokenFacts {
 	var f tokenFacts
 	var n uint32
-	// Label.Sid apunta dentro del propio búfer, y ese puntero lo escribe Windows en un []byte: si el búfer viviera en el
-	// stack, al crecer el stack Go movería el búfer sin corregir Label.Sid, que quedaría apuntando al stack viejo ya
-	// liberado («found pointer to free object», checkptr). Desde Go 1.25 un make de tamaño variable de hasta 32 bytes que
-	// no escapa va al stack (el TOKEN_MANDATORY_LABEL mide 28): con 64 o más va siempre al heap.
+	// Label.Sid apunta dentro del propio búfer: el búfer tiene que estar en el heap (ver selfPtrBuf).
 	err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, nil, 0, &n)
 	if err != windows.ERROR_INSUFFICIENT_BUFFER {
 		f.Err = err
 		return f
 	}
-	buf := make([]byte, max(n, heapMin))
+	buf := selfPtrBuf(int(n))
 	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], uint32(len(buf)), &n); err != nil {
 		f.Err = err
 		return f

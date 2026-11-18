@@ -35,7 +35,7 @@ func init() { winAdapters = realAdapters }
 func realAdapters() []winAdapter {
 	size := uint32(15000)
 	for range 3 {
-		buf := make([]byte, size)
+		buf := selfPtrBuf(int(size)) // IP_ADAPTER_ADDRESSES enlaza nodos dentro del mismo búfer: tiene que estar en el heap
 		aa := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
 		err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, windows.GAA_FLAG_SKIP_ANYCAST|windows.GAA_FLAG_SKIP_MULTICAST|windows.GAA_FLAG_SKIP_DNS_SERVER, 0, aa, &size)
 		if err == windows.ERROR_BUFFER_OVERFLOW {
