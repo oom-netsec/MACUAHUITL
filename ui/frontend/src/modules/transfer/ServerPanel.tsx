@@ -190,8 +190,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       <Section title={t("transfer.form.server")}>
         <div className="field-row">
           <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); }} options={protos} w="sm" />
-          <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={any ? "" : listen} onChange={setListen} w="md"
-            options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />
+          {!any && <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} w="md"
+            options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />}
           <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />
           <Field label={t("transfer.minutes")} type="number" value={minutes} onChange={setMinutes} w="sm" />
         </div>

@@ -474,3 +474,16 @@ test("avisos de carpeta del servidor: texto como aviso y orden aparte; sin orden
   await waitFor(() => expect(within(card).queryByRole("log", { name: "Orden para corregir la carpeta" })).toBeNull());
   expect(within(card).getByText("Otros usuarios pueden escribir en /srv/img.")).toBeInTheDocument();
 });
+
+test("con «todas las interfaces» el selector de IP no se muestra y el envío usa 0.0.0.0", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
+  expect(screen.queryByLabelText("IP de escucha")).toBeNull();
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.5");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  await waitFor(() => expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:69", allowAny: true })));
+  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
+  expect(screen.getByLabelText("IP de escucha")).toBeInTheDocument();
+});
