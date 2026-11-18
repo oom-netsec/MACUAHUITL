@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
@@ -43,7 +44,6 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
     }
   };
 
-  const canPlan = equipo.trim() !== "" && credId !== "" && user.trim() !== "" && (generate ? update !== "" : secret !== "");
 
   return (
     <Page title={t("nav.credrotate")} description={t("credrotate.hint")}>
@@ -67,7 +67,7 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
         <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
       </Section>
       <div className="actions">
-        <button className="primary" disabled={!canPlan || active} onClick={doPlan}>{t("assist.plan")}</button>
+        <RunButton primary disabled={active} onClick={doPlan} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred"), !user.trim() && t("need.user"), generate ? !update && t("need.vaultCred") : !secret && t("need.secret")]}>{t("assist.plan")}</RunButton>
       </div>
       {err && <Notice kind="error">{err}</Notice>}
       {!planned && !active && <EmptyState icon="ops" title={t("credrotate.empty.title")}>{t("credrotate.empty")}</EmptyState>}

@@ -93,3 +93,16 @@ test("el núcleo rechaza al usuario de la sesión y el módulo lo dice", async (
   expect(screen.queryByRole("button", { name: START })).not.toBeInTheDocument();
   expect(document.body.textContent).not.toContain(NEW);
 });
+
+test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  render(<CredRotateView core={fakeCore({ listCredentials: vi.fn(async () => creds) })} />);
+  await screen.findAllByRole("option", { name: "tech (tech)" });
+  expect(planBtn()).toBeDisabled();
+  expect(planBtn()).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial, indicar el usuario, escribir el secreto nuevo.");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
+  await userEvent.type(screen.getByLabelText("Usuario a rotar"), "tech");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  await userEvent.type(screen.getByLabelText("Secreto nuevo"), NEW);
+  expect(planBtn()).toBeEnabled();
+  expect(planBtn()).not.toHaveAccessibleDescription();
+});

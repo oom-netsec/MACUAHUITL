@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
 import { Advanced } from "../../components/Advanced";
@@ -74,7 +75,6 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
   };
 
   const linesOk = Number(maxLines) >= 0 && Number(maxLines) <= 1000;
-  const canPlan = equipo.trim() !== "" && credId !== "" && linesOk;
 
   return (
     <div className="restore-block" ref={box}><Section title={t("backup.restore.heading", { id: entry.id })}>
@@ -93,7 +93,7 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
         <Check label={t("backup.restore.partial")} checked={partial} onChange={setPartial} />
       </Advanced>
       <div className="actions">
-        <button disabled={!canPlan || active} onClick={doPlan}>{t("backup.restore.plan")}</button>
+        <RunButton disabled={active} onClick={doPlan} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred"), !linesOk && t("need.restoreLines")]}>{t("backup.restore.plan")}</RunButton>
         <button onClick={onClose} disabled={active}>{t("backup.restore.close")}</button>
       </div>
       {err && <Notice kind="error">{err}</Notice>}

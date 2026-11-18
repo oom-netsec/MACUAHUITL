@@ -111,3 +111,13 @@ test("un tope de líneas fuera de rango abre Avanzado y dice por qué no se pued
   expect(screen.getByLabelText("Tope de líneas de cambio")).toHaveAccessibleDescription(/Entre 0 y 1000/);
   expect(planBtn()).toBeDisabled();
 });
+
+test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  await open({ listCredentials: vi.fn(async () => [cred, { ...cred, id: "c2", label: "otra" }]) });
+  await screen.findAllByRole("option", { name: /otra/ });
+  expect(planBtn()).toBeDisabled();
+  expect(planBtn()).toHaveAccessibleDescription("Falta: elegir una credencial.");
+  await userEvent.selectOptions(within(document.querySelector<HTMLElement>(".restore-block")!).getByLabelText("Credencial"), "c1");
+  expect(planBtn()).toBeEnabled();
+  expect(planBtn()).not.toHaveAccessibleDescription();
+});

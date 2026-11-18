@@ -212,3 +212,34 @@ test("al volver a Pre/Post la lista se relee: una captura que terminó habilita 
   await userEvent.click(screen.getByRole("tab", { name: "Pre/Post" }));
   await waitFor(() => expect(listChanges).toHaveBeenCalledTimes(2));
 });
+
+test("Crear cambio nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [...creds, { ...creds[0], id: "c2", label: "otra" }]) });
+  render(<ChangeView core={core} />);
+  await screen.findAllByRole("option", { name: /otra/ });
+  const go = () => screen.getByRole("button", { name: "Crear cambio" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: indicar el nombre, indicar los equipos, elegir una credencial.");
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-1");
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  expect(go()).toHaveAccessibleDescription("Falta: elegir una credencial.");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+});
+
+test("Reporte nombra qué fase falta y lo calla cuando PRE y POST terminan", async () => {
+  const mk = (post: string) => ({ id: "ch1", name: "CRQ-1", preJobId: "j1", preState: "completed", postJobId: "", postState: post });
+  const show = async (post: string) => {
+    const core = fakeCore({ listCredentials: vi.fn(async () => creds), listChanges: vi.fn(async () => [mk(post)]) });
+    return render(<ChangeView core={core} />);
+  };
+  const a = await show("");
+  const rep = await screen.findByRole("button", { name: /Reporte/ });
+  expect(rep).toBeDisabled();
+  expect(rep).toHaveAccessibleDescription("Falta: que termine POST.");
+  a.unmount();
+  await show("completed");
+  expect(await screen.findByRole("button", { name: /Reporte/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: /Reporte/ })).not.toHaveAccessibleDescription();
+});

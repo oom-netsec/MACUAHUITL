@@ -219,3 +219,16 @@ test("las opciones avanzadas del respaldo van plegadas, cuentan los cambios y el
   expect(det.open).toBe(false);
   expect(det).not.toContainElement(screen.getByRole("status"));
 });
+
+test("Respaldar ahora nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  render(<BackupView core={fakeCore({ listCredentials: vi.fn(async () => [cred, { ...cred, id: "c2", label: "otra" }]) })} />);
+  await screen.findAllByRole("option", { name: /otra/ });
+  const go = () => screen.getByRole("button", { name: "Respaldar ahora" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: elegir una credencial, indicar los equipos.");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  expect(go()).toHaveAccessibleDescription("Falta: indicar los equipos.");
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+});

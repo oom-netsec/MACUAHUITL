@@ -3057,6 +3057,19 @@ export const es = {
   "need.path": "indicar la ruta",
   "need.text": "pegar el texto a analizar",
   "need.name": "indicar el nombre",
+  "need.restoreLines": "poner un máximo de líneas entre 0 y 1000",
+  "need.upgradeOutputs": "pegar las salidas de los comandos",
+  "need.upgradeImage": "indicar la imagen",
+  "need.config": "pegar la configuración",
+  "need.pre": "que termine PRE",
+  "need.post": "que termine POST",
+  "need.user": "indicar el usuario",
+  "need.vaultCred": "elegir la credencial del almacén que se actualiza",
+  "need.secret": "escribir el secreto nuevo",
+  "need.snippet": "elegir una plantilla",
+  "need.snippetFields": "completar los campos obligatorios de la plantilla",
+  "need.ifaces": "indicar las interfaces",
+  "need.portChange": "elegir qué cambiar (VLAN, VLAN de voz, descripción o estado)",
 };
 
 export type Key = keyof typeof es;

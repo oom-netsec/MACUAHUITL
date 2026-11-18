@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
@@ -128,7 +129,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         </Advanced>
         {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="actions">
-          <button className="primary" disabled={busy || !cred || !devices.trim()} aria-busy={busy} onClick={run}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <RunButton primary kbd busy={busy} onClick={run} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets")]}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}</RunButton>
         </div>
         {err && <Notice kind="error">{err}</Notice>}
         {note && <Notice kind={note.kind}>{note.text}</Notice>}

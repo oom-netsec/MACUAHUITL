@@ -3,6 +3,7 @@ import { CredentialSelect, useCredentials } from "../../components/CredentialSel
 import { useEffect, useRef, useState } from "react";
 import type { AdhocResult, CoreAPI } from "../../lib/core";
 import { Field, Notice, TextArea } from "../../components/Field";
+import { RunButton } from "../../components/RunButton";
 import { ExportMenu } from "../../components/Files";
 import { AdhocMatrix } from "./AdhocMatrix";
 import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
@@ -84,9 +85,9 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
       <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
       <div className="actions">
-        <button className="primary" disabled={r.busy || !cred || !devices.trim() || !commands.trim()} aria-busy={r.busy} onClick={run}>
-          {t(r.busy ? "adhoc.running" : "adhoc.run")}<kbd aria-hidden="true">Ctrl ↵</kbd>
-        </button>
+        <RunButton primary kbd busy={r.busy} onClick={run} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>
+          {t(r.busy ? "adhoc.running" : "adhoc.run")}
+        </RunButton>
       </div>
       {note && <Notice kind="warn">{note}</Notice>}
       {!started && !note && <EmptyState icon="layers" title={t("adhoc.empty.title")}>{t("adhoc.empty.text")}</EmptyState>}

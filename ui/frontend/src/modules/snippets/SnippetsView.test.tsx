@@ -513,3 +513,15 @@ test("el secreto se conserva para volver a planear y se borra al iniciar la ejec
   await waitFor(() => expect(screen.getByLabelText("Clave")).toHaveValue(""));
   expect(screen.getByLabelText("Texto *")).toHaveValue("abc"); // lo demás se conserva
 });
+
+test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  await open();
+  await screen.findByRole("option", { name: "lab (admin)" });
+  expect(planBtn()).toBeDisabled();
+  expect(planBtn()).toHaveAccessibleDescription("Falta: elegir una plantilla.");
+  await choose("Port-security en puertos de acceso");
+  expect(planBtn()).toHaveAccessibleDescription("Falta: completar los campos obligatorios de la plantilla.");
+  await userEvent.type(screen.getByLabelText(/^Puertos/), "Gi1/0/1");
+  expect(planBtn()).toBeEnabled();
+  expect(planBtn()).not.toHaveAccessibleDescription();
+});
