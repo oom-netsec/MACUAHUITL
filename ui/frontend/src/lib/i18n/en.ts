@@ -3045,4 +3045,5 @@ export const en: Record<Key, string> = {
   "security.csr.subject": "Subject details",
   "backup.restore.maxLines.bad": "Between 0 and 1000 (0 = no limit).",
   "calc.bgp.more": "More attributes",
+  "change.upgrade.integrity": "Verify integrity (optional)",
 };

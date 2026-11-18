@@ -3044,6 +3044,7 @@ export const es = {
   "security.csr.subject": "Datos del sujeto",
   "backup.restore.maxLines.bad": "Entre 0 y 1000 (0 = sin tope).",
   "calc.bgp.more": "Más atributos",
+  "change.upgrade.integrity": "Verificar integridad (opcional)",
 };
 
 export type Key = keyof typeof es;
