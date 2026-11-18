@@ -9,19 +9,26 @@ import { useHostsVersion } from "./signal";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
+// La libreta de hosts, al día cuando cambia.
+export function useHosts(core: CoreAPI): Host[] {
+  const hv = useHostsVersion();
+  const [hosts, setHosts] = useState<Host[]>([]);
+  useEffect(() => {
+    let live = true;
+    core.listHosts().then((l) => { if (live) setHosts(l); }, () => { if (live) setHosts([]); });
+    return () => { live = false; };
+  }, [core, hv]);
+  return hosts;
+}
+
 // Elegir un host de la libreta (búsqueda + lista agrupada por carpeta) para rellenar equipo y credencial. Escribir a mano sigue valiendo.
 export function HostPicker({ core, onPick }: { core: CoreAPI; onPick: (h: Host) => void }) {
   const t = useT();
-  const hv = useHostsVersion();
   const id = useId();
-  const [hosts, setHosts] = useState<Host[]>([]);
+  const hosts = useHosts(core);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(""); // el host elegido ("" = ninguno): el select muestra lo elegido y no un valor fijo
-  useEffect(() => {
-    let live = true;
-    core.listHosts().then((l) => { if (live) { setHosts(l); setSel((s) => (l.some((h) => h.id === s) ? s : "")); } }, () => { if (live) setHosts([]); });
-    return () => { live = false; };
-  }, [core, hv]);
+  useEffect(() => { setSel((s) => (hosts.some((h) => h.id === s) ? s : "")); }, [hosts]);
   const groups = useMemo(() => {
     const s = norm(q.trim());
     return groupByFolder(hosts.filter((h) => !s || norm([h.name, h.address, h.folder, ...h.tags].join("\n")).includes(s)));

@@ -305,7 +305,7 @@ export const es = {
   "patrol.deviceCount.one": "1 equipo",
 
   "assist.cred": "Credencial",
-  "assist.device": "Equipo (IP o nombre[:puerto])",
+  "assist.device": "Equipo (IP o nombre, con :puerto opcional)",
   "assist.desc": "Descripción",
   "assist.writeMem": "Guardar en NVRAM al final (write memory, con confirmación)",
   "assist.plan": "Planear (solo lectura)",
@@ -2260,6 +2260,7 @@ export const es = {
   "hosts.data.field.exampleHidden": "—",
   "hosts.data.template.note": "Los valores de ejemplo de la plantilla los escribe el núcleo y pueden venir en español; son contenido del archivo.",
   "ssh.credPick": "Elige una credencial",
+  "hosts.pick.open": "Elegir de la libreta",
   "hosts.pick.noCred": "Este host no tiene credencial en la bóveda: elige una",
   "hosts.err.nameDup": "Ya hay un host con este nombre.",
   "hosts.err.addrDup": "Esta dirección y puerto ya están en la libreta.",
