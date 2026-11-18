@@ -9,6 +9,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 | Device credentials | Encrypted `vault.mcv`; plaintext only in memory during authentication | Administrative access to the customer's network |
 | DEK (data key) | Locked core memory while the vault is open or armed | Decrypts all credentials |
 | Master password | Only in memory during `Unlock`, `Create` and `ChangeMasterPassword` | Same as the DEK |
+| Typed answers (password, MFA code) | Only in memory, for the handshake of that connection | Access to that device, once |
 | Outputs | Folder chosen by the engineer, with or without masking | Customer configuration, and secrets if masking is off or misses a format |
 | Audit log | Local SQLite | Loss of traceability |
 
@@ -32,7 +33,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 | Tampering with the vault file | AES-GCM with associated data (vault ID, entry ID, version) |
 | Another local user uses the socket | 0600 permissions and `SO_PEERCRED` UID check |
 | Core memory dump | `PR_SET_DUMPABLE=0`, `RLIMIT_CORE=0` |
-| Secret in a log by accident | `Secret` type with redaction in every formatter; no-leak test with a marker password |
+| Secret in a log by accident | `Secret` type with redaction in every formatter; no-leak test with a marker password; typed answers: no-leak test with a marker |
 | Connection to an unauthorized destination | `noegress` in CI, `EgressGuard` at runtime, no telemetry or update checks |
 | SSH spoofing | Trust on first use with confirmation; a changed key blocks by default |
 | External tool used to exfiltrate | Validated arguments, no shell, no options that read destinations from files or scripts; everything in the audit log |
@@ -43,7 +44,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 
 These are the things MACUAHUITL does **not** guarantee. They are declared so that nobody assumes them.
 
-1. **Password copy in `x/crypto/ssh`.** The SSH library receives the password as a Go `string`, which cannot be erased. It is created at the moment it is sent, once per connection, and lives until the garbage collector frees it. A private SSH key, if used, stays parsed in normal memory for the length of the session. The same applies when a key is generated, regenerated or derived (public key request): the private key passes through Go memory (`ed25519.GenerateKey`, `ssh.ParsePrivateKey`), where the garbage collector may leave copies that cannot be erased. The core zeroes the buffers it owns, and no RPC returns the private key. When an existing key is imported (phase 47), the private key and its passphrase also cross the local socket and the parser (`x/crypto/ssh`, `crypto/x509`, `encoding/pem`) in normal memory: the core clears the request buffers, the parsed key material (best effort) and the re-encoded copy, but gRPC, the parsers and the garbage collector may leave copies that cannot be erased (limit 1). `origin` (`generated`/`imported`) is informational and is not a security control.
+1. **Password copy in `x/crypto/ssh`.** The SSH library receives the password as a Go `string`, which cannot be erased. It is created at the moment it is sent, once per connection, and lives until the garbage collector frees it. A private SSH key, if used, stays parsed in normal memory for the length of the session. The same applies when a key is generated, regenerated or derived (public key request): the private key passes through Go memory (`ed25519.GenerateKey`, `ssh.ParsePrivateKey`), where the garbage collector may leave copies that cannot be erased. The core zeroes the buffers it owns, and no RPC returns the private key. When an existing key is imported (phase 47), the private key and its passphrase also cross the local socket and the parser (`x/crypto/ssh`, `crypto/x509`, `encoding/pem`) in normal memory: the core clears the request buffers, the parsed key material (best effort) and the re-encoded copy, but gRPC, the parsers and the garbage collector may leave copies that cannot be erased (limit 1). `origin` (`generated`/`imported`) is informational and is not a security control. Typed answers cross the local socket and gRPC buffers. The core zeroes its own byte copy, but x/crypto/ssh needs a `string` per answer, which lives until GC and cannot be erased. The UI holds them as JavaScript strings. They are never stored, recorded or audited.
 2. **Swap and hibernation.** The core tries `mlockall`, but if it fails, the operating system could write memory containing secrets to swap or to the hibernation image. The core warns if unencrypted swap or hibernation is active.
 3. **Malware running as the engineer's UID.** While the vault is open or armed, a process of the same user can debug the core or use the socket. No user application can defend itself from its own user.
 4. **Local rewrite of the audit log.** The hash chain detects accidental damage. Whoever controls the user can rewrite the whole chain. The anchor in each `manifest.json` protects what has already been delivered to third parties.
