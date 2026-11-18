@@ -200,6 +200,8 @@ const (
 	JobPhaseKind_JOB_PHASE_KIND_FAILED          JobPhaseKind = 10
 	// El Login Test que repite el armado, sin interacción, justo antes de armar.
 	JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE JobPhaseKind = 11
+	// El armado falló y el trabajo sigue en created; reason y args llevan el motivo.
+	JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED JobPhaseKind = 12
 )
 
 // Enum value maps for JobPhaseKind.
@@ -217,6 +219,7 @@ var (
 		9:  "JOB_PHASE_KIND_CANCELLED",
 		10: "JOB_PHASE_KIND_FAILED",
 		11: "JOB_PHASE_KIND_ARM_CHECK_DONE",
+		12: "JOB_PHASE_KIND_ARM_FAILED",
 	}
 	JobPhaseKind_value = map[string]int32{
 		"JOB_PHASE_KIND_UNSPECIFIED":     0,
@@ -231,6 +234,7 @@ var (
 		"JOB_PHASE_KIND_CANCELLED":       9,
 		"JOB_PHASE_KIND_FAILED":          10,
 		"JOB_PHASE_KIND_ARM_CHECK_DONE":  11,
+		"JOB_PHASE_KIND_ARM_FAILED":      12,
 	}
 )
 
@@ -2101,7 +2105,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x14LOGIN_TEST_STEP_AUTH\x10\x03\x12\x1d\n" +
 	"\x19LOGIN_TEST_STEP_PRIVILEGE\x10\x04\x12\x1a\n" +
 	"\x16LOGIN_TEST_STEP_PROMPT\x10\x05\x12\x1c\n" +
-	"\x18LOGIN_TEST_STEP_PLATFORM\x10\x06*\x86\x03\n" +
+	"\x18LOGIN_TEST_STEP_PLATFORM\x10\x06*\xa5\x03\n" +
 	"\fJobPhaseKind\x12\x1e\n" +
 	"\x1aJOB_PHASE_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16JOB_PHASE_KIND_CREATED\x10\x01\x12\"\n" +
@@ -2115,7 +2119,8 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x18JOB_PHASE_KIND_CANCELLED\x10\t\x12\x19\n" +
 	"\x15JOB_PHASE_KIND_FAILED\x10\n" +
 	"\x12!\n" +
-	"\x1dJOB_PHASE_KIND_ARM_CHECK_DONE\x10\v2\x8b\x05\n" +
+	"\x1dJOB_PHASE_KIND_ARM_CHECK_DONE\x10\v\x12\x1d\n" +
+	"\x19JOB_PHASE_KIND_ARM_FAILED\x10\f2\x8b\x05\n" +
 	"\rPatrolService\x12N\n" +
 	"\tCreateJob\x12\x1f.macuahuitl.v1.CreateJobRequest\x1a .macuahuitl.v1.CreateJobResponse\x12P\n" +
 	"\tLoginTest\x12\x1f.macuahuitl.v1.LoginTestRequest\x1a .macuahuitl.v1.LoginTestResponse0\x01\x12E\n" +
