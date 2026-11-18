@@ -691,28 +691,26 @@ test("las opciones de salida, ventana y seguridad van plegadas; cuentan los camb
 });
 
 // PR 6: «Una vez» / «Repetir» y, dentro, «Cada N minutos» / «Expresión cron»; lo oculto no viaja.
-const sched = () => vi.mocked(createJobOf).mock.calls.at(-1)![0].schedule;
-let createJobOf: ReturnType<typeof fakeCore>["createJob"];
-const crear = async () => {
-  const n = vi.mocked(createJobOf).mock.calls.length;
+type Core = ReturnType<typeof fakeCore>;
+const sched = (core: Core) => vi.mocked(core.createJob).mock.calls.at(-1)![0].schedule;
+const crear = async (core: Core) => {
+  const n = vi.mocked(core.createJob).mock.calls.length;
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
-  await waitFor(() => expect(createJobOf).toHaveBeenCalledTimes(n + 1));
+  await waitFor(() => expect(core.createJob).toHaveBeenCalledTimes(n + 1));
 };
 
 test("programación: por omisión es una sola ronda y no se ven intervalo, cron ni rondas", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
-  createJobOf = core.createJob;
   await fillForm(core);
   expect(screen.getByRole("radio", { name: "Una vez" })).toBeChecked();
   for (const l of [/Intervalo/, "Rondas"]) expect(screen.queryByLabelText(l)).toBeNull();
   expect(screen.queryByRole("textbox", { name: "Expresión cron" })).toBeNull();
-  await crear();
-  expect(sched()).toEqual({ intervalSeconds: 0, rounds: 1 });
+  await crear(core);
+  expect(sched(core)).toEqual({ intervalSeconds: 0, rounds: 1 });
 });
 
 test("programación: Repetir por intervalo no manda cron y por cron no manda intervalo; lo escrito se conserva", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
-  createJobOf = core.createJob;
   await fillForm(core);
   await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
   expect(screen.getByRole("radio", { name: "Cada N minutos" })).toBeChecked();
@@ -721,18 +719,18 @@ test("programación: Repetir por intervalo no manda cron y por cron no manda int
   await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), "15");
   await userEvent.clear(screen.getByLabelText("Rondas"));
   await userEvent.type(screen.getByLabelText("Rondas"), "3");
-  await userEvent.click(screen.getByRole("radio", { name: "Expresión cron" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Con expresión cron" }));
   expect(screen.queryByLabelText("Intervalo (minutos)")).toBeNull();
   await userEvent.type(screen.getByRole("textbox", { name: "Expresión cron" }), "*/5 * * * *");
-  await crear();
-  expect(sched()).toEqual({ cron: "*/5 * * * *", rounds: 3 });
+  await crear(core);
+  expect(sched(core)).toEqual({ cron: "*/5 * * * *", rounds: 3 });
   await userEvent.click(screen.getByRole("radio", { name: "Cada N minutos" }));
   expect(screen.getByLabelText("Intervalo (minutos)")).toHaveValue(15); // se conserva
-  await crear();
-  expect(sched()).toEqual({ intervalSeconds: 900, rounds: 3 });
+  await crear(core);
+  expect(sched(core)).toEqual({ intervalSeconds: 900, rounds: 3 });
   await userEvent.click(screen.getByRole("radio", { name: "Una vez" })); // lo oculto no se envía
-  await crear();
-  expect(sched()).toEqual({ intervalSeconds: 0, rounds: 1 });
+  await crear(core);
+  expect(sched(core)).toEqual({ intervalSeconds: 0, rounds: 1 });
 });
 
 test("programación: Repetir sin cron o sin intervalo positivo no crea el trabajo y lo nombra", async () => {
@@ -743,8 +741,56 @@ test("programación: Repetir sin cron o sin intervalo positivo no crea el trabaj
   await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), "0");
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   expect(await screen.findByText(/Datos incompletos: .*intervalo en minutos/)).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("radio", { name: "Expresión cron" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Con expresión cron" }));
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   expect(await screen.findByText(/Datos incompletos: .*expresión cron/)).toBeInTheDocument();
   expect(core.createJob).not.toHaveBeenCalled();
+});
+
+test("programación: Repetir sin tocar nada manda cada hora y sin límite de rondas", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  await crear(core);
+  expect(sched(core)).toEqual({ intervalSeconds: 3600, rounds: 0 });
+});
+
+test("programación: un cron de solo espacios no crea el trabajo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Con expresión cron" }));
+  await userEvent.type(screen.getByRole("textbox", { name: "Expresión cron" }), "   ");
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  expect(await screen.findByText(/Datos incompletos: .*expresión cron/)).toBeInTheDocument();
+  expect(core.createJob).not.toHaveBeenCalled();
+});
+
+test.each(["0.01", "1e9", "10081", "1.5", ""])("programación: el intervalo %j se rechaza junto al campo y en Datos incompletos", async (v) => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  await userEvent.clear(screen.getByLabelText("Intervalo (minutos)"));
+  if (v) await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), v);
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  expect(await screen.findByText(/Datos incompletos: .*intervalo en minutos/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Intervalo (minutos)")).toHaveAccessibleDescription(/entero de 1 a 10080/);
+  expect(core.createJob).not.toHaveBeenCalled();
+});
+
+test("programación: 1 y 10080 minutos son válidos; la pista de Rondas nombra las horas de la ventana", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Repetir" }));
+  expect(screen.getByLabelText("Rondas")).toHaveAccessibleDescription("0: hasta el fin de la ventana (4 h).");
+  await userEvent.click(screen.getByText(/Opciones avanzadas/));
+  await userEvent.clear(screen.getByLabelText(/Ventana/));
+  await userEvent.type(screen.getByLabelText(/Ventana/), "12");
+  expect(screen.getByLabelText("Rondas")).toHaveAccessibleDescription("0: hasta el fin de la ventana (12 h).");
+  for (const m of ["1", "10080"]) {
+    await userEvent.clear(screen.getByLabelText("Intervalo (minutos)"));
+    await userEvent.type(screen.getByLabelText("Intervalo (minutos)"), m);
+    await crear(core);
+    expect(sched(core)).toMatchObject({ intervalSeconds: Number(m) * 60 });
+  }
 });

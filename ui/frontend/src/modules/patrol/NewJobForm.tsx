@@ -60,6 +60,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
   const [minutes, setMinutes] = useState("60");
   const [rounds, setRounds] = useState("0");
   const [roundsErr, setRoundsErr] = useState("");
+  const [minutesErr, setMinutesErr] = useState("");
   const [hours, setHours] = useState("4");
   const [cron, setCron] = useState("");
   const [split, setSplit] = useState<JobSpec["split"]>("SPLIT_STRATEGY_PER_ROUND");
@@ -71,6 +72,8 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
   const [busy, setBusy] = useState(false);
 
   const devices = parseTargets(targets);
+  const winHours = Math.min(96, Math.max(1, Number(hours) || 1));
+  const minutesOk = /^\d+$/.test(minutes.trim()) && Number(minutes) >= 1 && Number(minutes) <= 10080; // una semana: el núcleo rechaza lo demás con un error crudo
   // Solo viaja lo que se ve: con cron no hay intervalo y con intervalo no hay cron.
   const schedule = (): JobSpec["schedule"] => !repeat ? { intervalSeconds: 0, rounds: 1 }
     : byCron ? { cron: cron.trim(), rounds: Number(rounds) } : { intervalSeconds: Number(minutes) * 60, rounds: Number(rounds) };
@@ -78,8 +81,9 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
     e.preventDefault();
     const noVal = asked.filter(([n]) => !(vals[n] ?? "").trim());
     setParamErr(Object.fromEntries(noVal.map(([n]) => [n, t("patrol.param.required")])));
-    const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"], [repeat && !byCron && !(Number(minutes) > 0), "interval"], [repeat && byCron && !cron.trim(), "cron"]] as const)
+    const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"], [repeat && !byCron && !minutesOk, "interval"], [repeat && byCron && !cron.trim(), "cron"]] as const)
       .filter(([m]) => m).map(([, k]) => t(`patrol.missing.${k}` as Key));
+    setMinutesErr(repeat && !byCron && !minutesOk ? t("patrol.interval.invalid") : "");
     if (missing.length) return setErr(t("patrol.missing", { list: missing.join(", ") }));
     if (pathProblem(out.trim())) return setErr(t(pathProblem(out.trim())!)); // también junto al campo (PathField)
     if (noVal.length) return setErr(t("patrol.param.check"));
@@ -88,7 +92,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
     const spec: JobSpec = {
       name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: zip !== "ZIP_POLICY_NONE" && delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
-      windowHours: Math.min(96, Math.max(1, Number(hours) || 1)),
+      windowHours: winHours,
       schedule: schedule(),
     };
     if (asked.length) spec.params = Object.fromEntries(asked.map(([n]) => [n, vals[n].trim()]));
@@ -135,10 +139,10 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
         <Segmented legend={t("patrol.sched.mode")} value={repeat ? "repeat" : "once"} onChange={(v) => setRepeat(v === "repeat")} options={[["once", t("patrol.sched.once")], ["repeat", t("patrol.sched.repeat")]]} />
         {repeat && (
           <>
-            <Segmented legend={t("patrol.sched.kind")} value={byCron ? "cron" : "every"} onChange={(v) => setByCron(v === "cron")} options={[["every", t("patrol.sched.every")], ["cron", t("patrol.cron")]]} />
+            <Segmented legend={t("patrol.sched.kind")} value={byCron ? "cron" : "every"} onChange={(v) => setByCron(v === "cron")} options={[["every", t("patrol.sched.every")], ["cron", t("patrol.sched.cron")]]} />
             <div className="field-row">
-              {byCron ? <Field label={t("patrol.cron")} value={cron} onChange={setCron} w="sm" mono /> : <Field label={t("patrol.interval")} type="number" value={minutes} onChange={setMinutes} w="sm" />}
-              <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint")} error={roundsErr} type="number" value={rounds} onChange={setRounds} w="sm" />
+              {byCron ? <Field label={t("patrol.cron")} value={cron} onChange={setCron} w="sm" mono /> : <Field label={t("patrol.interval")} error={minutesErr} type="number" value={minutes} onChange={setMinutes} w="sm" />}
+              <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint", { h: winHours })} error={roundsErr} type="number" value={rounds} onChange={setRounds} w="sm" />
             </div>
           </>
         )}

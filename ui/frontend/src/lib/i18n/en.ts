@@ -225,7 +225,7 @@ export const en: Record<Key, string> = {
   "patrol.interval": "Interval (minutes)",
   "patrol.cron": "Cron expression",
   "patrol.rounds": "Rounds",
-  "patrol.rounds.hint": "0 = until the window ends.",
+  "patrol.rounds.hint": "0 = until the window ends ({h} h).",
   "patrol.window": "Window (hours)",
   "patrol.window.hint": "Maximum 96.",
   "patrol.split": "Output files",
@@ -3108,6 +3108,8 @@ export const en: Record<Key, string> = {
   "patrol.sched.repeat": "Repeat",
   "patrol.sched.kind": "Repeat with",
   "patrol.sched.every": "Every N minutes",
-  "patrol.missing.interval": "interval in minutes (greater than 0)",
+  "patrol.missing.interval": "interval in minutes (whole number, 1 to 10080)",
   "patrol.missing.cron": "cron expression",
+  "patrol.interval.invalid": "Enter a whole number from 1 to 10080 minutes (one week).",
+  "patrol.sched.cron": "With a cron expression",
 };

@@ -223,7 +223,7 @@ export const es = {
   "patrol.interval": "Intervalo (minutos)",
   "patrol.cron": "Expresión cron",
   "patrol.rounds": "Rondas",
-  "patrol.rounds.hint": "0: hasta el fin de la ventana.",
+  "patrol.rounds.hint": "0: hasta el fin de la ventana ({h} h).",
   "patrol.window": "Ventana (horas)",
   "patrol.window.hint": "Máximo 96.",
   "patrol.split": "Archivos de salida",
@@ -3107,8 +3107,10 @@ export const es = {
   "patrol.sched.repeat": "Repetir",
   "patrol.sched.kind": "Repetir con",
   "patrol.sched.every": "Cada N minutos",
-  "patrol.missing.interval": "intervalo en minutos (mayor que 0)",
+  "patrol.missing.interval": "intervalo en minutos (entero de 1 a 10080)",
   "patrol.missing.cron": "expresión cron",
+  "patrol.interval.invalid": "Escribe un entero de 1 a 10080 minutos (una semana).",
+  "patrol.sched.cron": "Con expresión cron",
 };
 
 export type Key = keyof typeof es;
