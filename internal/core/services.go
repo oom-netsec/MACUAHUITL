@@ -680,14 +680,16 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	return &v1.CancelJobResponse{}, nil
 }
 
-func (s *patrolSvc) ListJobs(ctx context.Context, _ *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
+func (s *patrolSvc) ListJobs(ctx context.Context, req *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
 	s.c.mu.Lock()
 	defer s.c.mu.Unlock()
-	r := &v1.ListJobsResponse{}
+	out := &v1.ListJobsResponse{}
 	for _, j := range s.c.jobs {
-		r.Jobs = append(r.Jobs, s.c.summary(i18n.Locale(ctx), j))
+		if sum := s.c.summary(i18n.Locale(ctx), j); req.IncludePast || !sum.Past { // sin include_past, los terminados de días anteriores no salen
+			out.Jobs = append(out.Jobs, sum)
+		}
 	}
-	return r, nil
+	return out, nil
 }
 
 // ListPlaybooks devuelve los playbooks ya cargados (embebidos, de paquetes y de config/playbooks), ordenados por id;
