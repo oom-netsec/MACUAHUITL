@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -109,25 +110,50 @@ func inside(p, dir string) bool {
 	return err == nil && filepath.IsLocal(rel) || rel == "."
 }
 
-// JobOutputRoots son los output_dir absolutos de los trabajos guardados, distintos de Outputs():
-// ahí caen las corridas cuando el ingeniero eligió otra carpeta. Un error de la base da lista vacía.
+// RecordJobRoot guarda la carpeta de corrida de un trabajo en job_roots (idempotente), para que sobreviva
+// a quitar el trabajo del historial. Una ruta vacía o relativa (trabajo sin carpeta propia) no se guarda.
+func RecordJobRoot(db *sql.DB, dir string) error {
+	if !filepath.IsAbs(dir) {
+		return nil
+	}
+	_, err := db.Exec(`INSERT OR IGNORE INTO job_roots(dir) VALUES(?)`, filepath.Clean(dir))
+	return err
+}
+
+// JobOutputRoots son los output_dir absolutos de los trabajos guardados y de job_roots, distintos de Outputs():
+// ahí caen las corridas cuando el ingeniero eligió otra carpeta. Van primero los trabajos, del más nuevo al más
+// viejo (los topes de fleet e inventory cortan lo viejo), y al final las de los quitados. Un error de la base da lista vacía.
 func JobOutputRoots(d Deps) []string {
-	rows, err := d.DB().Query(`SELECT spec_json FROM jobs ORDER BY created_at DESC`)
+	rows, err := d.DB().Query(`SELECT spec_json, 0, created_at FROM jobs UNION ALL SELECT dir, 1, '' FROM job_roots ORDER BY 2, 3 DESC`)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	var out []string
 	for rows.Next() {
-		var raw string
-		var sp struct{ OutputDir string }
-		if rows.Scan(&raw) != nil || json.Unmarshal([]byte(raw), &sp) != nil || !filepath.IsAbs(sp.OutputDir) {
+		var raw, created string
+		var plain bool
+		if rows.Scan(&raw, &plain, &created) != nil {
+			continue
+		}
+		dir := raw // job_roots trae la ruta tal cual; jobs trae el spec en JSON
+		if !plain {
+			var sp struct{ OutputDir string }
+			if json.Unmarshal([]byte(raw), &sp) != nil {
+				continue
+			}
+			dir = sp.OutputDir
+		}
+		if !filepath.IsAbs(dir) {
 			continue
 		}
 		// Lo que cae dentro de outputs/ (p. ej. los lotes temporales de respaldos) ya lo cubre Outputs().
-		if r := filepath.Clean(sp.OutputDir); !inside(r, d.Outputs()) && !slices.Contains(out, r) {
+		if r := filepath.Clean(dir); !inside(r, d.Outputs()) && !slices.Contains(out, r) {
 			out = append(out, r)
 		}
+	}
+	if rows.Err() != nil {
+		return nil
 	}
 	return out
 }

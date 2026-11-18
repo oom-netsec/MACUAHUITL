@@ -67,7 +67,7 @@ func TestListDevicesDescubreOutputDirDeLosTrabajos(t *testing.T) {
 	// Las carpetas de lote de respaldo (dentro de outputs/) no son raíces aparte.
 	lote := filepath.Join(d.Out, "respaldos", ".trabajos", "lote-1")
 	if _, err := d.DB().Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at) VALUES('j2','lote',?,'completed','2026-11-06T11:00:00Z')`,
-		`{"Name":"lote","OutputDir":"`+lote+`"}`); err != nil {
+		`{"Name":"lote","OutputDir":`+strconv.Quote(lote)+`}`); err != nil {
 		t.Fatal(err)
 	}
 	if roots := service.JobOutputRoots(d); len(roots) != 1 || roots[0] != raiz {
@@ -405,5 +405,22 @@ func TestManualOnlyNoFusionaConLoDescubierto(t *testing.T) {
 	}
 	if r, err := (&svc{d: servicetest.New(t)}).ListDevices(bg, &v1.ListDevicesRequest{ManualOnly: true}); err != nil || len(r.Devices) != 0 {
 		t.Fatalf("libreta vacía sin outputs: %v %v", r, err)
+	}
+}
+
+// Quitar el trabajo del historial no hace desaparecer la evidencia: job_roots guarda la carpeta (fase 46b).
+func TestListDevicesVeLaRaizDeUnTrabajoQuitado(t *testing.T) {
+	d := servicetest.New(t)
+	os.MkdirAll(d.Out, 0o700)
+	raiz := t.TempDir()
+	dd := filepath.Join(raiz, "ronda_20261106-100000", "SW2_10.0.0.2")
+	os.MkdirAll(dd, 0o700)
+	os.WriteFile(filepath.Join(dd, "r001.txt"), []byte("===== x ====="), 0o600)
+	if err := service.RecordJobRoot(d.DB(), raiz); err != nil {
+		t.Fatal(err)
+	}
+	r, err := (&svc{d: d}).ListDevices(context.Background(), &v1.ListDevicesRequest{})
+	if err != nil || len(r.Devices) != 1 || r.Devices[0].Id != "10.0.0.2" {
+		t.Fatalf("r = %v err = %v", r, err)
 	}
 }
