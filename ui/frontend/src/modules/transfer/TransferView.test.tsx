@@ -153,6 +153,47 @@ test("el bind negado llega por el evento de cierre (StartServer es un stream) y 
   expect(screen.queryByText(cmd)).toBeNull();
 });
 
+test("la carpeta de recepción abierta a otros muestra la orden exacta para copiar, sin aplicarla", async () => {
+  const cmd = "chmod o-w /srv/recibidos";
+  const open = Object.assign(new Error("fileserve: la carpeta de recepción /srv/recibidos la pueden escribir otros (escritura para otros usuarios); quítales la escritura con: chmod o-w /srv/recibidos"), {
+    cause: { code: "FailedPrecondition", reason: "fileserve.err.recv_dir_open", metadata: { dir: "/srv/recibidos", who: "sys.who.others", cmd } },
+  });
+  const core = await openServer(setup({ transferServe: vi.fn(async () => { throw open; }) }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("la pueden escribir otros");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  expect(screen.getByText(/Orden para quitar la escritura ajena/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Copiar/ }));
+  expect(core.copyText).toHaveBeenCalledWith(cmd);
+  // La variante sin orden (Windows sin icacls seguro) no muestra consola.
+  const bare = Object.assign(new Error("fileserve: la carpeta de recepción X la pueden escribir otros"), { cause: { code: "FailedPrecondition", reason: "fileserve.err.recv_dir_open", metadata: { dir: "X", who: "sys.who.others" } } });
+  vi.mocked(core.transferServe).mockRejectedValueOnce(bare);
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  await waitFor(() => expect(screen.queryByText(cmd)).toBeNull());
+  expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull();
+});
+
+test("con note (ruta del programa insegura) el hint es texto: sin consola de regla ni orden para copiar", async () => {
+  const note = "La ruta de macuahuitld.exe no se puede citar con seguridad: crea a mano la regla de entrada del Firewall.";
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "", note, noteCode: "fileserve.hint.win_rule_manual" })) }));
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:6969" }) }));
+  setOSForTests("windows"); // la nota solo llega en Windows
+  try {
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const el = await within(card).findByText(note);
+  expect(el.closest('[role="log"]')).toBeNull();
+  expect(within(card).queryByRole("log", { name: /redirección/i })).toBeNull();
+  expect(within(card).queryAllByRole("log")).toHaveLength(1); // solo la orden de IOS
+  } finally { setOSForTests(undefined); }
+});
+
+test("sin note, la regla sigue siendo una orden para copiar y no aparece texto de nota", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:6969" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  expect(await within(card).findByRole("log", { name: "Regla de redirección (nftables)" })).toBeInTheDocument();
+  expect(within(card).queryByText(/macuahuitld\.exe/)).toBeNull();
+});
+
 test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
   const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
   act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
@@ -412,4 +453,24 @@ test("done vacía el lote pendiente: ninguna línea se pierde y el orden se cons
   expect(rows).toHaveLength(4);
   expect(rows[1]).toHaveTextContent("f0");
   expect(rows[3]).toHaveTextContent("f2");
+});
+
+// 43d-2b: los avisos de carpeta de ServerReady.warnings: el texto como aviso y la orden en una consola copiable.
+test("avisos de carpeta del servidor: texto como aviso y orden aparte; sin orden no hay consola; cerrado, sin orden", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ warnings: [
+    { code: "fileserve.hint.warn_from_writable", message: "Otros usuarios pueden escribir en /srv/img.", cmd: "chmod go-w '/srv/img'" },
+    { code: "fileserve.hint.warn_unverified", message: "No se pudieron revisar los permisos de /srv/img.", cmd: "" },
+  ] }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const notes = within(card).getAllByRole("status").map((n) => n.textContent);
+  expect(notes).toContain("Otros usuarios pueden escribir en /srv/img.");
+  expect(notes).toContain("No se pudieron revisar los permisos de /srv/img.");
+  expect(notes.join("")).not.toContain("chmod"); // la orden nunca va dentro del texto del aviso
+  const fix = within(card).getByRole("log", { name: "Orden para corregir la carpeta" });
+  expect(fix).toHaveTextContent("chmod go-w '/srv/img'");
+  expect(within(card).getAllByRole("log", { name: "Orden para corregir la carpeta" })).toHaveLength(1);
+  act(() => core.emitTransfer({ runId: "r1", done: true }));
+  await waitFor(() => expect(within(card).queryByRole("log", { name: "Orden para corregir la carpeta" })).toBeNull());
+  expect(within(card).getByText("Otros usuarios pueden escribir en /srv/img.")).toBeInTheDocument();
 });

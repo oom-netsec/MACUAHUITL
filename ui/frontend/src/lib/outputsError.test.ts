@@ -106,3 +106,10 @@ test("Windows: el texto de permisos lleva la orden icacls; sin orden, el detalle
     expect(outputsErrorText(win, t as never)).toBe("[settings.storage.err.permisos]"); // ruta de Windows en Linux: sin chmod (lleva \\)
   } finally { setOSForTests(undefined); }
 });
+
+test("los motivos de otros módulos (no_drive, outdir_shared) llegan con el texto del núcleo, ya en el idioma pedido", () => {
+  for (const reason of ["file.err.no_drive", "sys.err.outdir_shared"]) {
+    const e = Object.assign(new Error(`texto del núcleo de ${reason}`), { cause: { code: "FailedPrecondition", reason, metadata: { who: "sys.who.owner" } } });
+    expect(outputsErrorText(e, t as never)).toBe(`texto del núcleo de ${reason}`);
+  }
+});

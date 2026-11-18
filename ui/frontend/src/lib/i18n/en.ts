@@ -3037,4 +3037,7 @@ export const en: Record<Key, string> = {
   "patrol.armFailed.noReason": "Could not start.",
   "patrol.armFailed.help": "Resolve the cause and arm again. The Login Test lists each device so you can accept a new host key or exclude it.",
   "patrol.phase.ARM_FAILED": "Failed to start (before arming)",
+  "settings.storage.err.sin_unidad": "On Windows the folder must start with a drive letter (C:\\...); network and device paths are not accepted.",
+  "transfer.recvDirOpen.cmd": "Command to remove the others' write access (copy it and run it yourself; the app never applies it)",
+  "transfer.warn.cmd": "Command to fix the folder",
 };

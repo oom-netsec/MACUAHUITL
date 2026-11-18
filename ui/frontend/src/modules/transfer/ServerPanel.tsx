@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -6,6 +6,7 @@ import type { CoreAPI, NetInterface } from "../../lib/core";
 import { Badge, EmptyState, ResultPanel, Section } from "../../components/Page";
 import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
+import type { Key } from "../../lib/i18n/es";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { LivePanel } from "./LivePanel";
 import { iosCommands, splitListen, unsafeName } from "./ios";
@@ -14,7 +15,9 @@ import { isWindows } from "../../lib/platform";
 import { useBatch } from "../../lib/useBatch";
 import { showHidden } from "../../lib/safeText";
 
-const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
+// Solo estos dos motivos traen una orden para copiar (la app nunca la aplica): sysctl del puerto negado y chmod/icacls de la carpeta de recepción abierta.
+const CMD_LABEL: Record<string, Key> = { "fileserve.err.port_denied": "transfer.portDenied.cmd", "fileserve.err.recv_dir_open": "transfer.recvDirOpen.cmd" };
+const errCmd = (i?: ErrInfo) => (i && CMD_LABEL[i.reason] ? i.metadata.cmd ?? "" : "");
 import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
@@ -64,6 +67,12 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {r.protocol === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
       {r.protocol === "tftp" && r.recvDir && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
       {s.legacy && <Notice kind="warn">{t("transfer.legacyWarn")}</Notice>}
+      {r.warnings?.map((w, i) => (
+        <Fragment key={`${w.code}-${i}`}>
+          <Notice kind="warn">{w.message}</Notice>
+          {w.cmd && !s.done && <Console label={t("transfer.warn.cmd")} text={w.cmd} copy={core.copyText} />}
+        </Fragment>
+      ))}
       <dl className="stats">
         <div><dt>{t("transfer.addr")}</dt><dd className="mono">{r.listening} <CopyButton value={r.listening} label={t("transfer.addr")} /></dd></div>
         {r.user && <div><dt>{t("transfer.user")}</dt><dd className="mono">{r.user} <CopyButton value={r.user} label={t("transfer.user")} /></dd></div>}
@@ -83,7 +92,8 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
         </>
       )}
-      {hint && !hint.nftables && !isWindows() && !s.done && nftLeftoverCmd(r.protocol, host, port) && (
+      {hint?.note && <Notice kind="warn">{hint.note}</Notice> /* sin regla por una ruta insegura: el núcleo explica qué crear a mano; es texto, nunca una orden para copiar */}
+      {hint && !hint.nftables && !hint.note && !isWindows() && !s.done && nftLeftoverCmd(r.protocol, host, port) && (
         /* Sin privilegios no se puede ver si quedó una tabla nft vieja que se lleve el tráfico del puerto estándar: se explica y se da la orden. */
         <>
           <p className="hint">{t("transfer.nftLeftover")}</p>
@@ -120,8 +130,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [legacy, setLegacy] = useState(false);
   const legacyNext = useRef(false); // lo que se pidió al abrir: la tarjeta lo recuerda
   // Error visible y, si es el de puerto negado, la orden de sysctl que trae (solo para copiar). Juntos: un error nuevo nunca deja la orden vieja.
-  const [err, setErrState] = useState({ text: "", cmd: "" });
-  const setErr = (text: string, cmd = "") => setErrState({ text, cmd });
+  const [err, setErrState] = useState({ text: "", cmd: "", label: "transfer.portDenied.cmd" as Key });
+  const setErr = (text: string, i?: ErrInfo) => setErrState({ text, cmd: errCmd(i), label: CMD_LABEL[i?.reason ?? ""] ?? "transfer.portDenied.cmd" });
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
@@ -145,7 +155,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       const msg = e.error && errorText(new Error(e.error));
       // Un error sin tarjeta es que el servidor no llegó a abrir (carpeta o regla inválida).
       if (seen.current.has(e.runId)) setServers((l) => l.map((s) => (s.runId === e.runId ? { ...s, done: true, error: msg || undefined, cleanup: e.cleanup } : s)));
-      else if (msg) setErr(msg, sysctlCmd(e.errorInfo)); // el bind negado llega aquí: StartServer es un stream
+      else if (msg) setErr(msg, e.errorInfo); // el bind negado llega aquí: StartServer es un stream
     }
   }), [core, batch.push, batch.flush]);
   useBusy(servers.some((s) => !s.done));
@@ -167,7 +177,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         files: splitList(files), fromDir, write, recvDir: write ? recvDir : "", allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
       });
     } catch (e) {
-      setErr(errorText(e), sysctlCmd(errInfo(e)));
+      setErr(errorText(e), errInfo(e));
     } finally {
       setStarting(false);
     }
@@ -198,7 +208,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
         <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
         {(err.text || loadErr) && <Notice kind="error">{err.text || loadErr}</Notice>}
-        {err.text && err.cmd && <Console label={t("transfer.portDenied.cmd")} text={err.cmd} copy={core.copyText} />}
+        {err.text && err.cmd && <Console label={t(err.label)} text={err.cmd} copy={core.copyText} />}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}
       {servers.map((s) => (

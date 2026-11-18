@@ -3036,6 +3036,9 @@ export const es = {
   "patrol.armFailed.noReason": "No se pudo arrancar.",
   "patrol.armFailed.help": "Resuelve el motivo y vuelve a armar. El Login Test muestra cada equipo para aceptar una huella nueva o excluirlo.",
   "patrol.phase.ARM_FAILED": "No arrancó (antes de armar)",
+  "settings.storage.err.sin_unidad": "En Windows la carpeta debe empezar con una letra de unidad (C:\\...); no se aceptan rutas de red ni de dispositivo.",
+  "transfer.recvDirOpen.cmd": "Orden para quitar la escritura ajena (cópiala y córrela tú; la app nunca la aplica)",
+  "transfer.warn.cmd": "Orden para corregir la carpeta",
 };
 
 export type Key = keyof typeof es;

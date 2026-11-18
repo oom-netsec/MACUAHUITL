@@ -13,7 +13,9 @@ export interface TransferServeParams {
 export interface TransferReady {
   serverId: string; protocol: TransferProto; listening: string; hint: string; user: string; password: string;
   fingerprints: string[] | null; recvDir: string; fromDir: string; files: string[] | null;
+  warnings?: ServerWarning[] | null; // avisos de carpeta (43d-2b): message es texto; cmd, la orden que lo corrige (vacía si no hay una segura)
 }
+export interface ServerWarning { code: string; message: string; cmd: string }
 // Una transferencia o rechazo (JSON de fileserve.Transfer; Duration en nanosegundos).
 export interface TransferLine {
   Proto: string; Client: string; File: string; Bytes: number; Duration: number; Result: string;
@@ -27,7 +29,7 @@ export interface TransferGetParams {
   acceptedHostKeys: string[]; name?: string; insecure?: boolean; legacySsh?: boolean; maxBytes?: number; seconds?: number;
 }
 export interface TransferPutParams { url: string; fromDir: string; name: string; credentialId: string; acceptedHostKeys: string[]; legacySsh?: boolean; maxBytes?: number; seconds?: number }
-export interface TransferHintInfo { standardPort: number; nftables: string; remove: string }
+export interface TransferHintInfo { standardPort: number; nftables: string; remove: string; note?: string; noteCode?: string }
 
 
 // ---- Explorador remoto, avance y descarga múltiple (Fase 19) ----
