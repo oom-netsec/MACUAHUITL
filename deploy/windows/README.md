@@ -18,6 +18,9 @@ VERSION=1.2.3 BIN=<carpeta> deploy/windows/build-installer.sh dist/MACUAHUITL-1.
 ## Qué instala
 
 - **Carpeta:** los tres ejecutables, el ícono, `LICENSE.txt`, `NOTICE.txt`, `THIRD_PARTY_LICENSES.txt` y `TRADEMARK.md`, en `%LOCALAPPDATA%\Programs\MACUAHUITL`.
+  - La carpeta es fija: no hay página para elegirla y `/D=` se ignora. Una carpeta fuera del perfil, como `C:\Tools\…`, heredaría «Modificar» para Usuarios autenticados, y otro usuario local podría reemplazar el núcleo que arranca la entrada `Run`.
+  - Si la clave de desinstalación apunta a otra carpeta que existe (una instalación de cuando se podía elegir), el instalador sale con código 3 sin cambiar nada y pide desinstalarla primero. Si esa carpeta ya no existe, instala normalmente.
+  - Riesgo residual aceptado: la carpeta hereda la ACL del perfil. Si un administrador reubica `Local AppData` en un volumen con permisos abiertos, o en FAT/exFAT, esa protección no existe, igual que para los datos que están al lado.
 - **Accesos directos:** uno en el menú Inicio del usuario. El del escritorio es opcional y viene apagado.
 - **Entrada `Run` en HKCU:** arranca el núcleo al iniciar sesión, con la ruta absoluta de `macuahuitld.exe`.
 - **Clave de desinstalación en HKCU.** Nada en HKLM y nada que pida UAC.

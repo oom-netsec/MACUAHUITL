@@ -40,8 +40,10 @@ SetCompressor /SOLID lzma
 
 Name "MACUAHUITL"
 OutFile "${OUT}"
-InstallDir "$LOCALAPPDATA\Programs\MACUAHUITL"
-InstallDirRegKey HKCU "${UNINST_KEY}" "InstallLocation"
+; Carpeta fija, sin página para elegirla ni /D=: una carpeta fuera del perfil (C:\Tools\…) hereda «Modificar» para Usuarios
+; autenticados, y otro usuario local podría reemplazar macuahuitld.exe, que la entrada Run ejecuta como la víctima.
+!define FIXED_DIR "$LOCALAPPDATA\Programs\MACUAHUITL"
+InstallDir "${FIXED_DIR}"
 ShowInstDetails show
 
 VIProductVersion "${VERSION}.0"
@@ -66,9 +68,6 @@ Var PrevInstall ; carpeta de una instalación anterior (HKCU), vacía si es la p
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_COMPONENTS
-; Al actualizar no se ofrece otra carpeta: el núcleo viejo seguiría corriendo allá con el pipe y quedarían huérfanos.
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipDirOnUpgrade
-!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -85,6 +84,8 @@ LangString WV2Missing ${LANG_ENGLISH} "The Microsoft WebView2 Runtime is not ins
 LangString WV2Missing ${LANG_SPANISH} "En este equipo no está instalado el runtime WebView2 de Microsoft, que MACUAHUITL necesita para su ventana. Descárgalo e instálalo desde ${WV2_URL} y vuelve a abrir MACUAHUITL."
 LangString CoreBusy ${LANG_ENGLISH} "MACUAHUITL has work in progress (a Patrol job, a transfer or a capture). Close or cancel what is running in MACUAHUITL and try again. Nothing was changed."
 LangString CoreBusy ${LANG_SPANISH} "MACUAHUITL tiene trabajo en curso (un trabajo de Patrol, una transferencia o una captura). Cierra o cancela lo que está corriendo en MACUAHUITL y vuelve a intentarlo. No se cambió nada."
+LangString OtherDir ${LANG_ENGLISH} "MACUAHUITL is installed in $PrevInstall. Uninstall it from Settings → Apps and run this installer again; it now always installs in ${FIXED_DIR}. Nothing was changed."
+LangString OtherDir ${LANG_SPANISH} "MACUAHUITL está instalado en $PrevInstall. Desinstálalo desde Configuración → Aplicaciones y vuelve a ejecutar este instalador; ahora siempre instala en ${FIXED_DIR}. No se cambió nada."
 LangString AppOpen ${LANG_ENGLISH} "MACUAHUITL is open. Close it and try again. Nothing was changed."
 LangString AppOpen ${LANG_SPANISH} "MACUAHUITL está abierto. Ciérralo y vuelve a intentarlo. No se cambió nada."
 LangString CoreInUse ${LANG_ENGLISH} "$R9 is still running and did not stop. Open Task Manager → Details, end $R9 and choose Retry."
@@ -152,7 +153,18 @@ FunctionEnd
 !insertmacro StopCoreAll "un."
 
 Function .onInit
+  StrCpy $INSTDIR "${FIXED_DIR}" ; pisa un /D= de la línea de comandos
   ReadRegStr $PrevInstall HKCU "${UNINST_KEY}" "InstallLocation"
+  ; Una instalación anterior en otra carpeta (cuando se podía elegir): su núcleo seguiría corriendo allá y su entrada Run
+  ; quedaría pisada. Se pide desinstalarla antes; no se cambió nada. Si esa carpeta ya no existe (borrada a mano, perfil
+  ; movido) no hay núcleo viejo: se sigue, y esta instalación reescribe Run y la clave de desinstalación.
+  ${If} $PrevInstall != ""
+  ${AndIf} $PrevInstall != "${FIXED_DIR}"
+  ${AndIf} ${FileExists} "$PrevInstall\*.*"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "$(OtherDir)" /SD IDOK
+    SetErrorLevel 3
+    Quit
+  ${EndIf}
   ; Elevado (clic derecho → Ejecutar como administrador): todo iría al perfil y al HKCU de esa cuenta y lo que la app cree
   ; quedaría con dueño Administradores. En silencioso se sigue (despliegue deliberado; el runner de CI siempre es admin).
   System::Call 'shell32::IsUserAnAdmin() i .r0'
@@ -160,12 +172,6 @@ Function .onInit
     MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "$(Elevated)" /SD IDOK IDOK elevatedOk
     Abort
     elevatedOk:
-  ${EndIf}
-FunctionEnd
-
-Function SkipDirOnUpgrade
-  ${If} $PrevInstall != ""
-    Abort
   ${EndIf}
 FunctionEnd
 
