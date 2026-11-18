@@ -3,6 +3,8 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
+import { TargetField } from "../inventory/TargetField";
+import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { planTarget } from "../../lib/targets";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -105,7 +107,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("snippets.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={edit(setEquipo)} w="lg" mono />
+          <TargetField core={core} value={equipo} onChange={edit(setEquipo)} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) edit(setCredId)(id); }} />
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={edit(setCredId)} />
           <Select<Platform> label={t("snippets.platform")} value={platform} onChange={edit(setPlatform)} w="sm" options={[["", t("snippets.platform.all")], ["ios", "IOS"], ["ios-xe", "IOS-XE"]]} />
         </div>

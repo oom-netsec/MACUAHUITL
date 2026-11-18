@@ -21,7 +21,7 @@ async function read(over: Record<string, unknown> = {}) {
   render(<PortsView core={core} />);
   const btn = await screen.findByRole("button", { name: "Leer puertos (solo lectura)" });
   expect(btn).toBeDisabled(); // falta el equipo
-  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5:2222");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5:2222");
   await userEvent.click(btn);
   return core;
 }
@@ -125,6 +125,6 @@ test("una huella cambiada en Leer puertos muestra el aviso de peligro", async ()
 test("si se cambia el equipo, la huella pendiente desaparece: no se reintenta contra otro con la huella del primero", async () => {
   await read({ portStatus: vi.fn().mockRejectedValue(hkErr("transport.hostkey.unknown")) });
   expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
-  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "9");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "9");
   expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
 });

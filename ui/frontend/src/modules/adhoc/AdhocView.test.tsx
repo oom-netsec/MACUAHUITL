@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { AdhocView } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
 
 const cred = { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false };
 const report = { commands: ["show clock"], devices: 2, rows: [
@@ -211,4 +212,26 @@ test("Ejecutar lote nombra lo que falta y deja de hacerlo al completarlo", async
   await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
   expect(run()).toBeEnabled();
   expect(run()).not.toHaveAccessibleDescription();
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se envía igual que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "10.9.0.1", port: 0 }, { address: "ap1.lab", port: 2222 }], BOOK_CRED, expect.stringContaining("show version"), []);
+});
+
+test("equipos de la libreta: una credencial ya elegida a mano no se pisa", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "otra (x)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c2");
+  await pickHost("LAB-CORE");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1");
+  expect(screen.getByLabelText("Credencial")).toHaveValue("c2");
 });

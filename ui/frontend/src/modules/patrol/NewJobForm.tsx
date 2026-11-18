@@ -16,6 +16,7 @@ import { useScriptsVersion } from "../scripts/signal";
 import { NoPacks } from "../../components/NoPacks";
 import { useNav } from "../../app/activity";
 import { parseTargets } from "../../lib/targets";
+import { TargetsField } from "../inventory/TargetField";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
@@ -29,6 +30,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
   const [cred, setCred] = useState("");
+  const pickCred = (id: string) => { if (!cred && creds.some((c) => c.id === id)) setCred(id); }; // de la libreta; no pisa la que ya se eligió
   const [cmds, setCmds] = useState("");
   const [catalog, setCatalog] = useState<PlaybookInfo[] | null>(null);
   const go = useNav();
@@ -115,7 +117,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
           <Field label={t("patrol.name")} value={name} onChange={setName} w="md" />
           <CredentialSelect creds={creds} vault={vault} notice={false} value={cred} onChange={setCred} w="lg" />
         </div>
-        <TextArea label={t("patrol.targets")} hint={t("patrol.targets.hint")} value={targets} onChange={setTargets} rows={4} mono />
+        <TargetsField core={core} hint={t("patrol.targets.hint")} value={targets} onChange={setTargets} rows={4} onPickCredential={pickCred} />
         <p className="hint count">{t("patrol.deviceCount", { n: devices.length })}</p>
       </Section>
       <Section title={`2 · ${t("patrol.step.commands")}`}>

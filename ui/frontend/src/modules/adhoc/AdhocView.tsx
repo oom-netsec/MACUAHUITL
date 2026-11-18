@@ -12,7 +12,8 @@ import { parseTarget, parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { hostKeysFromLogin, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 // Lotes: comandos de solo lectura en varios equipos, como un trabajo de Patrol de una ronda.
@@ -89,7 +90,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
       <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); setUnarmed(""); }} w="lg" />
-      <TextArea label={t("adhoc.devices")} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} rows={3} />
+      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); setUnarmed(""); } }} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); setHks([]); setUnarmed(""); }} rows={5} />
       <div className="actions">
         <RunButton primary kbd busy={r.busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>

@@ -3,6 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
 import { Advanced } from "../../components/Advanced";
+import { TargetField } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
@@ -82,7 +83,7 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
       <AssistBanner active={active} />
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">
-        <Field label={t("backup.restore.device")} value={equipo} onChange={setEquipo} w="lg" mono />
+        <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) setCredId(id); }} />
         <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
       </div>
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />

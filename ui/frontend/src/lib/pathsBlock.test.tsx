@@ -34,7 +34,7 @@ test("Patrol: con la carpeta de salida rechazada no se crea el trabajo y se avis
   const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }]) });
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.type(screen.getByLabelText("Comandos"), "show version");
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "\\\\?\\C:\\out".replaceAll("\\", "\\"));

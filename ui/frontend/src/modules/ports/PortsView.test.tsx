@@ -5,12 +5,13 @@ import { fakeCore } from "../../lib/fake";
 import { samplePlan } from "./fake";
 import { ModuleIdContext, NavContext } from "../../app/activity";
 import { START, clickWhenReady, confirmStep, lineText } from "../../lib/assistTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 
 async function plan(core: ReturnType<typeof fakeCore>) {
   render(<PortsView core={core} />);
-  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5:2222");
+  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5:2222");
   await userEvent.type(screen.getByLabelText("Interfaces"), "GigabitEthernet1/0/1");
   await userEvent.type(screen.getByLabelText("VLAN de acceso"), "20");
   await userEvent.click(screen.getByRole("button", { name: "Planear (solo lectura)" }));
@@ -89,7 +90,7 @@ test("un fallo mantiene el aviso, muestra el motivo y ofrece la reversa o aborta
 test("un error del núcleo al planear se muestra y no deja iniciar nada", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistPlanPorts: vi.fn(async () => { throw new Error("rpc error: code = FailedPrecondition desc = es trunk"); }) });
   render(<PortsView core={core} />);
-  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
+  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5");
   await userEvent.type(screen.getByLabelText("Interfaces"), "Gi1/0/1");
   await userEvent.type(screen.getByLabelText("VLAN de acceso"), "20");
   await userEvent.click(screen.getByRole("button", { name: "Planear (solo lectura)" }));
@@ -216,7 +217,7 @@ test("al montarse con una ejecución detenida por fallo ofrece la reversa o abor
 test("sin ejecuciones vivas el módulo abre limpio", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   render(<PortsView core={core} />);
-  await screen.findByLabelText("Equipo (IP o nombre[:puerto])");
+  await screen.findByLabelText("Equipo (IP o nombre, con :puerto opcional)");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(core.assistWatch).not.toHaveBeenCalled();
 });
@@ -464,7 +465,7 @@ test("un paso nuevo no le quita el foco a un campo donde se está escribiendo", 
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   await plan(core);
   await start();
-  const campo = screen.getByLabelText("Equipo (IP o nombre[:puerto])");
+  const campo = screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)");
   campo.focus();
   act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: applyStep }));
   await screen.findByRole("region", { name: "Paso pendiente apply-1" });
@@ -510,7 +511,7 @@ test("Planear y Leer puertos nombran lo que falta y dejan de hacerlo al completa
   expect(planBtn).toBeDisabled();
   expect(planBtn).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial, indicar las interfaces, elegir qué cambiar (VLAN, VLAN de voz, descripción o estado).");
   expect(read).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial.");
-  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.type(screen.getByLabelText("Interfaces"), "Gi1/0/1");
   expect(read).toBeEnabled();
@@ -519,4 +520,21 @@ test("Planear y Leer puertos nombran lo que falta y dejan de hacerlo al completa
   await userEvent.type(screen.getByLabelText("VLAN de acceso"), "20");
   expect(planBtn).toBeEnabled();
   expect(planBtn).not.toHaveAccessibleDescription();
+});
+
+test("equipo de la libreta: etiqueta común, rellena campo y credencial, y el plan lleva lo mismo que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<PortsView core={core} />);
+  await screen.findAllByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_ONE)).toHaveValue("ap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue("");
+  await pickHost("LAB-CORE");
+  expect(screen.getByLabelText(LABEL_ONE)).toHaveValue("10.9.0.1");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.type(screen.getByLabelText("Interfaces"), "GigabitEthernet1/0/1");
+  await userEvent.type(screen.getByLabelText("VLAN de acceso"), "20");
+  await userEvent.click(screen.getByRole("button", { name: "Planear (solo lectura)" }));
+  await screen.findByRole("region", { name: "Reversa" });
+  expect(core.assistPlanPorts).toHaveBeenCalledWith({ target: { name: "10.9.0.1", address: "10.9.0.1", credentialId: BOOK_CRED }, interfaces: ["GigabitEthernet1/0/1"], vlan: 20 });
 });

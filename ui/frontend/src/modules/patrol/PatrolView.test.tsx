@@ -9,6 +9,7 @@ import type { RunDevice } from "../../lib/core";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { NavContext } from "../../app/activity";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
 
 test("elapsed resume duraciones de forma legible", () => {
   const t = (s: number) => elapsed(s * 1000);
@@ -24,7 +25,7 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 async function fillForm(core: ReturnType<typeof fakeCore>) {
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-1");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1 10.0.0.2");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1 10.0.0.2");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.type(screen.getByLabelText("Comandos"), "show version");
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
@@ -262,7 +263,7 @@ test("se eligen playbooks del catálogo y van en playbookIds; sin comandos pegad
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-2");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.click(await findPb("STP"));
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
@@ -788,4 +789,22 @@ test("programación: 1 y 10080 minutos son válidos; la pista de Rondas nombra l
     await crear(core);
     expect(sched(core)).toMatchObject({ intervalSeconds: Number(m) * 60 });
   }
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y el trabajo lleva lo mismo que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<PatrolView core={core} />);
+  await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-2");
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.type(screen.getByLabelText("Comandos"), "show version");
+  await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+  const spec = vi.mocked(core.createJob).mock.calls[0][0];
+  expect(spec.targets.map((t: { address: string }) => t.address)).toEqual(["10.9.0.1", "ap1.lab:2222"]);
+  expect(spec.defaultCredentialId).toBe(BOOK_CRED);
 });

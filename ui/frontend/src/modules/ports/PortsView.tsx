@@ -2,6 +2,7 @@ import { useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
+import { TargetField } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -86,7 +87,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("ports.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} w="lg" mono />
+          <TargetField core={core} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) setCredId(id); }} />
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
         </div>
       </Section>

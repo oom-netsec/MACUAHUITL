@@ -3,7 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
-import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
+import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { DiffView } from "../../components/DiffView";
@@ -20,7 +20,8 @@ import { BackupTimeline } from "./BackupTimeline";
 import { useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import "./backup.css";
-import { hostKeysFromLogin, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 // Respaldos: running-config (y startup-config) de cada equipo en outputs/respaldos/, con permisos 0600.
@@ -118,7 +119,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
     <Page title={t("backup.title")} description={<>{t("backup.intro.a")}<code>outputs/respaldos/</code>{t("backup.intro.b")}</>}>
       <Section title={t("backup.sec.run")}>
         <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); }} />
-        <TextArea label={t("backup.devices")} value={devices} onChange={(v) => { setDevices(v); setHks([]); }} rows={3} />
+        <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); } }} />
         <div className="field-row end">
           <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
           {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}

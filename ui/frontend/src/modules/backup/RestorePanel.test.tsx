@@ -4,6 +4,7 @@ import { BackupView } from "./BackupView";
 import { fakeCore } from "../../lib/fake";
 import { sampleEntry, sampleRestore } from "./fake";
 import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
 
 const clear = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });
 const masked = sampleEntry();
@@ -31,7 +32,7 @@ test("un respaldo enmascarado no se puede restaurar: el botón está apagado y d
 
 test("planear solo lee: manda el respaldo, muestra el plan con su reversa y no inicia nada", async () => {
   const core = await open();
-  expect(screen.getByLabelText("Equipo (IP o nombre[:puerto])")).toHaveValue("192.0.2.1");
+  expect(screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)")).toHaveValue("192.0.2.1");
   expect(screen.getByText(/Esto cambia la configuración de un equipo real/)).toBeInTheDocument();
   await userEvent.type(screen.getByLabelText(/Interfaz de gestión/), "Vlan1");
   await userEvent.click(planBtn());
@@ -120,4 +121,15 @@ test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () =>
   await userEvent.selectOptions(within(document.querySelector<HTMLElement>(".restore-block")!).getByLabelText("Credencial"), "c1");
   expect(planBtn()).toBeEnabled();
   expect(planBtn()).not.toHaveAccessibleDescription();
+});
+
+test("equipo de la libreta: etiqueta común, rellena campo y credencial, y el plan lleva lo mismo que a mano", async () => {
+  const core = await open({ listCredentials: vi.fn(async () => bookCreds) });
+  await screen.findAllByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE", true);
+  expect(screen.getByLabelText(LABEL_ONE)).toHaveValue("10.9.0.1");
+  expect(screen.getAllByLabelText("Credencial").at(-1)).toHaveValue(BOOK_CRED); // el del panel; la vista trae otro antes
+  await userEvent.type(screen.getByLabelText(/Interfaz de gestión/), "Vlan1");
+  await userEvent.click(planBtn());
+  expect(core.assistPlanRestore).toHaveBeenCalledWith(expect.objectContaining({ target: { name: "10.9.0.1", address: "10.9.0.1", credentialId: BOOK_CRED }, backupId: clear.id }));
 });
