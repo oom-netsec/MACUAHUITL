@@ -171,7 +171,9 @@ function bps(v?: number | null) {
 const profiles: [string, Key][] = [["sistema", "visibility.prof.system"], ["interfaces", "visibility.prof.interfaces"], ["cpu", "visibility.prof.cpu"], ["memoria", "visibility.prof.memory"]];
 
 const authOpts: [string, string][] = [["SHA", "SHA"], ["SHA256", "SHA-256"], ["SHA384", "SHA-384"], ["SHA512", "SHA-512"]];
-const privOpts: [string, string][] = [["AES", "AES-128"], ["AES192", "AES-192"], ["AES256", "AES-256"]];
+// Cisco IOS deriva la llave de AES-192/256 con Reeder (las «C» de gosnmp); Blumenthal no descifra con un IOS.
+const privOpts = (t: ReturnType<typeof useT>): [string, string][] => [["AES", "AES-128"], ["AES192C", t("visibility.priv.cisco", { alg: "AES-192" })], ["AES256C", t("visibility.priv.cisco", { alg: "AES-256" })],
+  ["AES192", t("visibility.priv.rfc", { alg: "AES-192" })], ["AES256", t("visibility.priv.rfc", { alg: "AES-256" })]];
 
 type PanelProps = { core: CoreAPI; active: boolean; onRun: (running: boolean) => void };
 
@@ -211,7 +213,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           {version === "3" && (
             <>
               <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
-              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts} w="md" />
+              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts(t)} w="md" />
             </>
           )}
         </div>
@@ -324,7 +326,7 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
           {cred && (
             <>
               <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
-              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts} w="md" />
+              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts(t)} w="md" />
             </>
           )}
         </div>

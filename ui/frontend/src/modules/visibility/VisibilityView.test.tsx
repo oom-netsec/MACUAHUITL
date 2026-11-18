@@ -274,9 +274,9 @@ test("snmp v3 manda auth y priv; con v2c van vacíos", async () => {
   await userEvent.type(screen.getByLabelText(/OID/), "1.3.6.1.2.1.1.5.0");
   await userEvent.selectOptions(screen.getByLabelText("Versión"), "3");
   await userEvent.selectOptions(screen.getByLabelText("Autenticación"), "SHA256");
-  await userEvent.selectOptions(screen.getByLabelText("Privacidad"), "AES256");
+  await userEvent.selectOptions(screen.getByLabelText("Privacidad"), screen.getByRole("option", { name: "AES-256 (Cisco IOS)" })); // la variante Reeder que usa IOS
   await userEvent.click(screen.getByRole("button", { name: "Get" }));
-  await waitFor(() => expect(core.snmpGet).toHaveBeenLastCalledWith(expect.objectContaining({ version: "3", auth: "SHA256", priv: "AES256" }), expect.anything()));
+  await waitFor(() => expect(core.snmpGet).toHaveBeenLastCalledWith(expect.objectContaining({ version: "3", auth: "SHA256", priv: "AES256C" }), expect.anything()));
   await userEvent.selectOptions(screen.getByLabelText("Versión"), "2c");
   await userEvent.click(screen.getByRole("button", { name: "Get" }));
   await waitFor(() => expect(core.snmpGet).toHaveBeenLastCalledWith(expect.objectContaining({ version: "2c", auth: "", priv: "" }), expect.anything()));

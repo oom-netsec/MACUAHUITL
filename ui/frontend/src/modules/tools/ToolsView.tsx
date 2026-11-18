@@ -82,7 +82,8 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
 
 const dnsModes = ["query", "transport", "hygiene", "exposure", "trace", "zone", "dnssec"] as const;
 const deepModes = new Set(["trace", "zone", "dnssec"]);
-// Qué lee el núcleo en cada modo (internal/service/tools/tools.go:121-138; dnssec: checks.go:47 y dnssec.go:107 lo fijan ellos mismos).
+// Qué lee el núcleo en cada modo (internal/service/tools/tools.go:121-138). transport fija DNSSEC por variante (checks.go:47);
+// dnssec lo fuerza en sus consultas (dnssec.go:107); su Trace previo solo aporta los cortes de zona.
 const dnsUses = {
   name: (m: string) => m !== "exposure",
   type: (m: string) => m === "query" || m === "trace",
