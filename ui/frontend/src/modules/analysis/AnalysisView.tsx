@@ -9,7 +9,7 @@ import { ExportMenu } from "../../components/Files";
 import { tableCsv, tableMarkdown } from "../../lib/tableExport";
 import type { AnalysisReport, AnalysisWarning, CoreAPI, DiffReport, Severity, TimelineEvent, TimelineReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, Warnings, useResult } from "../../components/Page";
 import { useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { vocab } from "../../lib/vocab";
@@ -33,16 +33,8 @@ function NoRun() {
   );
 }
 
-function Warnings({ list }: { list: AnalysisWarning[] | null }) {
-  const t = useT();
-  if (!list?.length) return null;
-  return (
-    <Notice kind="warn">
-      <ul className="warnings">
-        {list.map((w, i) => <li key={i}>{t("analysis.warning", { text: [w.device, w.round ? t("analysis.roundN", { n: w.round }) : "", w.command].filter(Boolean).join(" · ") + (w.device || w.command ? ": " : "") + w.msg })}</li>)}
-      </ul>
-    </Notice>
-  );
+function warnLines(t: ReturnType<typeof useT>, list: AnalysisWarning[] | null | undefined) {
+  return list?.map((w) => [w.device, w.round ? t("analysis.roundN", { n: w.round }) : "", w.command].filter(Boolean).join(" · ") + (w.device || w.command ? ": " : "") + w.msg);
 }
 
 function Findings({ core, job, device, head }: { core: CoreAPI; job: string; device: string; head: ReactNode }) {
@@ -88,7 +80,7 @@ function Findings({ core, job, device, head }: { core: CoreAPI; job: string; dev
               );
             })}
             {r.missing.length > 0 && <p className="meta">{t("analysis.missing", { list: r.missing.join(", ") })}</p>}
-            <Warnings list={r.warnings} />
+            <Warnings list={warnLines(t, r.warnings)} />
           </div>
         </ResultPanel>
       )}
@@ -150,7 +142,7 @@ function Diff({ core, job, device, head }: { core: CoreAPI; job: string; device:
         </ResultPanel>
       ))}
       {q.data && q.data.devices.length === 0 && <Notice kind="info">{t("analysis.noDiffDevices")}</Notice>}
-      <Warnings list={q.data?.warnings ?? null} />
+      <Warnings list={warnLines(t, q.data?.warnings)} />
     </>
   );
 }
@@ -196,7 +188,7 @@ function Timeline({ core, job, device, head }: { core: CoreAPI; job: string; dev
             height={Math.min(520, 40 + 32 * q.data.events.length)} />
         </ResultPanel>
       )}
-      <Warnings list={q.data?.warnings ?? null} />
+      <Warnings list={warnLines(t, q.data?.warnings)} />
     </>
   );
 }

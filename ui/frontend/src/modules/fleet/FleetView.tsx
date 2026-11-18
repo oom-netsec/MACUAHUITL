@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { vocab } from "../../lib/vocab";
 import type { CapacityResult, CoreAPI, FindResult, HealthResult, InventoryResult, PathResult, SummaryResult, TraceResult } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, TabPanels, Tabs, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, TabPanels, Tabs, Warnings, useResult } from "../../components/Page";
 import { useLang, useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import { formatDateTime } from "../../components/Data";
@@ -34,12 +34,6 @@ function When({ at, source }: { at: string; source?: string }) {
   const lang = useLang();
   const old = Date.now() - Date.parse(at) > 24 * 3600 * 1000;
   return <span className={old ? "stale" : "meta"} data-stale={old || undefined} title={at}>{source ? `${vocab(t, "source", source)} · ` : ""}{formatDateTime(at, lang)} ({age(at, t)}){old ? ` · ${t("fleet.stale")}` : ""}</span>;
-}
-
-function Warnings({ list }: { list: string[] | null | undefined }) {
-  const t = useT();
-  if (!list?.length) return null;
-  return <Notice kind="warn"><ul className="fleet-warnings">{list.map((w, i) => <li key={i}>{t("fleet.warning", { w })}</li>)}</ul></Notice>;
 }
 
 const runKbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
