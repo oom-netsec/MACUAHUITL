@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +18,12 @@ import (
 type fakePing200 struct {
 	v1.UnimplementedDiagServiceServer
 	stop chan struct{}
+	// parada marca que ya se paró: como el núcleo real, un segundo StopRun no la encuentra.
+	parada *atomic.Bool
+}
+
+func nuevoPing200() fakePing200 {
+	return fakePing200{stop: make(chan struct{}), parada: new(atomic.Bool)}
 }
 
 func (f fakePing200) Run(_ *v1.RunRequest, st v1.DiagService_RunServer) error {
@@ -34,6 +41,10 @@ func (f fakePing200) StopRun(_ context.Context, r *v1.StopRunRequest) (*v1.StopR
 	if r.RunId != "core-1" {
 		return nil, status.Error(codes.NotFound, "no run")
 	}
+	// El puente puede reenviar un StopRun si aún no vio el cierre de la ronda: el núcleo real responde NotFound.
+	if f.parada.Swap(true) {
+		return nil, status.Error(codes.NotFound, "no run")
+	}
 	close(f.stop)
 	return &v1.StopRunResponse{}, nil
 }
@@ -45,7 +56,7 @@ func waitCount(rec *recorder, name string, n int) {
 }
 
 func TestDiagPingExtendido200(t *testing.T) {
-	b, rec := startServices(t, func(r ipc.Registrar) { v1.RegisterDiagServiceServer(r, fakePing200{stop: make(chan struct{})}) })
+	b, rec := startServices(t, func(r ipc.Registrar) { v1.RegisterDiagServiceServer(r, nuevoPing200()) })
 	id, err := b.DiagRun("ping", []string{"192.0.2.1"}, map[string]string{"continuous": "true"})
 	if err != nil {
 		t.Fatal(err)
