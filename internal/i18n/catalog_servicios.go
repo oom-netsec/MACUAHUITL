@@ -5,11 +5,13 @@ package i18n
 func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
 	add(map[string]entry{
-		"backup.err.keep":          e("la retención máxima es {max}", "the maximum retention is {max}", "max"),
-		"backup.err.no_targets":    e("indica al menos un equipo", "specify at least one device"),
-		"backup.err.rounds":        e("con intervalo indica cuántas rondas (2 o más)", "with an interval, specify how many rounds (2 or more)"),
-		"backup.err.out_dir":       e("carpeta de salida: {error}", "output folder: {error}", "error"),
-		"backup.err.diff_mismatch": e("compara dos respaldos del mismo equipo y del mismo tipo", "compare two backups of the same device and the same type"),
+		"backup.err.dir_fuera":        e("backup.err.dir_fuera: {dir} no está dentro de la carpeta de salidas ni de la de un trabajo", "backup.err.dir_fuera: {dir} is not inside the outputs folder or a job's folder", "dir"),
+		"backup.err.dir_sin_manifest": e("backup.err.dir_sin_manifest: {dir} no tiene un manifest.json legible: la corrida no terminó o no es una corrida", "backup.err.dir_sin_manifest: {dir} has no readable manifest.json: the run did not finish or is not a run", "dir"),
+		"backup.err.keep":             e("la retención máxima es {max}", "the maximum retention is {max}", "max"),
+		"backup.err.no_targets":       e("indica al menos un equipo", "specify at least one device"),
+		"backup.err.rounds":           e("con intervalo indica cuántas rondas (2 o más)", "with an interval, specify how many rounds (2 or more)"),
+		"backup.err.out_dir":          e("carpeta de salida: {error}", "output folder: {error}", "error"),
+		"backup.err.diff_mismatch":    e("compara dos respaldos del mismo equipo y del mismo tipo", "compare two backups of the same device and the same type"),
 
 		"terminal.err.out_dir":       e("carpeta de salida: {error}", "output folder: {error}", "error"),
 		"terminal.err.recording":     e("archivo de grabación: {error}", "recording file: {error}", "error"),

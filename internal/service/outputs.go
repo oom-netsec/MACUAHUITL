@@ -60,14 +60,9 @@ func resolve(p string) string {
 	return filepath.Clean(p)
 }
 
-// CheckOutputs comprueba una carpeta de salidas (la de Ajustes o la que el cliente pasa en un RPC) y devuelve la ruta resuelta (sin enlaces). Vacía = la de
-// fábrica y no se comprueba nada. El núcleo no cambia los permisos del usuario: si la carpeta es más abierta que
-// 0700, la rechaza y sugiere la orden. Con probe prueba además la escritura (crea y borra un temporal); al arrancar
-// se llama sin probe.
-func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
-	if dir == "" {
-		return "", nil
-	}
+// resolveDir es la parte de CheckOutputs que no mira permisos ni dueño: ruta absoluta sin «..», enlaces resueltos, carpeta real,
+// ni raíz, ni HOME, ni /tmp, ni dentro de (ni conteniendo a) una carpeta reservada. Devuelve la ruta resuelta.
+func resolveDir(dir string, st *CoreSettings) (string, error) {
 	// Una relativa simple (sin barra inicial ni «X:») conserva su motivo propio.
 	if !strings.ContainsAny(dir[:1], `\/`) && !(len(dir) > 1 && dir[1] == ':') && !filepath.IsAbs(dir) {
 		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
@@ -119,6 +114,25 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		if inside(r, real) { // la elegida contiene una reservada: el núcleo escribiría entre sus propios datos
 			return "", outputsErr("prefs.outputs.reservada_contiene", "dir", real, "res", r)
 		}
+	}
+	return real, nil
+}
+
+// CheckOutputs comprueba una carpeta de salidas (la de Ajustes o la que el cliente pasa en un RPC) y devuelve la ruta resuelta (sin enlaces). Vacía = la de
+// fábrica y no se comprueba nada. El núcleo no cambia los permisos del usuario: si la carpeta es más abierta que
+// 0700, la rechaza y sugiere la orden. Con probe prueba además la escritura (crea y borra un temporal); al arrancar
+// se llama sin probe.
+func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
+	if dir == "" {
+		return "", nil
+	}
+	real, err := resolveDir(dir, st)
+	if err != nil {
+		return "", err
+	}
+	fi, err := os.Stat(real)
+	if err != nil {
+		return "", outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
 	}
 	if runtime.GOOS == "windows" { // dueño, ACL y ancestros por SID (ADR 0012, c); sin modos ni uid
 		if err := sys.PrivateDir(real); err != nil {

@@ -12,7 +12,8 @@ uso: mctl <comando>
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);
          cada conflicto necesita una decisión por ID o etiqueta, o --all; si falta una no se importa nada)
   job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
-        cancel ID | list | watch ID
+        cancel ID | list [--all] | watch ID
+        rm ID... | clear --finished   (quitan del historial; la evidencia en disco no se borra)
   playbooks [--platform P]
   audit verify | export
   (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
@@ -108,7 +109,7 @@ uso: mctl <comando>
   backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]
         (guarda show running-config en outputs/respaldos/EQUIPO/ con 0600; un trabajo de Patrol: solo lectura.
          Con --every y --rounds queda programado y el núcleo guarda cada ronda)
-  backup collect TRABAJO [--keep N] [--json]   guarda lo que un trabajo lleva recolectado (idempotente)
+  backup collect (TRABAJO | --dir CARPETA) [--keep N] [--json]   guarda lo que un trabajo (o la carpeta de una corrida ya quitada del historial) lleva recolectado (idempotente)
   backup list [EQUIPO] [--json]                respaldos guardados (avisa los de secretos enmascarados)
   backup diff ID_A ID_B | ID_A --now -d EQUIPO --cred ID [--json]
         (diferencias entre dos respaldos, o contra el running actual: toma uno nuevo; sin líneas volátiles)

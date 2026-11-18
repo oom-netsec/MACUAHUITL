@@ -115,14 +115,16 @@ func runBackup(c *cli.Env, args []string) error {
 func collect(c *cli.Env, args []string) error {
 	var keep int
 	var asJSON bool
+	var dir string
 	fs, err := cli.Flags("backup collect", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&dir, "dir", "", "carpeta absoluta de la corrida, si el trabajo ya se quitó del historial (en vez de TRABAJO)")
 		fs.IntVar(&keep, "keep", 0, "respaldos a conservar por equipo y tipo (0 = lo del trabajo, o 30)")
 		fs.BoolVar(&asJSON, "json", false, "salida JSON")
 	})
-	if err != nil || fs.NArg() != 1 || keep < 0 {
-		return errors.New("uso: mctl backup collect TRABAJO [--keep N] [--json]")
+	if err != nil || fs.NArg() != btoi(dir == "") || keep < 0 {
+		return errors.New("uso: mctl backup collect (TRABAJO | --dir CARPETA) [--keep N] [--json]")
 	}
-	r, err := v1.NewBackupServiceClient(c.Conn).CollectBackups(context.Background(), &v1.CollectBackupsRequest{JobId: fs.Arg(0), Keep: uint32(keep)})
+	r, err := v1.NewBackupServiceClient(c.Conn).CollectBackups(context.Background(), &v1.CollectBackupsRequest{JobId: fs.Arg(0), Dir: dir, Keep: uint32(keep)})
 	if err != nil {
 		return err
 	}
@@ -131,7 +133,7 @@ func collect(c *cli.Env, args []string) error {
 		fmt.Fprintln(c.Out, cli.T("mctl.backup.still_running", "state", r.State))
 	}
 	if r.Done && r.Error != "" {
-		return cli.Err("mctl.backup.job_failed", "job", fs.Arg(0), "error", r.Error)
+		return cli.Err("mctl.backup.job_failed", "job", firstNonEmpty(fs.Arg(0), dir), "error", r.Error)
 	}
 	return nil
 }
@@ -243,7 +245,7 @@ func export(c *cli.Env, args []string) error {
 const help = `  ` + runUsage + `
         (guarda show running-config en outputs/respaldos/EQUIPO/ con 0600; un trabajo de Patrol: solo lectura.
          Con --every y --rounds queda programado y el núcleo guarda cada ronda)
-  backup collect TRABAJO [--keep N] [--json]   guarda lo que un trabajo lleva recolectado (idempotente)
+  backup collect (TRABAJO | --dir CARPETA) [--keep N] [--json]   guarda lo que un trabajo (o la carpeta de una corrida ya quitada del historial) lleva recolectado (idempotente)
   backup list [EQUIPO] [--json]                respaldos guardados (avisa los de secretos enmascarados)
   backup diff ID_A ID_B | ID_A --now -d EQUIPO --cred ID [--json]
         (diferencias entre dos respaldos, o contra el running actual: toma uno nuevo; sin líneas volátiles)
@@ -255,4 +257,18 @@ func Area() cli.Area {
 		{Name: "backup run", Run: runBackup}, {Name: "backup collect", Run: collect}, {Name: "backup list", Run: list},
 		{Name: "backup diff", Run: diff}, {Name: "backup export", Run: export},
 	}}
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func firstNonEmpty(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

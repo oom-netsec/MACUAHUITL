@@ -29,6 +29,7 @@ type PlaybookRef struct {
 }
 
 type Manifest struct {
+	JobID           string            `json:"job_id,omitempty"` // vacío en las corridas anteriores a la fase 46
 	Name            string            `json:"name"`
 	AppVersion      string            `json:"app_version"`
 	StartedAt       time.Time         `json:"started_at"`
@@ -88,7 +89,7 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 		}
 	}
 	m := Manifest{
-		Name: s.Name, AppVersion: version.Version, StartedAt: w.started, EndedAt: d.Now(),
+		JobID: d.JobID, Name: s.Name, AppVersion: version.Version, StartedAt: w.started, EndedAt: d.Now(),
 		Devices: results, Rounds: rounds, Masked: !s.DisableMasking, MaskCounts: w.masks(),
 		Files: []FileRef{}, ChangedHostKeys: []HostKeyChange{},
 	}

@@ -81,6 +81,8 @@ type Spec struct {
 
 // Deps son los servicios que Patrol usa; el núcleo los arma.
 type Deps struct {
+	// JobID es el id del trabajo que escribe el manifest (vacío en las pruebas que no lo necesitan).
+	JobID     string
 	Guard     *transport.Guard
 	Hosts     *transport.KnownHosts
 	Vault     *vault.Vault

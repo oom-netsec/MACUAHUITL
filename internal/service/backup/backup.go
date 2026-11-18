@@ -263,15 +263,24 @@ func masked(t *tracked, dir string) bool {
 // collect serializa collectLocked; el primero en ver el estado terminal de un trabajo propio deja su
 // resultado en final, para que el otro (vigilante o CollectBackups) no responda con la carpeta ya borrada.
 func (s *backupSvc) collect(ctx context.Context, job string, keep int) (collected, error) {
+	return s.collectIn(ctx, job, keep, "")
+}
+
+// collectIn es collect con dir ya validada (CheckRunDir): la corrida de un trabajo que se quitó del historial. Con dir el
+// estado es terminado y nada del trabajo en memoria (tracked, final, seen) se toca: job solo rotula los respaldos.
+func (s *backupSvc) collectIn(ctx context.Context, job string, keep int, dir string) (collected, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if dir != "" {
+		return s.collectLocked(ctx, job, keep, dir)
+	}
 	if f, ok := s.final[job]; ok {
 		return f, nil
 	}
 	s.jobsMu.Lock()
 	own := s.jobs[job] != nil
 	s.jobsMu.Unlock()
-	res, err := s.collectLocked(ctx, job, keep)
+	res, err := s.collectLocked(ctx, job, keep, "")
 	if err == nil && res.done && own {
 		if s.final == nil {
 			s.final = map[string]collected{}
@@ -285,16 +294,22 @@ func (s *backupSvc) collect(ctx context.Context, job string, keep int) (collecte
 	return res, err
 }
 
-func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (collected, error) {
-	j, err := s.d.Job(ctx, job)
-	if err != nil {
-		return collected{}, err
+func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int, dir string) (collected, error) {
+	j := service.JobInfo{State: "completed", Dir: dir}
+	if dir == "" {
+		var err error
+		if j, err = s.d.Job(ctx, job); err != nil {
+			return collected{}, err
+		}
 	}
 	res := collected{state: j.State, Saved: []string{}, Warnings: []string{}}
 	terminal := j.State == "completed" || j.State == "cancelled"
-	s.jobsMu.Lock()
-	tr := s.jobs[job]
-	s.jobsMu.Unlock()
+	var tr *tracked
+	if dir == "" {
+		s.jobsMu.Lock()
+		tr = s.jobs[job]
+		s.jobsMu.Unlock()
+	}
 	if keep == 0 {
 		keep = backup.DefaultKeep
 		if tr != nil {
@@ -329,15 +344,19 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 		return false
 	}
 	b, err := analyze.LoadSkipping(j.Dir, skip)
-	if s.seen == nil {
-		s.seen = map[string]map[string]fstat{}
+	if dir == "" {
+		if s.seen == nil {
+			s.seen = map[string]map[string]fstat{}
+		}
+		s.seen[job] = observed
 	}
-	s.seen[job] = observed
 	if err != nil {
 		// Sin salidas aún no es un error mientras el trabajo corre.
 		if terminal {
 			res.errMsg = firstNonEmpty(j.FinishErr, err.Error())
-			s.forget(job, tr, false)
+			if dir == "" {
+				s.forget(job, tr, false)
+			}
 		}
 		return res, nil
 	}
@@ -456,7 +475,9 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 		if !clean && tr != nil {
 			s.d.Audit("backup.kept", job, "Patrol folder kept: "+tr.lote)
 		}
-		s.forget(job, tr, clean)
+		if dir == "" {
+			s.forget(job, tr, clean)
+		}
 	}
 	return res, nil
 }
@@ -508,7 +529,18 @@ func (s *backupSvc) CollectBackups(ctx context.Context, r *v1.CollectBackupsRequ
 			return nil, err
 		}
 	}
-	c, err := s.collect(ctx, r.JobId, keep)
+	job, dir := r.JobId, ""
+	if r.Dir != "" {
+		var id string
+		var err error
+		if dir, id, err = service.CheckRunDir(ctx, s.d, r.Dir); err != nil {
+			return nil, err
+		}
+		if job = id; job == "" { // corrida vieja sin job_id en el manifest: la carpeta la identifica
+			job = filepath.Base(dir)
+		}
+	}
+	c, err := s.collectIn(ctx, job, keep, dir)
 	if err != nil {
 		return nil, err
 	}
