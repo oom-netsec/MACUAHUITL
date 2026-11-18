@@ -7,7 +7,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -106,7 +105,7 @@ func TestRunTracerouteLinuxPrefiereV4(t *testing.T) {
 	dual := func(context.Context, string, string) ([]netip.Addr, error) {
 		return []netip.Addr{netip.MustParseAddr("2001:db8::1"), netip.MustParseAddr("192.0.2.1")}, nil
 	}
-	if r := corre(t, v1.DiagTool_DIAG_TOOL_TRACEROUTE, "sw1.example", dual).ev[0].GetResolved(); runtime.GOOS != "windows" && r.GetIp() != "192.0.2.1" {
+	if r := corre(t, v1.DiagTool_DIAG_TOOL_TRACEROUTE, "sw1.example", dual).ev[0].GetResolved(); r.GetIp() != "192.0.2.1" {
 		t.Errorf("traceroute con doble pila: %v", r)
 	}
 }
