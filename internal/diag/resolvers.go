@@ -9,7 +9,8 @@ type DNSAdapter struct {
 }
 
 // ResolverHosts devuelve los DNS de los adaptadores activos y no loopback, sin repetidos y en orden.
-// Descarta lo que Windows reporta sin estar configurado: direcciones sin especificar, link-local sin zona
+// Descarta lo que Windows reporta sin estar configurado: direcciones sin especificar, link-local IPv6 sin zona (las
+// IPv4 169.254/16 sí: GCE da 169.254.169.254 por DHCP)
 // y fec0::/10 (los «fantasma» fec0:0:0:ffff::1-3).
 func ResolverHosts(as []DNSAdapter) []string {
 	seen := map[netip.Addr]bool{}
@@ -20,7 +21,7 @@ func ResolverHosts(as []DNSAdapter) []string {
 		}
 		for _, ip := range a.DNS {
 			ip = ip.Unmap()
-			if !ip.IsValid() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || seen[ip] {
+			if !ip.IsValid() || ip.IsUnspecified() || ip.Is6() && ip.IsLinkLocalUnicast() || seen[ip] {
 				continue
 			}
 			if ip.Is6() && ip.As16()[0] == 0xfe && ip.As16()[1]&0xc0 == 0xc0 { // fec0::/10 (site-local, en desuso)

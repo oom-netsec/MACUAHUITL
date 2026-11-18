@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -291,7 +292,7 @@ func TestErroresDeValidacionEnYEs(t *testing.T) {
 }
 
 // 43e-1: sin -s, el resolver sale del seam (en Windows, los adaptadores), no de /etc/resolv.conf.
-func TestSystemResolversSinSFallaSinArchivo(t *testing.T) {
+func TestDnsUsaLosResolversDelSistema(t *testing.T) {
 	old := systemResolvers
 	systemResolvers = func() ([]dnsq.Server, error) {
 		return []dnsq.Server{{Transport: "udp", Host: "192.0.2.53", Port: 53}}, nil
@@ -317,5 +318,16 @@ func TestSinResolversPideS(t *testing.T) {
 		if st.Code() != codes.FailedPrecondition || !strings.Contains(st.Message(), "-s") || strings.Contains(st.Message(), "dns.err") {
 			t.Fatalf("%s: %v", loc, err)
 		}
+	}
+}
+
+// En Windows, los hosts del sistema pasan a servidores UDP en el 53; sin ninguno, el error pide -s (nunca una lista vacía).
+func TestServidoresDeHostsDeWindows(t *testing.T) {
+	if s, err := serversFromHosts([]string{"192.0.2.53", "2001:db8::53"}); err != nil || len(s) != 2 || s[1].Host != "2001:db8::53" || s[1].Port != 53 || s[1].Transport != "udp" {
+		t.Fatalf("s = %+v err = %v", s, err)
+	}
+	var e *i18n.Error
+	if s, err := serversFromHosts(nil); len(s) != 0 || !errors.As(err, &e) || e.Code != "dns.err.no_resolvers" {
+		t.Fatalf("vacío: s = %+v err = %v", s, err)
 	}
 }

@@ -35,8 +35,13 @@ var systemResolvers = func() ([]dnsq.Server, error) {
 	if runtime.GOOS != "windows" {
 		return dnsq.SystemResolvers(resolvConf)
 	}
+	return serversFromHosts(diag.SystemDNSHosts())
+}
+
+// serversFromHosts pasa los DNS del sistema a servidores UDP en el 53; sin ninguno, pide -s (nunca una lista vacía).
+func serversFromHosts(hosts []string) ([]dnsq.Server, error) {
 	var out []dnsq.Server
-	for _, h := range diag.SystemDNSHosts() {
+	for _, h := range hosts {
 		out = append(out, dnsq.Server{Transport: "udp", Host: h, Port: 53})
 	}
 	if len(out) == 0 {

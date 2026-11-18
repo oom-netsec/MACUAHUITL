@@ -21,10 +21,11 @@ func TestResolverHostsFiltra(t *testing.T) {
 		{Up: true, DNS: ips("192.0.2.53", "fec0:0:0:ffff::1", "fec0:0:0:ffff::2", "fec0:0:0:ffff::3")},
 		{Up: false, DNS: ips("198.51.100.1")},
 		{Up: true, Loopback: true, DNS: ips("127.0.0.1")},
-		{Up: true, DNS: ips("192.0.2.53", "2001:db8::53", "0.0.0.0", "::", "fe80::1")},
+		{Up: true, DNS: ips("192.0.2.53", "2001:db8::53", "0.0.0.0", "::", "fe80::1", "::ffff:192.0.2.53")},
+		{Up: true, DNS: ips("169.254.169.254")}, // DNS que da DHCP en Windows sobre GCE: IPv4 link-local, sí se usa
 	}
 	got := ResolverHosts(as)
-	want := []string{"192.0.2.53", "2001:db8::53"}
+	want := []string{"192.0.2.53", "2001:db8::53", "169.254.169.254"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ResolverHosts = %v, quería %v", got, want)
 	}

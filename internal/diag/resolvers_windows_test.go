@@ -1,6 +1,7 @@
 package diag
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,9 @@ func TestSystemDNSHostsReal(t *testing.T) {
 		}
 	}
 	if len(hosts) == 0 {
+		if os.Getenv("CI") != "" { // el runner del CI siempre tiene DNS: vacío ahí es un flag o una API mal usada
+			t.Fatal("sin resolvers en el runner del CI")
+		}
 		t.Skip("sin adaptador activo con DNS en este equipo")
 	}
 }
