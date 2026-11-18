@@ -27,9 +27,9 @@ import (
 func TestToolsDnsLightDefaultsToSystemResolver(t *testing.T) {
 	conf := filepath.Join(t.TempDir(), "resolv.conf")
 	os.WriteFile(conf, []byte("nameserver 127.0.0.1\n"), 0o600)
-	old := resolvConf
-	resolvConf = conf
-	t.Cleanup(func() { resolvConf = old })
+	old := systemResolvers // en Windows los resolvers salen de los adaptadores: la prueba fija los del sistema en los dos
+	systemResolvers = func() ([]dnsq.Server, error) { return dnsq.SystemResolvers(conf) }
+	t.Cleanup(func() { systemResolvers = old })
 	d := servicetest.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
