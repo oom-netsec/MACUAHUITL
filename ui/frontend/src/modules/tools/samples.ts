@@ -42,7 +42,7 @@ const cert = (subject: string, issuer: string, days: number, sha: string, isCA: 
 });
 export const tlsSample = JSON.stringify({
   Target: "ise.lab:443", SNI: "ise.lab", Version: "TLS 1.3", Cipher: "TLS_AES_256_GCM_SHA384", ALPN: "h2", Accepted: ["TLS 1.2", "TLS 1.3"],
-  Verified: true, NameMatches: true, DaysLeft: 19, Findings: [{ Severity: "aviso", Code: "vence-pronto", Detail: "el certificado vence en 19 días" }],
+  Verified: true, NameMatches: true, DaysLeft: 19, Findings: [{ Severity: "warning", Code: "vence-pronto", Detail: "el certificado vence en 19 días" }],
   Chain: [
     cert("CN=ise.lab", "CN=Lab Issuing CA", 19, "9f:86:d0:81:88:4c:7d:65:9a:2f:ea:a0:c5:5a:d0:15:a3:bf:4f:1b:2b:0b:82:2c:d1:5d:6c:15:b0:f0:0a:08", false, ["ise.lab", "ise-01.lab"]),
     cert("CN=Lab Issuing CA", "CN=Lab Root CA", 900, "2c:26:b4:6b:68:ff:c6:8f:f9:9b:45:3c:1d:30:41:34:13:42:2d:70:64:83:be:a8:d6:d7:4b:2b:a6:2e:5b:2a", true),

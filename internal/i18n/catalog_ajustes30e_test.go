@@ -17,21 +17,22 @@ func TestTextosEnQueCitanCosasReales(t *testing.T) {
 	}
 }
 
-// El motivo de cada error de la carpeta de salidas es el prefijo prefs.outputs.<motivo> de su texto, aunque haya
-// varias claves para el mismo motivo.
-func TestMotivoDeCarpetaDeSalidasIgualAlPrefijo(t *testing.T) {
+// El motivo de cada error de la carpeta de salidas es el código sin sufijo de variante, y el texto (es y en) ya no
+// lo lleva pegado al inicio (43e-9): el motivo viaja en ErrorInfo.Reason.
+func TestMotivoDeCarpetaDeSalidasNoVaEnElTexto(t *testing.T) {
 	n := 0
 	for _, c := range Codes() {
 		if !strings.HasPrefix(c, "prefs.outputs.") || c == "prefs.outputs.issue" || c == "prefs.outputs.note" {
 			continue
 		}
 		n++
-		prefix, _, _ := strings.Cut(Msg(Es, c, nil), ":")
-		if got := Reason(c); got != prefix {
-			t.Errorf("%s: reason %q, prefijo %q", c, got, prefix)
+		if !strings.HasPrefix(Reason(c), "prefs.outputs.") {
+			t.Errorf("%s: reason %q", c, Reason(c))
 		}
-		if pe, _, _ := strings.Cut(Msg(En, c, nil), ":"); pe != prefix {
-			t.Errorf("%s: el prefijo en inglés es %q", c, pe)
+		for _, loc := range []string{Es, En} {
+			if m := Msg(loc, c, nil); strings.Contains(m, "prefs.outputs.") {
+				t.Errorf("%s/%s: el texto lleva el código: %q", c, loc, m)
+			}
 		}
 	}
 	if n < 12 {

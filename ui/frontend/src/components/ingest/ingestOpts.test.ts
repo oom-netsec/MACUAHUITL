@@ -83,7 +83,7 @@ test("flujos: defaults de tasa propios, plantilla propia y sin topes cuando no s
   expect(rangeOf("flows", "rateGlobal").def).toBe("5000");
   expect(rangeOf("traps", "rateGlobal").def).toBe("1000");
   const now = new Date(2026, 10, 7, 9, 5, 3);
-  expect(previewName("", "texto", now, "flows")).toBe("flujos_20261107_090503.log");
+  expect(previewName("", "texto", now, "flows")).toBe("flows_20261107_090503.log");
   expect(previewName("", "jsonl", now, "traps")).toBe("traps_20261107_090503.jsonl");
   const f = form({ rateGlobal: "9000", queueSize: "128", rotateMb: "10" });
   expect(buildOpts(f, false, "flows")).toEqual({});
@@ -102,6 +102,6 @@ test("la plantilla acepta los tokens en inglés igual que en español ({date}, {
   expect(perSourceTemplate("x_{source}_{date}")).toBe(true);
   expect(perSourceTemplate("x_{origen}_{fecha}")).toBe(true);
   expect(perSourceTemplate("x_{date}")).toBe(false);
-  expect(defaultTemplate("flows", "en")).toBe("flujos_{date}_{time}");
-  expect(defaultTemplate("flows", "es")).toBe("flujos_{fecha}_{hora}");
+  expect(defaultTemplate("flows", "en")).toBe("flows_{date}_{time}");
+  expect(defaultTemplate("flows", "es")).toBe("flows_{fecha}_{hora}");
 });

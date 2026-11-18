@@ -59,7 +59,7 @@ test("traps: defaults de syslog en tasa y plantilla propia con su ejemplo", asyn
   expect(screen.getByText(/^Ejemplo: traps_\d{8}_\d{6}\.jsonl$/)).toBeInTheDocument();
 });
 
-test("flujos: defaults de 1000 por exportador y 5000 global, plantilla flujos_ y la tasa cuenta datagramas", async () => {
+test("flujos: defaults de 1000 por exportador y 5000 global, plantilla flows_ y la tasa cuenta datagramas", async () => {
   await setup("Flujos");
   await userEvent.click(screen.getByLabelText("Guardar cada flujo en archivo"));
   await openOpts();
@@ -67,8 +67,8 @@ test("flujos: defaults de 1000 por exportador y 5000 global, plantilla flujos_ y
   expect(screen.getByLabelText("Tasa global (datagramas/s)")).toHaveAccessibleDescription("Por defecto 5000 · Rango 1 a 100000.");
   expect(screen.getByLabelText("Tasa global (datagramas/s)")).toHaveAttribute("placeholder", "5000");
   expect(screen.getByText(/La tasa cuenta datagramas de exportación/)).toBeInTheDocument();
-  expect(screen.getByLabelText("Plantilla del nombre")).toHaveAttribute("placeholder", "flujos_{fecha}_{hora}");
-  expect(screen.getByText(/^Ejemplo: flujos_\d{8}_\d{6}\.log$/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Plantilla del nombre")).toHaveAttribute("placeholder", "flows_{fecha}_{hora}");
+  expect(screen.getByText(/^Ejemplo: flows_\d{8}_\d{6}\.log$/)).toBeInTheDocument();
   expect(screen.getByText(/IP del exportador/)).toBeInTheDocument();
 });
 

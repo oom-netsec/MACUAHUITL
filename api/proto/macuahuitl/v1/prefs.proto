@@ -43,7 +43,7 @@ message IngestDefaults {
 
 message CorePrefs {
   // Carpeta base de salidas; vacía = la de fábrica. Absoluta, existente, del usuario, escribible y 0700.
-  // Los errores llevan el código prefs.outputs.<motivo> al inicio del mensaje.
+  // Los errores llevan el código prefs.outputs.<motivo> en ErrorInfo.Reason (no en el texto).
   string outputs_dir = 1;
   IngestDefaults ingest_defaults = 2;
 }

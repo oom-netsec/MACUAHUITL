@@ -78,3 +78,11 @@ func TestAuditoriaDeSalidasMotivoDesconocido(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// 43e-9: con el código fuera del texto, la auditoría sigue anotando el motivo (sin sufijo de variante) y no «unknown».
+func TestAuditoriaDeSalidasMotivoDelCodigo(t *testing.T) {
+	err := outputsErr("prefs.outputs.permisos_orden", "dir", "/x", "mode", "0755")
+	if got := OutputsIssueAudit("/x", err); got != `outputs_dir_invalid dir="/x" reason=permisos` {
+		t.Fatal(got)
+	}
+}

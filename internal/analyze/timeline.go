@@ -31,6 +31,7 @@ type Event struct {
 	Note     string    `json:"note,omitempty"`
 	TextTx   i18n.Text `json:"-"` // Text y Note como texto de catálogo (solo los que arma la app)
 	NoteTx   i18n.Text `json:"-"`
+	Action   string    `json:"-"` // acción de auditoría guardada (hosts.crear…): el texto en inglés la muestra con su etiqueta
 	// KB es la ficha de la base de mensajes (internal/msgkb) del mnemónico del evento: qué significa y qué hacer.
 	KB string `json:"kb,omitempty"`
 }
@@ -322,7 +323,7 @@ func AuditEvents(r io.Reader) []Event {
 			break // fin o línea dañada: lo leído hasta ahí sirve
 		}
 		note := i18n.Tx("analyze.event.by", "actor", rec.Actor)
-		evs = append(evs, Event{At: rec.At.UTC(), Source: "auditoria", Text: strings.TrimSpace(fmt.Sprintf("%s %s %s", rec.Action, rec.Target, rec.Detail)), Note: note.In(i18n.Es), NoteTx: note})
+		evs = append(evs, Event{At: rec.At.UTC(), Source: "auditoria", Text: strings.TrimSpace(fmt.Sprintf("%s %s %s", rec.Action, rec.Target, rec.Detail)), Note: note.In(i18n.Es), NoteTx: note, Action: rec.Action})
 	}
 	return evs
 }
@@ -423,7 +424,15 @@ func (r TimelineReport) TextIn(loc string) string {
 		if e.Severity != "" {
 			sev = "[" + m("analyze.sev."+e.Severity) + "] "
 		}
-		fmt.Fprintf(&b, "%s  %-10s %-20s %s%s", i18n.FmtLocal(e.At, i18n.LocalMs), e.Source, dev, sev, e.Text)
+		src := e.Source
+		if src == "auditoria" { // el valor del JSON es el enumerado estable; solo el texto lo traduce
+			src = m("analyze.source.audit")
+		}
+		text := e.Text
+		if e.Action != "" && loc == i18n.En { // la clave guardada no se toca; solo cambia lo que se ve
+			text = audit.ActionLabel(loc, e.Action) + strings.TrimPrefix(text, e.Action)
+		}
+		fmt.Fprintf(&b, "%s  %-10s %-20s %s%s", i18n.FmtLocal(e.At, i18n.LocalMs), src, dev, sev, text)
 		if e.Note != "" {
 			fmt.Fprintf(&b, "  (%s)", e.Note)
 		}

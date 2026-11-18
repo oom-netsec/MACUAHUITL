@@ -52,15 +52,15 @@ export const sampleHostFields: HostField[] = [
   { name: "folder", type: "texto", required: false, example: "Lab", description: "Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta." },
   { name: "tags", type: "lista", required: false, example: "core;dc-1", description: "Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo." },
   { name: "credential_label", type: "texto", required: false, example: "admin lab", description: "Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña)." },
-  { name: "notes", type: "texto", required: false, example: "Piso 2", description: "Notas libres, hasta 2000 caracteres." },
+  { name: "notes", type: "texto", required: false, example: "Floor 2", description: "Notas libres, hasta 2000 caracteres." },
   { name: "startup_command", type: "texto", required: false, example: "tmux attach", description: "Orden de inicio, solo con linux o windows: una línea de hasta 256 caracteres, sin caracteres de control ni invisibles. Se ejecuta en el equipo al conectar." },
 ];
 export const sampleHostsFormat: HostsFormat = { fields: sampleHostFields, maxRows: 1000, maxBytes: 5 << 20 };
 
 const templateRows = [
-  ["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "admin lab", "Piso 2", ""],
-  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "acceso", "", "", ""],
-  ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Oficina", "wifi", "", "", ""],
+  ["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "admin lab", "Floor 2", ""],
+  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "access", "", "", ""],
+  ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Office", "wifi", "", "", ""],
 ];
 const sampleTemplate = (format: HostFileFormat) => ({
   format,

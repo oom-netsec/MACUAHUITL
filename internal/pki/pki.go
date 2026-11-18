@@ -154,7 +154,7 @@ func InitCA(k crypto.Signer, cn string, days int, now time.Time) ([]byte, error)
 	if err != nil {
 		return nil, err
 	}
-	tpl := &x509.Certificate{SerialNumber: sn, Subject: pkix.Name{CommonName: cn, OrganizationalUnit: []string{"Laboratorio - no confiable"}},
+	tpl := &x509.Certificate{SerialNumber: sn, Subject: pkix.Name{CommonName: cn, OrganizationalUnit: []string{"Lab - untrusted"}},
 		NotBefore: nb, NotAfter: na, IsCA: true, BasicConstraintsValid: true, MaxPathLen: 0, MaxPathLenZero: true,
 		KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature}
 	der, err := x509.CreateCertificate(rand.Reader, tpl, tpl, k.Public(), k)

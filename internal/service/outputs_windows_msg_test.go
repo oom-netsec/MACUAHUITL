@@ -21,10 +21,10 @@ func TestWindowsOutputsErr(t *testing.T) {
 	}{
 		{"otro dueño", &sys.PrivateDirError{Reason: sys.PrivateDirOwner, Path: dir, SID: "S-1-5-18"}, "prefs.outputs.otro_dueno", "otro_dueno", nil, nil},
 		{"ACL con orden", &sys.PrivateDirError{Reason: sys.PrivateDirACL, Path: dir, SID: "S-1-5-32-545, S-1-1-0", SIDs: []string{"S-1-5-32-545", "S-1-1-0"}, User: "S-1-5-21-1-2-3-1001"}, "prefs.outputs.permisos_orden_win", "permisos",
-			[]string{"prefs.outputs.permisos:", `icacls "C:\Users\ana\salidas" /inheritance:r`, `/remove "*S-1-5-32-545" /remove "*S-1-1-0"`, `"*S-1-5-21-1-2-3-1001:(OI)(CI)F"`, `"*S-1-5-18:(OI)(CI)F"`, `"*S-1-5-32-544:(OI)(CI)F"`},
-			[]string{"prefs.outputs.permisos:", "icacls ", `/remove "*S-1-5-32-545" /remove "*S-1-1-0"`, `"*S-1-5-18:(OI)(CI)F"`}},
+			[]string{`icacls "C:\Users\ana\salidas" /inheritance:r`, `/remove "*S-1-5-32-545" /remove "*S-1-1-0"`, `"*S-1-5-21-1-2-3-1001:(OI)(CI)F"`, `"*S-1-5-18:(OI)(CI)F"`, `"*S-1-5-32-544:(OI)(CI)F"`},
+			[]string{"icacls ", `/remove "*S-1-5-32-545" /remove "*S-1-1-0"`, `"*S-1-5-18:(OI)(CI)F"`}},
 		{"ancestro", &sys.PrivateDirError{Reason: sys.PrivateDirAncestor, Path: `C:\Compartida`, SID: "S-1-1-0"}, "prefs.outputs.ancestro_inseguro_win", "ancestro_inseguro",
-			[]string{"prefs.outputs.ancestro_inseguro:", "S-1-1-0", `C:\Compartida`}, []string{"prefs.outputs.ancestro_inseguro:", "S-1-1-0", `C:\Compartida`}},
+			[]string{"S-1-1-0", `C:\Compartida`}, []string{"S-1-1-0", `C:\Compartida`}},
 		{"ilegible", &sys.PrivateDirError{Reason: sys.PrivateDirRead, Path: `C:\Users`, Err: errors.New("boom")}, "prefs.outputs.ilegible_ruta", "ilegible", nil, nil},
 	}
 	for _, c := range casos {

@@ -1,6 +1,7 @@
 package fileserve
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -480,5 +481,106 @@ func TestFTPRangoPasivoOcupadoFallaAlArrancar(t *testing.T) {
 	var c i18n.Coded
 	if !errors.As(err, &c) || c.Reason() != "fileserve.err.port_in_use" {
 		t.Fatalf("%v", err)
+	}
+}
+
+// 43e-9: el 550 de «ya existe» va en inglés en el cable (los equipos no leen español); el registro conserva el motivo del catálogo.
+func TestFTPStorExistenteRespondeEnIngles(t *testing.T) {
+	recv := realTemp(t)
+	if err := os.WriteFile(filepath.Join(recv, "x"), []byte("1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, r := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: recv})
+	f := ftpDial(t, s.addr)
+	f.login(r)
+	f.pasv()
+	got := f.cmd(550, "STOR x")
+	if got != "the file already exists" {
+		t.Fatalf("550 = %q", got)
+	}
+}
+
+// 43e-9: nada de lo que el servidor FTP manda al cable va en español (los equipos no lo leen); el registro conserva su motivo.
+func TestFTPRespuestasSinEspanol(t *testing.T) {
+	es := regexp.MustCompile(`[áéíóúñ¿¡]|\b(archivo|orden|usa|sin|solo|lectura|escritura|transferencia|nombre|conexión|sesión|contraseña|credenciales|intentos|primero|listado|enviando|recibi\w*|adiós|existe|publicado|permitido|soportado|deshabilitad\w*|demasiados|directorio|tipo|error|guardar|abortada|interrumpida|completa|puertos)\b`)
+	check := func(f *ftpC, cmd string) {
+		t.Helper()
+		if err := f.tp.PrintfLine("%s", cmd); err != nil {
+			t.Fatal(err)
+		}
+		line, err := f.tp.ReadLine()
+		if err != nil {
+			t.Fatalf("%s: %v", cmd, err)
+		}
+		for strings.HasPrefix(line, line[:3]+"-") { // respuesta de varias líneas (FEAT)
+			if line, err = f.tp.ReadLine(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if m := es.FindString(line); m != "" {
+			t.Errorf("%s -> %q lleva español (%q)", cmd, line, m)
+		}
+	}
+	// solo lectura: sin sesión, credenciales malas, bloqueo y las órdenes de una sesión abierta
+	pub, _ := image(t, "a.bin", 10)
+	s, r := startCfg(t, Config{Proto: "ftp", Files: []string{pub}})
+	f := ftpDial(t, s.addr) // el 220 de bienvenida ya se leyó en ftpDial
+	for _, c := range []string{"RETR a.bin", "ZZZ", "PASS x", "USER " + r.User, "PASS mala"} {
+		check(f, c)
+	}
+	f.login(r)
+	for _, c := range []string{"SYST", "FEAT", "TYPE I", "TYPE E", "MODE S", "STRU F", "PWD", "CWD /x", "CWD /", "CDUP", "NOOP", "SIZE nada", "SIZE a.bin", "PORT 1,2,3,4,5,6", "EPRT |1|1.2.3.4|5|", "DELE a.bin", "ZZZ", "RETR nada", "RETR a.bin", "STOR x", "LIST", "NLST", "EPSV 2"} {
+		check(f, c)
+	}
+
+	// el 220 de bienvenida
+	c, err := net.DialTimeout("tcp", s.addr, 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.SetDeadline(time.Now().Add(5 * time.Second))
+	if hi, _ := textproto.NewReader(bufio.NewReader(c)).ReadLine(); es.MatchString(hi) {
+		t.Errorf("saludo en español: %q", hi)
+	}
+
+	// bloqueo por contraseñas malas (421)
+	s2, r2 := startCfg(t, Config{Proto: "ftp", Files: []string{pub}})
+	f2 := ftpDial(t, s2.addr)
+	for range 12 {
+		check(f2, "USER "+r2.User)
+		if err := f2.tp.PrintfLine("PASS mala"); err != nil {
+			break
+		}
+		l, err := f2.tp.ReadLine()
+		if err != nil {
+			break
+		}
+		if es.MatchString(l) {
+			t.Errorf("PASS mala -> %q", l)
+		}
+		if strings.HasPrefix(l, "421") {
+			break
+		}
+	}
+
+	// escritura: sin PASV, nombre existente/ilegal, tope de tamaño, lectura apagada
+	recv := realTemp(t)
+	os.WriteFile(filepath.Join(recv, "x"), []byte("1"), 0o600)
+	s3, r3 := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: recv, MaxFile: 4})
+	f3 := ftpDial(t, s3.addr)
+	f3.login(r3)
+	check(f3, "STOR y") // sin PASV
+	check(f3, "RETR x") // lectura deshabilitada
+	f3.pasv()
+	check(f3, "STOR x")  // ya existe
+	check(f3, "STOR ..") // nombre no permitido
+	dc := f3.pasv()
+	f3.cmd(150, "STOR grande")
+	dc.Write([]byte("123456789"))
+	dc.Close()
+	l, err := f3.tp.ReadLine()
+	if err != nil || es.MatchString(l) {
+		t.Errorf("tope de tamaño -> %q %v", l, err)
 	}
 }

@@ -823,7 +823,7 @@ type FlowsRequest struct {
 	// Archivo (solo con save).
 	RotateMb      int32  `protobuf:"varint,12,opt,name=rotate_mb,json=rotateMb,proto3" json:"rotate_mb,omitempty"`                // rotar al llegar a N MB; default 50, 1–1024
 	RotateMinutes int32  `protobuf:"varint,13,opt,name=rotate_minutes,json=rotateMinutes,proto3" json:"rotate_minutes,omitempty"` // rotar cada N minutos; 0 = no, 1–10080
-	NameTemplate  string `protobuf:"bytes,14,opt,name=name_template,json=nameTemplate,proto3" json:"name_template,omitempty"`     // {fecha} {hora} {origen}; default flujos_{fecha}_{hora}
+	NameTemplate  string `protobuf:"bytes,14,opt,name=name_template,json=nameTemplate,proto3" json:"name_template,omitempty"`     // {fecha} {hora} {origen}; default flows_{fecha}_{hora}
 	MaxFiles      int32  `protobuf:"varint,15,opt,name=max_files,json=maxFiles,proto3" json:"max_files,omitempty"`                // archivos que se conservan; default 20, 1–1000
 	Format        string `protobuf:"bytes,16,opt,name=format,proto3" json:"format,omitempty"`                                     // texto (default), crudo o jsonl
 	unknownFields protoimpl.UnknownFields

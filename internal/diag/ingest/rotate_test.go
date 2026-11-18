@@ -380,3 +380,12 @@ func TestRetentionRegexMatchesEveryNameItCreates(t *testing.T) {
 		}
 	}
 }
+
+// 43e-9: el núcleo solo conoce texto|crudo|jsonl (lo que guarda prefs); text y raw los normaliza mctl con cli.WireFormat.
+func TestFormatoEnInglesNoEsDelNucleo(t *testing.T) {
+	for _, f := range []string{"text", "raw"} {
+		if (Sink{Dir: "/x", Template: "s_{fecha}", MaxFiles: 1, Format: f}).Validate() == nil {
+			t.Errorf("%s: el núcleo no debe aceptarlo", f)
+		}
+	}
+}

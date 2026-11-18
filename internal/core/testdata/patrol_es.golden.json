@@ -9,7 +9,7 @@
  "crear_fin_pasado": "ERROR: rpc error: code = InvalidArgument desc = patrol: schedule: la fecha de fin ya pasó",
  "crear_override": "ERROR: rpc error: code = InvalidArgument desc = patrol: overrides: zzz (equipo sw1) no está en la bóveda",
  "crear_playbook": "ERROR: rpc error: code = InvalidArgument desc = patrol: playbook_ids: no-existe no existe",
- "crear_salida_no_dir": "ERROR: rpc error: code = InvalidArgument desc = prefs.outputs.no_existe: la carpeta no existe: \u003croot\u003e/o/no-existe-aun (créala con permisos 0700)",
+ "crear_salida_no_dir": "ERROR: rpc error: code = InvalidArgument desc = la carpeta no existe: \u003croot\u003e/o/no-existe-aun (créala con permisos 0700)",
  "crear_sin_comandos": "ERROR: rpc error: code = InvalidArgument desc = patrol: commands: sin playbooks ni comandos",
  "crear_sin_cred": "ERROR: rpc error: code = InvalidArgument desc = patrol: credential: sin credencial por defecto",
  "crear_sin_equipos": "ERROR: rpc error: code = InvalidArgument desc = patrol: targets: sin equipos",

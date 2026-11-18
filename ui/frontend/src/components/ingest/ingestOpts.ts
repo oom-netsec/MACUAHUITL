@@ -24,7 +24,7 @@ export const RANGES: Record<NumKey, { lo: number; hi: number; def: string }> = {
   rotateMinutes: { lo: 1, hi: 10080, def: "" },
   maxFiles: { lo: 1, hi: 1000, def: "20" },
 };
-export const DEFAULT_TEMPLATES: Record<IngestKind, string> = { syslog: "syslog_{fecha}_{hora}", traps: "traps_{fecha}_{hora}", flows: "flujos_{fecha}_{hora}" };
+export const DEFAULT_TEMPLATES: Record<IngestKind, string> = { syslog: "syslog_{fecha}_{hora}", traps: "traps_{fecha}_{hora}", flows: "flows_{fecha}_{hora}" };
 // El núcleo acepta los tokens en español y en inglés: {fecha}/{date}, {hora}/{time}, {origen}/{source}.
 const TOKENS = { fecha: ["{fecha}", "{date}"], hora: ["{hora}", "{time}"], origen: ["{origen}", "{source}"] } as const;
 const hasToken = (t: string, k: keyof typeof TOKENS) => TOKENS[k].some((x) => t.includes(x));

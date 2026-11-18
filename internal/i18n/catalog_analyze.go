@@ -70,6 +70,7 @@ func init() {
 		"analyze.diff.more_lines": e("{n} líneas más sin mostrar", "{n} more {n|line|lines} not shown", "n"),
 
 		// texto fijo de los informes
+		"analyze.source.audit":     e("auditoria", "audit"),
 		"analyze.sev.critica":      e("CRÍTICA", "CRITICAL"),
 		"analyze.sev.alta":         e("ALTA", "HIGH"),
 		"analyze.sev.media":        e("MEDIA", "MEDIUM"),

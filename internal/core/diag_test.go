@@ -190,10 +190,10 @@ func TestDiagValidaOutputDirComoAjustes(t *testing.T) {
 	os.Mkdir(laxa, 0o700)
 	os.Chmod(laxa, 0o755)
 	err := correr(laxa)
-	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.permisos:") || !strings.Contains(err.Error(), "chmod 700 "+laxa) {
+	if status.Code(err) != codes.InvalidArgument || motivoSalidas(err, "permisos") || !strings.Contains(err.Error(), "chmod 700 "+laxa) {
 		t.Fatalf("0755 debía rechazarse con el chmod sugerido: %v", err)
 	}
-	if err := correr("/tmp"); status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.reservada:") {
+	if err := correr("/tmp"); status.Code(err) != codes.InvalidArgument || motivoSalidas(err, "reservada") {
 		t.Fatalf("/tmp debía rechazarse: %v", err)
 	}
 	propia := filepath.Join(h.out, "propia")
@@ -216,7 +216,7 @@ func TestDiagOutputDirUNCSeRechazaEnWindows(t *testing.T) {
 		if err == nil {
 			_, err = st.Recv()
 		}
-		if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.sin_unidad:") {
+		if status.Code(err) != codes.InvalidArgument || motivoSalidas(err, "sin_unidad") {
 			t.Fatalf("%q: %v", dir, err)
 		}
 	}

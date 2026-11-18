@@ -286,7 +286,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 	// Un exportador NetFlow/IPFIX manda muchos más datagramas que un equipo syslog: defaults más altos que los de syslog y traps.
 	fo := ingestOpts(s.d.Settings().Ingest(), r.RatePerSource, r.BurstPerSource, r.RateGlobal, r.BurstGlobal, r.QueueSize, r.RotateMb, r.RotateMinutes, r.MaxFiles, r.NameTemplate, r.Format)
 	fo.DefPerSource, fo.DefGlobal = flowsRatePerSource, flowsRateGlobal
-	lim, sink, err := fo.Build(st.Context(), filepath.Join(s.d.Outputs(), "flows"), "flujos_{fecha}_{hora}")
+	lim, sink, err := fo.Build(st.Context(), filepath.Join(s.d.Outputs(), "flows"), "flows_{date}_{time}") // 43e-9: antes flujos_*; los viejos no se tocan y quedan fuera de max_files (se borran a mano)
 	if err != nil {
 		return err
 	}

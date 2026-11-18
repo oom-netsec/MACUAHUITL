@@ -35,7 +35,7 @@ func TestValidacionTextoEsYMetadata(t *testing.T) {
 		{"rotate mb", Sink{Dir: "x", Template: "t_{fecha}", MaxFiles: 1, RotateBytes: 1}.Validate(), "el tamaño de rotación debe estar entre 1 y 1024 MB", "the rotation size must be between 1 and 1024 MB", "rotate_mb", map[string]string{"min": "1", "max": "1024"}},
 		{"rotate min", Sink{Dir: "x", Template: "t_{fecha}", MaxFiles: 1, RotateEvery: time.Second}.Validate(), "la rotación por tiempo debe estar entre 1 minuto y 7 días", "the time-based rotation must be between 1 minute and 7 days", "rotate_minutes", map[string]string{"min": "1", "max": "10080"}},
 		{"max files", Sink{Dir: "x", Template: "t_{fecha}"}.Validate(), "el máximo de archivos debe estar entre 1 y 1000", "the maximum number of files must be between 1 and 1000", "max_files", map[string]string{"min": "1", "max": "1000"}},
-		{"formato", Sink{Dir: ok.Dir, Template: ok.Template, MaxFiles: 1, Format: "xml"}.Validate(), `formato "xml" no soportado (texto, crudo o jsonl)`, `format "xml" is not supported (texto, crudo or jsonl)`, "format", map[string]string{"value": "xml"}},
+		{"formato", Sink{Dir: ok.Dir, Template: ok.Template, MaxFiles: 1, Format: "xml"}.Validate(), `formato "xml" no soportado (texto, crudo o jsonl)`, `format "xml" is not supported (text, raw or jsonl)`, "format", map[string]string{"value": "xml"}},
 	} {
 		var c i18n.Coded
 		if !errors.As(tc.err, &c) {
