@@ -24,9 +24,9 @@ func (f fakeHistorial) ListJobs(_ context.Context, r *v1.ListJobsRequest) (*v1.L
 	return &v1.ListJobsResponse{Jobs: []*v1.JobSummary{{JobId: "j1", State: "completed", Past: true,
 		FinishedAt: timestamppb.New(time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)),
 		Phases: []*v1.JobPhase{
-			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Reason: "patrol.svc.login_failed", Args: map[string]string{"failed": "10.0.0.1:22: AUTH"}, Detail: "raw"},
-			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Reason: "x.reason_nuevo", Detail: "core text"},
-			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Detail: "dial tcp: timeout"},
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, Reason: "patrol.svc.login_failed", Args: map[string]string{"failed": "10.0.0.1:22: AUTH"}, Detail: "raw"},
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, Reason: "x.reason_nuevo", Detail: "core text"},
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, Detail: "dial tcp: timeout"},
 		}}}}, nil
 }
 
@@ -55,7 +55,7 @@ func TestHistorial46(t *testing.T) {
 	if want := i18n.Msg(b.locale(), "patrol.svc.login_failed", i18n.Args{"failed": "10.0.0.1:22: AUTH"}); len(ph) != 3 || ph[0].Detail != want || !strings.Contains(want, "10.0.0.1:22: AUTH") {
 		t.Fatalf("fase con reason del catálogo: %+v", ph)
 	}
-	if ph[0].Reason != "patrol.svc.login_failed" || ph[0].Kind != "JOB_PHASE_KIND_FAILED" || ph[1].Detail != "core text" || ph[2].Detail != "dial tcp: timeout" {
+	if ph[0].Reason != "patrol.svc.login_failed" || ph[0].Kind != "JOB_PHASE_KIND_ARM_FAILED" || ph[1].Detail != "core text" || ph[2].Detail != "dial tcp: timeout" {
 		t.Fatalf("fases: %+v", ph)
 	}
 
