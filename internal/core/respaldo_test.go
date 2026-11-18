@@ -681,3 +681,59 @@ func TestPreviewTargetIdEnIgualYConflicto(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// 43e-3: con dos credenciales vivas de la misma etiqueta, target_id es la que «reemplazar» sobrescribe de verdad.
+func TestPreviewTargetIdConDosVivasMismaEtiqueta(t *testing.T) {
+	_, path := bovedaConRespaldo(t, nil)
+	o := newHarness(t, nil)
+	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
+	var ids []string
+	for _, pw := range []string{"VIVA-1", "VIVA-2"} {
+		id, err := o.core.vault.Put(vault.Credential{Label: "core", Username: "u", Password: secret.New([]byte(pw))})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	if ids[0] == ids[1] {
+		t.Fatalf("Put reusó el id: %v", ids)
+	}
+	pr, err := o.preview(t, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var target string
+	for _, it := range pr.Items {
+		if it.Label == "core" {
+			target = it.TargetId
+		}
+	}
+	// Fija el criterio: la primera viva con esa etiqueta, en el orden de List (el que usa classify).
+	infos, err := o.core.vault.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	primera := ""
+	for _, i := range infos {
+		if i.Label == "core" {
+			primera = i.ID
+			break
+		}
+	}
+	if target == "" || target != primera {
+		t.Fatalf("target_id %q != primera viva %q (vivas %v)", target, primera, ids)
+	}
+	if _, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: itemID(t, pr, "core"), Action: "reemplazar"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		c, err := o.core.vault.Get(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := string(c.Password.Bytes())
+		if (id == target) != (got == "PW-CORE") {
+			t.Fatalf("id %s (target=%v) quedó con %q", id, id == target, got)
+		}
+	}
+}

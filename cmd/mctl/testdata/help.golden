@@ -10,7 +10,7 @@ usage: mctl <command>
   cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
          export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);
-         each conflict needs a decision per ID or label, or --all; if one is missing nothing is imported)
+         each conflict needs a decision per BACKUP ID (first column) or label, or --all; if one is missing nothing is imported)
   job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept FINGERPRINT]... [--exclude DEVICE]... ID
         cancel ID | list [--all] | watch ID
         rm ID... | clear --finished   (remove from history; the evidence on disk is not deleted)

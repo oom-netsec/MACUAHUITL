@@ -186,8 +186,18 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 				f = strings.Fields(l)
 			}
 		}
-		if len(f) != 4 || f[0] == f[3] {
-			t.Fatalf("import %s: fila sin dos ids distintos: %q", lang, f)
+		lv := strings.Fields(enMust(t, "", "cred", "list"))
+		if len(f) != 4 || len(lv) == 0 || f[3] != lv[0] || f[0] == lv[0] {
+			t.Fatalf("import %s: ID EN LA BÓVEDA debe ser el de cred list (%v) y el primero el del respaldo: %q", lang, lv, f)
+		}
+		// El id del respaldo vale en --decision; el de la bóveda no (se rechaza en vez de ignorarse).
+		must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--decision", f[0]+"=omitir")
+		_, err = en(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=skip", "--decision", f[3]+"=replace")
+		errHas(t, "decision ajena en "+lang, err, "--decision \""+f[3], "BACKUP ID")
+		_, err = mctl(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=omitir", "--decision", f[3]+"=reemplazar")
+		errHas(t, "decision ajena es "+lang, err, "ID EN EL RESPALDO")
+		if strings.Contains(o, " \n") {
+			t.Fatalf("import %s: espacios al final de línea: %q", lang, o)
 		}
 	}
 	has(t, "import es", must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "ETIQUETA", "importadas: 0 nuevas, 0 reemplazadas, 0 renombradas, 0 omitidas, 1 iguales")
