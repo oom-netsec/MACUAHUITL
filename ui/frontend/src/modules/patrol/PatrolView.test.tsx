@@ -5,6 +5,7 @@ import { PatrolView, parseTargets } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
 import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
+import type { RunDevice } from "../../lib/core";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { NavContext } from "../../app/activity";
@@ -600,4 +601,41 @@ test("los playbooks propios no cuentan como paquete de contenido: el aviso sigue
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "usuario/mio", platform: "ios-xe", name: "Mío", commands: ["show clock"], params: [], pack: "usuario" }]) });
   render(<PatrolView core={core} />);
   expect(await screen.findByText(/No hay playbooks de paquetes de contenido/)).toBeVisible();
+});
+
+// Un evento que llega mientras se arma la grilla (GetRun pendiente, antes del montaje) se aplica al montar, no se pierde.
+test("evento entre GetRun y el montaje de la grilla: el equipo aparece con su estado", async () => {
+  let resolveRun: (v: never[]) => void = () => {};
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed", round: 1 }]),
+    getRun: vi.fn(() => new Promise<never[]>((r) => { resolveRun = r; })),
+  });
+  render(<PatrolView core={core} />);
+  await screen.findByRole("heading", { name: "nocturno" });
+  await waitFor(() => expect(core.getRun).toHaveBeenCalled());
+  act(() => {
+    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.7:22", state: "DEVICE_STATE_COMPLETED" } });
+    core.emitEvent({ jobId: "otro", deviceStateChanged: { deviceId: "10.9.9.9:22", state: "DEVICE_STATE_FAILED" } });
+  });
+  await act(async () => resolveRun([]));
+  const row = await screen.findByRole("row", { name: /10\.0\.0\.7:22/ });
+  expect(within(row).getByText("Completado")).toBeInTheDocument();
+  expect(screen.queryByRole("row", { name: /10\.9\.9\.9:22/ })).toBeNull();
+  // Después de montar, la grilla sigue en vivo (sin duplicar el evento ya aplicado).
+  act(() => core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.7:22", state: "DEVICE_STATE_FAILED" } }));
+  expect(within(screen.getByRole("row", { name: /10\.0\.0\.7:22/ })).getByText("Fallido")).toBeInTheDocument();
+});
+
+test("un evento guardado más viejo que GetRun no pisa el estado terminal que trae GetRun", async () => {
+  let resolveRun: (v: RunDevice[]) => void = () => {};
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed", round: 1 }]),
+    getRun: vi.fn(() => new Promise<RunDevice[]>((r) => { resolveRun = r; })),
+  });
+  render(<PatrolView core={core} />);
+  await waitFor(() => expect(core.getRun).toHaveBeenCalled());
+  act(() => core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.7:22", state: "DEVICE_STATE_RUNNING" } }));
+  await act(async () => resolveRun([{ target: "10.0.0.7:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]));
+  const row = await screen.findByRole("row", { name: /10\.0\.0\.7:22/ });
+  expect(within(row).getByText("Completado")).toBeInTheDocument();
 });

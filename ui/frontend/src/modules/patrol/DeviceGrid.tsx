@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
-import type { CoreAPI } from "../../lib/core";
+import type { CoreAPI, CoreEvent } from "../../lib/core";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { DeviceMenu } from "../../components/DeviceMenu";
@@ -12,31 +12,39 @@ export interface Row { state: string; progress: string; detail: string; cut?: nu
 // "10.0.0.1:22" -> "10.0.0.1": la dirección que usan el menú de equipo y las métricas.
 export const addressOf = (target: string) => target.replace(/:\d+$/, "");
 
+// Eventos que llegaron antes de que la grilla escuche (mientras se armaba): JobDetail los guarda y la grilla los aplica al
+// suscribirse. live = la grilla ya escucha y no hace falta guardar más.
+export interface EarlyEvents { events: CoreEvent[]; live: boolean }
+
 // cpu: CPU de 1 min por ronda, por dirección (de las métricas del trabajo).
-export function DeviceGrid({ core, jobId, devices: known, initial, cpu }: { core: CoreAPI; jobId: string; devices: string[]; initial?: Record<string, Row>; cpu?: Record<string, number[]> }) {
+export function DeviceGrid({ core, jobId, devices: known, initial, cpu, early }: { core: CoreAPI; jobId: string; devices: string[]; initial?: Record<string, Row>; cpu?: Record<string, number[]>; early?: EarlyEvents }) {
   const t = useT();
   const label = (s: string) => (s.startsWith("DEVICE_STATE_") ? t(`device.${s.slice(13)}` as Key) : s);
   const [rows, setRows] = useState<Record<string, Row>>(initial ?? {});
   const [beat, setBeat] = useState<string>("");
   // Un equipo que no estaba en la lista (grilla reconstruida a mitad de la ronda 1) entra con su primer evento.
   const devices = useMemo(() => [...new Set([...known, ...Object.keys(rows)])], [known, rows]);
-  useEffect(
-    () =>
-      core.onEvent((e) => {
-        if (e.jobId !== jobId) return;
-        if (e.heartbeat) setBeat(new Date().toLocaleTimeString());
-        const d = e.deviceStateChanged ?? e.commandProgress;
-        if (!d) return;
-        setRows((r) => {
-          const cur = r[d.deviceId] ?? { state: "DEVICE_STATE_QUEUED", progress: "", detail: "" };
-          const next = e.deviceStateChanged
-            ? { ...cur, state: e.deviceStateChanged.state, detail: e.deviceStateChanged.detail ?? "", cut: Number(e.deviceStateChanged.args?.cut) || 0, reconnects: Number(e.deviceStateChanged.args?.reconnects) || 0, first: e.deviceStateChanged.args?.first ?? "" }
-            : { ...cur, state: "DEVICE_STATE_RUNNING", progress: `${e.commandProgress!.index ?? 0}/${e.commandProgress!.total ?? 0} ${e.commandProgress!.command}` };
-          return { ...r, [d.deviceId]: next };
-        });
-      }),
-    [core, jobId],
-  );
+  // Layout: se suscribe en el mismo commit que monta la grilla, sin hueco por donde se pierda un evento; antes aplica los guardados.
+  useLayoutEffect(() => {
+    const apply = (e: CoreEvent) => {
+      if (e.jobId !== jobId) return;
+      if (e.heartbeat) setBeat(new Date().toLocaleTimeString());
+      const d = e.deviceStateChanged ?? e.commandProgress;
+      if (!d) return;
+      setRows((r) => {
+        const cur = r[d.deviceId] ?? { state: "DEVICE_STATE_QUEUED", progress: "", detail: "" };
+        const next = e.deviceStateChanged
+          ? { ...cur, state: e.deviceStateChanged.state, detail: e.deviceStateChanged.detail ?? "", cut: Number(e.deviceStateChanged.args?.cut) || 0, reconnects: Number(e.deviceStateChanged.args?.reconnects) || 0, first: e.deviceStateChanged.args?.first ?? "" }
+          : { ...cur, state: "DEVICE_STATE_RUNNING", progress: `${e.commandProgress!.index ?? 0}/${e.commandProgress!.total ?? 0} ${e.commandProgress!.command}` };
+        return { ...r, [d.deviceId]: next };
+      });
+    };
+    // GetRun solo trae equipos que ya terminaron la ronda: su estado manda sobre un evento guardado, que es igual o más viejo.
+    early?.events.splice(0).filter((e) => !initial?.[(e.deviceStateChanged ?? e.commandProgress)?.deviceId ?? ""]).forEach(apply);
+    if (early) early.live = true;
+    const off = core.onEvent(apply);
+    return () => { off(); if (early) early.live = false; };
+  }, [core, jobId, early]); // sin initial: solo cuenta al montar
   const parent = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({
     count: devices.length, getScrollElement: () => parent.current, estimateSize: () => 32, overscan: 8,
