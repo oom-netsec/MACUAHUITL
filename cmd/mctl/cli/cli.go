@@ -115,6 +115,9 @@ func (c *Env) Secret(prompt string) ([]byte, error) {
 	}
 	line, err := c.In.ReadString('\n')
 	if err != nil && line == "" {
+		if err == io.EOF {
+			return nil, ErrWrap("mctl.cli.stdin_eof", err, "prompt", strings.TrimRight(prompt, ": ")) // conserva io.EOF para quien lo trata como opcional
+		}
 		return nil, ErrWrap("mctl.cli.stdin_expected", err, "prompt", strings.TrimSpace(prompt))
 	}
 	return []byte(strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")), nil

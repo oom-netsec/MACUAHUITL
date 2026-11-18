@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -61,17 +62,63 @@ func newPassword(c *cli.Env, prompt string) ([]byte, error) {
 	return a, nil
 }
 
+var writeNewFn = writeNew // sustituible en pruebas para provocar un fallo a mitad
+
+// writeCA crea la carpeta y los dos archivos; si algo falla quita solo lo que creó (os.Remove, nunca RemoveAll) para poder reintentar.
+func writeCA(dir string, cert, key []byte) (err error) {
+	abs, err := filepath.Abs(dir) // MkdirPrivate pide ruta absoluta
+	if err != nil {
+		return err
+	}
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		return err
+	}
+	var made []string
+	defer func() {
+		if err != nil {
+			for _, p := range made {
+				os.Remove(p)
+			}
+			os.Remove(dir)
+		}
+	}()
+	if err := sys.MkdirPrivate(abs); err != nil { // en Linux no hace nada más; en Windows le pone la DACL protegida
+		return err
+	}
+	for _, f := range []struct {
+		name string
+		data []byte
+	}{{"ca.crt.pem", cert}, {"ca.key.pem", key}} {
+		p := filepath.Join(dir, f.name)
+		if err := writeNewFn(p, f.data); err != nil {
+			return err
+		}
+		made = append(made, p)
+	}
+	return nil
+}
+
 // writeNew nunca sobrescribe: perder una llave sellada no tiene vuelta.
 func writeNew(path string, data []byte) error {
 	f, err := sys.OpenNewPrivate(path) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 	if err != nil {
 		return err
 	}
+	return fill(f, path, data)
+}
+
+// fill escribe y cierra f; si algo falla quita path, que creó esta llamada.
+func fill(f *os.File, path string, data []byte) error {
 	if _, err := f.Write(data); err != nil {
 		f.Close()
+		os.Remove(path)
 		return err
 	}
-	return f.Close()
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
 }
 
 func radiusTest(c *cli.Env, args []string) error {
@@ -299,12 +346,14 @@ func pkiCaInit(c *cli.Env, args []string) error {
 	if name == "" {
 		return cli.Err("mctl.security.missing_name")
 	}
-	if err := os.Mkdir(dir, 0o700); err != nil {
-		return err
-	}
-	if abs, err := filepath.Abs(dir); err != nil { // MkdirPrivate pide ruta absoluta
-		return err
-	} else if err := sys.MkdirPrivate(abs); err != nil { // en Linux no hace nada más; en Windows le pone la DACL protegida
+	// se comprueba antes de preguntar; la carpeta se crea hasta tener la respuesta del núcleo
+	if _, err := os.Lstat(dir); err == nil {
+		return cli.Err("mctl.security.exists", "path", dir)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		var pe *fs.PathError
+		if errors.As(err, &pe) {
+			err = pe.Err // sin la llamada del sistema ni la ruta
+		}
 		return err
 	}
 	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_ca_key"))
@@ -316,10 +365,7 @@ func pkiCaInit(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeNew(filepath.Join(dir, "ca.crt.pem"), []byte(r.CaCertPem)); err != nil {
-		return err
-	}
-	if err := writeNew(filepath.Join(dir, "ca.key.pem"), []byte(r.SealedKeyPem)); err != nil {
+	if err := writeCA(dir, []byte(r.CaCertPem), []byte(r.SealedKeyPem)); err != nil {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.Report.Text)
