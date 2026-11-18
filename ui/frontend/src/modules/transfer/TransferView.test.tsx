@@ -172,6 +172,28 @@ test("la carpeta de recepción abierta a otros muestra la orden exacta para copi
   expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull();
 });
 
+test("con note (ruta del programa insegura) el hint es texto: sin consola de regla ni orden para copiar", async () => {
+  const note = "La ruta de macuahuitld.exe no se puede citar con seguridad: crea a mano la regla de entrada del Firewall.";
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "", note, noteCode: "fileserve.hint.win_rule_manual" })) }));
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:6969" }) }));
+  setOSForTests("windows"); // la nota solo llega en Windows
+  try {
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const el = await within(card).findByText(note);
+  expect(el.closest('[role="log"]')).toBeNull();
+  expect(within(card).queryByRole("log", { name: /redirección/i })).toBeNull();
+  expect(within(card).queryAllByRole("log")).toHaveLength(1); // solo la orden de IOS
+  } finally { setOSForTests(undefined); }
+});
+
+test("sin note, la regla sigue siendo una orden para copiar y no aparece texto de nota", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:6969" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  expect(await within(card).findByRole("log", { name: "Regla de redirección (nftables)" })).toBeInTheDocument();
+  expect(within(card).queryByText(/macuahuitld\.exe/)).toBeNull();
+});
+
 test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
   const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
   act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));

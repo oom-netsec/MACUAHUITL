@@ -27,7 +27,7 @@ export interface TransferGetParams {
   acceptedHostKeys: string[]; name?: string; insecure?: boolean; legacySsh?: boolean; maxBytes?: number; seconds?: number;
 }
 export interface TransferPutParams { url: string; fromDir: string; name: string; credentialId: string; acceptedHostKeys: string[]; legacySsh?: boolean; maxBytes?: number; seconds?: number }
-export interface TransferHintInfo { standardPort: number; nftables: string; remove: string }
+export interface TransferHintInfo { standardPort: number; nftables: string; remove: string; note?: string; noteCode?: string }
 
 
 // ---- Explorador remoto, avance y descarga múltiple (Fase 19) ----

@@ -86,6 +86,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
         </>
       )}
+      {hint?.note && <Notice kind="warn">{hint.note}</Notice> /* sin regla por una ruta insegura: el núcleo explica qué crear a mano; es texto, nunca una orden para copiar */}
       {hint && !hint.nftables && !isWindows() && !s.done && nftLeftoverCmd(r.protocol, host, port) && (
         /* Sin privilegios no se puede ver si quedó una tabla nft vieja que se lleve el tráfico del puerto estándar: se explica y se da la orden. */
         <>
