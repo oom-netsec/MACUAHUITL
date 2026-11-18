@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
@@ -164,7 +165,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
 
   const ssh = proto === "scp" || proto === "sftp";
   const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
-  const missing = (!any && !listen) || (!write && !fromDir && splitList(files).length === 0); // datos requeridos; el resto lo explica serveProblem al abrir
+// Los datos requeridos los nombra el botón (missing); el resto lo explica serveProblem al abrir.
   const [bad, setBad] = useState<{ k: Key | null; n: number }>({ k: null, n: 0 }); // última razón de validación y nº de intento: si cae en Avanzado, se abre (también al repetir)
   // Con TFTP + recibir la lista de IP es obligatoria: se queda a la vista, fuera de Avanzado.
   const allowVisible = write && proto === "tftp";
@@ -218,7 +219,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {any && <Notice kind="warn">{t("transfer.any.warn")}</Notice>}
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
-        <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
+        <div className="actions"><RunButton primary kbd disabled={starting} onClick={start} missing={[!any && !listen && t("need.listen"), !write && !fromDir && splitList(files).length === 0 && t("need.serveFiles")]}>{t("transfer.open")}</RunButton></div>
         {(err.text || loadErr) && <Notice kind="error">{err.text || loadErr}</Notice>}
         {err.text && err.cmd && <Console label={t(err.label)} text={err.cmd} copy={core.copyText} />}
       </Section>

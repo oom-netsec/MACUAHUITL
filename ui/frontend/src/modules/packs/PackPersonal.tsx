@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI } from "../../lib/core";
@@ -57,7 +58,7 @@ export function ExportDialog({ core, onClose }: { core: CoreAPI; onClose: () => 
       {(err || loadErr) && <Notice kind="error">{err || loadErr}</Notice>}
       {res && <Notice kind="ok">{t("packs.export.done", { id: res.id, version: res.version, sha: res.sha256, scripts: res.scripts, playbooks: res.playbooks })}</Notice>}
       {res && res.omittedPlaybooks.length > 0 && <Notice kind="warn">{t("packs.export.omitted", { ids: res.omittedPlaybooks.join(", ") })}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy || !EDITOR_RE.test(editor) || (!picked.length && !playbooks)} onClick={go}>{t("packs.export.go")}</button></div>
+      <div className="actions"><RunButton primary busy={busy} missing={[!EDITOR_RE.test(editor) && t("need.editor"), !picked.length && !playbooks && t("need.packItems")]} onClick={go}>{t("packs.export.go")}</RunButton></div>
     </Dialog>
   );
 }

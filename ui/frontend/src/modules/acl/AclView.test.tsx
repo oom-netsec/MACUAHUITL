@@ -49,3 +49,13 @@ test("importar y analizar espera a que haya texto", async () => {
   await userEvent.type(screen.getByLabelText("ACL a importar"), "permit ip any any");
   expect(screen.getByRole("button", { name: /Importar y analizar/ })).toBeEnabled();
 });
+
+test("Importar y analizar nombra la ACL que falta y deja de hacerlo al pegarla", async () => {
+  render(<AclView core={fakeCore()} />);
+  const btn = screen.getByRole("button", { name: "Importar y analizar" });
+  expect(btn).toBeDisabled();
+  expect(btn).toHaveAccessibleDescription("Falta: pegar la ACL a importar.");
+  await userEvent.type(screen.getByLabelText("ACL a importar"), "x");
+  expect(btn).toBeEnabled();
+  expect(btn).not.toHaveAccessibleDescription();
+});

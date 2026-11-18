@@ -124,3 +124,17 @@ test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
   await userEvent.click(screen.getByRole("tab", { name: /^Hallazgos/ }));
   expect(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" })).toHaveValue("/o/lab");
 });
+
+test("Analizar, Comparar y Ver línea de tiempo nombran el trabajo que falta", async () => {
+  render(<AnalysisView core={fakeCore()} />);
+  const btn = (n: string) => screen.getByRole("button", { name: n });
+  expect(btn("Analizar")).toBeDisabled();
+  expect(btn("Analizar")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.click(screen.getByRole("tab", { name: "Diferencias" }));
+  expect(btn("Comparar")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.click(screen.getByRole("tab", { name: "Línea de tiempo" }));
+  expect(btn("Ver línea de tiempo")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  expect(btn("Ver línea de tiempo")).toBeEnabled();
+  expect(btn("Ver línea de tiempo")).not.toHaveAccessibleDescription();
+});

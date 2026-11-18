@@ -1,4 +1,5 @@
 import { Advanced } from "../../components/Advanced";
+import { RunButton } from "../../components/RunButton";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useBatch } from "../../lib/useBatch";
 import { showHidden, stripAnsi } from "../../lib/safeText";
@@ -193,7 +194,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
         </>
       )}
       <div className="actions">
-        <button className="primary" onClick={run} disabled={!!runId || launching || (tool === "ping" && Object.keys(ping.errors).length > 0) || (needsTarget && !target.trim()) || (server && (!bindIP || !portOk))} aria-busy={!!runId}>{t("common.run")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+        <RunButton primary kbd onClick={run} busy={!!runId} disabled={launching}
+          missing={[tool === "ping" && Object.keys(ping.errors).length > 0 && t("need.fixFields"), needsTarget && !target.trim() && t("need.target"), server && !bindIP && t("need.bindIP"), server && !portOk && t("need.portValid")]}>{t("common.run")}</RunButton>
         {stoppable && <button onClick={stop} disabled={!runId}>{t("diag.stop")}</button>}
         <button onClick={cancel} disabled={!runId}>{t("common.cancel")}</button>
       </div>

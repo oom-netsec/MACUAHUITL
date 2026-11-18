@@ -511,3 +511,16 @@ test("servidor: recibir por TFTP deja «IP permitidas» a la vista, fuera de Ava
   await userEvent.click(screen.getByLabelText(/Permitir recibir/));
   expect(screen.getByLabelText(/IP permitidas/).closest("details")).toBeNull();
 });
+
+test("Abrir servidor nombra la IP y los archivos que faltan y deja de hacerlo al completarlos", async () => {
+  setup();
+  const go = () => screen.getByRole("button", { name: "Abrir servidor" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: indicar la dirección de escucha (o elegir cualquiera), elegir los archivos o la carpeta a servir (o activar recibir).");
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  expect(go()).toHaveAccessibleDescription("Falta: elegir los archivos o la carpeta a servir (o activar recibir).");
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+});

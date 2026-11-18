@@ -431,3 +431,13 @@ test("el aviso de la captura en Windows pide Wireshark con Npcap, no el paquete 
   render(<DiagView core={fakeCore()} tool="pcap" />);
   expect(screen.getByText(/wireshark-common/)).toBeInTheDocument();
 });
+
+test("Ejecutar nombra el destino que falta y deja de hacerlo al escribirlo", async () => {
+  render(<DiagView core={fakeCore()} tool="ping" />);
+  const go = () => screen.getByRole("button", { name: "Ejecutar" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: indicar el equipo.");
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+});

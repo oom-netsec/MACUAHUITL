@@ -189,6 +189,19 @@ describe("respaldo cifrado", () => {
     expect(core.removeEmptyFile).not.toHaveBeenCalled();
   });
 
+  test("Exportar e Importar respaldo nombran lo que falta y dejan de hacerlo al completarlo", async () => {
+    render(<VaultView core={fakeCore()} />);
+    const exp = await screen.findByRole("button", { name: "Exportar respaldo…" });
+    const imp = screen.getByRole("button", { name: "Importar respaldo…" });
+    expect(exp).toHaveAccessibleDescription("Falta: marcar que entiendes el aviso.");
+    expect(imp).toHaveAccessibleDescription("Falta: escribir la frase del respaldo.");
+    await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
+    await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "x");
+    expect(exp).toBeEnabled();
+    expect(exp).not.toHaveAccessibleDescription();
+    expect(imp).not.toHaveAccessibleDescription();
+  });
+
   test("Importar respaldo… sigue deshabilitado hasta que hay frase", async () => {
     render(<VaultView core={fakeCore()} />);
     const b = await screen.findByRole("button", { name: "Importar respaldo…" });

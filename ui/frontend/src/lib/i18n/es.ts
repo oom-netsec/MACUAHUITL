@@ -3093,6 +3093,19 @@ export const es = {
   "need.layers": "agregar al menos una capa",
   "need.network": "indicar la red",
   "need.vlsmNeeds": "indicar las necesidades de hosts",
+  "need.fixFields": "corregir los campos marcados",
+  "need.bindIP": "elegir la dirección de escucha",
+  "need.portValid": "poner un puerto válido",
+  "need.listen": "indicar la dirección de escucha (o elegir cualquiera)",
+  "need.serveFiles": "elegir los archivos o la carpeta a servir (o activar recibir)",
+  "need.aclText": "pegar la ACL a importar",
+  "need.backupSure": "marcar que entiendes el aviso",
+  "need.backupPhrase": "escribir la frase del respaldo",
+  "need.backupDecisions": "elegir una decisión por cada conflicto",
+  "need.displaceOk": "aceptar que se desplazan los elementos indicados",
+  "need.editor": "indicar un editor válido",
+  "need.packItems": "elegir al menos un script o los playbooks",
+  "need.pickScripts": "elegir al menos un script",
 };
 
 export type Key = keyof typeof es;

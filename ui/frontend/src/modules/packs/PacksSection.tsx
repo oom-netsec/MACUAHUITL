@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { NoPacks } from "../../components/NoPacks";
 import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI, PackDetail, PackInfo, PackInspectResult } from "../../lib/core";
@@ -117,7 +118,7 @@ function InstallDialog({ core, path, info, onDone, onClose, onDisplaced }: { cor
       </>}
       {err && changed !== "displace" && <Notice kind="error">{err}</Notice>}
       {changed && <Notice kind="warn">{t(changed === "displace" ? "packs.displace.changed" : "packs.import.changed")}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy || !!changed || (displaced.length > 0 && !okDisplace)} onClick={install}>{t("packs.install.go")}</button></div>
+      <div className="actions"><RunButton primary busy={busy} disabled={!!changed} missing={[displaced.length > 0 && !okDisplace && t("need.displaceOk")]} onClick={install}>{t("packs.install.go")}</RunButton></div>
     </Dialog>
   );
 }

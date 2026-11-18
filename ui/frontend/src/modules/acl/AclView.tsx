@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { Acl, AclFinding, CoreAPI } from "../../lib/core";
 import { Notice, Select, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, useResult } from "../../components/Page";
@@ -55,7 +56,7 @@ export function AclView({ core }: { core: CoreAPI }) {
         <Select label={t("acl.from")} value={from} onChange={setFrom} options={vendors} w="md" />
         <TextArea label={t("acl.input")} rows={10} value={text} onChange={setText} />
         <div className="actions">
-          <button className="primary" onClick={importAndAnalyze} disabled={busy || !text.trim()} aria-busy={imp.busy}>{t("acl.import")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <RunButton primary kbd onClick={importAndAnalyze} disabled={busy} busy={imp.busy} missing={[!text.trim() && t("need.aclText")]}>{t("acl.import")}</RunButton>
         </div>
       </Section>
       {imp.error && <Notice kind="error">{imp.error}</Notice>}

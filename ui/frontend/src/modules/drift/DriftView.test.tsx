@@ -77,3 +77,12 @@ test("avisa cuando el trabajo se recogió sin enmascarar, y no cuando sí", asyn
   await screen.findByRole("region", { name: "SW1_192.0.2.1" });
   expect(screen.queryByText(/sin enmascarar/)).not.toBeInTheDocument();
 });
+
+test("Comparar nombra el trabajo que falta y deja de hacerlo al escribirlo", async () => {
+  render(<DriftView core={fakeCore()} />);
+  const btn = screen.getByRole("button", { name: "Comparar" });
+  expect(btn).toHaveAccessibleDescription("Falta: indicar el trabajo.");
+  await userEvent.type(screen.getByLabelText("Trabajo o carpeta"), "/o/job");
+  expect(btn).toBeEnabled();
+  expect(btn).not.toHaveAccessibleDescription();
+});

@@ -346,3 +346,13 @@ test("en una sola columna (ventana angosta) elegir un script lleva el detalle a 
     expect(scroll).toHaveBeenCalled();
   } finally { window.matchMedia = prev; }
 });
+
+test("Exportar seleccionados nombra que no hay nada elegido y deja de hacerlo al elegir", async () => {
+  setup();
+  await screen.findByText("L2 · STP");
+  const btn = () => screen.getByRole("button", { name: /^Exportar seleccionados/ });
+  expect(btn()).toHaveAccessibleDescription("Falta: elegir al menos un script.");
+  await userEvent.click(screen.getByRole("checkbox", { name: "Seleccionar L2 · STP" }));
+  expect(btn()).toBeEnabled();
+  expect(btn()).not.toHaveAccessibleDescription();
+});
