@@ -1,3 +1,4 @@
+import { Advanced } from "../../components/Advanced";
 import { useState } from "react";
 import { showHidden } from "../../lib/safeText";
 import type { CoreAPI, DriftReport } from "../../lib/core";
@@ -22,9 +23,13 @@ export function DriftView({ core }: { core: CoreAPI }) {
     <Page title={t("drift.title")} description={t("drift.intro")}>
       <div className="field-row">
         <Field label={t("drift.job")} value={job} onChange={setJob} w="lg" mono />
-        <Field label={t("drift.round")} type="number" value={round} onChange={setRound} w="sm" />
-        <Field label={t("drift.device")} value={device} onChange={setDevice} w="md" mono />
       </div>
+      <Advanced changed={Number(round !== "0") + Number(device !== "")}>
+        <div className="field-row">
+          <Field label={t("drift.round")} type="number" value={round} onChange={setRound} w="sm" />
+          <Field label={t("drift.device")} value={device} onChange={setDevice} w="md" mono />
+        </div>
+      </Advanced>
       <div className="actions">
         <button className="primary" disabled={!job.trim() || q.busy} aria-busy={q.busy}
           onClick={() => q.run(() => core.driftRun(job.trim(), Number(round) || 0, device.trim()))}>{t("drift.btn")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
