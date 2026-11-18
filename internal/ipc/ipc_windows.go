@@ -185,20 +185,27 @@ func pipeLabel(c net.Conn) (uint32, error) {
 
 const aceMandatoryLabel = 0x11 // SYSTEM_MANDATORY_LABEL_ACE_TYPE; x/sys no la define
 
+// heapMin es el tamaño mínimo de un búfer que Windows llena con punteros a sí mismo: por encima de 32 bytes, un make de
+// tamaño variable nunca va al stack (ver factsOf).
+const heapMin = 64
+
 const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; x/sys no la define
 
 // factsOf lee integridad, AppContainer y restricción de un token abierto con TOKEN_QUERY. Cualquier fallo va en Err.
 func factsOf(tok windows.Token) tokenFacts {
 	var f tokenFacts
 	var n uint32
-	// Búfer en el heap (patrón de Token.getInfo de x/sys): Label.Sid apunta dentro del propio búfer.
+	// Label.Sid apunta dentro del propio búfer, y ese puntero lo escribe Windows en un []byte: si el búfer viviera en el
+	// stack, al crecer el stack Go movería el búfer sin corregir Label.Sid, que quedaría apuntando al stack viejo ya
+	// liberado («found pointer to free object», checkptr). Desde Go 1.25 un make de tamaño variable de hasta 32 bytes que
+	// no escapa va al stack (el TOKEN_MANDATORY_LABEL mide 28): con 64 o más va siempre al heap.
 	err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, nil, 0, &n)
 	if err != windows.ERROR_INSUFFICIENT_BUFFER {
 		f.Err = err
 		return f
 	}
-	buf := make([]byte, n)
-	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], n, &n); err != nil {
+	buf := make([]byte, max(n, heapMin))
+	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], uint32(len(buf)), &n); err != nil {
 		f.Err = err
 		return f
 	}
