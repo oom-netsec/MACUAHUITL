@@ -70,7 +70,7 @@ test("Análisis (diferencias): el nombre del equipo en el título", async () => 
   const core = fakeCore({ analysisDiff: vi.fn(async () => diff as never) });
   wrap(<AnalysisView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "Diferencias" }));
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o");
   await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
   const h = await screen.findByRole("heading", { name: `SW${SHOWN}` });
   noRaw(h.textContent);

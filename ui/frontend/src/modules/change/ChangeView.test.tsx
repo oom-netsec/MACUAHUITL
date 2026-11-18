@@ -199,6 +199,16 @@ test("las subpestañas conservan lo escrito y Pre/Post refresca la lista sin rem
   await screen.findByRole("option", { name: "lab (admin)" });
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
-  await waitFor(() => expect(core.listChanges).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(core.listChanges).toHaveBeenCalledTimes(3)); // montaje, volver a Pre/Post y crear
   expect(screen.getByLabelText("Nombre del cambio")).toHaveValue("CRQ-1");
+});
+
+test("al volver a Pre/Post la lista se relee: una captura que terminó habilita «Reporte»", async () => {
+  const run = { id: "ch1", name: "CRQ-1", preJobId: "j1", preState: "completed", postJobId: "j2", postState: "running" };
+  const listChanges = vi.fn().mockResolvedValueOnce([run]).mockResolvedValue([{ ...run, postState: "completed" }]);
+  render(<ChangeView core={fakeCore({ listChanges })} />);
+  await waitFor(() => expect(listChanges).toHaveBeenCalledTimes(1));
+  await userEvent.click(screen.getByRole("tab", { name: "Upgrade" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Pre/Post" }));
+  await waitFor(() => expect(listChanges).toHaveBeenCalledTimes(2));
 });
