@@ -117,6 +117,19 @@ func (o *opts) boolean(key string) bool {
 	return v == "true" || v == "1"
 }
 
+// strictBool es como boolean pero solo acepta «true» o «false»: lo demás es error, no «falso» en silencio.
+func (o *opts) strictBool(key string) bool {
+	v, ok := o.m[key]
+	if !ok {
+		return false
+	}
+	o.used[key] = true
+	if v != "true" && v != "false" {
+		o.fail(i18n.New("diag.err.bool", i18n.A("key", key, "value", v)))
+	}
+	return v == "true"
+}
+
 func (o *opts) fail(err error) {
 	if o.err == nil {
 		o.err = err
@@ -207,6 +220,12 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 		}
 		if o.boolean("service_detection") {
 			argv = append(argv, "-sV")
+		}
+		if o.strictBool("skip_discovery") {
+			if scan == "ping" { // -sn y -Pn se contradicen: se rechaza en vez de descartar la opción
+				return "", nil, PingPlan{}, i18n.New("diag.err.skip_with_ping", nil)
+			}
+			argv = append(argv, "-Pn")
 		}
 		if a, err := netip.ParseAddr(host); err == nil && a.Is6() {
 			argv = append(argv, "-6")
@@ -340,7 +359,12 @@ func isLocalIP(a netip.Addr) bool {
 }
 
 var literalFlags = map[string]bool{"-B": true, "-n": true, "-c": true, "-i": true, "-s": true, "-m": true, "-sT": true, "-sS": true, "-sU": true, "-sn": true,
-	"-p": true, "-T0": true, "-T1": true, "-T2": true, "-T3": true, "-T4": true, "-T5": true, "-sV": true, "-6": true, "-oG": true, "-": true,
+	"-p": true, "-T0": true, "-T1": true, "-T2": true, "-T3": true, "-T4": true, "-T5": true, "-sV": true, "-Pn": true, "-6": true, "-oG": true, "-": true,
 	"-P": true, "-R": true, "-u": true, "-t": true, "-1": true, "-a": true, "-f": true, "-w": true,
 	"-l": true, "-h": true, "-d": true,
 	"-I": true, "-M": true, "-W": true, "-Q": true, "-4": true, "-S": true}
+
+// NmapZeroUp dice si la línea final de nmap (-oG) informa 0 hosts up.
+func NmapZeroUp(line string) bool {
+	return strings.HasPrefix(line, "# Nmap done") && strings.Contains(line, "(0 hosts up)")
+}

@@ -111,6 +111,9 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	}}
 	res, err := run.Run(st.Context(), req, func(line string) {
 		st.Send(&v1.RunResponse{OutputLine: line})
+		if w := avisoNmap(i18n.Locale(st.Context()), tool, line); w != "" {
+			st.Send(&v1.RunResponse{OutputLine: w})
+		}
 	})
 	code := res.ExitCode
 	if err != nil {
@@ -149,4 +152,12 @@ type Module struct{}
 
 func (Module) Register(s ipc.Registrar, d service.Deps) {
 	v1.RegisterDiagServiceServer(s, &diagSvc{d: d, runs: map[string]*liveRun{}})
+}
+
+// avisoNmap devuelve el aviso de 0 hosts up (vacío si no toca); solo viaja por el flujo, no va al archivo de salida.
+func avisoNmap(loc string, tool diag.Tool, line string) string {
+	if tool != diag.Nmap || !diag.NmapZeroUp(line) {
+		return ""
+	}
+	return i18n.Msg(loc, "diag.warn.zero_up", nil)
 }
