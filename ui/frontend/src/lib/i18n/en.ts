@@ -3071,4 +3071,13 @@ export const en: Record<Key, string> = {
   "need.snippetFields": "fill in the template's required fields",
   "need.ifaces": "enter the interfaces",
   "need.portChange": "choose what to change (VLAN, voice VLAN, description or state)",
+  "need.sharedSecret": "enter the shared secret or pick it from the vault",
+  "need.testUser": "enter the test user or pick it from the vault",
+  "need.cn": "enter the common name (CN)",
+  "need.keyPassword": "enter the key password",
+  "need.cert": "paste the certificate",
+  "need.caPassword": "enter the CA password",
+  "need.caCert": "paste the CA certificate",
+  "need.caKey": "paste the CA sealed key",
+  "need.csr": "paste the request (CSR)",
 };

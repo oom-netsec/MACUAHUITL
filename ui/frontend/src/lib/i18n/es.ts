@@ -3070,6 +3070,15 @@ export const es = {
   "need.snippetFields": "completar los campos obligatorios de la plantilla",
   "need.ifaces": "indicar las interfaces",
   "need.portChange": "elegir qué cambiar (VLAN, VLAN de voz, descripción o estado)",
+  "need.sharedSecret": "escribir el secreto compartido o elegirlo de la bóveda",
+  "need.testUser": "indicar el usuario de prueba o elegirlo de la bóveda",
+  "need.cn": "indicar el nombre común (CN)",
+  "need.keyPassword": "escribir la contraseña de la llave",
+  "need.cert": "pegar el certificado",
+  "need.caPassword": "escribir la contraseña de la CA",
+  "need.caCert": "pegar el certificado de la CA",
+  "need.caKey": "pegar la llave sellada de la CA",
+  "need.csr": "pegar la solicitud (CSR)",
 };
 
 export type Key = keyof typeof es;

@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Check, Field, Notice, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -35,8 +36,8 @@ export function ExportCard({ core }: { core: CoreAPI }) {
       {pem && <Check label={t("security.export.plain")} checked={f.plainKey} onChange={set("plainKey")} />}
       <Field label={t("security.export.path")} value={f.path} onChange={set("path")} w="full" mono />
       <div className="actions">
-        <button disabled={!f.cert || !f.path || r.busy} aria-busy={r.busy}
-          onClick={() => { void r.run(() => core.secPkiExport(body)); set("keyPassword")(""); set("exportPassword")(""); }}>{t("security.export")}</button>
+        <RunButton busy={r.busy} missing={[!f.cert && t("need.cert"), !f.path && t("need.path")]}
+          onClick={() => { void r.run(() => core.secPkiExport(body)); set("keyPassword")(""); set("exportPassword")(""); }}>{t("security.export")}</RunButton>
       </div>
       {r.error && <Notice kind="error">{r.error}</Notice>}
       {r.data && <Notice kind="ok">{t("security.export.saved", { path: r.data })}</Notice>}
