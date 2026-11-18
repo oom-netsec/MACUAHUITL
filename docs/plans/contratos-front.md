@@ -1408,3 +1408,25 @@ Antes, `accepted_host_key_fingerprints` (lista de huellas) valía para cualquier
 - **Front:** al aceptar una huella del Login Test hay que mandar `{host: target, fingerprint}` del equipo que la mostró. El puente (`ui/bridge`) sigue usando el campo viejo, que solo sirve con un destino.
 - **Trabajos guardados de Patrol:** el `Spec` guardado nunca llevó las huellas aceptadas (solo se usan al armar), así que no hay formato viejo que migrar.
 - **mctl:** `--accept HOST=HUELLA` o `HOST:PUERTO=HUELLA`, repetible; una huella sola solo vale con un destino.
+
+## Terminal con credencial tecleada (fase 47t-4)
+
+Solo el núcleo y el proto: el puente y la vista son de Front. Todo es aditivo; con `credential_id` o `host_id` la terminal se comporta igual que antes.
+
+- **Modo tecleado implícito:** `TerminalOpen` con `address` y **sin** `credential_id` (ni `host_id`). No usa la bóveda ni exige que esté abierta. `host_id` sigue exigiendo credencial hasta 47t-5.
+- **`TerminalOpen.username`** (campo 11), opcional y solo en modo tecleado: texto imprimible UTF-8, 1 a 128 bytes. Con `credential_id` o `host_id` da `InvalidArgument` `terminal.err.username_with_credential`; inválido, `terminal.err.username`. Vacío: el núcleo pregunta «login as:» (`terminal.auth.login`, `echo:true`) antes de marcar, con el mismo `AuthPrompt`. En «Confiar y reintentar» la UI reenvía el usuario, nunca respuestas.
+- **`OpenTerminalResponse.auth_prompt`** (4): `{seq, name, instruction, prompts:[{text, echo}]}`. `seq` empieza en 1 y crece por ronda. `echo:false` = secreto, no se pinta lo tecleado. Si el equipo rechaza y vuelve a preguntar, antes llega un `data` con «Access denied\r\n» (en el idioma pedido).
+- **`OpenTerminalRequest.auth_answer`** (4): `{seq, answers:[bytes]}`, una respuesta por pregunta, en una sola llamada. Otro `seq` u otro número de respuestas: `InvalidArgument` `terminal.err.auth_answer` y la sesión se cierra. Mientras se autentica, `data` se descarta y `resize` se guarda para el PTY.
+- **Fin por el motivo** (`errorInfo.reason` en `terminal:done`):
+
+| reason | código gRPC | cuándo |
+|---|---|---|
+| `terminal.err.auth_attempts` | PermissionDenied | 3 intentos fallidos (también el tope de rondas del equipo) |
+| `terminal.err.auth_timeout` | DeadlineExceeded | 2 min sin respuesta a una pregunta |
+| `terminal.err.auth_no_method` | FailedPrecondition | el equipo no ofrece password ni keyboard-interactive |
+| `terminal.err.auth_answer` | InvalidArgument | respuesta con otro seq o cantidad |
+| `terminal.err.client_gone` / `terminal.err.core_closing` | Unavailable | cerrar la pestaña o el núcleo durante una pregunta |
+
+- Cerrar la pestaña (cerrar el envío o cancelar) aborta la pregunta en pie. La huella nueva sigue como siempre (`FailedPrecondition` con la huella, antes de cualquier pregunta; con usuario vacío, «login as:» va antes de conectar).
+- **Auditoría** (en inglés): `terminal.open` con `credential=typed user="..."`; `terminal.failed` igual más el motivo. Nunca respuestas ni textos de preguntas, y la grabación no ve nada de la autenticación. Con la bóveda cerrada también se audita.
+- Cambia un texto: `terminal.err.no_address` ya no menciona la credencial.

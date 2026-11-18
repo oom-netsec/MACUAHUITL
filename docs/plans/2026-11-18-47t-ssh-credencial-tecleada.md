@@ -88,7 +88,7 @@ StartBackup, StartAdhoc, CreateChange, assist StartRun, transfer Get scp:// y m�
 
 Proto, aditivo:
 ```
-TerminalOpen        string username = 10;   // solo en modo tecleado; vacío = el núcleo pregunta «login as:»
+TerminalOpen        string username = 11;   // solo en modo tecleado; vacío = el núcleo pregunta «login as:»
 OpenTerminalRequest oneof: AuthAnswer auth_answer = 4;
 OpenTerminalResponse      AuthPrompt auth_prompt = 4;
 message AuthPrompt  { uint32 seq = 1; string name = 2; string instruction = 3; repeated AuthQuestion prompts = 4; }

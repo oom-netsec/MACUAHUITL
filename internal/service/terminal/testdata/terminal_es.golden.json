@@ -4,5 +4,5 @@
  "limite": "ERROR: rpc error: code = ResourceExhausted desc = máximo 8 terminales abiertas",
  "no_abre": "ERROR: rpc error: code = InvalidArgument desc = el primer mensaje debe abrir la sesión",
  "puerto": "ERROR: rpc error: code = InvalidArgument desc = puerto fuera de rango",
- "sin_equipo": "ERROR: rpc error: code = InvalidArgument desc = indica el equipo (dirección) y la credencial"
+ "sin_equipo": "ERROR: rpc error: code = InvalidArgument desc = indica el equipo (dirección)"
 }
