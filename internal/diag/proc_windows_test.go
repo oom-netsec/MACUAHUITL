@@ -85,7 +85,7 @@ func confineProbe(t *testing.T, kill func(cancel func(), done func())) {
 // Cancel después de done (la goroutine de diag puede llegar tarde) no debe tocar el job: su handle ya está cerrado y el
 // número puede ser de otro objeto.
 func TestCancelTrasDoneNoTerminaElJob(t *testing.T) {
-	cmd := exec.Command(os.Args[0], "-test.run=^$")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^$") // como en producción: Cancel solo vale con CommandContext
 	_, done, err := confine(cmd)
 	if err != nil {
 		t.Fatal(err)
