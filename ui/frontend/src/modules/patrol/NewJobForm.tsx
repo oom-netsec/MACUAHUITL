@@ -78,7 +78,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     setRoundsErr("");
     const spec: JobSpec = {
       name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
-      outputDir: out, split, zip, deleteLooseFiles: delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
+      outputDir: out, split, zip, deleteLooseFiles: zip !== "ZIP_POLICY_NONE" && delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
       windowHours: Math.min(96, Math.max(1, Number(hours) || 1)),
       schedule: cron ? { cron, rounds: Number(rounds) } : { intervalSeconds: Number(minutes) * 60, rounds: Number(rounds) },
     };
@@ -128,7 +128,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
           <Select label={t("patrol.zip")} value={zip} onChange={setZip} w="md"
             options={[["ZIP_POLICY_AT_END", t("patrol.zip.atEnd")], ["ZIP_POLICY_PER_ROUND", t("patrol.zip.perRound")], ["ZIP_POLICY_NONE", t("patrol.zip.none")]]} />
         </div>
-        <Check label={t("patrol.deleteLoose")} checked={delLoose} onChange={setDelLoose} />
+        {zip !== "ZIP_POLICY_NONE" && <Check label={t("patrol.deleteLoose")} checked={delLoose} onChange={setDelLoose} />}
       </Section>
       <Section title={`3 · ${t("patrol.step.schedule")}`}>
         <div className="field-row">
