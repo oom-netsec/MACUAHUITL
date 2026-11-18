@@ -3,6 +3,7 @@ package fileserve
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -160,7 +161,7 @@ func OpenDir(dir string, extraDeny ...string) (*os.Root, string, error) {
 	}
 	root, err := os.OpenRoot(real)
 	if err != nil {
-		return nil, "", fmt.Errorf("fileserve: %w", err)
+		return nil, "", fmt.Errorf("fileserve: %w", causa(err))
 	}
 	if rst, err := root.Stat("."); err != nil || !os.SameFile(st, rst) {
 		root.Close()
@@ -189,7 +190,7 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	}
 	st, err := os.Lstat(clean)
 	if err != nil {
-		return "", nil, i18n.Wrap("fileserve.err.dir_unreadable", err, nil)
+		return "", nil, i18n.Wrap("fileserve.err.dir_unreadable", causa(err), nil)
 	}
 	if st.Mode()&os.ModeSymlink != 0 {
 		return "", nil, i18n.New("fileserve.err.dir_symlink", i18n.A("dir", clean))
@@ -199,7 +200,7 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	}
 	real, err := evalSymlinks(clean)
 	if err != nil {
-		return "", nil, fmt.Errorf("fileserve: %w", err)
+		return "", nil, fmt.Errorf("fileserve: %w", causa(err))
 	}
 	if exigeUnidad && sinLetraDeUnidad(real) {
 		return "", nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", real))
@@ -432,4 +433,13 @@ func dirWarnings(loc string, c Config) []string {
 		}
 	}
 	return out
+}
+
+// causa deja solo la causa de un *fs.PathError: sin «lstat»/«GetFileAttributesEx» ni la ruta, que el usuario acaba de teclear.
+func causa(err error) error {
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		return pe.Err
+	}
+	return err
 }

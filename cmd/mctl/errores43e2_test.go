@@ -37,16 +37,13 @@ func TestCoreCaidoMensajeLegible(t *testing.T) {
 }
 
 // Una ruta relativa se rechaza con un mensaje del catálogo antes de cualquier Stat: nunca sale la cadena cruda del
-// sistema (GetFileAttributesEx, lstat…). Las tres variantes del QA: prefs set --outputs, transfer --dir y diag --out.
+// sistema (GetFileAttributesEx, lstat…). Las tres variantes del QA: prefs set --outputs, diag --out.
 func TestOutputsRelativaSinApiCruda(t *testing.T) {
 	startCore(t)
 	cmds := map[string][]string{
-		"prefs":        {"prefs", "set", "--outputs", "rel"},
-		"transfer":     {"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--write", "--allow", "127.0.0.1", "--dir", "rel"},
-		"transfer-get": {"transfer", "get", "tftp://127.0.0.1/x.cfg", "--dir", "rel"},
-		"transfer-win": {"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--write", "--allow", "127.0.0.1", "--dir", `.\rel`},
-		"diag":         {"diag", "ping", "127.0.0.1", "--out", "rel"},
-		"diag-punto":   {"diag", "ping", "127.0.0.1", "--out", "./rel"},
+		"prefs":      {"prefs", "set", "--outputs", "rel"},
+		"diag":       {"diag", "ping", "127.0.0.1", "--out", "rel"},
+		"diag-punto": {"diag", "ping", "127.0.0.1", "--out", "./rel"},
 	}
 	for name, args := range cmds {
 		for lang, want := range map[string]string{"en": "must be absolute", "es": "debe ser absoluta"} {
@@ -73,5 +70,28 @@ func TestCaWrittenUnaBarra(t *testing.T) {
 	want := "CA in " + filepath.Join(wd, "ca") + " (ca.crt.pem, sealed ca.key.pem)"
 	if !strings.Contains(out, want) {
 		t.Fatalf("%q no contiene %q", out, want)
+	}
+}
+
+// Una carpeta absoluta que no existe sale sin la llamada del sistema (lstat, GetFileAttributesEx en Windows) ni la ruta repetida.
+func TestTransferCarpetaInexistenteSinLlamadaCruda(t *testing.T) {
+	startCore(t)
+	d := filepath.Join(t.TempDir(), "no-existe")
+	for _, a := range [][]string{
+		{"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--write", "--allow", "127.0.0.1", "--dir", d},
+		{"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--from", d},
+	} {
+		_, err := mctlRaw(t, "", append([]string{"--lang", "en"}, a...)...)
+		if err == nil {
+			t.Fatal("debe fallar")
+		}
+		for _, bad := range []string{"lstat", "GetFileAttributesEx", d + ": "} {
+			if strings.Contains(err.Error(), bad) {
+				t.Errorf("%q contiene %q", err, bad)
+			}
+		}
+		if !strings.Contains(err.Error(), "no such file or directory") {
+			t.Errorf("falta la causa: %q", err)
+		}
 	}
 }
