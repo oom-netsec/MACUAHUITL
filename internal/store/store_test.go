@@ -250,6 +250,11 @@ func TestEscrituraConcurrenteSinBusy(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	// Lo que se prueba es la serialización sobre la única conexión, no la durabilidad: sin fsync por commit, un
+	// FlushFileBuffers lento del runner de Windows no retiene la conexión más que el vigía y lo confunde con un interbloqueo.
+	if _, err := db.Exec(`PRAGMA synchronous = OFF`); err != nil {
+		t.Fatal(err)
+	}
 	const workers, each = 8, 50
 	errs := make(chan error, workers*each*3)
 	var wg sync.WaitGroup
