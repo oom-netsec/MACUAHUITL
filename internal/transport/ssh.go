@@ -121,12 +121,15 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 	// Cancelar el ctx corta el handshake; stop() lo desarma al terminar para que cancelarlo después no cierre la sesión abierta.
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
-	stop()
-	if err != nil {
-		conn.Close()
-		if cerr := ctx.Err(); cerr != nil {
-			return nil, cerr
+	if !stop() { // la cancelación ya cerró (o está cerrando) la conexión: no se entrega una sesión muerta
+		if err == nil {
+			c.Close()
 		}
+		conn.Close()
+		return nil, ctx.Err()
+	}
+	if err != nil { // stop() en true: el AfterFunc no tocó la conexión, el error es del handshake (huella, autenticación…)
+		conn.Close()
 		var he *HostKeyError
 		if errors.As(err, &he) {
 			return nil, he
