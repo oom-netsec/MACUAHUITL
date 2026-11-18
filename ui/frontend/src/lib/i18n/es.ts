@@ -3039,8 +3039,8 @@ export const es = {
   "visibility.snmp.credHint": "v2c: contraseña = comunidad; v3: contraseña = auth, enable = priv",
   "cred.vault.error": "No se pudo leer la bóveda: {error}",
   "cred.pick": "Elige una credencial",
-  "fps.accepted.hint.multi": "Con un equipo: SHA256:…; con varios: EQUIPO=SHA256:… (EQUIPO:PUERTO=SHA256:… si no es el 22), separadas por espacios o comas",
-  "fps.needHost": "Con varios equipos, escribe cada huella como EQUIPO=HUELLA (EQUIPO:PUERTO=HUELLA si no es el 22): una huella sin equipo valdría para cualquiera.",
+  "fps.accepted.hint.multi": "Con un equipo: SHA256:…; con varios: EQUIPO=SHA256:… (EQUIPO:PUERTO=SHA256:… si no es el 22; una IPv6 con puerto va entre corchetes: [2001:db8::1]:2222=SHA256:…), separadas por espacios o comas",
+  "fps.needHost": "Con varios equipos, escribe cada huella como EQUIPO=HUELLA (EQUIPO:PUERTO=HUELLA si no es el 22; IPv6 con puerto entre corchetes): una huella sin equipo valdría para cualquiera.",
 };
 
 export type Key = keyof typeof es;

@@ -3040,6 +3040,6 @@ export const en: Record<Key, string> = {
   "visibility.snmp.credHint": "v2c: password = community; v3: password = auth, enable = priv",
   "cred.vault.error": "Could not read the vault: {error}",
   "cred.pick": "Choose a credential",
-  "fps.accepted.hint.multi": "One device: SHA256:…; several: DEVICE=SHA256:… (DEVICE:PORT=SHA256:… if not 22), separated by spaces or commas",
-  "fps.needHost": "With several devices, write each fingerprint as DEVICE=FINGERPRINT (DEVICE:PORT=FINGERPRINT if not 22): a fingerprint without a device would be valid for any of them.",
+  "fps.accepted.hint.multi": "One device: SHA256:…; several: DEVICE=SHA256:… (DEVICE:PORT=SHA256:… if not 22; an IPv6 with a port goes in brackets: [2001:db8::1]:2222=SHA256:…), separated by spaces or commas",
+  "fps.needHost": "With several devices, write each fingerprint as DEVICE=FINGERPRINT (DEVICE:PORT=FINGERPRINT if not 22; IPv6 with a port in brackets): a fingerprint without a device would be valid for any of them.",
 };

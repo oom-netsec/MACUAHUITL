@@ -45,6 +45,30 @@ test("crea el cambio, confirma la huella y captura PRE", async () => {
   expect(await screen.findByText(/trabajo j2/)).toBeInTheDocument();
 });
 
+test("confiar en la huella A de un equipo no deja marcada otra huella B del mismo equipo en la captura siguiente", async () => {
+  const row = (fp: string) => ({ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: fp });
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    changeCapture: vi.fn()
+      .mockResolvedValueOnce({ jobId: "j1", armed: false, detail: "host_key" })
+      .mockResolvedValueOnce({ jobId: "j2", armed: true, detail: "" })
+      .mockResolvedValueOnce({ jobId: "j3", armed: false, detail: "host_key" }),
+    loginTest: vi.fn().mockResolvedValueOnce([row("SHA256:aaa")]).mockResolvedValueOnce([row("SHA256:bbb")]),
+  });
+  render(<ChangeView core={core} />);
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-1");
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
+  await userEvent.click(await screen.findByLabelText(/SHA256:aaa/));
+  await userEvent.click(screen.getByRole("button", { name: "Capturar PRE" }));
+  await screen.findByText(/trabajo j2/);
+  await userEvent.click(screen.getByRole("button", { name: "Capturar POST" }));
+  expect(await screen.findByLabelText(/SHA256:bbb/)).not.toBeChecked(); // otra llave del mismo equipo: el usuario decide de nuevo
+});
+
 test("el reporte muestra el semáforo por equipo", async () => {
   const json = JSON.stringify({ devices: [
     { address: "192.0.2.1", hostname: "DIST-01", verdict: "regression", findings: [{ facet: "ospf", level: "regression", detail: "192.0.2.3 @ Gi1/0/24: FULL → INIT" }], config_diff: ["+ line vty 0 15 > exec-timeout 10 0"] },

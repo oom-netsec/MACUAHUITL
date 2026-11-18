@@ -4,6 +4,8 @@ import v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 
 // AcceptedHostKeyDTO ata una huella SSH aceptada al equipo que la mostró. Host es la dirección tal como se marca
 // (con :puerto si no es 22); con varios destinos es la única forma de aceptar una huella.
+// Nombres JSON: en los DTO de struct (metrics, transfer, terminal) los pares van en "acceptedKeys" porque
+// "acceptedHostKeys" ya es la lista vieja de huellas; en Assist, que pasa protojson tal cual, "acceptedHostKeys" son los pares.
 type AcceptedHostKeyDTO struct {
 	Host        string `json:"host"`
 	Fingerprint string `json:"fingerprint"`
