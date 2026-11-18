@@ -43,7 +43,7 @@ test("hallazgos agrupados por severidad con evidencia expandible", async () => {
   expect(within(details).getByText(/five minutes: 91%/)).toBeInTheDocument();
   expect(within(details).getByText(/Revisa los procesos/)).toBeInTheDocument();
   expect(screen.getByText(/show ip bgp summary/)).toBeInTheDocument();
-  expect(screen.getByText(/formato inesperado/)).toBeInTheDocument();
+  expect(screen.getByText("Aviso: SW1_10.0.0.1 · ronda 2 · show version: formato inesperado")).toBeInTheDocument();
   expect(screen.getByText(/sin validar en laboratorio/i)).toBeInTheDocument();
 }, 15_000);
 

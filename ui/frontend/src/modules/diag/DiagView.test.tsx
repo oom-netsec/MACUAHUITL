@@ -2,6 +2,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DiagView } from "./DiagView";
 import { fakeCore } from "../../lib/fake";
+import { CoreContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 import { I18nProvider, useSetLang } from "../../lib/i18n";
 import { setOSForTests } from "../../lib/platform";
 
@@ -440,4 +442,17 @@ test("Ejecutar nombra el destino que falta y deja de hacerlo al escribirlo", asy
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   expect(go()).toBeEnabled();
   expect(go()).not.toHaveAccessibleDescription();
+});
+
+test("Copiar solo aparece con salida; copia el texto completo y anuncia Copiado", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "rc") });
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><DiagView core={core} tool="ping" /></CoreContext.Provider>);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  expect(screen.queryByRole("button", { name: "Copiar Salida" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  act(() => { core.emitDiag({ runId: "rc", line: "linea uno" }); core.emitDiag({ runId: "rc", line: "linea dos" }); });
+  await userEvent.click(await screen.findByRole("button", { name: "Copiar Salida" }));
+  expect(core.copyText).toHaveBeenCalledWith("linea uno\nlinea dos");
+  expect(await screen.findByText("Copiado")).toBeInTheDocument();
 });

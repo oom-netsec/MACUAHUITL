@@ -4,10 +4,10 @@ import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
-import { ResultPanel, Section, useResult } from "../../components/Page";
+import { ResultPanel, Section, Warnings, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { CounterJump, FlapRow, FlappingReport } from "./api";
-import { FirstRun, Intro, SourcePicker, Warnings, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
+import { FirstRun, Intro, SourcePicker, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 import { FlapLanes } from "./FlapLanes";
 

@@ -25,6 +25,7 @@ test("limpia, muestra el informe, las huérfanas y el resultado", async () => {
   expect(screen.getByRole("log", { name: "Resultado" }).textContent).toBe(result.output);
   await userEvent.click(screen.getByRole("button", { name: "Copiar Resultado" }));
   expect(core.copyText).toHaveBeenCalledWith(result.output);
+  expect(await screen.findByText("Copiado")).toBeInTheDocument();
 });
 
 test("el error del núcleo se muestra como alerta", async () => {

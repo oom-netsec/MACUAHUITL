@@ -2,10 +2,10 @@ import { useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, TextArea } from "../../components/Field";
-import { ResultPanel, useResult } from "../../components/Page";
+import { ResultPanel, Warnings, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { CrashReport } from "./api";
-import { FirstRun, Intro, MsgCard, Warnings } from "./shared";
+import { FirstRun, Intro, MsgCard } from "./shared";
 
 // Analizador de crashinfo de IOS e IOS-XE (texto). Un core binario solo se identifica.
 export function CrashSection({ core }: { core: CoreAPI }) {

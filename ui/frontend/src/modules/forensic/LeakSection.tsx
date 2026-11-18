@@ -3,10 +3,10 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
-import { ResultPanel, useResult } from "../../components/Page";
+import { ResultPanel, Warnings, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { LeakRow, LeaksReport } from "./api";
-import { FirstRun, Intro, Warnings } from "./shared";
+import { FirstRun, Intro } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 import { Sparkline } from "../../components/charts/Mini";
 
