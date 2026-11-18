@@ -52,7 +52,7 @@ func finding(sev, code, key string, kv ...any) Finding {
 	return Finding{sev, code, t.In(i18n.Es), t}
 }
 
-// SeverityCode da la severidad cerrada en inglés (el JSON conserva aviso, error e info).
+// SeverityCode da la severidad cerrada en inglés; acepta «aviso» de informes viejos (el informe nuevo ya sale «warning»).
 func SeverityCode(s string) string {
 	if s == "aviso" {
 		return "warning"
@@ -189,7 +189,7 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 		if _, err := handshake(ctx, d, host, port, sni, v.v, v.v, o.Timeout); err == nil {
 			r.Accepted = append(r.Accepted, v.name)
 			if v.v < tls.VersionTLS12 {
-				add("aviso", "tls-antiguo", "tls.finding.legacy_version", "version", v.name)
+				add("warning", "tls-antiguo", "tls.finding.legacy_version", "version", v.name)
 			}
 		}
 	}
@@ -220,14 +220,14 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 	case now.Before(leaf.NotBefore):
 		add("error", "aun-no-valido", "tls.finding.not_yet_valid", "date", leaf.NotBefore.UTC().Format(time.RFC3339))
 	case leaf.NotAfter.Sub(now) < 30*24*time.Hour:
-		add("aviso", "vence-pronto", "tls.finding.expires_soon", "days", r.DaysLeft)
+		add("warning", "vence-pronto", "tls.finding.expires_soon", "days", r.DaysLeft)
 	}
 	if !r.NameMatches {
 		add("error", "nombre-no-coincide", "tls.finding.name_mismatch", "name", sni, "san", strings.Join(leaf.DNSNames, ", "))
 	}
 	// CheckSignatureFrom exige que el emisor sea CA; un autofirmado de servidor no lo es.
 	if leaf.Subject.String() == leaf.Issuer.String() && leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) == nil {
-		add("aviso", "autofirmado", "tls.finding.self_signed")
+		add("warning", "autofirmado", "tls.finding.self_signed")
 	}
 	var ua x509.UnknownAuthorityError
 	if errors.As(verr, &ua) && !hasCode(r.Findings, "autofirmado") {
@@ -235,10 +235,10 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 	}
 	for i, c := range r.Chain {
 		if c.KeyType == "RSA" && c.KeyBits < 2048 {
-			add("aviso", "llave-debil", "tls.finding.weak_key", "index", i, "bits", c.KeyBits)
+			add("warning", "llave-debil", "tls.finding.weak_key", "index", i, "bits", c.KeyBits)
 		}
 		if strings.Contains(c.SigAlg, "SHA1") || strings.Contains(c.SigAlg, "MD5") {
-			add("aviso", "firma-debil", "tls.finding.weak_signature", "index", i, "algorithm", c.SigAlg)
+			add("warning", "firma-debil", "tls.finding.weak_signature", "index", i, "algorithm", c.SigAlg)
 		}
 	}
 	return r, nil

@@ -2335,6 +2335,7 @@ export const en: Record<Key, string> = {
   "vocab.source.log-equipo": "Device log",
   "vocab.source.syslog": "Syslog",
   "vocab.source.auditoria": "Audit",
+  "vocab.source.audit": "Audit",
   "vocab.source.pcap": "PCAP",
   "vocab.source.carpeta-de-patrol": "Patrol folder",
   "vocab.hit.mac-table": "MAC table",

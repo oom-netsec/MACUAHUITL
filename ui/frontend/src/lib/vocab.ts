@@ -10,7 +10,7 @@ export const VOCAB = {
   ma: ["absent", "valid", "invalid"],
   phase: ["established", "failed", "mixed", "incomplete", "no_data"],
   proposal: ["accepted", "rejected"],
-  source: ["patrol", "hallazgo", "log-equipo", "syslog", "auditoria", "pcap", "carpeta de Patrol"],
+  source: ["patrol", "hallazgo", "log-equipo", "syslog", "auditoria", "audit", "pcap", "carpeta de Patrol"],
   hit: ["mac-table", "arp", "dhcp-snooping", "interface", "device"],
   inv: ["equipo", "modulo", "sfp"],
   problem: ["err-disabled", "half-duplex", "crc", "input_errors", "output_errors", "runts", "giants", "drops"],

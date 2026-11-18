@@ -77,7 +77,7 @@ func TestLocalizarAnalisisEn(t *testing.T) {
 			if i := strings.Index(ln, "  ["); i > 0 && strings.HasSuffix(ln, "]") {
 				ln = ln[:i] // ficha de msgkb
 			}
-			if m := spanish.FindString(strings.NewReplacer("log-equipo", "", "auditoria", "").Replace(ln)); m != "" {
+			if m := spanish.FindString(strings.NewReplacer("log-equipo", "").Replace(ln)); m != "" {
 				t.Errorf("%s: español en %q (%s)", name, ln, m)
 			}
 		}
@@ -201,5 +201,31 @@ func TestEscenariosCubrenTodasLasClavesDeAnalisis(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// 43e-9: la fuente «auditoria» del JSON se queda (quien filtra por ella no se rompe); el texto en inglés la dice «audit».
+func TestFuenteAuditoriaSoloSeTraduceEnElTexto(t *testing.T) {
+	r := TimelineReport{Events: []Event{{At: time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC), Source: "auditoria", Text: "diag.run"}}}
+	if en := r.TextIn(i18n.En); strings.Contains(en, "auditoria") || !strings.Contains(en, " audit ") {
+		t.Errorf("en: %q", en)
+	}
+	if es := r.TextIn(i18n.Es); !strings.Contains(es, " auditoria ") {
+		t.Errorf("es: %q", es)
+	}
+}
+
+// 43e-9: el texto en inglés de un evento de auditoría muestra la etiqueta de la acción; el JSON y el español guardan la clave.
+func TestAccionDeAuditoriaEnElTexto(t *testing.T) {
+	line := `{"seq":1,"at":"2026-11-04T10:00:00Z","actor":"u","action":"hosts.crear","target":"SW1","detail":"x"}` + "\n"
+	r := TimelineReport{Events: AuditEvents(strings.NewReader(line))}
+	if en := r.TextIn(i18n.En); !strings.Contains(en, "host created SW1 x") || strings.Contains(en, "hosts.crear") {
+		t.Errorf("en: %q", en)
+	}
+	if es := r.TextIn(i18n.Es); !strings.Contains(es, "hosts.crear SW1 x") {
+		t.Errorf("es: %q", es)
+	}
+	if b, _ := json.Marshal(r); !strings.Contains(string(b), "hosts.crear SW1 x") {
+		t.Errorf("json: %s", b)
 	}
 }

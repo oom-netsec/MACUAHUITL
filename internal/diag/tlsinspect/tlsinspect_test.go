@@ -169,3 +169,18 @@ func TestNotTLS(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// 43e-9: el informe nuevo sale con Severity «warning» (el Code «vence-pronto» es un slug estable y se queda); al leer valen «aviso» y «warning».
+func TestSeveridadDelInformeEnIngles(t *testing.T) {
+	ca, key, pool := newCA(t)
+	soon := serve(t, issue(t, ca, key, certSpec{name: "wlc.lab", notBefore: time.Now().Add(-time.Hour), notAfter: time.Now().Add(10 * 24 * time.Hour)}), tls.VersionTLS12, tls.VersionTLS13)
+	r, _ := Inspect(context.Background(), dial, "127.0.0.1", soon, "wlc.lab", Options{Roots: pool})
+	for _, f := range r.Findings {
+		if f.Code == "vence-pronto" && f.Severity != "warning" {
+			t.Fatalf("Severity = %q", f.Severity)
+		}
+	}
+	if SeverityCode("aviso") != "warning" || SeverityCode("warning") != "warning" || SeverityCode("error") != "error" {
+		t.Fatal("SeverityCode no acepta los dos valores")
+	}
+}

@@ -2333,6 +2333,7 @@ export const es = {
   "vocab.source.log-equipo": "Registro del equipo",
   "vocab.source.syslog": "Syslog",
   "vocab.source.auditoria": "Auditoría",
+  "vocab.source.audit": "Auditoría",
   "vocab.source.pcap": "PCAP",
   "vocab.source.carpeta-de-patrol": "Carpeta de Patrol",
   "vocab.hit.mac-table": "Tabla MAC",
