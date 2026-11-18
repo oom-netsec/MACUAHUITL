@@ -10,7 +10,7 @@ import (
 // hintsEs arma todas las instrucciones en español (las de siempre) para fijarlas con un golden.
 func hintsEs() map[string]string {
 	out := map[string]string{}
-	r := Ready{Addr: "10.0.0.5:2121", User: "mac", Pass: "pw123", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}}
+	r := Ready{Addr: "10.0.0.5:2121", User: "mac", Pass: "pw123", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}, FingerprintKinds: []string{"ssh-ed25519", "ssh-rsa"}}
 	for _, proto := range []string{"tftp", "ftp", "scp", "sftp", "http"} {
 		for _, w := range []string{"ro", "rw"} {
 			out[proto+"-"+w] = ServerHint(Config{Proto: proto, Write: w == "rw"}, r, []string{"a.bin", "b.bin"})

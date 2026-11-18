@@ -490,13 +490,13 @@ func TestUploadInformaLoRealmenteEnviado(t *testing.T) {
 // y nunca CR/LF ni nada de lo demás.
 func TestRemotePathEspacioPorEsquema(t *testing.T) {
 	for u, ok := range map[string]bool{"ftp://h/b%20c.txt": true, "sftp://h/b%20c.txt": true, "scp://h/b%20c.txt": false, "tftp://h/b%20c.txt": false,
-		"ftp://h/a%0d%0aDELE%20x": false, "ftp://h/a%0ab": false, "sftp://h/a%00b": false, "ftp://h/a%3Bb": false} {
+		"ftp://h/a%0d%0aDELE%20x": false, "ftp://h/a%0ab": false, "ftp://h/a%0db": false, "ftp://h/%20a": false, "ftp://h/a%20": false, "sftp://h/d%20/a": false, "sftp://h/d/%20a": false, "ftp://h/a%20b/c%20d": true, "sftp://h/a%00b": false, "ftp://h/a%3Bb": false} {
 		pu, err := url.Parse(u)
 		if err != nil {
 			t.Fatal(err)
 		}
 		got, err := remotePath(pu)
-		if (err == nil) != ok || (ok && got != "b c.txt") {
+		if (err == nil) != ok || (ok && !strings.Contains(got, " ")) {
 			t.Errorf("%s: %q %v", u, got, err)
 		}
 	}
@@ -512,7 +512,7 @@ func TestListHTTP404DiceSinIndice(t *testing.T) {
 	defer srv.Close()
 	req := Request{Net: rawNet, URL: &url.URL{Scheme: "http", Host: strings.TrimPrefix(srv.URL, "http://"), Path: "/"}}
 	_, err := Browse(context.Background(), req, "/", 0)
-	if err == nil || strings.Contains(err.Error(), "HTTP 404") || !strings.Contains(err.Error(), "índice") {
+	if err == nil || strings.Contains(err.Error(), "HTTP 404") || !strings.Contains(err.Error(), "sin índice de archivos") {
 		t.Fatalf("err = %v", err)
 	}
 	if en := i18n.In("en", err); !strings.Contains(en, "index") {

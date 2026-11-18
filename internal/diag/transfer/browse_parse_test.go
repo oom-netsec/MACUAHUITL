@@ -130,8 +130,22 @@ func TestParseListNombresNoConfiables(t *testing.T) {
 	if es[1].Unsafe || !es[1].Downloadable {
 		t.Errorf("ok.cfg = %+v", es[1])
 	}
-	if e := ParseList("-rw-r--r-- 1 u g 5 Nov  6 10:15 sala de juntas.txt\n", now)[0]; e.Downloadable {
-		t.Errorf("un nombre con espacios no pasa el filtro de la ruta remota: %+v", e)
+	if e := ParseList("-rw-r--r-- 1 u g 5 Nov  6 10:15 sala de juntas.txt\n", now)[0]; !e.Downloadable {
+		t.Errorf("un espacio interior sí se puede pedir por ftp/sftp: %+v", e)
+	}
+	if remoteOK(" borde") || remoteOK("borde ") || !remoteOK("a b") {
+		t.Error("espacio solo interior")
+	}
+	// scp y http no admiten el espacio: Browse lo marca no descargable.
+	ls := Listing{Entries: []Entry{{Name: "a b", Downloadable: true}, {Name: "ab", Downloadable: true}}}
+	sinEspacios(&ls, "scp")
+	if ls.Entries[0].Downloadable || !ls.Entries[1].Downloadable {
+		t.Errorf("scp: %+v", ls.Entries)
+	}
+	ls = Listing{Entries: []Entry{{Name: "a b", Downloadable: true}}}
+	sinEspacios(&ls, "sftp")
+	if !ls.Entries[0].Downloadable {
+		t.Error("sftp lo admite")
 	}
 }
 

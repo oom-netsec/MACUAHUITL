@@ -170,6 +170,7 @@ func init() {
 		"mctl.transfer.files_error":       e("--files {path:q}: {cause}", "--files {path:q}: {cause}"),
 		"mctl.transfer.pasv_range":        e("--pasv-ports espera MIN-MAX, p. ej. 50000-50031", "--pasv-ports expects MIN-MAX, e.g. 50000-50031"),
 		"mctl.transfer.allow_not_ip":      e("--allow {value:q} no es una IP", "--allow {value:q} is not an IP"),
+		"mctl.transfer.closed_win":        e("servidor cerrado. Si creaste la regla de firewall, quítala:\n  {cmd}", "server closed. If you created the firewall rule, remove it:\n  {cmd}"),
 		"mctl.transfer.closed":            e("servidor cerrado. Si aplicaste la regla de redirección, quítala:\n  {cmd}", "server closed. If you applied the redirect rule, remove it:\n  {cmd}"),
 		"mctl.transfer.serving":           e("sirviendo {proto} en {addr} (servidor {id})", "serving {proto} on {addr} (server {id})"),
 		"mctl.transfer.reads_from":        e("  lee de:   {dir}", "  reads from: {dir}"),

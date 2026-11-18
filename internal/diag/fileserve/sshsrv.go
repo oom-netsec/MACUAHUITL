@@ -35,32 +35,32 @@ const (
 	maxScpLine         = 2048
 )
 
-func hostSigners(legacy bool) ([]ssh.Signer, []string, error) {
+func hostSigners(legacy bool) ([]ssh.Signer, []string, []string, error) {
 	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	ed, err := ssh.NewSignerFromKey(edPriv)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	rk, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	rs, err := ssh.NewSignerFromKey(rk)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	algs := []string{ssh.KeyAlgoRSASHA512, ssh.KeyAlgoRSASHA256} // la llave RSA firma solo con SHA-2…
 	if legacy {
 		algs = append(algs, ssh.KeyAlgoRSA) // …salvo a pedido: IOS 15.x firma con ssh-rsa (SHA-1)
 	}
 	if rs, err = ssh.NewSignerWithAlgorithms(rs.(ssh.AlgorithmSigner), algs); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	fps := []string{ssh.FingerprintSHA256(ed.PublicKey()), ssh.FingerprintSHA256(rs.PublicKey())}
-	return []ssh.Signer{ed, rs}, fps, nil
+	return []ssh.Signer{ed, rs}, fps, []string{ed.PublicKey().Type(), rs.PublicKey().Type()}, nil
 }
 
 func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
@@ -69,7 +69,7 @@ func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	defer ln.Close()
-	signers, fps, err := hostSigners(c.Legacy)
+	signers, fps, kinds, err := hostSigners(c.Legacy)
 	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
@@ -91,7 +91,7 @@ func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	sshAlgorithms(cfg, c.Legacy)
 	stop := context.AfterFunc(ctx, func() { ln.Close() })
 	defer stop()
-	c.ready(Ready{Addr: ln.Addr().String(), User: c.User, Pass: c.Pass, Fingerprints: fps})
+	c.ready(Ready{Addr: ln.Addr().String(), User: c.User, Pass: c.Pass, Fingerprints: fps, FingerprintKinds: kinds})
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	for {

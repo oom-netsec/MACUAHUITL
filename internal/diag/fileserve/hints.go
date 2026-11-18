@@ -4,14 +4,20 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// hostKeyKinds es el tipo de cada huella de Ready.Fingerprints, en el orden fijo de hostSigners.
-var hostKeyKinds = []string{"ed25519", "RSA"}
+// keyKind es el nombre corto del tipo de llave de host (PublicKey().Type()).
+func keyKind(t string) string {
+	if t == "ssh-rsa" {
+		return "RSA"
+	}
+	return strings.TrimPrefix(t, "ssh-")
+}
 
 // ServerHint explica qué teclear en el equipo para usar el servidor y, si no escucha en el puerto
 // estándar, cómo llegar a él con una redirección (la app nunca ejecuta esos comandos). names son los
@@ -22,6 +28,13 @@ func ServerHint(c Config, r Ready, names []string) string { return ServerHintIn(
 func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 	h, _ := ServerHintWarnings(loc, c, r, names)
 	return h
+}
+
+func kind(r Ready, i int) string {
+	if i < len(r.FingerprintKinds) {
+		return keyKind(r.FingerprintKinds[i])
+	}
+	return "?"
 }
 
 // ServerHintWarnings es ServerHintIn y, aparte, los avisos de carpeta que lleva: una sola lectura de permisos, así la
@@ -46,7 +59,7 @@ func ServerHintWarnings(loc string, c Config, r Ready, names []string) (string, 
 	// IOS no decodifica %20: un nombre con espacios no tiene copy utilizable, se avisa que se renombre.
 	each := func(f func(n string)) {
 		for _, n := range names {
-			if strings.ContainsRune(n, ' ') {
+			if c.Proto != "http" && strings.ContainsRune(n, ' ') { // el servidor HTTP de Go sí decodifica %20
 				line("%s", t("fileserve.hint.name_spaces", "name", n, "proto", strings.ToUpper(c.Proto)))
 				continue
 			}
@@ -82,14 +95,14 @@ func ServerHintWarnings(loc string, c Config, r Ready, names []string) (string, 
 			line("copy running-config %s://%s@%s/r1-config.txt   %s", c.Proto, r.User, h, t("fileserve.hint.password", "pass", r.Pass))
 		}
 		for i, fp := range r.Fingerprints {
-			line("%s", t("fileserve.hint.fingerprint", "n", i+1, "fp", fp, "kind", hostKeyKinds[min(i, len(hostKeyKinds)-1)]))
+			line("%s", t("fileserve.hint.fingerprint", "n", i+1, "fp", fp, "kind", kind(r, i)))
 		}
 		if c.Proto == "sftp" {
 			line("%s", t("fileserve.hint.sftp_note"))
 		}
 	case "http":
 		each(func(n string) {
-			line("copy http://%s:%s/%s flash:", h, port, n)
+			line("copy http://%s:%s/%s flash:", h, port, url.PathEscape(n))
 		})
 	}
 	if s, ok := standard[c.Proto]; ok {

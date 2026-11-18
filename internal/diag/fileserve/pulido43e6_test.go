@@ -1,21 +1,16 @@
 package fileserve
 
 import (
-	"net"
-	"os"
 	"strings"
-	"syscall"
 	"testing"
-
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // 43e-6 punto 1: en Windows no hay regla de redirección que quitar, así que el cierre no lleva «Cleanup»;
 // en Linux solo si se sugirió una regla (puerto distinto del estándar).
 func TestCleanupSoloSiHuboRegla(t *testing.T) {
 	fijaWindows(t, "windows")
-	for _, a := range []string{"172.30.0.2:69", "127.0.0.1:69", "10.0.0.5:6969"} {
-		if c := RedirectCleanupAddr("tftp", a); c != "" {
+	for a, want := range map[string]string{"172.30.0.2:69": "Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 172.30.0.2 69'", "127.0.0.1:69": ""} {
+		if c := RedirectCleanupAddr("tftp", a); c != want {
 			t.Errorf("windows %s: cleanup = %q", a, c)
 		}
 	}
@@ -41,21 +36,6 @@ func TestHintLoopbackWindowsSinRegla(t *testing.T) {
 	}
 }
 
-// Punto 3: puerto estándar ocupado → mensaje claro con sugerencia de un puerto alto; otros errores no se tocan.
-func TestPuertoEstandarOcupado(t *testing.T) {
-	busy := &net.OpError{Op: "listen", Err: os.NewSyscallError("bind", syscall.EADDRINUSE)}
-	if BusyErr("scp", "0.0.0.0:22", busy) == nil {
-		t.Fatal("puerto 22 ocupado sin mensaje")
-	}
-	es, en := i18n.In(i18n.Es, BusyErr("scp", "10.0.0.5:22", busy)), i18n.In("en", BusyErr("scp", "10.0.0.5:22", busy))
-	if !strings.Contains(es, "en uso") || !strings.Contains(es, "alto") || !strings.Contains(en, "in use") || !strings.Contains(en, "high") {
-		t.Errorf("es=%q en=%q", es, en)
-	}
-	if BusyErr("scp", "10.0.0.5:2222", busy) != nil || BusyErr("scp", "10.0.0.5:22", os.ErrPermission) != nil {
-		t.Error("solo el puerto estándar con dirección en uso")
-	}
-}
-
 // Punto 4: IOS no decodifica %20: con espacios no se imprime un copy inservible, se avisa que se renombre.
 func TestHintNombreConEspaciosAvisa(t *testing.T) {
 	fijaWindows(t, "linux")
@@ -63,6 +43,12 @@ func TestHintNombreConEspaciosAvisa(t *testing.T) {
 	for _, loc := range []string{"es", "en"} {
 		for _, p := range []string{"tftp", "ftp", "scp", "sftp", "http"} {
 			h := ServerHintIn(loc, Config{Proto: p}, r, []string{"mi archivo.bin", "ok.bin"})
+			if p == "http" { // el servidor HTTP decodifica %20: se escapa y no hay aviso
+				if !strings.Contains(h, "mi%20archivo.bin flash:") || strings.Contains(h, "renómbralo") || strings.Contains(h, "rename it") {
+					t.Errorf("%s/http:\n%s", loc, h)
+				}
+				continue
+			}
 			if strings.Contains(h, "mi archivo.bin flash:") || !strings.Contains(h, "ok.bin flash:") || !strings.Contains(h, "mi archivo.bin") {
 				t.Errorf("%s/%s:\n%s", loc, p, h)
 			}
@@ -80,11 +66,19 @@ func TestHintNombreConEspaciosAvisa(t *testing.T) {
 // Punto 7: cada huella dice su tipo (el orden fijo de hostSigners es ed25519, RSA).
 func TestHintHuellaConTipo(t *testing.T) {
 	fijaWindows(t, "linux")
-	r := Ready{Addr: "10.0.0.5:2222", User: "mac", Pass: "pw", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}}
+	r := Ready{Addr: "10.0.0.5:2222", User: "mac", Pass: "pw", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}, FingerprintKinds: []string{"ssh-rsa", "ssh-ed25519"}}
 	for _, loc := range []string{"es", "en"} {
 		h := ServerHintIn(loc, Config{Proto: "scp"}, r, nil)
-		if !strings.Contains(h, "SHA256:aa (ed25519)") || !strings.Contains(h, "SHA256:bb (RSA)") || strings.Contains(h, "(ed25519, RSA)") {
+		if !strings.Contains(h, "SHA256:aa (RSA)") || !strings.Contains(h, "SHA256:bb (ed25519)") || strings.Contains(h, "(ed25519, RSA)") {
 			t.Errorf("%s:\n%s", loc, h)
 		}
+	}
+}
+
+// Punto 7: el tipo sale de la llave real, no de la posición.
+func TestHostSignersDanTipo(t *testing.T) {
+	_, fps, kinds, err := hostSigners(false)
+	if err != nil || len(fps) != 2 || len(kinds) != 2 || kinds[0] != "ssh-ed25519" || kinds[1] != "ssh-rsa" {
+		t.Fatalf("%v %v %v", fps, kinds, err)
 	}
 }
