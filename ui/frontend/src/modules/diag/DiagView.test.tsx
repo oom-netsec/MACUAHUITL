@@ -409,3 +409,25 @@ test("nmap: «Omitir descubrimiento (-Pn)» manda skip_discovery; con scan=ping 
   await userEvent.click(await screen.findByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "ping" }));
 });
+
+test("nmap con scan=ping oculta «Puertos» y no manda ports", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="nmap" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText("Puertos"), "22,80");
+  await userEvent.selectOptions(screen.getByLabelText("Tipo de escaneo"), "ping");
+  expect(screen.queryByLabelText("Puertos")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenLastCalledWith("nmap", ["10.0.0.1"], { scan: "ping" }));
+});
+
+test("el aviso de la captura en Windows pide Wireshark con Npcap, no el paquete de Linux", () => {
+  setOSForTests("windows");
+  try {
+    render(<DiagView core={fakeCore()} tool="pcap" />);
+    expect(screen.getByText(/Wireshark.*Npcap/)).toBeInTheDocument();
+    expect(screen.queryByText(/wireshark-common/)).toBeNull();
+  } finally { setOSForTests(undefined); }
+  render(<DiagView core={fakeCore()} tool="pcap" />);
+  expect(screen.getByText(/wireshark-common/)).toBeInTheDocument();
+});

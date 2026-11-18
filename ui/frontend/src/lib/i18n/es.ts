@@ -3042,6 +3042,9 @@ export const es = {
   "transfer.warn.cmd": "Orden para corregir la carpeta",
   "diag.skipDiscovery": "Omitir descubrimiento de hosts (-Pn)",
   "diag.skipDiscovery.ping": "No aplica con «Solo descubrimiento de hosts».",
+  "diag.pcap.req.windows": "Requisitos: Wireshark instalado (incluye dumpcap.exe) con Npcap.",
+  "visibility.priv.cisco": "{alg} (Cisco IOS)",
+  "visibility.priv.rfc": "{alg} (RFC, Blumenthal)",
 };
 
 export type Key = keyof typeof es;

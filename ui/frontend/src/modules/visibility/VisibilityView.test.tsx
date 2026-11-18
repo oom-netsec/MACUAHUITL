@@ -46,7 +46,7 @@ test("snmp: get con la credencial de la bóveda y sondeo en vivo", async () => {
   await userEvent.type(screen.getByLabelText(/OID/), "1.3.6.1.2.1.1.5.0");
   await userEvent.click(screen.getByRole("button", { name: "Get" }));
   expect(await screen.findByText(/OctetString: SW1/)).toBeInTheDocument();
-  expect(core.snmpGet).toHaveBeenCalledWith({ host: "10.0.0.1", port: 161, version: "2c", credentialId: "c1", auth: "SHA", priv: "AES" }, ["1.3.6.1.2.1.1.5.0"]);
+  expect(core.snmpGet).toHaveBeenCalledWith({ host: "10.0.0.1", port: 161, version: "2c", credentialId: "c1", auth: "", priv: "" }, ["1.3.6.1.2.1.1.5.0"]);
   await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
   expect(core.snmpPollStart).toHaveBeenCalledWith(expect.objectContaining({ host: "10.0.0.1" }), ["sistema", "interfaces"], 10);
   act(() => core.emitVis("snmp", { runId: "p1", json: JSON.stringify({ Time: "2026-11-04T10:00:00Z", Interfaces: [{ Name: "Gi1/0/1", Oper: "up", InBps: 2500000, OutBps: null }] }) }));
@@ -58,7 +58,7 @@ test("traps: escucha en 1162, muestra solo su ejecución y se detiene", async ()
   render(<VisibilityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
   await userEvent.click(screen.getByRole("button", { name: "Escuchar" }));
-  expect(core.trapsStart).toHaveBeenCalledWith("127.0.0.1:1162", false, false, "", "SHA", "AES", {});
+  expect(core.trapsStart).toHaveBeenCalledWith("127.0.0.1:1162", false, false, "", "", "", {});
   act(() => {
     core.emitVis("traps", { runId: "t1", listening: "127.0.0.1:1162" });
     core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.2:5000", Name: "linkDown", Summary: "linkDown GigabitEthernet1/0/7 oper down" }) });
@@ -262,4 +262,49 @@ test("traps: la nota del 162 cambia en Windows (sin puertos privilegiados, regla
   render(<VisibilityView core={fakeCore()} />);
   await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
   expect(screen.getByText(/162 es privilegiado/)).toBeInTheDocument();
+});
+
+test("snmp v3 manda auth y priv; con v2c van vacíos", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpGet: vi.fn(async () => "x") });
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
+  await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.type(screen.getByLabelText(/OID/), "1.3.6.1.2.1.1.5.0");
+  await userEvent.selectOptions(screen.getByLabelText("Versión"), "3");
+  await userEvent.selectOptions(screen.getByLabelText("Autenticación"), "SHA256");
+  await userEvent.selectOptions(screen.getByLabelText("Privacidad"), screen.getByRole("option", { name: "AES-256 (Cisco IOS)" })); // la variante Reeder que usa IOS
+  await userEvent.click(screen.getByRole("button", { name: "Get" }));
+  await waitFor(() => expect(core.snmpGet).toHaveBeenLastCalledWith(expect.objectContaining({ version: "3", auth: "SHA256", priv: "AES256C" }), expect.anything()));
+  await userEvent.selectOptions(screen.getByLabelText("Versión"), "2c");
+  await userEvent.click(screen.getByRole("button", { name: "Get" }));
+  await waitFor(() => expect(core.snmpGet).toHaveBeenLastCalledWith(expect.objectContaining({ version: "2c", auth: "", priv: "" }), expect.anything()));
+});
+
+test("traps: los selects de auth y priv solo aparecen con usuario v3 y viajan elegidos", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), trapsStart: vi.fn(async () => "t1") });
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
+  expect(screen.queryByLabelText("Autenticación")).toBeNull();
+  expect(screen.queryByLabelText("Privacidad")).toBeNull();
+  await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.selectOptions(screen.getByLabelText(/Usuario v3/), "c1");
+  expect(screen.getByLabelText("Autenticación")).toHaveValue("SHA");
+  expect(screen.getByLabelText("Privacidad")).toHaveValue("AES");
+  await userEvent.selectOptions(screen.getByLabelText("Autenticación"), "SHA512");
+  await userEvent.selectOptions(screen.getByLabelText("Privacidad"), "AES192");
+  await userEvent.click(screen.getByRole("button", { name: "Escuchar" }));
+  expect(core.trapsStart).toHaveBeenCalledWith("127.0.0.1:1162", false, false, "c1", "SHA512", "AES192", {});
+});
+
+test("gnmi: «Al cambiar» oculta los segundos entre muestras y no los manda", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), gnmiSubscribeStart: vi.fn(async () => "g1") });
+  await gnmiListo(core);
+  await userEvent.clear(screen.getByLabelText(/Rutas/));
+  await userEvent.type(screen.getByLabelText(/Rutas/), "/a");
+  await userEvent.selectOptions(screen.getByLabelText("Modo de suscripción"), "on_change");
+  expect(screen.queryByLabelText("Segundos entre muestras")).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Suscribir" }));
+  expect(core.gnmiSubscribeStart).toHaveBeenCalledWith(expect.anything(), ["/a"], "on_change", 0);
 });

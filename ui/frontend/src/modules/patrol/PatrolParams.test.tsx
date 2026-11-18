@@ -101,3 +101,23 @@ test("los tipos vrf y vnid (ACI) llevan su etiqueta y su ayuda", async () => {
   expect(screen.getByLabelText("VRF (vrf)")).toHaveAccessibleDescription(/tenant:vrf/);
   expect(screen.getByLabelText("VNID (vnid)")).toHaveAccessibleDescription(/16777215/);
 });
+
+test("sin empaquetar no hay «eliminar sueltos» y no se manda deleteLooseFiles", async () => {
+  const core = await setup([pbPlain]);
+  await userEvent.click(await findPb("STP"));
+  await userEvent.click(screen.getByLabelText("Eliminar archivos sueltos después de empaquetar"));
+  await userEvent.selectOptions(screen.getByLabelText("Empaquetado .zip"), "ZIP_POLICY_NONE");
+  expect(screen.queryByLabelText("Eliminar archivos sueltos después de empaquetar")).toBeNull();
+  await create();
+  await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+  expect(vi.mocked(core.createJob).mock.calls[0][0]).toMatchObject({ zip: "ZIP_POLICY_NONE", deleteLooseFiles: false });
+});
+
+test("con empaquetado, «eliminar sueltos» sí viaja", async () => {
+  const core = await setup([pbPlain]);
+  await userEvent.click(await findPb("STP"));
+  await userEvent.click(screen.getByLabelText("Eliminar archivos sueltos después de empaquetar"));
+  await create();
+  await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+  expect(vi.mocked(core.createJob).mock.calls[0][0]).toMatchObject({ zip: "ZIP_POLICY_AT_END", deleteLooseFiles: true });
+});

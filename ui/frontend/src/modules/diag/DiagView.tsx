@@ -115,7 +115,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     switch (tool) {
       case "ping": Object.assign(options, ping.options); targets = [target]; setStoppable(!!(ping.options.continuous || ping.options.duration)); setFam((ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?")); setInterval_(Number(ping.options.interval) || 1); break;
       case "traceroute": options.max_hops = hops; targets = [target]; break;
-      case "nmap": options.scan = scan; if (ports) options.ports = ports; if (skipDisc && scan !== "ping") options.skip_discovery = "true"; targets = [target]; break; // -Pn con scan=ping: diag.err.skip_with_ping
+      case "nmap": options.scan = scan; if (ports && scan !== "ping") options.ports = ports; if (skipDisc && scan !== "ping") options.skip_discovery = "true"; targets = [target]; break; // -Pn con scan=ping: diag.err.skip_with_ping
       case "iperf3": options.mode = mode; if (mode === "client") { options.seconds = seconds; targets = [target]; } else { options.bind = bindIP; options.port = port; } break;
       case "pcap": options.interface = iface; options.seconds = seconds; if (filter) options.filter = filter; break;
     }
@@ -154,7 +154,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
         {needsTarget && <Field label={t("diag.target")} hint={t("diag.target.hint")} value={target} onChange={setTarget} w="lg" mono />}
         {tool === "ping" && <Field label={t("diag.count")} type="number" value={count} onChange={(count) => setP({ count })} w="sm" disabled={pf.continuous} error={ping.errors.count ? t(ping.errors.count) : undefined} />}
         {tool === "traceroute" && <Field label={t("diag.hops")} type="number" value={hops} onChange={setHops} w="sm" />}
-        {tool === "nmap" && <Field label={t("diag.ports")} hint={t("diag.ports.hint")} value={ports} onChange={setPorts} w="md" mono />}
+        {tool === "nmap" && scan !== "ping" && <Field label={t("diag.ports")} hint={t("diag.ports.hint")} value={ports} onChange={setPorts} w="md" mono />}
         {tool === "iperf3" && <Select label={t("diag.mode")} value={mode} onChange={setMode} options={[["client", t("diag.mode.client")], ["server", t("diag.mode.server")]]} w="md" />}
         {((tool === "iperf3" && !server) || tool === "pcap") && <Field label={t("diag.seconds")} type="number" value={seconds} onChange={setSeconds} w="sm" />}
         {server && binds.length > 0 && <Select label={t("diag.bind")} value={bindIP} onChange={setBind} options={binds.map((a) => [a, a] as [string, string])} w="md" />}

@@ -41,7 +41,7 @@ export function CsrCard({ core }: { core: CoreAPI }) {
         </div>
         <div className="actions">
           <button className="primary" disabled={!f.cn || !f.keyPassword || r.busy} aria-busy={r.busy}
-            onClick={() => { void r.run(() => core.secPkiCsr({ cn: f.cn, o: f.o, ou: f.ou, l: f.l, st: f.st, c: f.c, dns: list(f.dns), ips: list(f.ips), algorithm: f.algorithm, sealedKey: f.sealedKey, keyPassword: f.keyPassword })); set("keyPassword")(""); }}>{t("security.csr.generate")}{kbd}</button>
+            onClick={() => { void r.run(() => core.secPkiCsr({ cn: f.cn, o: f.o, ou: f.ou, l: f.l, st: f.st, c: f.c, dns: list(f.dns), ips: list(f.ips), algorithm: f.sealedKey ? "" : f.algorithm, sealedKey: f.sealedKey, keyPassword: f.keyPassword })); set("keyPassword")(""); }}>{t("security.csr.generate")}{kbd}</button>
         </div>
       </Section>
       <Outcome r={r}>

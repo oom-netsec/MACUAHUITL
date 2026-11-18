@@ -78,3 +78,32 @@ test("pcap elige el archivo con el diálogo nativo filtrando capturas", async ()
   await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
   expect(core.toolsPcap).toHaveBeenCalledWith("/home/x/elegida.pcap", 20);
 });
+
+// Qué lee el núcleo en cada modo (internal/service/tools/tools.go Dns + internal/diag/dnsq): lo demás ni se ve ni viaja.
+const dnsFields: Record<string, { name: boolean; type: boolean; servers: boolean; dnssec: boolean }> = {
+  query: { name: true, type: true, servers: true, dnssec: true },
+  transport: { name: true, type: false, servers: true, dnssec: false },
+  hygiene: { name: true, type: false, servers: true, dnssec: true },
+  exposure: { name: false, type: false, servers: true, dnssec: true },
+  trace: { name: true, type: true, servers: false, dnssec: true },
+  zone: { name: true, type: false, servers: false, dnssec: true },
+  dnssec: { name: true, type: false, servers: false, dnssec: false },
+};
+
+test.each(Object.entries(dnsFields))("DNS %s: solo muestra y manda los campos que el modo usa", async (mode, f) => {
+  const core = fakeCore({ toolsDns: vi.fn(async () => "{}") });
+  render(<DnsPanel core={core} />);
+  // se llena todo en «query» y luego se cambia de modo: lo oculto no debe viajar
+  await userEvent.type(screen.getByLabelText("Nombre"), "example.com");
+  await userEvent.selectOptions(screen.getByLabelText("Tipo de registro"), "MX");
+  await userEvent.type(screen.getByLabelText("Servidores"), "1.1.1.1");
+  await userEvent.click(screen.getByLabelText(/Solicitar DNSSEC/));
+  await userEvent.selectOptions(screen.getByLabelText("Modo"), mode);
+  await userEvent.click(screen.getByLabelText(/Modo profundo/));
+  expect(!!screen.queryByLabelText("Nombre")).toBe(f.name);
+  expect(!!screen.queryByLabelText("Tipo de registro")).toBe(f.type);
+  expect(!!screen.queryByLabelText("Servidores")).toBe(f.servers);
+  expect(!!screen.queryByLabelText(/Solicitar DNSSEC/)).toBe(f.dnssec);
+  await userEvent.click(screen.getByRole("button", { name: "Consultar" }));
+  await waitFor(() => expect(core.toolsDns).toHaveBeenCalledWith({ mode, name: f.name ? "example.com" : "", type: f.type ? "MX" : "", servers: f.servers ? ["1.1.1.1"] : [], deep: true, dnssec: f.dnssec }));
+});

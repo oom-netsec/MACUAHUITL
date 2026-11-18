@@ -82,6 +82,14 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
 
 const dnsModes = ["query", "transport", "hygiene", "exposure", "trace", "zone", "dnssec"] as const;
 const deepModes = new Set(["trace", "zone", "dnssec"]);
+// Qué lee el núcleo en cada modo (internal/service/tools/tools.go:121-138). transport fija DNSSEC por variante (checks.go:47);
+// dnssec lo fuerza en sus consultas (dnssec.go:107); su Trace previo solo aporta los cortes de zona.
+const dnsUses = {
+  name: (m: string) => m !== "exposure",
+  type: (m: string) => m === "query" || m === "trace",
+  servers: (m: string) => ["query", "transport", "hygiene", "exposure"].includes(m),
+  dnssec: (m: string) => !["transport", "dnssec"].includes(m),
+};
 const dnsTypes = ["A", "AAAA", "CNAME", "MX", "NS", "PTR", "SOA", "SRV", "TXT", "CAA", "DS", "DNSKEY"];
 
 export function DnsPanel({ core }: { core: CoreAPI }) {
@@ -94,26 +102,26 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
   const [dnssec, setDnssec] = useState(false);
   const r = useResult<Out<DnsReportData>>();
   const needsDeep = deepModes.has(mode) && !deep;
-  const list = servers.split(/[\s,;]+/).filter(Boolean);
+  const list = dnsUses.servers(mode) ? servers.split(/[\s,;]+/).filter(Boolean) : [];
   return (
     <Page title={t("dns.title")} description={t("dns.desc")}>
       <Section title={t("dns.section.query")}>
         <div className="field-row">
           <Select label={t("dns.mode")} value={mode} onChange={setMode} options={dnsModes.map((m) => [m, t(`dns.mode.${m}` as Key)])} w="lg" />
-          <Field label={t("dns.name")} value={name} onChange={setName} w="lg" mono />
-          <Select label={t("dns.type")} value={type} onChange={setType} options={dnsTypes.map((x) => [x, x])} w="sm" />
+          {dnsUses.name(mode) && <Field label={t("dns.name")} value={name} onChange={setName} w="lg" mono />}
+          {dnsUses.type(mode) && <Select label={t("dns.type")} value={type} onChange={setType} options={dnsTypes.map((x) => [x, x])} w="sm" />}
         </div>
-        <Field label={t("dns.servers")} hint={t("dns.servers.hint")} value={servers} onChange={setServers} w="full" mono />
+        {dnsUses.servers(mode) && <Field label={t("dns.servers")} hint={t("dns.servers.hint")} value={servers} onChange={setServers} w="full" mono />}
       </Section>
       <Section title={t("dns.section.options")}>
-        <Check label={t("dns.dnssec")} checked={dnssec} onChange={setDnssec} />
+        {dnsUses.dnssec(mode) && <Check label={t("dns.dnssec")} checked={dnssec} onChange={setDnssec} />}
         <Check label={t("dns.deep")} checked={deep} onChange={setDeep} />
         {needsDeep && <Notice kind="warn">{t("dns.needsDeep")}</Notice>}
       </Section>
       <div className="actions">
         <button className="primary" disabled={needsDeep || (!name && mode !== "exposure") || r.busy} aria-busy={r.busy}
           onClick={() => r.run(async () => {
-            const req = { mode, name, type, servers: list, deep, dnssec };
+            const req = { mode, name: dnsUses.name(mode) ? name : "", type: dnsUses.type(mode) ? type : "", servers: list, deep, dnssec: dnsUses.dnssec(mode) && dnssec };
             const d = core.toolsDnsReport && await core.toolsDnsReport(req); // un error se muestra, sin repetir con el método de texto
             return d?.text ? { text: d.text, rep: d } : { text: await core.toolsDns(req) };
           })}>{t("dns.query")}{runKbd}</button>

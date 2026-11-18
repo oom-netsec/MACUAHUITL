@@ -170,6 +170,11 @@ function bps(v?: number | null) {
 
 const profiles: [string, Key][] = [["sistema", "visibility.prof.system"], ["interfaces", "visibility.prof.interfaces"], ["cpu", "visibility.prof.cpu"], ["memoria", "visibility.prof.memory"]];
 
+const authOpts: [string, string][] = [["SHA", "SHA"], ["SHA256", "SHA-256"], ["SHA384", "SHA-384"], ["SHA512", "SHA-512"]];
+// Cisco IOS deriva la llave de AES-192/256 con Reeder (las «C» de gosnmp); Blumenthal no descifra con un IOS.
+const privOpts = (t: ReturnType<typeof useT>): [string, string][] => [["AES", "AES-128"], ["AES192C", t("visibility.priv.cisco", { alg: "AES-192" })], ["AES256C", t("visibility.priv.cisco", { alg: "AES-256" })],
+  ["AES192", t("visibility.priv.rfc", { alg: "AES-192" })], ["AES256", t("visibility.priv.rfc", { alg: "AES-256" })]];
+
 type PanelProps = { core: CoreAPI; active: boolean; onRun: (running: boolean) => void };
 
 function SnmpPanel({ core, active, onRun }: PanelProps) {
@@ -194,7 +199,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
   }, undefined, onRun);
   const charted = picked ?? busiest(hist);
   const toggleChart = (name: string) => setPicked(charted.includes(name) ? charted.filter((n) => n !== name) : [...charted, name]);
-  const target = (): SnmpTarget => ({ host: host.trim(), port: Number(port) || 161, version, credentialId: cred, auth, priv });
+  const target = (): SnmpTarget => ({ host: host.trim(), port: Number(port) || 161, version, credentialId: cred, auth: version === "3" ? auth : "", priv: version === "3" ? priv : "" });
   return (
     <>
       <Section title={t("visibility.sec.target")}>
@@ -207,8 +212,8 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           <Select label={t("visibility.snmp.cred")} value={cred} onChange={setCred} options={credOpts} w="lg" />
           {version === "3" && (
             <>
-              <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={[["SHA", "SHA"], ["SHA256", "SHA-256"], ["SHA384", "SHA-384"], ["SHA512", "SHA-512"]]} w="md" />
-              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={[["AES", "AES-128"], ["AES192", "AES-192"], ["AES256", "AES-256"]]} w="md" />
+              <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
+              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts(t)} w="md" />
             </>
           )}
         </div>
@@ -287,6 +292,8 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
   const [any, setAny] = useState(false);
   const [save, setSave] = useState(false);
   const [cred, setCred] = useState("");
+  const [auth, setAuth] = useState("SHA");
+  const [priv, setPriv] = useState("AES");
   const [traps, setTraps] = useState<TrapRow[]>([]);
   const [received, setReceived] = useState(0);
   const o = useIngestOpts("traps", save);
@@ -307,7 +314,7 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
     if (!o.check()) { live.setErr(t("syslog.err.fix")); return; }
     batch.reset(); setTraps([]); setReceived(0);
     const opts = o.begin();
-    live.start(() => core.trapsStart(addr, any, save, cred, "SHA", "AES", opts));
+    live.start(() => core.trapsStart(addr, any, save, cred, cred ? auth : "", cred ? priv : "", opts));
   };
   const clear = () => { batch.reset(); setTraps([]); setReceived(0); };
   return (
@@ -316,6 +323,12 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
         <div className="field-row">
           <Field label={t("visibility.listenAddr")} value={addr} onChange={(v) => { setAddr(v); o.touch("addr"); }} w="lg" mono error={o.errors.addr} />
           <Select label={t("visibility.traps.user")} value={cred} onChange={setCred} options={credOpts} w="lg" />
+          {cred && (
+            <>
+              <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
+              <Select label={t("visibility.priv")} value={priv} onChange={setPriv} options={privOpts(t)} w="md" />
+            </>
+          )}
         </div>
         <Check label={t("visibility.anyIf")} checked={any} onChange={setAny} />
         <Check label={t("visibility.traps.save")} checked={save} onChange={setSave} disabled={!!live.runId} />
@@ -457,10 +470,10 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
       <Section title={t("visibility.sec.subscribe")}>
         <div className="field-row">
           <Select label={t("visibility.gnmi.mode")} value={mode} onChange={setMode} options={[["sample", t("visibility.gnmi.sample")], ["on_change", t("visibility.gnmi.onChange")]]} w="md" />
-          <Field label={t("visibility.every")} type="number" value={every} onChange={setEvery} w="sm" mono />
+          {mode === "sample" && <Field label={t("visibility.every")} type="number" value={every} onChange={setEvery} w="sm" mono />}
         </div>
         <div className="actions">
-          <button disabled={!host || !list.length || !!live.runId} onClick={() => { batch.reset(); setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, Number(every) || 10)); }}>{t("visibility.gnmi.subscribe")}</button>
+          <button disabled={!host || !list.length || !!live.runId} onClick={() => { batch.reset(); setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, mode === "sample" ? Number(every) || 10 : 0)); }}>{t("visibility.gnmi.subscribe")}</button>
           <button disabled={!live.runId} onClick={live.stop}>{t("common.stop")}</button>
         </div>
         {live.view}

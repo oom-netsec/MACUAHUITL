@@ -3043,4 +3043,7 @@ export const en: Record<Key, string> = {
   "transfer.warn.cmd": "Command to fix the folder",
   "diag.skipDiscovery": "Skip host discovery (-Pn)",
   "diag.skipDiscovery.ping": "Not available with “Host discovery only”.",
+  "diag.pcap.req.windows": "Requirements: Wireshark installed (includes dumpcap.exe) with Npcap.",
+  "visibility.priv.cisco": "{alg} (Cisco IOS)",
+  "visibility.priv.rfc": "{alg} (RFC, Blumenthal)",
 };
