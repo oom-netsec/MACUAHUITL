@@ -18,6 +18,7 @@ func init() {
 		"ipc.err.pipe_low_integrity":      e("ipc: el pipe {name} lo atiende un proceso de menor integridad, AppContainer o con token restringido", "ipc: the pipe {name} is served by a lower-integrity, AppContainer or restricted-token process", "name"),
 		"ipc.err.server_not_user":         e("el servidor del pipe no es de este usuario", "the pipe server does not belong to this user"),
 		"mctl.err.elevated":               e("mctl no habla con el núcleo desde una terminal elevada (el núcleo corre sin elevar); abre una terminal normal", "mctl does not talk to the core from an elevated terminal (the core runs unelevated); open a normal terminal"),
+		"mctl.err.core_down":             e("el núcleo no está corriendo; arráncalo (app, o macuahuitld)", "the core is not running; start it (the app, or macuahuitld)"),
 		"sys.err.log_not_regular":         e("{path}: no es un archivo regular", "{path}: is not a regular file", "path"),
 		"core.err.prefs":                  e("core: preferencias: {cause}", "core: preferences: {cause}", "cause"),
 		"core.err.packs":                  e("core: paquetes: {cause}", "core: packages: {cause}", "cause"),

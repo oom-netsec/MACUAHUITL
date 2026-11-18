@@ -3,7 +3,6 @@ package vault
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"io"
 )
 
@@ -39,7 +38,7 @@ func Seal(password, plain []byte, p Params) ([]byte, error) {
 	salt, nonce := make([]byte, 16), make([]byte, 12)
 	for _, x := range [][]byte{salt, nonce} {
 		if _, err := io.ReadFull(rand.Reader, x); err != nil {
-			return nil, fmt.Errorf("vault: %w", err)
+			return nil, wrap(err)
 		}
 	}
 	b = append(b, salt...)
@@ -47,7 +46,7 @@ func Seal(password, plain []byte, p Params) ([]byte, error) {
 	defer kek.Destroy()
 	g, err := newAEAD(kek.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	return g.Seal(append(b, nonce...), nonce, plain, b), nil
 }
@@ -68,7 +67,7 @@ func Unseal(password, blob []byte) ([]byte, error) {
 	defer kek.Destroy()
 	g, err := newAEAD(kek.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("vault: %w", err)
+		return nil, wrap(err)
 	}
 	plain, err := g.Open(nil, blob[sealAADLen:sealAADLen+12], blob[sealAADLen+12:], blob[:sealAADLen])
 	if err != nil {

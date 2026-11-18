@@ -173,5 +173,5 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if cli.HelpShown() {
 		return nil
 	}
-	return cli.LocalizeUsage(err)
+	return cli.LocalizeUsage(cli.CoreError(err))
 }
