@@ -119,6 +119,15 @@ test("Ctrl+Enter ejecuta la acción principal de la vista", async () => {
   expect(within(statusbar()).getByRole("button", { name: /1 en curso/ })).toBeInTheDocument();
 });
 
+test("Ctrl+Enter no pulsa un botón principal deshabilitado por datos faltantes", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<App core={core} initial="ping" />);
+  await screen.findByLabelText("Destino");
+  expect(screen.getByRole("button", { name: "Ejecutar" })).toHaveAccessibleDescription("Falta: indicar el equipo.");
+  await userEvent.keyboard("{Control>}{Enter}{/Control}");
+  expect(core.diagRun).not.toHaveBeenCalled();
+});
+
 test("Ctrl+Enter en la paleta solo abre el módulo: no pulsa el primario de ninguna vista", async () => {
   // En la app, el foco está en la paleta: ni la vista que se deja ni la que se abre deben ejecutar nada.
   const auditVerify = vi.fn(async () => ({ intact: true, firstBroken: 0, head: "" }));

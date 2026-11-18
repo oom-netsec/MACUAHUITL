@@ -516,7 +516,7 @@ test("el secreto se conserva para volver a planear y se borra al iniciar la ejec
 
 test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () => {
   await open();
-  await screen.findByRole("option", { name: "lab (admin)" });
+  await waitFor(() => expect(screen.getByLabelText("Credencial")).toHaveValue("c1")); // con una sola se preelige
   expect(planBtn()).toBeDisabled();
   expect(planBtn()).toHaveAccessibleDescription("Falta: elegir una plantilla.");
   await choose("Port-security en puertos de acceso");
