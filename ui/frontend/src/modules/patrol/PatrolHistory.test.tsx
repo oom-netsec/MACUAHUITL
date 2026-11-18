@@ -165,12 +165,26 @@ test("arranque fallido: estado «No arrancó», motivo de la última fase y Arma
   expect(list().getByText("Creado")).toBeInTheDocument(); // un created normal no cambia
   const detail = within(screen.getByRole("region", { name: "Adhoc caído" }));
   expect(detail.getByText("No arrancó")).toBeInTheDocument();
-  expect(detail.getByRole("alert")).toHaveTextContent("No se pudo arrancar: no quedan equipos");
+  expect(detail.getByRole("status")).toHaveTextContent("No se pudo arrancar: no quedan equipos. Resuelve el motivo");
+  expect(detail.queryByRole("alert")).toBeNull(); // estado del trabajo, no una alerta en cada selección
   expect(detail.getAllByText("No arrancó (antes de armar)").length).toBe(1); // la fase en la línea de tiempo
   expect(detail.getByRole("button", { name: "Ejecutar Login Test" })).toBeInTheDocument();
   expect(detail.getByRole("button", { name: "Quitar del historial" })).toBeInTheDocument();
   await userEvent.click(detail.getByRole("button", { name: "Armar trabajo" }));
   await waitFor(() => expect(armJob).toHaveBeenCalledWith("jf", [], []));
+});
+
+test("arranque fallido sin motivo: texto de respaldo, sin «: .»; el aviso se oculta mientras se reintenta", async () => {
+  const j: Job = { id: "jh", name: "Sin motivo", state: "created", kind: "adhoc", phases: [{ at: now, kind: "JOB_PHASE_KIND_ARM_FAILED" }] };
+  let finish: (v: unknown) => void = () => {};
+  const armJob = vi.fn(() => new Promise((r) => { finish = r; }));
+  setup([j], { armJob });
+  await userEvent.click(await list().findByText("Sin motivo"));
+  const detail = within(screen.getByRole("region", { name: "Sin motivo" }));
+  expect(detail.getByRole("status")).toHaveTextContent(/^No se pudo arrancar\. Resuelve/);
+  await userEvent.click(detail.getByRole("button", { name: "Armar trabajo" }));
+  expect(screen.queryByText(/No se pudo arrancar/)).toBeNull();
+  await act(async () => finish({ windowEndsAt: now, missingInhibitors: [] }));
 });
 
 test("un created que falló antes y luego tiene otra fase ya no se marca como fallido", async () => {

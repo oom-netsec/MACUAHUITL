@@ -3033,6 +3033,8 @@ export const en: Record<Key, string> = {
   "patrol.history.skip.adhoc_unread": "its ad hoc result has not been read yet",
   "patrol.history.skip.unknown": "the core could not remove it ({reason})",
   "patrol.state.armFailed": "Failed to start",
-  "patrol.armFailed": "Could not start: {reason}. Fix the device and arm again, or run the Login Test to review and accept a new host key.",
+  "patrol.armFailed": "Could not start: {reason}.",
+  "patrol.armFailed.noReason": "Could not start.",
+  "patrol.armFailed.help": "Resolve the cause and arm again. The Login Test lists each device so you can accept a new host key or exclude it.",
   "patrol.phase.ARM_FAILED": "Failed to start (before arming)",
 };

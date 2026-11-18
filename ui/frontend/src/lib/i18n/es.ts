@@ -3032,7 +3032,9 @@ export const es = {
   "patrol.history.skip.adhoc_unread": "su resultado ad hoc aún no se ha leído",
   "patrol.history.skip.unknown": "el núcleo no lo pudo quitar ({reason})",
   "patrol.state.armFailed": "No arrancó",
-  "patrol.armFailed": "No se pudo arrancar: {reason}. Corrige el equipo y vuelve a armar, o ejecuta el Login Test para revisar y aceptar una huella nueva.",
+  "patrol.armFailed": "No se pudo arrancar: {reason}.",
+  "patrol.armFailed.noReason": "No se pudo arrancar.",
+  "patrol.armFailed.help": "Resuelve el motivo y vuelve a armar. El Login Test muestra cada equipo para aceptar una huella nueva o excluirlo.",
   "patrol.phase.ARM_FAILED": "No arrancó (antes de armar)",
 };
 

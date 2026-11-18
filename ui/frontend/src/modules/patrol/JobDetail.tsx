@@ -69,7 +69,8 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
       const r = await core.armJob(job.id, [...trusted], [...excluded]);
       setArmed(r);
       await subscribe([job.id], true);
-      setGrid({ devices: login.filter((l) => !excluded.has(l.target)).map((l) => l.target) });
+      // Sin Login Test previo (reintento de un arranque fallido) no hay lista: la reconstruye el efecto al quedar armado.
+      if (login.length) setGrid({ devices: login.filter((l) => !excluded.has(l.target)).map((l) => l.target) });
       onChanged();
     } catch (e) {
       setErr(errorText(e));
@@ -98,6 +99,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   const live = ["created", "arming", "armed"].includes(job.state);
   const showLogin = job.state === "created" && !armed;
   const failedStart = !armed && armFailed(job, phases) ? phases[phases.length - 1] : undefined;
+  const failedReason = failedStart && phaseDetail(t, failedStart);
 
   return (
     <section aria-labelledby="job-h" className="job-detail">
@@ -121,7 +123,8 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
       </dl>
 
       {err && <Notice kind="error">{err}</Notice>}
-      {failedStart && !err && <Notice kind="error">{t("patrol.armFailed", { reason: phaseDetail(t, failedStart) ?? "" })}</Notice>}
+      {/* Estado del trabajo, no un error nuevo: role=status; se oculta mientras se reintenta o hay un error más reciente. */}
+      {failedStart && !err && !busy && <Notice kind="warn">{failedReason ? t("patrol.armFailed", { reason: failedReason }) : t("patrol.armFailed.noReason")} {t("patrol.armFailed.help")}</Notice>}
       {showLogin && (
         <Section title={t("patrol.login.title")} description={t("patrol.login.intro")}>
           {login.length > 0 && (
