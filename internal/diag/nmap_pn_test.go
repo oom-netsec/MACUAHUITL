@@ -46,8 +46,10 @@ func TestNmapSkipDiscoveryNoBooleano(t *testing.T) {
 
 func TestNmapZeroUp(t *testing.T) {
 	for line, want := range map[string]bool{
-		"# Nmap done at Tue Nov 17 10:00:00 2026 -- 1 IP address (0 hosts up) scanned in 0.50 seconds": true,
-		"# Nmap done at Tue Nov 17 10:00:00 2026 -- 1 IP address (1 host up) scanned in 0.50 seconds":  false,
+		"# Nmap done at Tue Nov 17 10:00:00 2026 -- 1 IP address (0 hosts up) scanned in 0.50 seconds":  true,
+		"# Nmap done at Tue Nov 17 10:00:00 2026 -- 1 IP address (1 host up) scanned in 0.50 seconds":   false,
+		"# Nmap done at Tue Nov 17 10:00:00 2026 -- 1 IP address (10 hosts up) scanned in 0.50 seconds": false,
+		"Nmap done: 1 IP address (0 hosts up) scanned in 0.50 seconds":                                  false,
 		"Host: 127.0.0.1 ()\tStatus: Up": false,
 	} {
 		if NmapZeroUp(line) != want {
@@ -59,4 +61,12 @@ func TestNmapZeroUp(t *testing.T) {
 func errCode(err error, code string) bool {
 	var e *i18n.Error
 	return errors.As(err, &e) && e.Code == code
+}
+
+// El primer error de opciones no lo tapa el rechazo de skip_discovery con scan=ping.
+func TestNmapSkipDiscoveryNoTapaPrimerError(t *testing.T) {
+	_, err := nmapArgv(t, map[string]string{"scan": "ping", "skip_discovery": "true", "timing": "9"})
+	if !errCode(err, "diag.err.number") {
+		t.Errorf("err = %v", err)
+	}
 }

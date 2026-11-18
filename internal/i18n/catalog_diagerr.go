@@ -32,7 +32,7 @@ func init() {
 		"diag.err.opt_windows":       e("la opción {key:q} no existe en Windows para esta herramienta", "option {key:q} does not exist on Windows for this tool", "key"),
 		"diag.err.bool":              e("{key} debe ser true o false, no {value:q}", "{key} must be true or false, not {value:q}", "key", "value"),
 		"diag.err.skip_with_ping":    e("skip_discovery (-Pn) no se combina con scan=ping (-sn)", "skip_discovery (-Pn) cannot be combined with scan=ping (-sn)"),
-		"diag.warn.zero_up":          e("0 hosts respondieron; si el equipo está arriba, repite con -o skip_discovery=true (-Pn)", "0 hosts responded; if the host is up, retry with -o skip_discovery=true (-Pn)"),
+		"diag.warn.zero_up":          e("0 hosts arriba: si el equipo no responde a ping, repite omitiendo el descubrimiento de hosts (skip_discovery / -Pn)", "0 hosts up: if the host does not answer ping, retry skipping host discovery (skip_discovery / -Pn)"),
 		"diag.err.syn_windows":       e("el escaneo SYN de nmap no está disponible en Windows (necesita Npcap); usa connect", "the nmap SYN scan is not available on Windows (it needs Npcap); use connect"),
 		"diag.err.combo": func() entry {
 			c := e("{a} y {b} no van juntos", "{a} and {b} cannot be used together", "a", "b")

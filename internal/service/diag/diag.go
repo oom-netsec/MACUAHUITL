@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"google.golang.org/grpc/codes"
@@ -111,7 +112,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	}}
 	res, err := run.Run(st.Context(), req, func(line string) {
 		st.Send(&v1.RunResponse{OutputLine: line})
-		if w := avisoNmap(i18n.Locale(st.Context()), tool, line); w != "" {
+		if w := avisoNmap(i18n.Locale(st.Context()), tool, req.Options, line); w != "" {
 			st.Send(&v1.RunResponse{OutputLine: w})
 		}
 	})
@@ -155,8 +156,10 @@ func (Module) Register(s ipc.Registrar, d service.Deps) {
 }
 
 // avisoNmap devuelve el aviso de 0 hosts up (vacío si no toca); solo viaja por el flujo, no va al archivo de salida.
-func avisoNmap(loc string, tool diag.Tool, line string) string {
-	if tool != diag.Nmap || !diag.NmapZeroUp(line) {
+// Sin aviso con scan=ping ni con skip_discovery (la sugerencia no aplicaría) ni con «0 IP addresses» (nombre sin resolver: -Pn no ayuda).
+func avisoNmap(loc string, tool diag.Tool, opts map[string]string, line string) string {
+	if tool != diag.Nmap || !diag.NmapZeroUp(line) || strings.Contains(line, " 0 IP addresses") ||
+		opts["scan"] == "ping" || opts["skip_discovery"] == "true" {
 		return ""
 	}
 	return i18n.Msg(loc, "diag.warn.zero_up", nil)

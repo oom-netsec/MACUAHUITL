@@ -182,7 +182,8 @@ const help = `  diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor
         ping -o: count (1-100; 1-5 con barrido), continuous, duration (1-3600), timeout (1-60), ttl (1-255), tos (0-255), df, source,
         family (4|6), interval (0.2-60, solo Linux), size (0-65500), sweep_start, sweep_end, sweep_step (0-65500, máximo 100 tamaños)
         (continuous corre hasta Ctrl-C, que detiene y muestra el resumen; otro Ctrl-C corta ya. Barrido con tabla y MTU estimado:
-         mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)`
+         mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)
+        nmap -o: scan, ports, timing, service_detection, skip_discovery`
 
 // Area registra "diag HERRAMIENTA".
 func Area() cli.Area {

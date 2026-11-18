@@ -117,7 +117,7 @@ func (o *opts) boolean(key string) bool {
 	return v == "true" || v == "1"
 }
 
-// strictBool es como boolean pero solo acepta «true» o «false»: lo demás es error, no «falso» en silencio.
+// strictBool es como boolean pero solo acepta «true» o «false» (boolean acepta también «1»; no se cambia en este bloque): lo demás es error, no «falso» en silencio.
 func (o *opts) strictBool(key string) bool {
 	v, ok := o.m[key]
 	if !ok {
@@ -223,7 +223,7 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 		}
 		if o.strictBool("skip_discovery") {
 			if scan == "ping" { // -sn y -Pn se contradicen: se rechaza en vez de descartar la opción
-				return "", nil, PingPlan{}, i18n.New("diag.err.skip_with_ping", nil)
+				o.fail(i18n.New("diag.err.skip_with_ping", nil)) // fail conserva el primer error
 			}
 			argv = append(argv, "-Pn")
 		}
