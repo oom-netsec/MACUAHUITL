@@ -26,7 +26,8 @@ func TestOutputsConAclLaxaSeRechaza(t *testing.T) {
 	}
 	err = fija(s, laxa)
 	m := status.Convert(err).Message()
-	if status.Code(err) != codes.InvalidArgument || !(strings.Contains(m, "da acceso a") || strings.Contains(m, "cuelga de")) || strings.Contains(m, "prefs.outputs.") {
+	r := reasonDe(err) // el motivo viaja en ErrorInfo y ya no va pegado al texto (43e-9)
+	if status.Code(err) != codes.InvalidArgument || r != "prefs.outputs.permisos" && r != "prefs.outputs.ancestro_inseguro" || strings.Contains(m, "prefs.outputs.") {
 		t.Fatalf("esperaba permisos o ancestro_inseguro, salió: %v", err)
 	}
 	if d.Outputs() == laxa {
