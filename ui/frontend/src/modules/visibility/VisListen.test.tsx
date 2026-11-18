@@ -80,3 +80,11 @@ test("topología: «Trabajo o carpeta» elige un trabajo y envía su ID; «Otra 
   await userEvent.click(screen.getByRole("button", { name: "Construir" }));
   expect(core.topoBuild).toHaveBeenLastCalledWith("/x", "");
 });
+
+test.each(cases)("%s: por omisión escucha en una IP local explícita (127.0.0.1), nunca en «Todas»", async (tab, fn, port) => {
+  const core = await setup(tab);
+  expect(screen.getByLabelText("Dirección de escucha")).toHaveValue("127.0.0.1");
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+  await listen();
+  expect(sent(core, fn)).toEqual([`127.0.0.1:${port}`, false]);
+});

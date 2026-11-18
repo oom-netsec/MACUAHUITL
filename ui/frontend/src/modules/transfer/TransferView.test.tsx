@@ -684,3 +684,17 @@ test("servidor: pasar de recibir+TFTP a enviar mueve «IP permitidas» a Avanzad
   expect(adv()).toContainElement(screen.getByLabelText(/IP permitidas/));
   expect(adv().querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
 });
+
+test("servidor: por omisión no se escucha en «Todas»; hay que elegir una IP local o «Todas» a propósito", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  expect(screen.getByLabelText("IP de escucha")).not.toHaveValue("0.0.0.0");
+  expect(screen.getByRole("option", { name: /Todas las interfaces/ })).not.toHaveProperty("selected", true);
+  expect(screen.queryByText(/Cualquier equipo/)).toBeNull();
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeDisabled(); // sin elegir dirección no se abre
+  expect(screen.getByRole("button", { name: "Abrir servidor" })).toHaveAccessibleDescription(/dirección de escucha/);
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenLastCalledWith(expect.objectContaining({ listen: expect.stringMatching(/^192\.0\.2\.10:/), allowAny: false }));
+});

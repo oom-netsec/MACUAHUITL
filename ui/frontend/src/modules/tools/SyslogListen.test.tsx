@@ -56,3 +56,9 @@ test("syslog: si falla la carga de interfaces, el error sale como pista bajo el 
   render(<SyslogPanel core={fakeCore({ listInterfaces: vi.fn(async () => { throw new Error("sin interfaces"); }) })} />);
   expect(await screen.findByText("sin interfaces")).toHaveClass("hint");
 });
+
+test("syslog: por omisión escucha en una IP local explícita (127.0.0.1), nunca en «Todas»", async () => {
+  await setup();
+  expect(sel()).toHaveValue("127.0.0.1");
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+});
