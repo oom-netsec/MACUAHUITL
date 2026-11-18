@@ -3080,4 +3080,8 @@ export const en: Record<Key, string> = {
   "need.caCert": "paste the CA certificate",
   "need.caKey": "paste the CA sealed key",
   "need.csr": "paste the request (CSR)",
+  "need.topoSource": "enter the Patrol job or folder, or a capture",
+  "need.oids": "enter the OIDs",
+  "need.profile": "choose at least one profile",
+  "need.paths": "enter the gNMI paths",
 };

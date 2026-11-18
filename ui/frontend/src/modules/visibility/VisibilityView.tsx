@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { Hl, Terminal } from "../../components/Terminal";
@@ -125,7 +126,7 @@ function TopoPanel({ core }: { core: CoreAPI }) {
           <Field label={t("visibility.topo.pcap")} value={pcap} onChange={setPcap} w="lg" mono />
         </Advanced>
         <div className="actions">
-          <button className="primary" disabled={(!src && !pcap) || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.topoBuild(src.trim(), pcap.trim()))}>{t("visibility.topo.build")}{kbd}</button>
+          <RunButton primary kbd busy={r.busy} missing={[!src && !pcap && t("need.topoSource")]} onClick={() => r.run(() => core.topoBuild(src.trim(), pcap.trim()))}>{t("visibility.topo.build")}</RunButton>
         </div>
       </Section>
       {!topo && !r.error && !r.busy && <EmptyState icon="layers" title={t("visibility.empty.title")}>{t("visibility.topo.empty")}</EmptyState>}
@@ -192,6 +193,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
   const charted = picked ?? busiest(hist);
   const toggleChart = (name: string) => setPicked(charted.includes(name) ? charted.filter((n) => n !== name) : [...charted, name]);
   const target = (): SnmpTarget => ({ host: host.trim(), port: Number(port) || 161, version, credentialId: cred, auth: version === "3" ? auth : "", priv: version === "3" ? priv : "" });
+  const snmpNeed = [!host && t("need.target"), !cred && t("need.cred"), !oids && t("need.oids")];
   return (
     <>
       <Section title={t("visibility.sec.target")}>
@@ -216,8 +218,8 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
         <Field label={t("visibility.snmp.oids")} value={oids} onChange={setOids} w="full" mono />
         <Check label={t("visibility.snmp.bulk")} checked={bulk} onChange={setBulk} />
         <div className="actions">
-          <button className="primary" disabled={!host || !cred || !oids || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.snmpGet(target(), words(oids)))}>Get{kbd}</button>
-          <button disabled={!host || !cred || !oids || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.snmpWalk(target(), words(oids)[0], bulk))}>Walk</button>
+          <RunButton primary kbd busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpGet(target(), words(oids)))}>Get</RunButton>
+          <RunButton busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpWalk(target(), words(oids)[0], bulk))}>Walk</RunButton>
         </div>
         <Report r={r} />
       </Section>
@@ -227,7 +229,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
         </div>
         <Field label={t("visibility.every")} type="number" value={every} onChange={setEvery} w="sm" mono />
         <div className="actions">
-          <button disabled={!host || !cred || !!live.runId} onClick={() => { setHist([]); setPicked(null); live.start(() => core.snmpPollStart(target(), profiles.map(([k]) => k).filter((k) => prof[k]), Number(every) || 10)); }}>{t("visibility.snmp.pollNow")}</button>
+          <RunButton disabled={!!live.runId} missing={[!host && t("need.target"), !cred && t("need.cred"), !profiles.some(([k]) => prof[k]) && t("need.profile")]} onClick={() => { setHist([]); setPicked(null); live.start(() => core.snmpPollStart(target(), profiles.map(([k]) => k).filter((k) => prof[k]), Number(every) || 10)); }}>{t("visibility.snmp.pollNow")}</RunButton>
           <button disabled={!live.runId} onClick={live.stop}>{t("common.stop")}</button>
         </div>
         {live.view}
@@ -448,6 +450,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
   }, undefined, onRun);
   const target = (): GnmiTarget => ({ host: host.trim(), port: Number(port) || 9339, credentialId: cred, caPath: ca.trim(), serverName: "" });
   const list = paths.split(/\s+/).filter(Boolean);
+  const gnmiNeed = [!host && t("need.target"), !list.length && t("need.paths")];
   return (
     <>
       <Section title={t("visibility.sec.target")}>
@@ -462,7 +465,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
       </Section>
       <Section title={t("visibility.sec.query")} description={t("visibility.gnmi.note")}>
         <Field label={t("visibility.gnmi.paths")} value={paths} onChange={setPaths} w="full" mono />
-        <div className="actions"><button className="primary" disabled={!host || !list.length || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.gnmiGet(target(), list, ""))}>Get{kbd}</button></div>
+        <div className="actions"><RunButton primary kbd busy={r.busy} missing={gnmiNeed} onClick={() => r.run(() => core.gnmiGet(target(), list, ""))}>Get</RunButton></div>
         <Report r={r} />
       </Section>
       <Section title={t("visibility.sec.subscribe")}>
@@ -471,7 +474,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
           {mode === "sample" && <Field label={t("visibility.every")} type="number" value={every} onChange={setEvery} w="sm" mono />}
         </div>
         <div className="actions">
-          <button disabled={!host || !list.length || !!live.runId} onClick={() => { batch.reset(); setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, mode === "sample" ? Number(every) || 10 : 0)); }}>{t("visibility.gnmi.subscribe")}</button>
+          <RunButton disabled={!!live.runId} missing={gnmiNeed} onClick={() => { batch.reset(); setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, mode === "sample" ? Number(every) || 10 : 0)); }}>{t("visibility.gnmi.subscribe")}</RunButton>
           <button disabled={!live.runId} onClick={live.stop}>{t("common.stop")}</button>
         </div>
         {live.view}

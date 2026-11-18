@@ -317,3 +317,42 @@ test("traps: la credencial es opcional y queda en «ninguna» aunque haya creden
   await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
   expect(screen.getByLabelText(/Usuario v3 para descifrar traps/)).toHaveValue("");
 });
+
+test("Construir, Get, Walk y Sondear nombran lo que falta", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [...creds, { ...creds[0], id: "c2", label: "otra" }]) });
+  render(<VisibilityView core={core} />);
+  const b = (n: string) => screen.getByRole("button", { name: n });
+  expect(b("Construir")).toBeDisabled();
+  expect(b("Construir")).toHaveAccessibleDescription("Falta: indicar el trabajo o la carpeta de Patrol, o una captura.");
+  await userEvent.type(screen.getByLabelText(/Trabajo o carpeta/), "/x");
+  expect(b("Construir")).toBeEnabled();
+  expect(b("Construir")).not.toHaveAccessibleDescription();
+
+  await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
+  await screen.findAllByRole("option", { name: /otra/ });
+  await userEvent.clear(screen.getByLabelText(/OID/));
+  expect(b("Get")).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial, indicar los OID.");
+  expect(b("Walk")).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial, indicar los OID.");
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
+  await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.type(screen.getByLabelText(/OID/), "1.3.6");
+  expect(b("Get")).toBeEnabled();
+  expect(b("Get")).not.toHaveAccessibleDescription();
+  for (const p of ["Sistema", "Interfaces"]) await userEvent.click(screen.getByLabelText(new RegExp(p)));
+  expect(b("Sondear")).toHaveAccessibleDescription("Falta: elegir al menos un perfil.");
+  await userEvent.click(screen.getByLabelText(/Sistema/));
+  expect(b("Sondear")).toBeEnabled();
+});
+
+test("gNMI: Get y Suscribir nombran lo que falta", async () => {
+  render(<VisibilityView core={fakeCore()} />);
+  const b = (n: string) => screen.getByRole("button", { name: n });
+  await userEvent.click(screen.getByRole("tab", { name: "gNMI" }));
+  await userEvent.clear(screen.getByLabelText(/Rutas/));
+  expect(b("Get")).toHaveAccessibleDescription("Falta: indicar el equipo, indicar las rutas gNMI.");
+  expect(b("Suscribir")).toHaveAccessibleDescription("Falta: indicar el equipo, indicar las rutas gNMI.");
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.9");
+  await userEvent.type(screen.getByLabelText(/Rutas/), "/a");
+  expect(b("Get")).toBeEnabled();
+  expect(b("Suscribir")).not.toHaveAccessibleDescription();
+});

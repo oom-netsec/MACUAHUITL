@@ -3079,6 +3079,10 @@ export const es = {
   "need.caCert": "pegar el certificado de la CA",
   "need.caKey": "pegar la llave sellada de la CA",
   "need.csr": "pegar la solicitud (CSR)",
+  "need.topoSource": "indicar el trabajo o la carpeta de Patrol, o una captura",
+  "need.oids": "indicar los OID",
+  "need.profile": "elegir al menos un perfil",
+  "need.paths": "indicar las rutas gNMI",
 };
 
 export type Key = keyof typeof es;
