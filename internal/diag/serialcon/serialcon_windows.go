@@ -29,6 +29,7 @@ type Port struct {
 	h      windows.Handle
 	rev    windows.Handle // eventos de las E/S superpuestas, uno por sentido
 	wev    windows.Handle
+	rmu    sync.Mutex   // un solo lector a la vez: comparten el evento rev (ver Read)
 	mu     sync.RWMutex // Close toma el candado de escritura: espera las E/S en curso
 	closed atomic.Bool
 	empty  emptyReads
@@ -130,15 +131,18 @@ func (p *Port) io(ev windows.Handle, start func(ov *windows.Overlapped) error) (
 	return n, err
 }
 
-// Read admite un solo lector a la vez.
+// Read admite un solo lector a la vez (rmu lo hace cumplir): dos lecturas con el mismo evento rev harían que
+// GetOverlappedResult(wait) volviera ERROR_IO_INCOMPLETE con la E/S viva, y el kernel escribiría luego en ov y b ya liberados.
 func (p *Port) Read(b []byte) (int, error) {
 	if len(b) == 0 {
 		return 0, nil
 	}
 	for {
+		p.rmu.Lock()
 		p.mu.RLock()
 		if p.closed.Load() {
 			p.mu.RUnlock()
+			p.rmu.Unlock()
 			return 0, os.ErrClosed
 		}
 		t0 := time.Now()
@@ -148,6 +152,7 @@ func (p *Port) Read(b []byte) (int, error) {
 		})
 		took := time.Since(t0)
 		p.mu.RUnlock()
+		p.rmu.Unlock()
 		if err != nil || n > 0 {
 			return int(n), err
 		}

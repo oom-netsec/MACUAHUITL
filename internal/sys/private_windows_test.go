@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -22,11 +24,13 @@ const (
 func setDACL(t *testing.T, path string, protected bool, sids ...string) {
 	t.Helper()
 	var entries []windows.EXPLICIT_ACCESS
+	var keep []*windows.SID
 	for _, s := range sids {
 		sid, err := windows.StringToSid(s)
 		if err != nil {
 			t.Fatal(err)
 		}
+		keep = append(keep, sid)
 		entries = append(entries, windows.EXPLICIT_ACCESS{
 			AccessPermissions: fileAllAccess,
 			AccessMode:        windows.GRANT_ACCESS,
@@ -35,6 +39,7 @@ func setDACL(t *testing.T, path string, protected bool, sids ...string) {
 		})
 	}
 	acl, err := windows.ACLFromEntries(entries, nil)
+	runtime.KeepAlive(keep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,5 +400,42 @@ func TestForeignWritersSoloLecturaYSoloHerencia(t *testing.T) {
 	}
 	if w, err = ForeignWriters(d); err != nil || len(w.Who) != 1 || w.Who[0] != authUsers {
 		t.Fatalf("ACE solo-herencia de Authenticated Users: %+v %v", w, err)
+	}
+}
+
+// Los SID de protect y ReadOnlyDir viajan en el EXPLICIT_ACCESS como uintptr: con el GC forzado entre medio, la DACL
+// tiene que seguir llevando los SID correctos.
+func TestProtectYReadOnlyDirConGCForzado(t *testing.T) {
+	user, err := currentSID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := user.String()
+	for i := 0; i < 30; i++ {
+		runtime.GC()
+		debug.FreeOSMemory()
+		d := t.TempDir()
+		if err := protect(d, true); err != nil {
+			t.Fatal(err)
+		}
+		runtime.GC()
+		debug.FreeOSMemory()
+		if ok, err := IsPrivate(d); err != nil || !ok {
+			t.Fatalf("vuelta %d: IsPrivate = %v, %v", i, ok, err)
+		}
+		restore, err := ReadOnlyDir(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		runtime.GC()
+		debug.FreeOSMemory()
+		_, _, aces, err := readACL(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(aces) != 1 || aces[0].sid != want {
+			t.Fatalf("vuelta %d: ACE = %+v, quiero solo %s", i, aces, want)
+		}
+		restore()
 	}
 }

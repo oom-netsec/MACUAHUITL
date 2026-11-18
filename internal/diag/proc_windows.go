@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -83,21 +85,31 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
+	// En el heap y con KeepAlive: el wrapper de x/sys recibe un uintptr y, si el stack creciera, el kernel leería la copia vieja.
+	info := new(windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION)
 	info.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
+	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))); err != nil {
 		windows.CloseHandle(job)
 		return nil, nil, err
 	}
+	runtime.KeepAlive(info)
 	cmd.SysProcAttr = &windows.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED | windows.CREATE_NO_WINDOW}
 	cmd.WaitDelay = 3 * time.Second
 	// Las DLL que falten se buscan junto a la herramienta, no en el cwd heredado.
 	if i := lastSep(cmd.Path); i > 0 {
 		cmd.Dir = cmd.Path[:i]
 	}
+	// jobMu y jobClosed: la goroutine de diag puede llamar a Cancel justo cuando done cierra el job; con el número de handle
+	// ya reutilizado, TerminateJobObject mataría un objeto ajeno.
+	var jobMu sync.Mutex
+	jobClosed := false
 	cmd.Cancel = func() error {
 		// El proceso aún puede no estar en el job (cancelación durante el arranque): Kill cubre ese caso.
-		windows.TerminateJobObject(job, 143) // como el 143 de Linux
+		jobMu.Lock()
+		if !jobClosed {
+			terminateJob(job, 143) // como el 143 de Linux
+		}
+		jobMu.Unlock()
 		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			return err
 		}
@@ -117,8 +129,18 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 		}
 		return err
 	}
-	return started, func() { windows.CloseHandle(job) }, nil
+	return started, func() {
+		jobMu.Lock()
+		defer jobMu.Unlock()
+		if !jobClosed {
+			jobClosed = true
+			windows.CloseHandle(job)
+		}
+	}, nil
 }
+
+// terminateJob es la costura de las pruebas: comprueban que no se termina un job ya cerrado.
+var terminateJob = windows.TerminateJobObject
 
 // resume reanuda los hilos del proceso recién creado (solo tiene el principal).
 func resume(pid uint32) error {
