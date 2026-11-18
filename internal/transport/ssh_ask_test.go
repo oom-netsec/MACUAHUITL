@@ -63,7 +63,7 @@ type scripted struct {
 	pw, otp string
 }
 
-func (s *scripted) ask(p Prompt) ([][]byte, error) {
+func (s *scripted) ask(_ context.Context, p Prompt) ([][]byte, error) {
 	s.mu.Lock()
 	s.prompts = append(s.prompts, p)
 	s.mu.Unlock()
@@ -96,10 +96,10 @@ func TestAskRelayaMFA(t *testing.T) {
 	// Código malo una vez y luego bueno: Attempt sube a 2.
 	n := 0
 	sc2 := &scripted{pw: "pw"}
-	s2, err := sim.open(context.Background(), userOnly(), SSHOptions{Ask: func(p Prompt) ([][]byte, error) {
+	s2, err := sim.open(context.Background(), userOnly(), SSHOptions{Ask: func(_ context.Context, p Prompt) ([][]byte, error) {
 		n++
 		sc2.otp = map[int]string{1: "000000", 2: "123456"}[n]
-		return sc2.ask(p)
+		return sc2.ask(context.Background(), p)
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -149,9 +149,9 @@ func TestAskPassword(t *testing.T) {
 func TestAskEsperaMasQueElHandshake(t *testing.T) {
 	sim := startAskSim(t, simulator.Config{OTP: "123456"})
 	sc := &scripted{pw: "pw", otp: "123456"}
-	s, err := sim.open(context.Background(), userOnly(), SSHOptions{HandshakeTimeout: 300 * time.Millisecond, Ask: func(p Prompt) ([][]byte, error) {
+	s, err := sim.open(context.Background(), userOnly(), SSHOptions{HandshakeTimeout: 300 * time.Millisecond, Ask: func(_ context.Context, p Prompt) ([][]byte, error) {
 		time.Sleep(900 * time.Millisecond)
-		return sc.ask(p)
+		return sc.ask(context.Background(), p)
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -166,13 +166,17 @@ func TestAskCanceladoNoDejaNada(t *testing.T) {
 	sim := startAskSim(t, simulator.Config{OTP: "123456"})
 	before := runtime.NumGoroutine()
 	release := make(chan struct{})
+	wiped := make(chan struct{})
+	lateWiped = func() { close(wiped) }
+	defer func() { lateWiped = nil }()
+	late := []byte("pw") // lo que Ask devuelve tarde, ya cancelado: debe quedar en ceros
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	time.AfterFunc(200*time.Millisecond, cancel)
 	start := time.Now()
-	_, err := sim.open(ctx, userOnly(), SSHOptions{Ask: func(Prompt) ([][]byte, error) {
+	_, err := sim.open(ctx, userOnly(), SSHOptions{Ask: func(context.Context, Prompt) ([][]byte, error) {
 		<-release
-		return [][]byte{[]byte("pw"), []byte("123456")}, nil
+		return [][]byte{late, []byte("123456")}, nil
 	}})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v", err)
@@ -188,12 +192,20 @@ func TestAskCanceladoNoDejaNada(t *testing.T) {
 	if n := runtime.NumGoroutine(); n > before+1 {
 		t.Fatalf("goroutines: %d -> %d", before, n)
 	}
+	select {
+	case <-wiped:
+	case <-time.After(2 * time.Second):
+		t.Fatal("la respuesta tardía no se borró")
+	}
+	if string(late) != "\x00\x00" {
+		t.Fatalf("respuesta tardía sin borrar: %q", late)
+	}
 }
 
 func TestAskErrorPropioAborta(t *testing.T) {
 	sim := startAskSim(t, simulator.Config{OTP: "123456"})
 	boom := errors.New("usuario canceló")
-	_, err := sim.open(context.Background(), userOnly(), SSHOptions{Ask: func(Prompt) ([][]byte, error) { return nil, boom }})
+	_, err := sim.open(context.Background(), userOnly(), SSHOptions{Ask: func(context.Context, Prompt) ([][]byte, error) { return nil, boom }})
 	if !errors.Is(err, boom) || sim.attempts.Load() != 0 {
 		t.Fatalf("err = %v, attempts = %d", err, sim.attempts.Load())
 	}
@@ -209,7 +221,7 @@ func TestCredencialVaciaNoMarca(t *testing.T) {
 
 func TestAskConSecretoRechaza(t *testing.T) {
 	sim := startAskSim(t, simulator.Config{})
-	ask := func(Prompt) ([][]byte, error) { t.Error("Ask no debe llamarse"); return nil, nil }
+	ask := func(context.Context, Prompt) ([][]byte, error) { t.Error("Ask no debe llamarse"); return nil, nil }
 	for name, c := range map[string]vault.Credential{
 		"password": {Username: "admin", Password: secret.New([]byte("pw"))},
 		"llave":    {Username: "admin", SSHKey: secret.New([]byte("x"))},
@@ -227,16 +239,21 @@ func TestAskConSecretoRechaza(t *testing.T) {
 // kiServer es un servidor crudo cuya ronda keyboard-interactive la fija la prueba; acepta cualquier respuesta.
 func kiServer(t *testing.T, name, ins string, qs []string, echos []bool) (*Guard, string, uint16, ssh.PublicKey) {
 	t.Helper()
-	signer, err := ssh.NewSignerFromKey(mustEd25519(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg := &ssh.ServerConfig{KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+	return rawServer(t, &ssh.ServerConfig{KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
 		if _, err := ch(name, ins, qs, echos); err != nil {
 			return nil, err
 		}
 		return nil, nil
-	}}
+	}})
+}
+
+// rawServer levanta un servidor x/crypto con la configuración de la prueba (sin shell: rechaza todo canal).
+func rawServer(t *testing.T, cfg *ssh.ServerConfig) (*Guard, string, uint16, ssh.PublicKey) {
+	t.Helper()
+	signer, err := ssh.NewSignerFromKey(mustEd25519(t))
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg.AddHostKey(signer)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -272,12 +289,112 @@ func kiServer(t *testing.T, name, ins string, qs []string, echos []bool) (*Guard
 	return g, ap.Addr().String(), ap.Port(), signer.PublicKey()
 }
 
+// chainKI: n rondas con éxito parcial y la siguiente (n+1) entra; n<0 es un equipo que siempre pide otra.
+func chainKI(n int) *ssh.ServerConfig {
+	var cb func(left int) func(ssh.ConnMetadata, ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error)
+	cb = func(left int) func(ssh.ConnMetadata, ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+		return func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			if _, err := ch("", "paso", []string{"Código: "}, []bool{true}); err != nil {
+				return nil, err
+			}
+			if left == 0 {
+				return nil, nil
+			}
+			return nil, &ssh.PartialSuccessError{Next: ssh.ServerAuthCallbacks{KeyboardInteractiveCallback: cb(left - 1)}}
+		}
+	}
+	return &ssh.ServerConfig{KeyboardInteractiveCallback: cb(n)}
+}
+
+func TestAskParcialNoCuentaComoFallo(t *testing.T) {
+	g, host, port, hk := rawServer(t, chainKI(3)) // 3 parciales y la cuarta entra: contarlos como fallos abortaría a la tercera
+	rounds := 0
+	s, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(_ context.Context, p Prompt) ([][]byte, error) {
+		rounds++
+		if p.Attempt != 1 {
+			t.Errorf("ronda %d: Attempt = %d", rounds, p.Attempt)
+		}
+		return [][]byte{[]byte("1")}, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if rounds != 4 {
+		t.Fatalf("rondas = %d", rounds)
+	}
+}
+
+func TestAskTopeDeRondas(t *testing.T) {
+	g, host, port, hk := rawServer(t, chainKI(1000)) // siempre pide otra: x/crypto lo dejaría llegar a 64
+	rounds := 0
+	_, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(context.Context, Prompt) ([][]byte, error) {
+		rounds++
+		return [][]byte{[]byte("1")}, nil
+	}})
+	if !errors.Is(err, ErrAuthRounds) || rounds != 10 {
+		t.Fatalf("err = %v, rondas = %d", err, rounds)
+	}
+}
+
+// Un equipo que calla tras recibir la respuesta muere por HandshakeTimeout: el plazo se repone al volver Ask.
+func TestAskReponeElPlazo(t *testing.T) {
+	quiet := make(chan struct{})
+	t.Cleanup(func() { close(quiet) })
+	g, host, port, hk := rawServer(t, &ssh.ServerConfig{KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+		if _, err := ch("", "", []string{"x: "}, []bool{false}); err != nil {
+			return nil, err
+		}
+		<-quiet
+		return nil, errors.New("tarde")
+	}})
+	done := make(chan error, 1)
+	go func() {
+		_, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{HandshakeTimeout: 300 * time.Millisecond, Ask: func(context.Context, Prompt) ([][]byte, error) {
+			time.Sleep(500 * time.Millisecond) // pasa el plazo mientras espera
+			return [][]byte{[]byte("a")}, nil
+		}})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("debió fallar por plazo")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("el handshake no cortó: el plazo no se repuso")
+	}
+}
+
+// Con password y keyboard-interactive a la vez se usa keyboard-interactive.
+func TestAskPrefiereKeyboardInteractive(t *testing.T) {
+	var pwUsed atomic.Bool
+	g, host, port, hk := rawServer(t, &ssh.ServerConfig{
+		PasswordCallback: func(ssh.ConnMetadata, []byte) (*ssh.Permissions, error) { pwUsed.Store(true); return nil, nil },
+		KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			_, err := ch("KI", "", []string{"Código: "}, []bool{true})
+			return nil, err
+		}})
+	var got Prompt
+	s, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(_ context.Context, p Prompt) ([][]byte, error) {
+		got = p
+		return [][]byte{[]byte("1")}, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Close()
+	if got.Name != "KI" || pwUsed.Load() {
+		t.Fatalf("prompt = %+v, password usado = %v", got, pwUsed.Load())
+	}
+}
+
 func TestAskSanea(t *testing.T) {
 	run := func(name, ins string, qs []string, answers func(n int) [][]byte) (Prompt, error) {
 		echos := make([]bool, len(qs))
 		g, host, port, hk := kiServer(t, name, ins, qs, echos)
 		var got Prompt
-		s, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(p Prompt) ([][]byte, error) {
+		s, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(_ context.Context, p Prompt) ([][]byte, error) {
 			got = p
 			return answers(len(p.Questions)), nil
 		}})
@@ -293,7 +410,7 @@ func TestAskSanea(t *testing.T) {
 		}
 		return a
 	}
-	p, err := run("\x1b[31mM\u202eFA\x00", "uno\n\x1b]0;t\x07d\u200bos\r\u0085", []string{"Pass\x1b[2J\u2066word: \n"}, one)
+	p, err := run("\x1b[31mM\u202eF\u2028A\x00", "uno\u2029\n\x1b]0;t\x07d\u200bos\r\u0085", []string{"Pass\x1b[2J\u2066\u2028word: \n"}, one)
 	if err != nil {
 		t.Fatal(err)
 	}

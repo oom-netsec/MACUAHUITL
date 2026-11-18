@@ -29,8 +29,9 @@ type Question struct {
 
 var (
 	ErrTypedMixed    error = i18n.New("transport.err.typed_mixed", nil)
-	ErrNoCredential  error = i18n.New("transport.err.no_credential", nil)
-	ErrAuthAttempts  error = i18n.New("transport.err.auth_attempts", nil)
+	ErrNoCredential  error = i18n.Wrap("transport.err.no_credential", ErrAuth, nil) // envuelve ErrAuth: los clasificadores la tratan como antes una credencial vacía
+	ErrAuthAttempts  error = i18n.Wrap("transport.err.auth_attempts", ErrAuth, nil)
+	ErrAuthRounds    error = i18n.Wrap("transport.err.auth_rounds", ErrAuth, nil)
 	ErrTypedNoMethod error = i18n.New("transport.err.typed_no_method", nil)
 	ErrTypedPrompt   error = i18n.New("transport.err.typed_prompt", nil)
 )
@@ -38,6 +39,7 @@ var (
 // Topes del texto del equipo y de las respuestas: un equipo hostil no inunda la terminal ni la memoria.
 const (
 	maxAskAttempts = 3
+	maxAskRounds   = 10 // fallos y éxitos parciales juntos: x/crypto deja llegar a 64
 	maxPromptName  = 128
 	maxPromptInstr = 1024
 	maxPromptText  = 256
@@ -86,6 +88,9 @@ func saneaPrompt(name, ins string, qs []string, echos []bool, attempt int) (p Pr
 	return p, nil
 }
 
+// lateWiped es un gancho de pruebas: avisa que se borró una respuesta que llegó con el ctx ya cancelado.
+var lateWiped func()
+
 type askRes struct {
 	ans [][]byte
 	err error
@@ -105,11 +110,14 @@ func askAuth(ctx context.Context, conn net.Conn, host, user string, o SSHOptions
 		conn.SetDeadline(time.Time{})
 		res, abandon := make(chan askRes), make(chan struct{})
 		go func() { // si el ctx gana, la goroutine pone en ceros lo que Ask devuelva tarde
-			a, err := o.Ask(p)
+			a, err := o.Ask(ctx, p)
 			select {
 			case res <- askRes{a, err}:
 			case <-abandon:
 				wipe(a)
+				if lateWiped != nil {
+					lateWiped()
+				}
 			}
 		}()
 		var r askRes
@@ -153,7 +161,12 @@ func askAuth(ctx context.Context, conn net.Conn, host, user string, o SSHOptions
 		if fails >= maxAskAttempts {
 			return nil, ErrAuthAttempts
 		}
+		if fails+len(c.PartialSuccessMethods) >= maxAskRounds { // un equipo que siempre da éxito parcial no nos hace preguntar sin fin
+			return nil, ErrAuthRounds
+		}
 		attempt := fails + 1
+		// Un keyboard-interactive que el equipo rechaza con FAILURE sin INFO_REQUEST no llama al challenge (Ask no ve esa
+		// ronda), pero x/crypto lo anota en TriedMethods: cuenta como fallo igual, y así no hay bucle sin preguntar.
 		switch {
 		case slices.Contains(c.AllowedMethods, methodKbdInter):
 			return ssh.KeyboardInteractive(func(name, ins string, qs []string, echos []bool) ([]string, error) {

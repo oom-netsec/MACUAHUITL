@@ -9,6 +9,7 @@ func init() {
 		"transport.err.typed_mixed":     e("transport: una credencial tecleada no se mezcla con una guardada", "transport: a typed credential cannot be mixed with a stored one"),
 		"transport.err.no_credential":   e("transport: la credencial no trae contraseña ni llave", "transport: the credential has neither a password nor a key"),
 		"transport.err.auth_attempts":   e("transport: autenticación rechazada tras 3 intentos", "transport: authentication rejected after 3 attempts"),
+		"transport.err.auth_rounds":     e("transport: el equipo pidió demasiadas rondas de autenticación", "transport: the device asked for too many authentication rounds"),
 		"transport.err.typed_no_method": e("transport: el equipo no ofrece password ni keyboard-interactive", "transport: the device offers neither password nor keyboard-interactive"),
 		"transport.err.typed_prompt":    e("transport: el equipo mandó preguntas inválidas o desmedidas", "transport: the device sent invalid or oversized prompts"),
 		"transport.err.no_shell":        e("transport: sin shell abierto", "transport: no shell is open"),

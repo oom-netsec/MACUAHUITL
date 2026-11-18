@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
 
@@ -29,6 +30,28 @@ func TestFallbackNeverDuringLoginTest(t *testing.T) {
 	e.d.PrimaryVerified = map[string]bool{hostport(e.spec.Targets[0]): true}
 	if r := LoginTest(context.Background(), e.d, "j", e.spec, false, nil); r[0].FailedStep != "auth" {
 		t.Fatalf("login test used the fallback: %+v", r)
+	}
+}
+
+// Una credencial vacía (sin contraseña ni llave) ya no marca al equipo, pero sigue siendo un rechazo de credencial: paso «auth»
+// y, con la principal verificada, prueba el respaldo en el trabajo.
+func TestCredencialVaciaEsAuth(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	good := e.spec.DefaultCredentialID
+	empty, err := e.d.Vault.Put(vault.Credential{Username: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.spec.DefaultCredentialID = empty
+	e.spec.Overrides = []Override{{DeviceID: "sw1", FallbackCredentialID: good}}
+	e.d.PrimaryVerified = map[string]bool{hostport(e.spec.Targets[0]): true}
+	if r := LoginTest(context.Background(), e.d, "j", e.spec, false, nil); r[0].FailedStep != "auth" {
+		t.Fatalf("login test: %+v", r)
+	}
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	if res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {}); res.State != "completed" {
+		t.Fatalf("el respaldo no se probó: %+v", res)
 	}
 }
 

@@ -33,9 +33,10 @@ type SSHOptions struct {
 	OnLegacy func(negotiated string)
 	// GenericHost: la conexión es del terminal a un host linux o windows. Solo así se acepta una credencial de solo llave (fase 44, regla 7b).
 	GenericHost bool
-	// Ask pide las respuestas al usuario cuando no hay credencial guardada (modo tecleado, fase 47t). Debe volver al cancelarse el
-	// ctx; las respuestas se ponen en ceros al usarlas. Con Ask la credencial no puede traer contraseña ni llave.
-	Ask func(Prompt) ([][]byte, error)
+	// Ask pide las respuestas al usuario cuando no hay credencial guardada (modo tecleado, fase 47t). Recibe el ctx del
+	// handshake y debe volver al cancelarse; las respuestas se ponen en ceros al usarlas. Con Ask la credencial no puede
+	// traer contraseña ni llave.
+	Ask func(context.Context, Prompt) ([][]byte, error)
 }
 
 // Algoritmos que solo negocian equipos viejos; se activan por perfil (spec §3).
