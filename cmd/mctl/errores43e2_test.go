@@ -90,7 +90,7 @@ func TestTransferCarpetaInexistenteSinLlamadaCruda(t *testing.T) {
 				t.Errorf("%q contiene %q", err, bad)
 			}
 		}
-		if !strings.Contains(err.Error(), "no such file or directory") {
+		if !strings.Contains(err.Error(), "no such file or directory") && !strings.Contains(err.Error(), "cannot find the file specified") { // la causa en Linux y en Windows
 			t.Errorf("falta la causa: %q", err)
 		}
 	}
