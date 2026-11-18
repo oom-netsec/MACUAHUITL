@@ -1,10 +1,12 @@
 import { useId } from "react";
 
 // Control segmentado tipo iOS sobre radios nativos: las flechas del teclado funcionan sin código.
-export function Segmented<T extends string>({ legend, value, onChange, options, disabled }: { legend: string; value: T; onChange: (v: T) => void; options: [T, string][]; disabled?: boolean }) {
+export function Segmented<T extends string>({ legend, value, onChange, options, disabled, hint }: { legend: string; value: T; onChange: (v: T) => void; options: [T, string][]; disabled?: boolean; hint?: string }) {
   const name = useId();
+  const hintId = useId();
   return (
-    <fieldset className="segmented">
+    <>
+    <fieldset className="segmented" aria-describedby={hint ? hintId : undefined}>
       <legend className="sr">{legend}</legend>
       {options.map(([v, l]) => (
         <label key={v}>
@@ -13,5 +15,7 @@ export function Segmented<T extends string>({ legend, value, onChange, options, 
         </label>
       ))}
     </fieldset>
+    {hint && <p className="hint" id={hintId}>{hint}</p>}
+    </>
   );
 }

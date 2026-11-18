@@ -387,3 +387,43 @@ test("snmp: consulta puntual y sondeo continuo se alternan sin perder lo escrito
   expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled();
 });
+
+async function snmpReady(core: ReturnType<typeof fakeCore>) {
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
+  await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
+  await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
+}
+
+test("snmp: si el sondeo tarda en arrancar y se pasa a consulta puntual, Detener no se desmonta", async () => {
+  let resolve!: (id: string) => void;
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(() => new Promise<string>((r) => { resolve = r; })) });
+  await snmpReady(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Consulta puntual" })); // aún sin runId
+  await act(async () => resolve("p1"));
+  expect(screen.getByRole("radio", { name: "Sondeo continuo" })).toBeChecked();
+  expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled();
+  expect(screen.queryByLabelText(/OID/)).toBeNull();
+  expect(screen.getByText(/Detén el sondeo/)).toBeInTheDocument();
+});
+
+test.each([["done", undefined], ["done con error", "boom"]])("snmp: el selector se desbloquea con %s", async (_n, error) => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(async () => "p1") });
+  await snmpReady(core);
+  await screen.findByRole("tab", { name: "SNMP · en curso" });
+  expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeDisabled();
+  act(() => core.emitVis("snmp", { runId: "p1", done: true, ...(error ? { error } : {}) }));
+  await waitFor(() => expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeEnabled());
+  await userEvent.click(screen.getByRole("radio", { name: "Consulta puntual" }));
+  expect(screen.getByLabelText(/OID/)).toBeInTheDocument();
+});
+
+test("snmp: el aviso del selector bloqueado lo describe (aria-describedby)", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(async () => "p1") });
+  await snmpReady(core);
+  await screen.findByRole("tab", { name: "SNMP · en curso" });
+  expect(screen.getAllByRole("group").find((g) => g.classList.contains("segmented"))).toHaveAccessibleDescription(/Detén el sondeo/);
+});

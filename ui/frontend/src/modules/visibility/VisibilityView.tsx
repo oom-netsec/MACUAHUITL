@@ -195,6 +195,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
   const charted = picked ?? busiest(hist);
   const toggleChart = (name: string) => setPicked(charted.includes(name) ? charted.filter((n) => n !== name) : [...charted, name]);
   const target = (): SnmpTarget => ({ host: host.trim(), port: Number(port) || 161, version, credentialId: cred, auth: version === "3" ? auth : "", priv: version === "3" ? priv : "" });
+  const shown = live.runId ? "poll" : mode; // mientras arranca o corre, la sección del sondeo (y su Detener) no se desmonta
   const snmpNeed = [!host && t("need.target"), !cred && t("need.cred"), !oids && t("need.oids")];
   return (
     <>
@@ -216,10 +217,9 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
         </Advanced>
       </Section>
-      <Segmented legend={t("visibility.snmp.mode")} value={mode} onChange={setMode} disabled={!!live.runId}
+      <Segmented legend={t("visibility.snmp.mode")} value={shown} onChange={setMode} disabled={!!live.runId} hint={live.runId ? t("visibility.snmp.mode.locked") : undefined}
         options={[["query", t("visibility.snmp.mode.query")], ["poll", t("visibility.snmp.mode.poll")]]} />
-      {live.runId && <p className="hint">{t("visibility.snmp.mode.locked")}</p>}
-      {mode === "query" && <Section title={t("visibility.sec.query")}>
+      {shown === "query" && <Section title={t("visibility.sec.query")}>
         <Field label={t("visibility.snmp.oids")} value={oids} onChange={setOids} w="full" mono />
         <Check label={t("visibility.snmp.bulk")} checked={bulk} onChange={setBulk} />
         <div className="actions">
@@ -228,7 +228,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
         </div>
         <Report r={r} />
       </Section>}
-      {mode === "poll" && <Section title={t("visibility.snmp.poll")}>
+      {shown === "poll" && <Section title={t("visibility.snmp.poll")}>
         <div className="cols">
           {profiles.map(([k, l]) => <Check key={k} label={t(l)} checked={!!prof[k]} onChange={(v) => setProf({ ...prof, [k]: v })} />)}
         </div>
