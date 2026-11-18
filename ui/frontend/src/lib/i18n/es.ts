@@ -3042,6 +3042,7 @@ export const es = {
   "common.advanced": "Opciones avanzadas",
   "common.advanced.changed": "{label} · cambiadas: {n}",
   "security.csr.subject": "Datos del sujeto",
+  "backup.restore.maxLines.bad": "Entre 0 y 1000 (0 = sin tope).",
 };
 
 export type Key = keyof typeof es;

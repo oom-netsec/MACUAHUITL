@@ -324,6 +324,12 @@ test("radius: atributos y accounting van plegados, cuentan los cambios y Status-
   await userEvent.selectOptions(screen.getByLabelText("Método"), "chap");
   await userEvent.type(screen.getByLabelText("NAS-IP-Address"), "1.1.1.1");
   expect(summaryOf(screen.getByLabelText("Método"))).toHaveTextContent("Atributos RADIUS · cambiadas: 2");
+  await userEvent.click(screen.getByLabelText(/Accounting/)); // accounting: +1, y su puerto cuenta solo mientras esté activo
+  await userEvent.clear(screen.getByLabelText(/Puerto de accounting/));
+  await userEvent.type(screen.getByLabelText(/Puerto de accounting/), "1814");
+  expect(summaryOf(screen.getByLabelText("Método"))).toHaveTextContent("Atributos RADIUS · cambiadas: 4");
+  await userEvent.click(screen.getByLabelText(/Accounting/));
+  expect(summaryOf(screen.getByLabelText("Método"))).toHaveTextContent("Atributos RADIUS · cambiadas: 2");
   await userEvent.click(screen.getByLabelText(/Solo Status-Server/));
   expect(screen.queryByLabelText("Método")).not.toBeInTheDocument();
 });

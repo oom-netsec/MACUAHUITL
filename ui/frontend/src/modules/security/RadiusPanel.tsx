@@ -50,7 +50,7 @@ export function RadiusPanel({ core }: { core: CoreAPI }) {
       </Section>
       {s.view(!f.statusServer)}
       {!f.statusServer && (
-        <Advanced label={t("security.sec.attrs")} changed={attrKeys.filter((k) => f[k] !== initial[k]).length}>
+        <Advanced label={t("security.sec.attrs")} changed={attrKeys.filter((k) => (k !== "acctPort" || f.accounting) && f[k] !== initial[k]).length}>
           <div className="field-row">
             <Select label={t("security.method")} value={f.method} onChange={set("method")} options={[["pap", "PAP"], ["chap", "CHAP"], ["mschapv2", "MS-CHAPv2"]]} w="md" />
             <Select label="NAS-Port-Type" value={f.portType} onChange={set("portType")} options={portTypes(t("security.noSend"))} w="md" />

@@ -3043,4 +3043,5 @@ export const en: Record<Key, string> = {
   "common.advanced": "Advanced options",
   "common.advanced.changed": "{label} · changed: {n}",
   "security.csr.subject": "Subject details",
+  "backup.restore.maxLines.bad": "Between 0 and 1000 (0 = no limit).",
 };

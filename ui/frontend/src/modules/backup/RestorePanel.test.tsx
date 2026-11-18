@@ -101,3 +101,13 @@ test("tope y plan parcial van plegados y cuentan los cambios; la interfaz de ges
   expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
   expect(det.open).toBe(false);
 });
+
+test("un tope de líneas fuera de rango abre Avanzado y dice por qué no se puede planear", async () => {
+  await open();
+  const det = screen.getByLabelText("Tope de líneas de cambio").closest("details")!;
+  await userEvent.clear(screen.getByLabelText("Tope de líneas de cambio"));
+  await userEvent.type(screen.getByLabelText("Tope de líneas de cambio"), "2000");
+  expect(det.open).toBe(true);
+  expect(screen.getByLabelText("Tope de líneas de cambio")).toHaveAccessibleDescription(/Entre 0 y 1000/);
+  expect(planBtn()).toBeDisabled();
+});

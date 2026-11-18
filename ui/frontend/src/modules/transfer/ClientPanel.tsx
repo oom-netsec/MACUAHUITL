@@ -115,7 +115,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
       ) : (
         <PathField label={t("transfer.src")} error={shown("src")} value={f.src} onChange={(src) => set({ src })} pick={() => core.pickPath({ title: t("transfer.src") })} />
       )}
-      <Advanced forceOpen={tried && Object.keys(errors).some((k) => advancedKeys.includes(k))}>
+      <Advanced forceOpen={tried && Object.keys(errors).some((k) => advancedKeys.includes(k)) ? failed : 0}>
         <div onPaste={(e) => { if (apply(e.clipboardData.getData("text"))) e.preventDefault(); }} onBlur={(e) => apply((e.target as HTMLInputElement).value)}>
           <Field label={t("transfer.paste")} hint={t("transfer.paste.hint")} error={pasteErr} value={paste} onChange={setPaste} w="full" mono />
         </div>

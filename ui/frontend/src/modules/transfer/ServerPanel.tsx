@@ -165,14 +165,14 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const ssh = proto === "scp" || proto === "sftp";
   const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
   const missing = (!any && !listen) || (!write && !fromDir && splitList(files).length === 0); // datos requeridos; el resto lo explica serveProblem al abrir
-  const [bad, setBad] = useState<Key | null>(null); // última razón de validación: si cae en Avanzado, se abre
+  const [bad, setBad] = useState<{ k: Key | null; n: number }>({ k: null, n: 0 }); // última razón de validación y nº de intento: si cae en Avanzado, se abre (también al repetir)
   // Con TFTP + recibir la lista de IP es obligatoria: se queda a la vista, fuera de Avanzado.
   const allowVisible = write && proto === "tftp";
   const allowField = <Field label={t("transfer.allow")} hint={t("transfer.allow.hint")} value={allow} onChange={setAllow} />;
   const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otro servidor
   const start = async () => {
     const p = serveProblem(form);
-    setBad(p);
+    setBad((b) => ({ k: p, n: b.n + 1 }));
     if (p) { setErr(t(p)); return; }
     setErr(""); clearLoadErr();
     const host = any ? "0.0.0.0" : listen;
@@ -207,7 +207,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
         {allowVisible && allowField}
-        <Advanced changed={[port !== portFor(proto), minutes !== "30", any, !allowVisible && allow.trim() !== ""].filter(Boolean).length} forceOpen={!!bad && advKeys.includes(bad)}>
+        <Advanced changed={[port !== portFor(proto), minutes !== "30", any, !allowVisible && allow.trim() !== ""].filter(Boolean).length} forceOpen={bad.k && advKeys.includes(bad.k) && !(allowVisible && bad.k === "transfer.err.allow") ? bad.n : 0}>
           <div className="field-row">
             <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />
             <Field label={t("transfer.minutes")} type="number" value={minutes} onChange={setMinutes} w="sm" />
