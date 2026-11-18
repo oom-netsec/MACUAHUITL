@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
@@ -283,6 +286,9 @@ func TestUsernameConCredencialRechaza(t *testing.T) {
 		"salto":          {r.typed("ad\nmin"), "terminal.err.username"},
 		"utf8":           {r.typed("ad\xffmin"), "terminal.err.username"},
 		"largo":          {r.typed(strings.Repeat("a", 129)), "terminal.err.username"},
+		"formato":        {r.typed("ad\u200bmin"), "terminal.err.username"},
+		"bidi":           {r.typed("ad\u202emin"), "terminal.err.username"},
+		"c1":             {r.typed("ad\u0085min"), "terminal.err.username"},
 	} {
 		_, done, cancel := r.session(tc.o)
 		err := wait(t, done)
@@ -317,4 +323,271 @@ func TestTecleadaHuellaNueva(t *testing.T) {
 	}
 	r.cerrada("terminal.failed", "unknown host key")
 	_ = transport.ErrAuth
+}
+
+func capturaLog(t *testing.T) *bytes.Buffer {
+	var logs bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+	return &logs
+}
+
+// Más caminos de la marca: data durante la autenticación, respuestas rechazadas, «login as:» inválido y timeout.
+func TestTecleadaNoFiltraOtrosCaminos(t *testing.T) {
+	const marca = "MARCA-OTROS-77c"
+	logs := capturaLog(t)
+	t.Run("data", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		p, _ := st.prompt(t)
+		st.data(marca)
+		st.answer(p.Seq, "pw", otp)
+		st.waitFor(t, "SW1>")
+		st.data("show version\r")
+		st.waitFor(t, "Cisco")
+		close(st.in)
+		wait(t, done)
+		buscaMarca(t, r, marca, logs.String())
+	})
+	for name, f := range map[string]func(st *fakeStream, seq uint32){
+		"seq":      func(st *fakeStream, seq uint32) { st.answer(seq+1, marca, marca) },
+		"cantidad": func(st *fakeStream, seq uint32) { st.answer(seq, marca) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newRig(t, simulator.Config{OTP: otp})
+			st, done, cancel := r.session(r.typed("admin"))
+			defer cancel()
+			p, _ := st.prompt(t)
+			f(st, p.Seq)
+			if err := wait(t, done); err == nil || strings.Contains(err.Error(), marca) {
+				t.Fatalf("err = %v", err)
+			}
+			buscaMarca(t, r, marca, logs.String())
+		})
+	}
+	t.Run("login", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed(""))
+		defer cancel()
+		p, _ := st.prompt(t)
+		st.answer(p.Seq, marca+"\x00")
+		err := wait(t, done)
+		if reason(t, err) != "terminal.err.username" || strings.Contains(err.Error(), marca) {
+			t.Fatalf("err = %v", err)
+		}
+		buscaMarca(t, r, marca, logs.String())
+	})
+	t.Run("timeout", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		r.svc.authWait = 200 * time.Millisecond
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		st.prompt(t)
+		st.data(marca)
+		if err := wait(t, done); reason(t, err) != "terminal.err.auth_timeout" {
+			t.Fatalf("err = %v", err)
+		}
+		buscaMarca(t, r, marca, logs.String())
+	})
+}
+
+// Una respuesta que llega antes de su pregunta no se acepta aunque traiga el seq esperado.
+func TestTecleadaRespuestaAdelantada(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	st, done, cancel := r.session(r.typed("admin"))
+	defer cancel()
+	p, _ := st.prompt(t)
+	st.answer(p.Seq, "pw", "000000") // mala: el equipo la rechaza y vuelve a preguntar
+	st.answer(p.Seq+1, "pw", otp)    // buena, pero adelantada: la siguiente pregunta aún no existe
+	for len(st.in) > 0 {             // el Recv ya la tiene en la mano
+		time.Sleep(time.Millisecond)
+	}
+	p2, _ := st.prompt(t)
+	if p2.Seq != p.Seq+1 {
+		t.Fatalf("seq = %d", p2.Seq)
+	}
+	select {
+	case m := <-st.out:
+		t.Fatalf("aceptó la respuesta adelantada: %+v", m)
+	case err := <-done:
+		t.Fatalf("terminó: %v", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	st.answer(p2.Seq, "pw", otp)
+	st.waitFor(t, "SW1>")
+	close(st.in)
+	wait(t, done)
+}
+
+func ceros(b []byte) bool {
+	for _, c := range b {
+		if c != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func rawAnswer(seq uint32, ans ...[]byte) *v1.OpenTerminalRequest {
+	return &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_AuthAnswer{AuthAnswer: &v1.AuthAnswer{Seq: seq, Answers: ans}}}
+}
+
+// Toda respuesta ignorada se pone en ceros: la rechazada, la que llega tarde y la que queda en la mano del Recv al cancelar.
+func TestTecleadaIgnoradasEnCeros(t *testing.T) {
+	t.Run("rechazada", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		p, _ := st.prompt(t)
+		b := []byte("secreto-rechazado")
+		st.in <- rawAnswer(p.Seq+1, b, b)
+		wait(t, done)
+		if !ceros(b) {
+			t.Errorf("sin borrar: %q", b)
+		}
+	})
+	t.Run("tarde", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		p, _ := st.prompt(t)
+		st.answer(p.Seq, "pw", otp)
+		st.waitFor(t, "SW1>")
+		b := []byte("secreto-tarde")
+		st.in <- rawAnswer(p.Seq, b)
+		for len(st.in) > 0 {
+			time.Sleep(time.Millisecond)
+		}
+		time.Sleep(50 * time.Millisecond)
+		close(st.in)
+		wait(t, done)
+		if !ceros(b) {
+			t.Errorf("sin borrar: %q", b)
+		}
+	})
+	t.Run("en la mano del Recv", func(t *testing.T) {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		p, _ := st.prompt(t)
+		a, b := []byte("uno"), []byte("secreto-en-mano")
+		st.in <- rawAnswer(p.Seq+1, a, a) // la primera se rechaza y cierra
+		st.in <- rawAnswer(p.Seq, b)      // la segunda queda en la mano del Recv
+		wait(t, done)
+		for i := 0; i < 100 && !ceros(b); i++ {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if !ceros(b) {
+			t.Errorf("sin borrar: %q", b)
+		}
+	})
+}
+
+func TestTecleadaRespuestaGrande(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	st, done, cancel := r.session(r.typed("admin"))
+	defer cancel()
+	p, _ := st.prompt(t)
+	st.answer(p.Seq, "pw", strings.Repeat("9", 1025))
+	err := wait(t, done)
+	if status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.auth_answer" {
+		t.Fatalf("err = %v (%s)", err, reason(t, err))
+	}
+}
+
+func TestTecleadaUsuarioConEspaciosYFormatoEnLogin(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	st, done, cancel := r.session(r.typed("  admin \t"))
+	defer cancel()
+	p, _ := st.prompt(t)
+	st.answer(p.Seq, "pw", otp)
+	if f := <-st.out; f.Opened != "admin@"+r.host+":"+strconv.Itoa(int(r.port)) {
+		t.Fatalf("opened = %q", f.Opened)
+	}
+	close(st.in)
+	wait(t, done)
+	for name, u := range map[string]string{"formato": "ad\u200bmin", "bidi": "ad\u202emin", "c1": "ad\u0085min", "largo": strings.Repeat("a", 129), "vacío": "  "} {
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed(""))
+		p, _ := st.prompt(t)
+		st.answer(p.Seq, u)
+		if err := wait(t, done); status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.username" {
+			t.Errorf("%s: %v", name, err)
+		}
+		cancel()
+	}
+}
+
+func TestTecleadaSinMetodo(t *testing.T) {
+	_, pub, err := servicetest.New(t).CreateVault().GenerateKey("k", "k") // el equipo solo ofrece publickey
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := newRig(t, simulator.Config{NoPassword: true, AuthorizedKeys: simulator.Keys(simulator.ParseAuthorizedKey(t, pub.AuthorizedKey()))})
+	st, done, cancel := r.session(r.typed("admin"))
+	defer cancel()
+	err = wait(t, done)
+	if status.Code(err) != codes.FailedPrecondition || reason(t, err) != "terminal.err.auth_no_method" {
+		t.Fatalf("err = %v (%s)", err, reason(t, err))
+	}
+	r.cerrada("terminal.failed", "offers neither password nor keyboard-interactive")
+	_ = st
+}
+
+func TestTecleadaResizeDuranteAutenticacion(t *testing.T) {
+	var mu sync.Mutex
+	var got [2]uint32
+	r := newRig(t, simulator.Config{OTP: otp, OnPtySize: func(c, rw uint32) { mu.Lock(); got = [2]uint32{c, rw}; mu.Unlock() }})
+	st, done, cancel := r.session(r.typed("admin"))
+	defer cancel()
+	p, _ := st.prompt(t)
+	st.in <- &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Resize{Resize: &v1.TerminalSize{Rows: 40, Cols: 120}}}
+	st.answer(p.Seq, "pw", otp)
+	st.waitFor(t, "SW1>")
+	close(st.in)
+	wait(t, done)
+	mu.Lock()
+	defer mu.Unlock()
+	if got != [2]uint32{120, 40} {
+		t.Errorf("pty = %v, quería 120x40", got)
+	}
+}
+
+func TestTecleadaTextosEnIngles(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	st, done, cancel := r.sessionCtx(i18n.WithLocale(context.Background(), "en"), r.typed(""))
+	defer cancel()
+	p, _ := st.prompt(t)
+	if p.Prompts[0].Text != "login as: " {
+		t.Fatalf("login = %q", p.Prompts[0].Text)
+	}
+	st.answer(p.Seq, "admin")
+	p, _ = st.prompt(t)
+	st.answer(p.Seq, "pw", "000000")
+	_, data := st.prompt(t)
+	if !strings.Contains(data, "Access denied\r\n") {
+		t.Errorf("data = %q", data)
+	}
+	cancel()
+	wait(t, done)
+}
+
+func TestTecleadaCancelarEnLoginAs(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	base := runtime.NumGoroutine()
+	st, done, cancel := r.session(r.typed(""))
+	defer cancel()
+	st.prompt(t)
+	t0 := time.Now()
+	cancel()
+	wait(t, done)
+	if time.Since(t0) > 2*time.Second {
+		t.Error("tardó")
+	}
+	r.cerrada("terminal.failed", "client disconnected")
+	if !goroutinesAt(base) {
+		t.Fatalf("goroutines %d > base %d", runtime.NumGoroutine(), base)
+	}
 }

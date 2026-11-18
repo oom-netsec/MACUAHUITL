@@ -314,3 +314,14 @@ func TestOrdenEnHostNoGenericoSeRechaza(t *testing.T) {
 	cancel()
 	h.nada(err, codes.FailedPrecondition, "terminal.err.startup_changed")
 }
+
+func TestHostConUsernameRechaza(t *testing.T) {
+	h := newHRig(t)
+	h.addHost("h1", "linux", h.host, h.keyID, "")
+	o := h.open("h1", "", true)
+	o.Username = "root"
+	_, done, cancel := h.session(o)
+	err := wait(t, done)
+	cancel()
+	h.nada(err, codes.InvalidArgument, "terminal.err.username_with_credential")
+}

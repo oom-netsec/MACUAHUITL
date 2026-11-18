@@ -37,8 +37,17 @@ import (
 const (
 	maxSessions = 8
 	closeWait   = 15 * time.Second
-	maxUser     = 128 // bytes del usuario tecleado
+	maxUser     = 128  // bytes del usuario tecleado
+	maxAnswer   = 1024 // bytes de cada respuesta tecleada: el mismo tope del transport
 )
+
+// wipeMsg pone en ceros lo que un mensaje ignorado pudiera traer: respuestas de autenticación y data.
+func wipeMsg(m *v1.OpenTerminalRequest) {
+	for _, b := range m.GetAuthAnswer().GetAnswers() {
+		clear(b)
+	}
+	clear(m.GetData())
+}
 
 // Motivos propios de la autenticación tecleada (fase 47t). Ninguno lleva respuestas ni textos de preguntas.
 var (
@@ -51,17 +60,19 @@ var (
 	errCoreClosing = i18n.New("terminal.err.core_closing", nil)
 )
 
-// validUser: UTF-8 imprimible, sin controles ni saltos, de 1 a maxUser bytes.
-func validUser(u string) bool {
+// cleanUser recorta espacios y valida el usuario (el de la petición y el de «login as:» pasan por aquí): UTF-8
+// imprimible, sin controles, C1 ni Unicode de formato, de 1 a maxUser bytes.
+func cleanUser(u string) (string, bool) {
+	u = strings.TrimSpace(u)
 	if u == "" || len(u) > maxUser || !utf8.ValidString(u) {
-		return false
+		return "", false
 	}
 	for _, r := range u {
 		if !unicode.IsPrint(r) {
-			return false
+			return "", false
 		}
 	}
-	return true
+	return u, true
 }
 
 type termSvc struct {
@@ -164,8 +175,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		address, credID, startup string
 		port                     uint16
 		label                    = o.Name
-		typed                    bool // fase 47t: credencial tecleada
-		generic                  bool // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
+		username                 string // modo tecleado: el de la petición, ya recortado y validado
+		typed                    bool   // fase 47t: credencial tecleada
+		generic                  bool   // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
 	)
 	if o.HostId != "" {
 		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
@@ -206,8 +218,11 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if o.CredentialId != "" && o.Username != "" {
 			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username_with_credential", nil)
 		}
-		if o.Username != "" && !validUser(o.Username) {
-			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username", nil)
+		if o.Username != "" {
+			var ok bool
+			if username, ok = cleanUser(o.Username); !ok && strings.TrimSpace(o.Username) != "" {
+				return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username", nil)
+			}
 		}
 		typed = o.CredentialId == "" // sin credencial: las respuestas se piden por el stream y no se usa la bóveda
 		address, credID, port = o.Address, o.CredentialId, uint16(o.Port)
@@ -270,7 +285,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		reasonEN   = "could not open" // lo mismo que reason, en inglés, para la auditoría
 		rx, tx     atomic.Int64
 		recordPath string
-		user       = o.Username // en modo tecleado, el de la petición o el de «login as:»
+		user       = username // en modo tecleado, el de la petición o el de «login as:»
 	)
 	defer func() {
 		if sess != nil {
@@ -307,6 +322,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			select {
 			case msgs <- m:
 			case <-ctx.Done():
+				wipeMsg(m) // nadie la va a leer
 				return
 			}
 		}
@@ -334,6 +350,20 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 				askErr = err
 			}
 		}()
+		for drained := false; !drained; { // una respuesta que llegó antes de esta pregunta no es de ella: se vacía y se borra
+			select {
+			case m, ok := <-msgs:
+				if !ok {
+					return nil, errClientGone
+				}
+				if rz := m.GetResize(); rz != nil {
+					szRows, szCols = rz.Rows, rz.Cols
+				}
+				wipeMsg(m)
+			default:
+				drained = true
+			}
+		}
 		if p.Attempt > lastAttempt {
 			lastAttempt = p.Attempt
 			if st.Send(&v1.OpenTerminalResponse{Data: []byte(i18n.T(st.Context(), "terminal.auth.denied", nil) + "\r\n")}) != nil {
@@ -361,10 +391,12 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 					szRows, szCols = m.GetResize().Rows, m.GetResize().Cols
 				case m.GetAuthAnswer() != nil:
 					a := m.GetAuthAnswer()
-					if a.Seq != seq || len(a.Answers) != len(p.Questions) {
-						for _, b := range a.Answers {
-							clear(b)
-						}
+					big := false
+					for _, b := range a.Answers {
+						big = big || len(b) > maxAnswer
+					}
+					if a.Seq != seq || len(a.Answers) != len(p.Questions) || big {
+						wipeMsg(m)
 						return nil, errAuthAnswer
 					}
 					return a.Answers, nil
@@ -417,10 +449,10 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 				te, _ := failTyped(err)
 				return te
 			}
-			user = strings.TrimSpace(string(ans[0]))
+			u, ok := cleanUser(string(ans[0]))
 			clear(ans[0])
-			if !validUser(user) {
-				user, askErr = "", errUsername
+			if user = u; !ok {
+				askErr = errUsername
 				te, _ := failTyped(errUsername)
 				return te
 			}
@@ -533,6 +565,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			case m.GetResize() != nil:
 				sz := m.GetResize()
 				sess.Resize(clamp(sz.Rows, 24, 1, 200), clamp(sz.Cols, 200, 20, 500))
+			case m.GetAuthAnswer() != nil: // llegó tarde: no es de nadie
+				wipeMsg(m)
 			case len(m.GetData()) > 0:
 				rec.Input(m.GetData())
 				if n, err := w.Write(m.GetData()); err != nil {

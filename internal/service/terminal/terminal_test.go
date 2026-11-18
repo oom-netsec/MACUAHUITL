@@ -112,7 +112,11 @@ func newRig(t *testing.T, c simulator.Config) *rig {
 
 // session abre la terminal en segundo plano. done recibe el resultado del manejador.
 func (r *rig) session(open *v1.TerminalOpen) (*fakeStream, chan error, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
+	return r.sessionCtx(context.Background(), open)
+}
+
+func (r *rig) sessionCtx(parent context.Context, open *v1.TerminalOpen) (*fakeStream, chan error, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
 	st := newStream(ctx)
 	st.in <- &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: open}}
 	done := make(chan error, 1)

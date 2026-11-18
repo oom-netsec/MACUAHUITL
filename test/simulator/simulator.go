@@ -84,6 +84,8 @@ type Config struct {
 	// OnPty recibe el tipo de terminal de cada pty-req.
 	Conns *atomic.Int32
 	OnPty func(term string)
+	// OnPtySize recibe las columnas y filas de cada pty-req.
+	OnPtySize func(cols, rows uint32)
 }
 
 // FixedHostKey confía en la llave de equipo que devolvió Start (para quien no importa x/crypto/ssh).
@@ -327,6 +329,11 @@ func serve(conn net.Conn, cfg *ssh.ServerConfig, c Config, outputs map[string]st
 					if c.OnPty != nil && len(r.Payload) >= 4 {
 						if n := int(binary.BigEndian.Uint32(r.Payload)); len(r.Payload) >= 4+n {
 							c.OnPty(string(r.Payload[4 : 4+n]))
+						}
+					}
+					if c.OnPtySize != nil && len(r.Payload) >= 4 {
+						if n := int(binary.BigEndian.Uint32(r.Payload)); len(r.Payload) >= 4+n+8 {
+							c.OnPtySize(binary.BigEndian.Uint32(r.Payload[4+n:]), binary.BigEndian.Uint32(r.Payload[8+n:]))
 						}
 					}
 				case "shell":
