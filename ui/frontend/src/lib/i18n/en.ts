@@ -1578,7 +1578,6 @@ export const en: Record<Key, string> = {
   "transfer.proto": "Protocol",
   "transfer.listen": "Listen address",
   "transfer.listen.hint": "Use the IP of the interface facing the device; the server binds only to that IP.",
-  "transfer.any": "Listen on all interfaces (advanced)",
   "transfer.port": "Port",
   "transfer.port.hint": "1 to 65535. The protocol's standard port by default; if the system does not allow opening it, you are told how to allow it.",
   "transfer.minutes": "Duration (minutes)",
@@ -3120,4 +3119,5 @@ export const en: Record<Key, string> = {
   "ssh.auth.said": "The device says:",
   "ssh.auth.sendFail": "The answer could not be sent. If the session is still open, the device will ask again.",
   "ssh.hostKey.ack": "I understand this device's host key changed",
+  "listen.all": "All interfaces (0.0.0.0)",
 };

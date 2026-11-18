@@ -1576,7 +1576,6 @@ export const es = {
   "transfer.proto": "Protocolo",
   "transfer.listen": "IP de escucha",
   "transfer.listen.hint": "La de la interfaz que ve al equipo; la IP queda explícita en la regla del servidor.",
-  "transfer.any": "Escuchar en todas las interfaces (avanzado)",
   "transfer.port": "Puerto",
   "transfer.port.hint": "De 1 a 65535. Por omisión, el puerto estándar del protocolo; si el sistema no deja abrirlo, se explica cómo permitirlo.",
   "transfer.minutes": "Duración (minutos)",
@@ -3119,6 +3118,7 @@ export const es = {
   "ssh.auth.said": "El equipo dice:",
   "ssh.auth.sendFail": "No se pudo enviar la respuesta. Si la sesión sigue abierta, el equipo volverá a preguntar.",
   "ssh.hostKey.ack": "Entiendo que la llave de este equipo cambió",
+  "listen.all": "Todas las interfaces (0.0.0.0)",
 };
 
 export type Key = keyof typeof es;

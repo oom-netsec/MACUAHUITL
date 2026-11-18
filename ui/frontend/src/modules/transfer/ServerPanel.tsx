@@ -2,10 +2,10 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { Segmented } from "../../components/Segmented";
 import { Advanced } from "../../components/Advanced";
-import { useCoreLoad } from "../../lib/useCoreLoad";
+import { ListenField, useLocalIPs } from "../../components/ListenField";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
-import type { CoreAPI, NetInterface } from "../../lib/core";
+import type { CoreAPI } from "../../lib/core";
 import { Badge, EmptyState, ResultPanel, Section } from "../../components/Page";
 import { CopyButton, formatDuration } from "../../components/Data";
 import { useT } from "../../lib/i18n";
@@ -122,7 +122,6 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
 export function ServerPanel({ core }: { core: CoreAPI }) {
   const t = useT();
   const [proto, setProto] = useState<TransferProto>("tftp");
-  const [ifaces, setIfaces] = useState<NetInterface[]>([]);
   const [listen, setListen] = useState("");
   const [port, setPort] = useState(portFor("tftp"));
   const [mode, setMode] = useState<"send" | "recv">("send"); // enviar sirve archivos; recibir deja escribir: cada modo manda solo lo suyo
@@ -141,8 +140,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
-  const [loadErr, clearLoadErr] = useCoreLoad((live) => core.listInterfaces().then((l) => { if (live()) setIfaces(l ?? []); }), [core]);
-  const ips = ifaces.filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as const));
+  const { ips, err: loadErr, clear: clearLoadErr } = useLocalIPs(core);
 
   // Las líneas de todos los servidores pasan a pantalla una vez cada FLUSH_MS, en orden y con tope de 500 por servidor.
   // shortcut: la cola es una sola; si un servidor manda más de 4000 líneas en 100 ms, se pierden las pendientes de otro. Cola por runId si llega a pasar.
@@ -202,8 +200,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       <Section title={t("transfer.form.server")}>
         <div className="field-row">
           <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); if (p === "http") setMode("send"); /* el núcleo no recibe por HTTP */ }} options={protos} w="sm" />
-          {!any && <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} w="md"
-            options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />}
+          <ListenField label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} any={any} onAny={setAny} ips={ips} />
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
         <Segmented legend={t("transfer.mode")} value={mode} onChange={setMode} disabledValues={proto === "http" ? ["recv"] : undefined} hint={proto === "http" ? t("transfer.mode.httpRo") : undefined} options={[["send", t("transfer.mode.send")], ["recv", t("transfer.mode.recv")]]} />
@@ -212,12 +209,11 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
         {allowVisible && allowField}
-        <Advanced changed={[port !== portFor(proto), minutes !== "30", any, !allowVisible && allow.trim() !== ""].filter(Boolean).length} forceOpen={bad.k && advKeys.includes(bad.k) && !(allowVisible && bad.k === "transfer.err.allow") ? bad.n : 0}>
+        <Advanced changed={[port !== portFor(proto), minutes !== "30", !allowVisible && allow.trim() !== ""].filter(Boolean).length} forceOpen={bad.k && advKeys.includes(bad.k) && !(allowVisible && bad.k === "transfer.err.allow") ? bad.n : 0}>
           <div className="field-row">
             <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />
             <Field label={t("transfer.minutes")} type="number" value={minutes} onChange={setMinutes} w="sm" />
           </div>
-          <Check label={t("transfer.any")} checked={any} onChange={setAny} />
           {!allowVisible && allowField}
         </Advanced>
         {any && <Notice kind="warn">{t("transfer.any.warn")}</Notice>}

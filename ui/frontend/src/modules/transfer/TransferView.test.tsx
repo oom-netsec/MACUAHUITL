@@ -341,12 +341,15 @@ test("el envío separa carpeta y nombre del archivo elegido con el diálogo", as
 
 // ---- revisión de seguridad: avisos y opciones nuevas ----
 
-test("0.0.0.0 no se ofrece en la lista; «todas las interfaces» es una opción avanzada que siempre exige la lista de IP", async () => {
+test("0.0.0.0 solo se ofrece como la opción final «Todas las interfaces»; elegirla siempre exige la lista de IP", async () => {
   const core = setup();
   await screen.findByRole("option", { name: /192.0.2.10/ });
-  expect(screen.queryByRole("option", { name: /0\.0\.0\.0/ })).not.toBeInTheDocument();
+  const opts = screen.getAllByRole("option", { name: /0\.0\.0\.0/ });
+  expect(opts).toHaveLength(1);
+  expect(opts[0]).toHaveTextContent("Todas las interfaces (0.0.0.0)");
+  expect(screen.getAllByRole("option").at(-1)).toBe(opts[0]); // la opción final
   await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
-  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "Todas las interfaces (0.0.0.0)");
   expect(screen.getByText(/Cualquier equipo de las redes conectadas/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Para escuchar en todas las interfaces indica las IP permitidas.");
@@ -523,27 +526,30 @@ test("avisos de carpeta del servidor: texto como aviso y orden aparte; sin orden
   expect(within(card).getByText("Otros usuarios pueden escribir en /srv/img.")).toBeInTheDocument();
 });
 
-test("con «todas las interfaces» el selector de IP no se muestra y el envío usa 0.0.0.0", async () => {
+test("con «Todas» no se envía la IP elegida: va 0.0.0.0, y volver a una IP restablece el envío", async () => {
   const core = setup();
   await screen.findByRole("option", { name: /192.0.2.10/ });
-  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
-  expect(screen.queryByLabelText("IP de escucha")).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "Todas las interfaces (0.0.0.0)");
+  expect(screen.getByLabelText("IP de escucha")).toHaveValue("0.0.0.0");
   await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
   await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.5");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   await waitFor(() => expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "0.0.0.0:69", allowAny: true })));
-  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
-  expect(screen.getByLabelText("IP de escucha")).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  expect(screen.queryByText(/Cualquier equipo de las redes conectadas/)).toBeNull(); // el aviso se va con «Todas»
 });
 
-test("servidor: puerto, duración, todas las interfaces e IP permitidas van plegados; cuentan los cambios y un error ahí abre el panel", async () => {
+test("servidor: puerto, duración e IP permitidas van plegados; «Todas» está en el selector, sigue el aviso fuera y un error ahí abre el panel", async () => {
   setup();
   await screen.findByRole("option", { name: /192.0.2.10/ });
   const det = screen.getByLabelText("Puerto").closest("details")!;
   expect(det.open).toBe(false);
-  for (const l of ["Puerto", /Duración/, /Escuchar en todas las interfaces/, /IP permitidas/]) expect(det).toContainElement(screen.getByLabelText(l));
-  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
-  expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
+  for (const l of ["Puerto", /Duración/, /IP permitidas/]) expect(det).toContainElement(screen.getByLabelText(l));
+  expect(det).not.toContainElement(screen.getByLabelText("IP de escucha"));
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "Todas las interfaces (0.0.0.0)");
+  expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas"); // elegir «Todas» ya no cuenta como cambio de Avanzado
+  expect(det.querySelector("summary")).not.toHaveTextContent("cambiadas");
   expect(screen.getByText(/Cualquier equipo de las redes conectadas/)).toBeInTheDocument(); // el aviso sigue fuera
   expect(det).not.toContainElement(screen.getByText(/Cualquier equipo de las redes conectadas/));
   expect(det.open).toBe(false);
