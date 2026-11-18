@@ -337,6 +337,27 @@ func TestAskTopeDeRondas(t *testing.T) {
 	}
 }
 
+// Un equipo que pregunta sin fin dentro de un solo intento: corta a las 30 llamadas a Ask por conexión.
+func TestAskTopeDeLlamadas(t *testing.T) {
+	g, host, port, hk := rawServer(t, &ssh.ServerConfig{KeyboardInteractiveCallback: func(_ ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+		for {
+			if _, err := ch("", "", []string{"otra: "}, []bool{false}); err != nil {
+				return nil, err
+			}
+		}
+	}})
+	calls := 0
+	_, err := OpenSSH(context.Background(), g, "j", host, port, userOnly(), ssh.FixedHostKey(hk), SSHOptions{Ask: func(context.Context, Prompt) ([][]byte, error) {
+		if calls++; calls > 100 {
+			return nil, errors.New("sin tope")
+		}
+		return [][]byte{[]byte("1")}, nil
+	}})
+	if !errors.Is(err, ErrAuthRounds) || calls != 30 {
+		t.Fatalf("err = %v, llamadas = %d", err, calls)
+	}
+}
+
 // Un equipo que calla tras recibir la respuesta muere por HandshakeTimeout: el plazo se repone al volver Ask.
 func TestAskReponeElPlazo(t *testing.T) {
 	quiet := make(chan struct{})

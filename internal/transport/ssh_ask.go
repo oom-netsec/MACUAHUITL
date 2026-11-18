@@ -39,6 +39,7 @@ var (
 // Topes del texto del equipo y de las respuestas: un equipo hostil no inunda la terminal ni la memoria.
 const (
 	maxAskAttempts = 3
+	maxAskCalls    = 30 // llamadas a Ask por conexión, también las rondas dentro de un mismo intento (IOS repregunta 3×3)
 	maxAskRounds   = 10 // fallos y éxitos parciales juntos: x/crypto deja llegar a 64
 	maxPromptName  = 128
 	maxPromptInstr = 1024
@@ -106,7 +107,11 @@ func wipe(ans [][]byte) {
 // El texto del equipo se sanea antes de llegar a Ask. Sin deadline mientras se espera a Ask.
 func askAuth(ctx context.Context, conn net.Conn, host, user string, o SSHOptions) ssh.ClientAuthCallback {
 	var abort error // error de Ask (o saneo) que x/crypto cuenta como fallo; el siguiente callback lo convierte en aborto
+	calls := 0
 	run := func(p Prompt) ([]string, error) {
+		if calls++; calls > maxAskCalls {
+			return nil, ErrAuthRounds
+		}
 		conn.SetDeadline(time.Time{})
 		res, abandon := make(chan askRes), make(chan struct{})
 		go func() { // si el ctx gana, la goroutine pone en ceros lo que Ask devuelva tarde
