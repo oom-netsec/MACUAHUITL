@@ -438,8 +438,8 @@ func (s *ftpSession) retr(name string) {
 
 func (s *ftpSession) stor(name string) {
 	t := Transfer{Proto: "ftp", Dir: "escritura", Client: s.client, File: name, Result: "error"}
-	fail := func(code int, cause, msg string) {
-		s.reply(code, msg)
+	fail := func(code int, cause, msg string, wire ...string) {
+		s.reply(code, append(wire, msg)[0]) // en el cable manda wire (inglés); el registro guarda msg
 		t.Error, t.ReasonT, t.Rejected, t.Cause = msg, lit(msg), true, cause
 		s.c.OnTransfer(t)
 	}
@@ -454,7 +454,7 @@ func (s *ftpSession) stor(name string) {
 	rf, err := s.rcv.create(name, 0)
 	switch {
 	case errors.Is(err, errExists):
-		fail(550, CauseOther, errExists.Error())
+		fail(550, CauseOther, errExists.Error(), errExists.Localize(i18n.En)) // 43e-9: el cable va en inglés
 		return
 	case errors.Is(err, errTooBig), errors.Is(err, errTotal), errors.Is(err, errTooMany):
 		fail(552, CauseOther, err.Error())

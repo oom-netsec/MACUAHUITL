@@ -63,7 +63,7 @@ func TestSeguridadRegresionEs(t *testing.T) {
 		}
 	}
 	ca, _ := c.PkiCaInit(con(t, ""), &v1.PkiCaInitRequest{Name: "Lab CA", KeyPassword: []byte("x")})
-	if !strings.HasPrefix(ca.Report.Text, pki.LabWarning+"\n\ncertificado: CN=Lab CA,OU=Laboratorio - no confiable\n  Emisor           CN=Lab CA") || !strings.Contains(ca.Report.Text, " días)\n") {
+	if !strings.HasPrefix(ca.Report.Text, pki.LabWarning+"\n\ncertificado: CN=Lab CA,OU=Lab - untrusted\n  Emisor           CN=Lab CA") || !strings.Contains(ca.Report.Text, " días)\n") {
 		t.Errorf("pki: %q", ca.Report.Text)
 	}
 }
@@ -217,7 +217,7 @@ func TestPkiEstructuradoYEn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !ca.LabWarning || !strings.HasPrefix(ca.Report.Text, i18n.Msg(i18n.En, "security.pki.lab_warning", nil)+"\n\ncertificate: CN=Lab CA,OU=Laboratorio - no confiable\n  Issuer           CN=Lab CA") ||
+	if !ca.LabWarning || !strings.HasPrefix(ca.Report.Text, i18n.Msg(i18n.En, "security.pki.lab_warning", nil)+"\n\ncertificate: CN=Lab CA,OU=Lab - untrusted\n  Issuer           CN=Lab CA") ||
 		strings.Contains(ca.Report.Text, "Emisor") || !strings.Contains(ca.Report.Text, " days)\n") || !strings.Contains(ca.Report.Text, "  CA               yes\n") {
 		t.Errorf("en:\n%s", ca.Report.Text)
 	}

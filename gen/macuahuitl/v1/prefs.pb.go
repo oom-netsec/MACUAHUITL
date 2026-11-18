@@ -279,7 +279,7 @@ func (x *IngestDefaults) GetFormat() string {
 type CorePrefs struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Carpeta base de salidas; vacía = la de fábrica. Absoluta, existente, del usuario, escribible y 0700.
-	// Los errores llevan el código prefs.outputs.<motivo> al inicio del mensaje.
+	// Los errores llevan el código prefs.outputs.<motivo> en ErrorInfo.Reason (no en el texto).
 	OutputsDir     string          `protobuf:"bytes,1,opt,name=outputs_dir,json=outputsDir,proto3" json:"outputs_dir,omitempty"`
 	IngestDefaults *IngestDefaults `protobuf:"bytes,2,opt,name=ingest_defaults,json=ingestDefaults,proto3" json:"ingest_defaults,omitempty"`
 	unknownFields  protoimpl.UnknownFields

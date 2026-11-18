@@ -17,7 +17,7 @@ export interface CorePrefsState extends CorePrefs {
   note: string;
 }
 
-// El error de una carpeta rechazada empieza con «prefs.outputs.<motivo>: » (relativa, punto_punto, no_existe, ilegible,
+// El error de una carpeta rechazada trae reason «prefs.outputs.<motivo>» (el texto ya no lo lleva) (relativa, punto_punto, no_existe, ilegible,
 // no_directorio, otro_dueno, reservada, permisos, no_escribible); el paso de idioma (fase 30a) lo traduce por ese código.
 export interface SettingsAPI {
   getCorePrefs(): Promise<CorePrefsState>;

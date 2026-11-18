@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -99,7 +100,7 @@ func TestCollectPorDirRechaza(t *testing.T) {
 	for nombre, c := range casos {
 		_, err := s.CollectBackups(context.Background(), &v1.CollectBackupsRequest{Dir: c.dir})
 		st, _ := status.FromError(err)
-		if st.Code() != codes.InvalidArgument || !strings.Contains(err.Error(), c.reason) {
+		if st.Code() != codes.InvalidArgument || !(strings.Contains(err.Error(), c.reason) || reasonDe(err) == c.reason) {
 			t.Errorf("%s: %v (se esperaba %s)", nombre, err, c.reason)
 		}
 	}
@@ -221,8 +222,18 @@ func TestCollectPorDirRechazaCasosBorde(t *testing.T) {
 		"raíz hermana":     {hermana, "backup.err.dir_fuera"},
 	} {
 		_, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{Dir: c.dir})
-		if st, _ := status.FromError(err); st.Code() != codes.InvalidArgument || !strings.Contains(err.Error(), c.reason) {
+		if st, _ := status.FromError(err); st.Code() != codes.InvalidArgument || !(strings.Contains(err.Error(), c.reason) || reasonDe(err) == c.reason) {
 			t.Errorf("%s: %v (se esperaba %s)", nombre, err, c.reason)
 		}
 	}
+}
+
+// reasonDe es el reason de ErrorInfo del error (el motivo ya no va pegado al texto: 43e-9).
+func reasonDe(err error) string {
+	for _, d := range status.Convert(err).Details() {
+		if ei, ok := d.(*errdetails.ErrorInfo); ok {
+			return ei.Reason
+		}
+	}
+	return ""
 }

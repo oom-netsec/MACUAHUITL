@@ -47,7 +47,7 @@ func (b *Bridge) SetPreference(key, value string) error {
 // ---- Preferencias del núcleo (fase 29e) ----
 
 // CorePrefsDTO son las preferencias tipadas del núcleo. En Set viajan los cuatro primeros campos (0 o vacío = de
-// fábrica); el resto lo llena el núcleo. Los errores de la carpeta empiezan con prefs.outputs.<motivo>.
+// fábrica); el resto lo llena el núcleo. Los errores de la carpeta llevan prefs.outputs.<motivo> en ErrorInfo.Reason.
 type CorePrefsDTO struct {
 	OutputsDir          string `json:"outputsDir"`
 	RotateMB            int32  `json:"rotateMb"`

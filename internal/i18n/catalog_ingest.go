@@ -28,7 +28,7 @@ func init() {
 	inv("rotate_mb", "rotate_mb", entry{Es: "el tamaño de rotación debe estar entre 1 y 1024 MB", En: "the rotation size must be between 1 and 1024 MB"}, "min", "1", "max", "1024")
 	inv("rotate_minutes", "rotate_minutes", entry{Es: "la rotación por tiempo debe estar entre 1 minuto y 7 días", En: "the time-based rotation must be between 1 minute and 7 days"}, "min", "1", "max", "10080")
 	inv("max_files", "max_files", entry{Es: "el máximo de archivos debe estar entre 1 y 1000", En: "the maximum number of files must be between 1 and 1000"}, "min", "1", "max", "1000")
-	inv("format", "format", entry{Es: "formato {value:q} no soportado (texto, crudo o jsonl)", En: "format {value:q} is not supported (texto, crudo or jsonl)", Args: []string{"value"}})
+	inv("format", "format", entry{Es: "formato {value:q} no soportado (texto, crudo o jsonl)", En: "format {value:q} is not supported (text, raw or jsonl)", Args: []string{"value"}})
 	inv("protocol", "protocol", entry{Es: "syslogd: protocolo {value:q} no soportado (udp o tcp)", En: "syslogd: protocol {value:q} is not supported (udp or tcp)", Args: []string{"value"}})
 	// Plantilla del nombre del archivo: {template_problem} dice cuál regla rompe.
 	inv("name_template.len", "name_template", entry{Es: "la plantilla debe tener entre 1 y 64 caracteres", En: "the template must be between 1 and 64 characters long"}, "template_problem", "len", "min", "1", "max", "64")

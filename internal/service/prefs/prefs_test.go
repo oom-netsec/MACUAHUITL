@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -59,7 +60,7 @@ func fija(s *prefsSvc, dir string) error {
 
 func quiero(t *testing.T, err error, codigo string) {
 	t.Helper()
-	if status.Code(err) != codes.InvalidArgument || !strings.HasPrefix(status.Convert(err).Message(), "prefs.outputs."+codigo+":") {
+	if status.Code(err) != codes.InvalidArgument || reasonDe(err) != "prefs.outputs."+codigo {
 		t.Fatalf("esperaba InvalidArgument prefs.outputs.%s, salió: %v", codigo, err)
 	}
 }
@@ -340,7 +341,7 @@ func TestCargarRevalidaLaCarpetaGuardada(t *testing.T) {
 	// un ancestro que otros escriben también la invalida
 	os.Chmod(dir, 0o700)
 	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o777, 0, nil }
-	if st = cargar(); st.Outputs() != "fabrica" || !strings.Contains(st.Issue(), "ancestro_inseguro") {
+	if st = cargar(); st.Outputs() != "fabrica" || !strings.Contains(st.Issue(), "cuelga de") {
 		t.Fatalf("ancestro: %s %q", st.Outputs(), st.Issue())
 	}
 }
@@ -427,7 +428,7 @@ func TestAvisoDeCarpetaInvalidaCambiaDeMotivoYSeAudita(t *testing.T) {
 		return r
 	}
 	os.RemoveAll(dir)
-	if r := guarda(); !strings.Contains(r.State.Note, "no_existe") {
+	if r := guarda(); !strings.Contains(r.State.Note, "does not exist") {
 		t.Fatalf("nota = %q", r.State.Note)
 	}
 	if a := d.AuditText(); !strings.Contains(a, "outputs_dir_invalid dir=") || !strings.Contains(a, "reason=no_existe") {
@@ -438,7 +439,7 @@ func TestAvisoDeCarpetaInvalidaCambiaDeMotivoYSeAudita(t *testing.T) {
 	}
 	os.Chmod(dir, 0o755)
 	r := guarda() // sin otros cambios: el motivo cambió y el aviso debe ponerse al día
-	if !strings.Contains(r.State.Note, "permisos") || strings.Contains(r.State.Note, "no_existe") {
+	if !strings.Contains(r.State.Note, "must be 0700") || strings.Contains(r.State.Note, "does not exist") {
 		t.Fatalf("nota = %q", r.State.Note)
 	}
 	if a := d.AuditText(); !strings.Contains(a, "reason=permisos") || !strings.Contains(a, filepath.Base(dir)) {
@@ -500,15 +501,15 @@ func TestCarpetaDeSalidasEnElIdioma(t *testing.T) {
 		return s.SetCorePrefs(i18n.WithLocale(context.Background(), loc), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: dir}})
 	}
 	for loc, want := range map[string]string{
-		"es": `prefs.outputs.relativa: la ruta debe ser absoluta: "salidas"`,
-		"en": `prefs.outputs.relativa: the path must be absolute: "salidas"`,
+		"es": `la ruta debe ser absoluta: "salidas"`,
+		"en": `the path must be absolute: "salidas"`,
 	} {
 		if _, err := set(loc, "salidas"); status.Convert(err).Message() != want {
 			t.Errorf("%s: %q", loc, status.Convert(err).Message())
 		}
 	}
 	_, err := set("en", laxa)
-	if m := status.Convert(err).Message(); !strings.HasPrefix(m, "prefs.outputs.permisos: the folder ") || !strings.Contains(m, "has mode 0755 and must be 0700; fix it with: chmod 700 ") {
+	if m := status.Convert(err).Message(); !strings.HasPrefix(m, "the folder ") || !strings.Contains(m, "has mode 0755 and must be 0700; fix it with: chmod 700 ") {
 		t.Errorf("permisos en: %q", m)
 	}
 	// Nota de cambio y aviso de carpeta que ya no vale.
@@ -524,11 +525,11 @@ func TestCarpetaDeSalidasEnElIdioma(t *testing.T) {
 	}
 	os.RemoveAll(ok)
 	r, _ := set("en", ok)
-	if !strings.Contains(r.State.Note, "the saved outputs folder ("+ok+") is no longer valid and the factory one is used: prefs.outputs.no_existe: the folder does not exist: ") {
+	if !strings.Contains(r.State.Note, "the saved outputs folder ("+ok+") is no longer valid and the factory one is used: the folder does not exist: ") {
 		t.Fatalf("aviso en: %q", r.State.Note)
 	}
 	r, _ = set("es", ok)
-	if !strings.Contains(r.State.Note, "la carpeta de salidas guardada ("+ok+") ya no es válida y se usa la de fábrica: prefs.outputs.no_existe: la carpeta no existe: ") {
+	if !strings.Contains(r.State.Note, "la carpeta de salidas guardada ("+ok+") ya no es válida y se usa la de fábrica: la carpeta no existe: ") {
 		t.Fatalf("aviso es: %q", r.State.Note)
 	}
 }
@@ -542,4 +543,14 @@ func TestOutputsUNCSeRechazaEnWindows(t *testing.T) {
 	for _, dir := range []string{`\\10.0.0.9\x\out`, `\\?\C:\x`, `\\.\pipe\x`} {
 		quiero(t, fija(s, dir), "sin_unidad")
 	}
+}
+
+// reasonDe es el reason de ErrorInfo del error (el motivo ya no va pegado al texto: 43e-9).
+func reasonDe(err error) string {
+	for _, d := range status.Convert(err).Details() {
+		if ei, ok := d.(*errdetails.ErrorInfo); ok {
+			return ei.Reason
+		}
+	}
+	return ""
 }

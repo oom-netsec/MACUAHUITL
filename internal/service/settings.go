@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -189,8 +190,11 @@ func OutputsIssue(dir string, reason error) i18n.Text {
 // OutputsIssueAudit es OutputsIssue para la auditoría: la carpeta y el código del motivo (el prefijo prefs.outputs.X).
 func OutputsIssueAudit(dir string, reason error) string {
 	code := "unknown"
-	if c, ok := strings.CutPrefix(reason.Error(), "prefs.outputs."); ok {
-		code, _, _ = strings.Cut(c, ":")
+	var ie *i18n.Error // el motivo viaja en el código del error, no en su texto (43e-9)
+	if errors.As(reason, &ie) {
+		if c, ok := strings.CutPrefix(ie.Reason(), "prefs.outputs."); ok {
+			code = c
+		}
 	}
 	return fmt.Sprintf("outputs_dir_invalid dir=%q reason=%s", dir, code)
 }

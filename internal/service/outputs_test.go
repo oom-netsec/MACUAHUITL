@@ -26,7 +26,7 @@ func TestSugerenciaChmodSoloConRutaSegura(t *testing.T) {
 			os.Mkdir(dir, 0o700)
 			os.Chmod(dir, 0o755)
 			_, err := CheckOutputs(dir, st, false)
-			if err == nil || !strings.Contains(err.Error(), "prefs.outputs.permisos:") {
+			if err == nil || !strings.Contains(err.Error(), "debe ser 0700") {
 				t.Fatalf("esperaba permisos: %v", err)
 			}
 			if got := strings.Contains(err.Error(), "corrígelo con: chmod 700 "); got != c.con {

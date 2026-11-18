@@ -48,7 +48,7 @@ func TestPrefsShowYSet(t *testing.T) {
 		t.Fatalf("reset = %q %v", out, err)
 	}
 	// errores del núcleo con su código; rangos fuera de 32 bits en el cliente
-	if _, err = mctl(t, "", "prefs", "set", "--outputs", "relativa"); err == nil || !strings.Contains(err.Error(), "prefs.outputs.relativa") {
+	if _, err = mctl(t, "", "prefs", "set", "--outputs", "relativa"); err == nil || !strings.Contains(err.Error(), "la ruta debe ser absoluta") || strings.Contains(err.Error(), "prefs.outputs.") {
 		t.Fatalf("relativa: %v", err)
 	}
 	if _, err = mctl(t, "", "prefs", "set", "--rotate-mb", "5000"); err == nil {

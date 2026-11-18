@@ -30,7 +30,7 @@ func TestCreateJobValidaOutputDirComoAjustes(t *testing.T) {
 	}
 	quiero := func(err error, codigo string) {
 		t.Helper()
-		if status.Code(err) != codes.InvalidArgument || !strings.HasPrefix(status.Convert(err).Message(), "prefs.outputs."+codigo+":") {
+		if status.Code(err) != codes.InvalidArgument || motivoSalidas(err, codigo) {
 			t.Fatalf("esperaba InvalidArgument prefs.outputs.%s, salió: %v", codigo, err)
 		}
 	}
@@ -137,8 +137,14 @@ func TestCreateJobOutputDirUNCSeRechazaEnWindows(t *testing.T) {
 		sp := h.spec(cred)
 		sp.OutputDir = dir
 		_, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: sp})
-		if status.Code(err) != codes.InvalidArgument || !strings.HasPrefix(status.Convert(err).Message(), "prefs.outputs.sin_unidad:") {
+		if status.Code(err) != codes.InvalidArgument || motivoSalidas(err, "sin_unidad") {
 			t.Fatalf("%q: %v", dir, err)
 		}
 	}
+}
+
+// motivoSalidas es true si el error NO es el motivo prefs.outputs.<codigo> (el reason de ErrorInfo) o si el texto aún trae el código pegado (43e-9).
+func motivoSalidas(err error, codigo string) bool {
+	r, _ := reasonOf(err)
+	return r != "prefs.outputs."+codigo || strings.Contains(status.Convert(err).Message(), "prefs.outputs.")
 }

@@ -482,3 +482,19 @@ func TestFTPRangoPasivoOcupadoFallaAlArrancar(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// 43e-9: el 550 de «ya existe» va en inglés en el cable (los equipos no leen español); el registro conserva el motivo del catálogo.
+func TestFTPStorExistenteRespondeEnIngles(t *testing.T) {
+	recv := realTemp(t)
+	if err := os.WriteFile(filepath.Join(recv, "x"), []byte("1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, r := startCfg(t, Config{Proto: "ftp", Write: true, RecvDir: recv})
+	f := ftpDial(t, s.addr)
+	f.login(r)
+	f.pasv()
+	got := f.cmd(550, "STOR x")
+	if got != "the file already exists" {
+		t.Fatalf("550 = %q", got)
+	}
+}
