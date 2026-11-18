@@ -120,3 +120,15 @@ test("si el núcleo no responde se ve el error; notice={false} lo calla junto co
   rerender(<Host creds={[]} vault="locked" notice={false} />);
   expect(screen.queryByRole("status")).toBeNull();
 });
+
+test("con la bóveda cerrada el valor conservado se ve como tal, no como «ninguna»", () => {
+  render(<Host creds={[]} initial="x9" vault="locked" optional notice={false} />);
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Credencial guardada (bóveda cerrada)");
+});
+
+test("si la lista falla con la bóveda todavía abierta, el hook dice error y no «cerrada»", async () => {
+  const c = { vaultStatus: vi.fn(async () => ({ state: "unlocked", armedJobs: [] })), listCredentials: vi.fn(async () => { throw new Error("corte"); }) } as never;
+  const { result } = renderHook(() => useCredentials(c));
+  await waitFor(() => expect(result.current.vault).toBe("error"));
+  expect(result.current.error).toContain("corte");
+});

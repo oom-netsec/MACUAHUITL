@@ -3,7 +3,8 @@ import { useNav } from "../app/activity";
 import type { CoreAPI } from "../lib/core";
 import { useT } from "../lib/i18n";
 import { useVaultVersion } from "../lib/vaultSignal";
-import { passwordCreds, type Credential } from "../modules/vault/api";
+import { passwordCreds } from "../lib/credentials";
+import type { Credential } from "../modules/vault/api";
 import { Notice, Select, errorText, type Width } from "./Field";
 
 // loading: aún sin respuesta; absent/locked: no hay lista que ofrecer; open: la lista se leyó (puede estar vacía);
@@ -22,7 +23,11 @@ export function useCredentials(core: CoreAPI, { keys }: { keys?: boolean } = {})
       try {
         const l = await core.listCredentials();
         if (live) setS({ creds: keys ? l : passwordCreds(l), vault: "open", error: "" });
-      } catch { if (live) setS({ creds: [], vault: "locked", error: "" }); } // se cerró entre el estado y la lista
+      } catch (e) {
+        // ¿se cerró entre el estado y la lista? Si sigue abierta, el fallo es otro y se dice como error.
+        const now = await core.vaultStatus().catch(() => null);
+        if (live) setS(now && now.state !== "unlocked" ? { creds: [], vault: now.state === "absent" ? "absent" : "locked", error: "" } : { creds: [], vault: "error", error: errorText(e) });
+      }
     }, (e) => { if (live) setS({ creds: [], vault: "error", error: errorText(e) }); });
     return () => { live = false; };
   }, [core, vv, keys]);
@@ -51,16 +56,20 @@ export function CredentialSelect({ creds, value, onChange, label, hint, error, w
     if (d !== value) onChange(d);
   }, [vault, creds, value, optional, extra, onChange]);
   const closed = notice && (vault === "absent" || vault === "locked");
+  // Con la lista sin leer, un valor ya elegido se conserva y se muestra como tal: el select no dice «ninguna» mientras se manda otra cosa.
+  const kept: [string, string][] = vault !== "open" && value && !creds.some((c) => c.id === value) && extra?.[0] !== value ? [[value, t("hosts.cred.hidden")]] : [];
   return (
     <>
       <Select label={label ?? t("assist.cred")} hint={hint} error={error} w={w} value={value} onChange={onChange}
-        options={[...(optional ? [["", t("cred.none")] as [string, string]] : []), ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), ...(extra ? [extra] : [])]} />
-      {notice && vault === "error" && <Notice kind="error">{t("cred.vault.error", { error: vaultError ?? "" })}</Notice>}
+        options={[...(optional ? [["", t("cred.none")] as [string, string]] : []), ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), ...(extra ? [extra] : []), ...kept]} />
+      {notice && vault === "error" && <div className="cred-notice"><Notice kind="error">{t("cred.vault.error", { error: vaultError ?? "" })}</Notice></div>}
       {closed && (
-        <Notice kind="info">
-          {t(vault === "absent" ? "cred.vault.absent" : "cred.vault.locked")}
-          <button type="button" className="inline" onClick={() => go("vault")}>{t(vault === "absent" ? "vault.create" : "vault.unlock")}</button>
-        </Notice>
+        <div className="cred-notice">
+          <Notice kind="info">
+            {t(vault === "absent" ? "cred.vault.absent" : "cred.vault.locked")}
+            <button type="button" className="inline" onClick={() => go("vault")}>{t(vault === "absent" ? "vault.create" : "vault.unlock")}</button>
+          </Notice>
+        </div>
       )}
     </>
   );

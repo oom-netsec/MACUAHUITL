@@ -447,7 +447,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
         <div className="field-row">
           <Field label={t("visibility.host")} value={host} onChange={setHost} w="lg" mono />
           <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} optional />
         </div>
         <Field label={t("visibility.gnmi.ca")} value={ca} onChange={setCa} w="full" mono />
       </Section>

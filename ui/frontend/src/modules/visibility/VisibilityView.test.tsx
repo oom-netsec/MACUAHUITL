@@ -168,7 +168,7 @@ test("gnmi: get y suscripción con actualizaciones en vivo", async () => {
   await userEvent.clear(screen.getByLabelText(/Rutas/));
   await userEvent.type(screen.getByLabelText(/Rutas/), "/system/memory/state");
   await userEvent.click(screen.getByRole("button", { name: "Get" }));
-  expect(core.gnmiGet).toHaveBeenCalledWith({ host: "10.0.0.9", port: 9339, credentialId: "c1", caPath: "", serverName: "" }, ["/system/memory/state"], "");
+  expect(core.gnmiGet).toHaveBeenCalledWith({ host: "10.0.0.9", port: 9339, credentialId: "", caPath: "", serverName: "" }, ["/system/memory/state"], ""); // gNMI sin usuario: «ninguna» aunque haya credenciales
   await userEvent.click(screen.getByRole("button", { name: "Suscribir" }));
   expect(core.gnmiSubscribeStart).toHaveBeenCalledWith(expect.objectContaining({ host: "10.0.0.9" }), ["/system/memory/state"], "sample", 10);
   act(() => core.emitVis("gnmi", { runId: "g1", json: JSON.stringify({ Path: "/system/memory/state/used", Value: 1234 }) }));

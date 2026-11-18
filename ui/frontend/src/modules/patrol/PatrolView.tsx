@@ -101,8 +101,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
     <Page title={t("patrol.title")} description={t("patrol.desc")}>
       <div className="patrol">
         <div className="patrol-main">
-          {err && <Notice kind="error">{err}</Notice>}
-          {credErr && <Notice kind="error">{credErr}</Notice>}
+          {(err || credErr) && <Notice kind="error">{err || credErr}</Notice>}
           {(vault === "absent" || vault === "locked") && (
             <Notice kind="info">
               {t(vault === "absent" ? "patrol.vault.absent" : "patrol.vault.locked")}
