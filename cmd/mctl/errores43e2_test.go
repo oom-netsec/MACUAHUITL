@@ -34,3 +34,31 @@ func TestCoreCaidoMensajeLegible(t *testing.T) {
 		}
 	}
 }
+
+// Una ruta relativa se rechaza con un mensaje del catálogo antes de cualquier Stat: nunca sale la cadena cruda del
+// sistema (GetFileAttributesEx, lstat…). Las tres variantes del QA: prefs set --outputs, transfer --dir y diag --out.
+func TestOutputsRelativaSinApiCruda(t *testing.T) {
+	startCore(t)
+	cmds := map[string][]string{
+		"prefs":        {"prefs", "set", "--outputs", "rel"},
+		"transfer":     {"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--write", "--allow", "127.0.0.1", "--dir", "rel"},
+		"transfer-get": {"transfer", "get", "tftp://127.0.0.1/x.cfg", "--dir", "rel"},
+		"transfer-win": {"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1", "--write", "--allow", "127.0.0.1", "--dir", `.\rel`},
+		"diag":         {"diag", "ping", "127.0.0.1", "--out", "rel"},
+		"diag-punto":   {"diag", "ping", "127.0.0.1", "--out", "./rel"},
+	}
+	for name, args := range cmds {
+		for lang, want := range map[string]string{"en": "must be absolute", "es": "debe ser absoluta"} {
+			_, err := mctlRaw(t, "", append([]string{"--lang", lang}, args...)...)
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("%s/%s: err = %v, quería %q", name, lang, err, want)
+				continue
+			}
+			for _, bad := range []string{"GetFileAttributesEx", "lstat", "fileserve", "no such file", "0700"} {
+				if strings.Contains(err.Error(), bad) {
+					t.Errorf("%s/%s: %q contiene %q", name, lang, err, bad)
+				}
+			}
+		}
+	}
+}

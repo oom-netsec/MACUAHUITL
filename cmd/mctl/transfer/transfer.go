@@ -77,6 +77,18 @@ func resolveFiles(paths []string, from string) ([]string, error) {
 	return out, nil
 }
 
+// requireAbs exige una ruta absoluta para --dir: una relativa se rechaza aquí, con un mensaje del catálogo, y no llega a un
+// Stat del sistema (en Windows saldría GetFileAttributesEx crudo). Con letra de unidad o barra inicial vale tal cual.
+func requireAbs(p string) (string, error) {
+	if p == "" {
+		return "", nil
+	}
+	if !filepath.IsAbs(p) && !strings.HasPrefix(p, `\`) && !strings.HasPrefix(p, "/") {
+		return "", cli.Err("mctl.err.path_relative", "flag", "--dir", "path", p)
+	}
+	return abs(p)
+}
+
 func abs(p string) (string, error) {
 	if p == "" {
 		return "", nil
@@ -133,7 +145,7 @@ func serve(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	absDir, err := abs(dir)
+	absDir, err := requireAbs(dir)
 	if err != nil {
 		return err
 	}
@@ -239,7 +251,7 @@ func get(c *cli.Env, args []string) error {
 	if fs.NArg() < 1 || fs.NArg() > 2 {
 		return errors.New("uso: mctl transfer get URL [LOCAL] [--dir CARPETA] [--cred ID] [--sha256 H] [--insecure]")
 	}
-	absDir, err := abs(dir)
+	absDir, err := requireAbs(dir)
 	if err != nil {
 		return err
 	}
