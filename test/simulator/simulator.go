@@ -191,7 +191,7 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 			return nil, errors.New("llave no autorizada")
 		}
 	}
-	if !c.NoPassword {
+	if !c.NoPassword && c.OTP == "" { // con MFA el método password no existe: solo se entra por keyboard-interactive con el código
 		cfg.PasswordCallback = func(m ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
 			if c.Attempts != nil {
 				c.Attempts.Add(1)

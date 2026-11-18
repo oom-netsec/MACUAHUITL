@@ -25,7 +25,7 @@ func main() {
 	otp := flag.String("otp", "", "si no está vacío, el login pide contraseña y este código (MFA)")
 	flag.Parse()
 	if *transcripts == "" || *addrFile == "" {
-		fmt.Fprintln(os.Stderr, "uso: simserver -transcripts DIR -addrfile ARCHIVO")
+		fmt.Fprintln(os.Stderr, "uso: simserver -transcripts DIR -addrfile ARCHIVO [-otp CÓDIGO]")
 		os.Exit(2)
 	}
 	addr, _ := simulator.Start(tb{}, simulator.Config{Hostname: "SW-LAB-01", Username: "admin", Password: "pw-lab", Enable: "en-lab", OTP: *otp, Transcripts: *transcripts})

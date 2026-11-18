@@ -268,3 +268,13 @@ func TestOTPDosPreguntas(t *testing.T) {
 		t.Fatalf("par bueno: %v", err)
 	}
 }
+
+// Con MFA no hay atajo por el método password: un cliente que solo ofrece password no entra.
+func TestOTPSinPasswordDirecto(t *testing.T) {
+	addr, _ := Start(t, Config{Hostname: "R1", Username: "admin", Password: "pw", OTP: "123456"})
+	cfg := &ssh.ClientConfig{User: "admin", Auth: []ssh.AuthMethod{ssh.Password("pw")}, HostKeyCallback: ssh.InsecureIgnoreHostKey(), Timeout: 5 * time.Second}
+	if c, err := ssh.Dial("tcp", addr, cfg); err == nil {
+		c.Close()
+		t.Fatal("entró con password sin el código")
+	}
+}
