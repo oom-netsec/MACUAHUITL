@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { CredRotateView } from "./CredRotateView";
 import { fakeCore } from "../../lib/fake";
 import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
-import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [
   { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false },

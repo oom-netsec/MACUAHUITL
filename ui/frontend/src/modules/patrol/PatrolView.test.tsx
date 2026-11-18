@@ -9,7 +9,7 @@ import type { RunDevice } from "../../lib/core";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { NavContext } from "../../app/activity";
-import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 test("elapsed resume duraciones de forma legible", () => {
   const t = (s: number) => elapsed(s * 1000);

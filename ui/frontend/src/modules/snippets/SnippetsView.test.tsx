@@ -6,7 +6,7 @@ import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
 import { samplePortSecurityPlan, sampleTemplates } from "./fake";
 import type { SnippetTemplate } from "./api";
 import { I18nProvider } from "../../lib/i18n";
-import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 const target = { name: "10.0.0.5", address: "10.0.0.5", credentialId: "c1" };

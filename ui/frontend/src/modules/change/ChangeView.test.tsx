@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { ChangeView } from "./ChangeView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext, ModuleIdContext } from "../../app/activity";
-import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 

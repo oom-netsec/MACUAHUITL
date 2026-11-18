@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { sampleHosts } from "../modules/inventory/fake";
+import { sampleHosts } from "./fake";
 
 // Credenciales para elegir de la libreta: dos, para que ninguna se preseleccione sola. LAB-CORE trae la primera (10.9.0.1); LAB-AP (ap1.lab:2222) no trae.
 export const bookCreds = [

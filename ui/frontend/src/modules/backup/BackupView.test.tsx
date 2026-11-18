@@ -4,7 +4,7 @@ import { BackupView } from "./BackupView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext, ModuleIdContext, NavContext } from "../../app/activity";
 import { sampleEntry } from "./fake";
-import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const a = sampleEntry();
 const b = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });

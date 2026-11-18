@@ -5,7 +5,7 @@ import { fakeCore } from "../../lib/fake";
 import { samplePlan } from "./fake";
 import { ModuleIdContext, NavContext } from "../../app/activity";
 import { START, clickWhenReady, confirmStep, lineText } from "../../lib/assistTestkit";
-import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 

@@ -4,7 +4,7 @@ import { BackupView } from "./BackupView";
 import { fakeCore } from "../../lib/fake";
 import { sampleEntry, sampleRestore } from "./fake";
 import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
-import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../inventory/testkit";
 
 const clear = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });
 const masked = sampleEntry();

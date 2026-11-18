@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { AdhocView } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
-import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../../lib/targetsTestkit";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const cred = { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false };
 const report = { commands: ["show clock"], devices: 2, rows: [
