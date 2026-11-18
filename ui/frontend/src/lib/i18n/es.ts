@@ -3047,6 +3047,16 @@ export const es = {
   "change.upgrade.integrity": "Verificar integridad (opcional)",
   "packs.export.meta": "Metadatos (opcional)",
   "common.advanced.error": "hay un error dentro",
+  "need.list": "Falta: {list}.",
+  "need.cred": "elegir una credencial",
+  "need.target": "indicar el equipo",
+  "need.targets": "indicar los equipos",
+  "need.commands": "escribir los comandos",
+  "need.job": "indicar el trabajo",
+  "need.file": "indicar el archivo",
+  "need.path": "indicar la ruta",
+  "need.text": "pegar el texto a analizar",
+  "need.name": "indicar el nombre",
 };
 
 export type Key = keyof typeof es;
