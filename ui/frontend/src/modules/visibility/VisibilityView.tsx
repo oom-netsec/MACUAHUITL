@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { CoreAPI, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
@@ -482,19 +482,16 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
 export function VisibilityView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [sub, setSub] = useState<Sub>("topo");
-  const [seen, setSeen] = useState<Set<Sub>>(() => new Set(["topo"]));
   const [running, setRunning] = useState<Partial<Record<Sub, boolean>>>({});
-  const go = (s: Sub) => { setSub(s); setSeen((v) => (v.has(s) ? v : new Set(v).add(s))); };
   const run = (s: Sub) => (r: boolean) => setRunning((m) => (!!m[s] === r ? m : { ...m, [s]: r }));
-  const panel = (s: Sub, body: ReactNode) => seen.has(s) && <div className="vis-panel" hidden={sub !== s}>{body}</div>;
   return (
     <Page title={t("visibility.title")} description={t("visibility.desc")}
-      tabs={<Tabs label={t("visibility.view")} value={sub} onChange={go} tabs={subs.map(([s, k]) => [s, running[s] ? t("visibility.tab.running", { name: t(k) }) : t(k)] as [Sub, string])} />}>
-      {panel("topo", <TopoPanel core={core} />)}
-      {panel("snmp", <SnmpPanel core={core} active={sub === "snmp"} onRun={run("snmp")} />)}
-      {panel("traps", <TrapsPanel core={core} active={sub === "traps"} onRun={run("traps")} />)}
-      {panel("flows", <FlowsPanel core={core} active={sub === "flows"} onRun={run("flows")} />)}
-      {panel("gnmi", <GnmiPanel core={core} active={sub === "gnmi"} onRun={run("gnmi")} />)}
+      tabs={<Tabs label={t("visibility.view")} value={sub} onChange={setSub} tabs={subs.map(([s, k]) => [s, running[s] ? t("visibility.tab.running", { name: t(k) }) : t(k)] as [Sub, string])} />}>
+      <TabPanels value={sub} render={(s) => {
+        if (s === "topo") return <TopoPanel core={core} />;
+        const p = { core, active: sub === s, onRun: run(s) };
+        return s === "snmp" ? <SnmpPanel {...p} /> : s === "traps" ? <TrapsPanel {...p} /> : s === "flows" ? <FlowsPanel {...p} /> : <GnmiPanel {...p} />;
+      }} />
     </Page>
   );
 }

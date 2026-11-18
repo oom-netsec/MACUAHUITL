@@ -14,7 +14,7 @@ const withCore = (core: ReturnType<typeof fakeCore>) => render(<CoreContext.Prov
 test("el comando de cada hallazgo se copia con un clic", async () => {
   const core = fakeCore({ analysisRun: vi.fn(async () => report) });
   withCore(core);
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
   await userEvent.click(await screen.findByRole("button", { name: "Copiar show processes cpu sorted" }));
   expect(core.copyText).toHaveBeenCalledWith("show processes cpu sorted");
@@ -23,7 +23,7 @@ test("el comando de cada hallazgo se copia con un clic", async () => {
 test("los hallazgos se exportan a CSV y Markdown", async () => {
   const core = fakeCore({ analysisRun: vi.fn(async () => report) });
   withCore(core);
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
   await userEvent.click(await screen.findByRole("button", { name: "Exportar" }));
   await userEvent.click(screen.getByRole("menuitem", { name: "CSV (.csv)" }));
@@ -46,7 +46,7 @@ test("la línea de tiempo es una tabla con búsqueda, hora exacta y hora relativ
   const core = fakeCore({ analysisTimeline: vi.fn(async () => tl) });
   withCore(core);
   await userEvent.click(screen.getByRole("tab", { name: "Línea de tiempo" }));
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   await userEvent.click(screen.getByRole("button", { name: "Ver línea de tiempo" }));
   const table = await screen.findByRole("table", { name: "Línea de tiempo" });
   const rows = within(table).getAllByRole("row");

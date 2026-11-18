@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
 import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
-import { Badge, EmptyState, Page, ResultPanel, Section, Tabs, useResult, type Tone } from "../../components/Page";
+import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult, type Tone } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
@@ -248,9 +248,7 @@ export function ChangeView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("nav.change")} description={t("change.desc")}
       tabs={<Tabs label={t("change.tool")} value={sub} onChange={setSub} tabs={subs.map(([s, l]) => [s, t(l)] as [Sub, string])} />}>
-      {sub === "prepost" && <PrePost core={core} />}
-      {sub === "upgrade" && <Upgrade core={core} />}
-      {sub === "compliance" && <Compliance core={core} />}
+      <TabPanels value={sub} render={(s) => s === "prepost" ? <PrePost core={core} /> : s === "upgrade" ? <Upgrade core={core} /> : <Compliance core={core} />} />
       <AssistBanner active={active} />
       {liveErr && <Notice kind="error">{liveErr}</Notice>}
       {live && <AssistExecution core={core} plan={null} onStarted={() => {}} onActive={setActiveLive} onError={setLiveErr} />}

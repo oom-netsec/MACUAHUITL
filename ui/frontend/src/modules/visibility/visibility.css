@@ -13,8 +13,5 @@ img.topo { max-width: 100%; height: auto; background: #ffffff; border: 1px solid
 .bars .bar-fill { display: block; height: 100%; background: var(--chart-1); border-radius: var(--r-1); }
 .bars .bar-value { text-align: right; color: var(--text-2); }
 
-/* Paneles de pestaña que siguen montados: contents conserva el espaciado; hidden los oculta. */
-.vis-panel { display: contents; }
-.vis-panel[hidden] { display: none; }
 .counters { table-layout: fixed; }
 .counters th.num { width: 128px; }

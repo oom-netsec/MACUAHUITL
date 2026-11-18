@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "./Page";
+import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult } from "./Page";
 
 test("Page tiene un encabezado con título y descripción y lo usa como nombre de la región", () => {
   render(<Page title="Ping" description="Alcance y latencia." actions={<button>Historial</button>}><p>cuerpo</p></Page>);
@@ -60,4 +60,29 @@ test("EmptyState dice qué hacer primero y ofrece la acción", () => {
   render(<EmptyState title="Sin corridas" action={<button>Ir a Patrol</button>}>Las corridas aparecen al terminar un trabajo.</EmptyState>);
   expect(screen.getByText("Sin corridas")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Ir a Patrol" })).toBeInTheDocument();
+});
+
+test("TabPanels: monta al visitar, conserva el estado oculto y no monta lo no visitado", async () => {
+  function Box({ id }: { id: string }) {
+    const [v, setV] = useState("");
+    return <input aria-label={id} value={v} onChange={(e) => setV(e.target.value)} />;
+  }
+  function Host() {
+    const [s, setS] = useState<"a" | "b" | "c">("a");
+    return (
+      <>
+        <Tabs label="x" value={s} onChange={setS} tabs={[["a", "A"], ["b", "B"], ["c", "C"]]} />
+        <TabPanels value={s} render={(id) => <Box id={id} />} />
+      </>
+    );
+  }
+  render(<Host />);
+  const user = userEvent.setup();
+  await user.type(screen.getByRole("textbox", { name: "a" }), "hola");
+  expect(document.querySelectorAll("input")).toHaveLength(1); // b y c no se montan sin visitarse
+  await user.click(screen.getByRole("tab", { name: "B" }));
+  expect(screen.queryByRole("textbox", { name: "a" })).toBeNull(); // oculto: fuera del árbol accesible
+  expect(document.querySelectorAll("input")).toHaveLength(2);
+  await user.click(screen.getByRole("tab", { name: "A" }));
+  expect(screen.getByRole("textbox", { name: "a" })).toHaveValue("hola");
 });

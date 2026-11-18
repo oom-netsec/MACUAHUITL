@@ -117,3 +117,14 @@ test("buscar espera a que haya una consulta", async () => {
   await userEvent.type(screen.getByRole("searchbox", { name: "Buscar IP, MAC o nombre" }), "SW1");
   expect(screen.getByRole("button", { name: /^Buscar/ })).toBeEnabled();
 });
+
+test("Rastreo L2 sigue montado: toma la búsqueda que llega del menú de equipo y conserva lo tecleado", async () => {
+  const core = fakeCore();
+  const ui = (n: number, data: string) => <NavContext.Provider value={{ go: () => {}, inbox: n ? { fleet: { data, n } } : {} }}><FleetView core={core} /></NavContext.Provider>;
+  const { rerender } = render(ui(0, ""));
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Búsqueda" }));
+  rerender(ui(1, "10.20.3.11"));
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  expect(screen.getByRole("textbox", { name: /IP|MAC/ })).toHaveValue("10.20.3.11");
+});

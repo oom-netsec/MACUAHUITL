@@ -1,3 +1,4 @@
+import { shown } from "../../test-utils";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SecurityView } from "./SecurityView";
@@ -9,17 +10,17 @@ const creds = [{ id: "c1", label: "ise-secreto", username: "-", hasEnable: false
 test("radius con secreto escrito y usuario de prueba", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "Access-Accept en 3.1 ms") });
   render(<SecurityView core={core} />);
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3cr3t");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.20");
+  await userEvent.type(shown("Secreto compartido"), "s3cr3t");
+  await userEvent.type(shown("Usuario de prueba"), "alice");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.selectOptions(screen.getByLabelText("Método"), "mschapv2");
   await userEvent.click(screen.getByLabelText(/Accounting/));
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   expect(await screen.findByText((_, el) => el?.tagName === "PRE" && /Access-Accept/.test(el.textContent ?? ""))).toBeInTheDocument(); // la terminal reparte la línea en spans
   expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ host: "10.0.0.20", authPort: 1812, secret: "s3cr3t", secretCredId: "", username: "alice",
     password: "pw", method: "mschapv2", accounting: true, statusServer: false }));
-  expect(screen.getByLabelText("Secreto compartido")).toHaveAttribute("type", "password");
+  expect(shown("Secreto compartido")).toHaveAttribute("type", "password");
 });
 
 test("radius toma el secreto de la bóveda", async () => {
@@ -28,7 +29,7 @@ test("radius toma el secreto de la bóveda", async () => {
   await waitFor(() => expect(screen.getAllByRole("option", { name: /ise-secreto/ }).length).toBeGreaterThan(0));
   await userEvent.selectOptions(screen.getByLabelText("Secreto desde"), "c1");
   expect(screen.queryByLabelText("Secreto compartido")).not.toBeInTheDocument();
-  await userEvent.type(screen.getByLabelText("Servidor"), "ise01");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "ise01");
   await userEvent.click(screen.getByLabelText(/Solo Status-Server/));
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   await waitFor(() => expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ secretCredId: "c1", secret: "", statusServer: true })));
@@ -38,10 +39,10 @@ test("tacacs autoriza show running-config por defecto", async () => {
   const core = fakeCore({ secTacacs: vi.fn(async () => "PASS_ADD") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.21");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "tk");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "admin");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.21");
+  await userEvent.type(shown("Secreto compartido"), "tk");
+  await userEvent.type(shown("Usuario de prueba"), "admin");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   expect(await screen.findByText("PASS_ADD")).toBeInTheDocument();
   expect(core.secTacacs).toHaveBeenCalledWith(expect.objectContaining({ host: "10.0.0.21", port: 49, command: "show running-config", authenType: "ascii" }));
@@ -117,10 +118,10 @@ Hallazgos:
 
 async function fillRadius(core: ReturnType<typeof fakeCore>) {
   render(<SecurityView core={core} />);
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3cr3t");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.20");
+  await userEvent.type(shown("Secreto compartido"), "s3cr3t");
+  await userEvent.type(shown("Usuario de prueba"), "alice");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
 }
 
@@ -146,10 +147,10 @@ authorization: FAIL en 8.0 ms
   const core = fakeCore({ secTacacs: vi.fn(async () => text) });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.21");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "tk");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "admin");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.21");
+  await userEvent.type(shown("Secreto compartido"), "tk");
+  await userEvent.type(shown("Usuario de prueba"), "admin");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   const authz = await screen.findByRole("region", { name: "Autorización" });
   expect(within(authz).getByText("FAIL")).toBeInTheDocument();
@@ -193,14 +194,14 @@ test("pki: la cadena es una lista con cuenta regresiva (aviso a 30 días, vencid
 test("radius vacía el secreto y la contraseña de prueba al probar", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "Access-Accept") });
   render(<SecurityView core={core} />);
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3cr3t");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.20");
+  await userEvent.type(shown("Secreto compartido"), "s3cr3t");
+  await userEvent.type(shown("Usuario de prueba"), "alice");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   await waitFor(() => expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ secret: "s3cr3t", password: "pw" })));
-  expect(screen.getByLabelText("Secreto compartido")).toHaveValue("");
-  expect(screen.getByLabelText("Contraseña de prueba")).toHaveValue("");
+  expect(shown("Secreto compartido")).toHaveValue("");
+  expect(shown("Contraseña de prueba")).toHaveValue("");
 });
 
 test("pki: la contraseña de la llave y las del export se vacían tras enviarse", async () => {
@@ -226,10 +227,10 @@ test("pki: la contraseña de la llave y las del export se vacían tras enviarse"
 test("radius con Status-Server no manda lo que la UI oculta", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "ok") });
   render(<SecurityView core={core} />);
-  await userEvent.type(screen.getByLabelText("Servidor"), "ise01");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "ise01");
+  await userEvent.type(shown("Secreto compartido"), "s3");
+  await userEvent.type(shown("Usuario de prueba"), "alice");
+  await userEvent.type(shown("Contraseña de prueba"), "pw");
   await userEvent.selectOptions(screen.getByLabelText("Método"), "chap");
   await userEvent.type(screen.getByLabelText("NAS-IP-Address"), "1.1.1.1");
   await userEvent.click(screen.getByLabelText(/Accounting/));
@@ -243,9 +244,9 @@ test("radius con Status-Server no manda lo que la UI oculta", async () => {
 test("radius sin accounting no manda el puerto de accounting", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "ok") });
   render(<SecurityView core={core} />);
-  await userEvent.type(screen.getByLabelText("Servidor"), "ise01");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "ise01");
+  await userEvent.type(shown("Secreto compartido"), "s3");
+  await userEvent.type(shown("Usuario de prueba"), "alice");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   await waitFor(() => expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ acctPort: 0, method: "pap", accounting: false })));
 });
@@ -302,4 +303,12 @@ test("csr con llave sellada no manda el algoritmo oculto", async () => {
   await userEvent.type(screen.getByLabelText("Contraseña de la llave"), "kpw");
   await userEvent.click(screen.getByRole("button", { name: "Generar CSR" }));
   await waitFor(() => expect(core.secPkiCsr).toHaveBeenCalledWith(expect.objectContaining({ sealedKey: "SEALED", algorithm: "" })));
+});
+
+test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.20");
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.click(screen.getByRole("tab", { name: "RADIUS" }));
+  expect(screen.getByRole("textbox", { name: "Servidor" })).toHaveValue("10.0.0.20");
 });
