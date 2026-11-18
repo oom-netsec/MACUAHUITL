@@ -4,6 +4,7 @@ package i18n
 func init() {
 	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
 	add(map[string]entry{
+		"mctl.cli.stdin_eof":      e("no llegó la contraseña por stdin; escríbela en una terminal o redirige un archivo con ella", "no password arrived on stdin; type it in a terminal or redirect a file that holds it"),
 		"mctl.cli.stdin_expected": e("se esperaba {prompt:q} en stdin: {cause}", "expected {prompt:q} on stdin: {cause}"),
 		"mctl.cli.needs_id":       e("{name} necesita un ID", "{name} needs an ID"),
 		"mctl.cli.out_of_range":   e("--{flag} fuera de rango: {value}", "--{flag} out of range: {value}"),

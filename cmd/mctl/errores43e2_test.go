@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -92,6 +93,54 @@ func TestTransferCarpetaInexistenteSinLlamadaCruda(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "no such file or directory") && !strings.Contains(err.Error(), "cannot find the file specified") { // la causa en Linux y en Windows
 			t.Errorf("falta la causa: %q", err)
+		}
+	}
+}
+
+// 43e-5: si ca init falla antes de escribir, la carpeta no se crea y el reintento funciona.
+func TestCaInitFallaNoDejaCarpeta(t *testing.T) {
+	startCore(t)
+	t.Chdir(t.TempDir())
+	for name, in := range map[string]string{"stdin vacío": "", "distintas": "uno\ndos\n"} {
+		if _, err := mctlRaw(t, in, "pki", "ca", "init", "--name", "Lab CA", "--out", "ca"); err == nil {
+			t.Fatalf("%s: debía fallar", name)
+		}
+		if _, err := os.Stat("ca"); !os.IsNotExist(err) {
+			t.Fatalf("%s: la carpeta quedó (err=%v)", name, err)
+		}
+	}
+	mustRaw(t, "capw\ncapw\n", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca") // el reintento funciona
+	if _, err := os.Stat(filepath.Join("ca", "ca.key.pem")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Una carpeta que ya existía con contenido: el error de siempre y no se borra nada.
+func TestCaInitCarpetaPreexistenteIntacta(t *testing.T) {
+	startCore(t)
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir("ca", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join("ca", "mio.txt"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mctlRaw(t, "capw\ncapw\n", "pki", "ca", "init", "--name", "Lab CA", "--out", "ca"); err == nil {
+		t.Fatal("debía fallar")
+	}
+	if b, err := os.ReadFile(filepath.Join("ca", "mio.txt")); err != nil || string(b) != "x" {
+		t.Fatalf("mio.txt: %q %v", b, err)
+	}
+}
+
+// El error de stdin vacío sale del catálogo, sin «EOF» y diciendo cómo seguir.
+func TestStdinEOFLegible(t *testing.T) {
+	startCore(t)
+	t.Chdir(t.TempDir())
+	for lang, want := range map[string]string{"en": "no password arrived on stdin", "es": "no llegó la contraseña por stdin"} {
+		_, err := mctlRaw(t, "", "--lang", lang, "pki", "ca", "init", "--name", "Lab CA", "--out", "ca")
+		if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "EOF") {
+			t.Errorf("%s: err = %v, quería %q sin EOF", lang, err, want)
 		}
 	}
 }
