@@ -3043,4 +3043,5 @@ export const en: Record<Key, string> = {
   "fps.needHost": "With several devices, write each fingerprint as DEVICE=FINGERPRINT (DEVICE:PORT=FINGERPRINT if not 22; IPv6 with a port in brackets): a fingerprint without a device would be valid for any of them.",
   "common.advanced": "Advanced options",
   "common.advanced.changed": "{label} · changed: {n}",
+  "security.csr.subject": "Subject details",
 };

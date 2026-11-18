@@ -312,3 +312,42 @@ test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
   await userEvent.click(screen.getByRole("tab", { name: "RADIUS" }));
   expect(screen.getByRole("textbox", { name: "Servidor" })).toHaveValue("10.0.0.20");
 });
+
+const summaryOf = (el: HTMLElement) => el.closest("details")!.querySelector("summary")!;
+
+test("radius: atributos y accounting van plegados, cuentan los cambios y Status-Server los oculta", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  const det = screen.getByLabelText("Método").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Método", "NAS-Port-Type", "Service-Type", "NAS-IP-Address", "NAS-Identifier", "Called-Station-Id", /Calling-Station-Id/, /Accounting/]) expect(det).toContainElement(screen.getByLabelText(l));
+  expect(summaryOf(screen.getByLabelText("Método"))).toHaveTextContent(/^Atributos RADIUS$/);
+  await userEvent.selectOptions(screen.getByLabelText("Método"), "chap");
+  await userEvent.type(screen.getByLabelText("NAS-IP-Address"), "1.1.1.1");
+  expect(summaryOf(screen.getByLabelText("Método"))).toHaveTextContent("Atributos RADIUS · cambiadas: 2");
+  await userEvent.click(screen.getByLabelText(/Solo Status-Server/));
+  expect(screen.queryByLabelText("Método")).not.toBeInTheDocument();
+});
+
+test("tacacs: autenticación, comando y accounting van plegados y cuentan los cambios", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
+  const det = screen.getByLabelText("Autenticación").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Autenticación", /Comando a autorizar/, /Accounting/]) expect(det).toContainElement(screen.getByLabelText(l));
+  expect(det).not.toContainElement(screen.getByLabelText("Servidor"));
+  await userEvent.click(screen.getByLabelText(/Accounting/)); // por omisión está activo
+  expect(det.querySelector("summary")).toHaveTextContent("Autorización y accounting · cambiadas: 1");
+});
+
+test("csr: los datos del sujeto van plegados y cuentan los llenos; CN, SAN y contraseña quedan a la vista", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  const det = screen.getByLabelText("OU").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["O", "OU", "L", "ST", /^C \(/]) expect(det).toContainElement(screen.getByLabelText(l));
+  for (const l of ["CN", /SAN DNS/, /SAN IP/, "Contraseña de la llave"]) expect(det).not.toContainElement(screen.getByLabelText(l));
+  expect(det.querySelector("summary")).toHaveTextContent(/^Datos del sujeto$/);
+  await userEvent.type(screen.getByLabelText("O"), "Lab");
+  await userEvent.type(screen.getByLabelText("ST"), "CDMX");
+  expect(det.querySelector("summary")).toHaveTextContent("Datos del sujeto · cambiadas: 2");
+});

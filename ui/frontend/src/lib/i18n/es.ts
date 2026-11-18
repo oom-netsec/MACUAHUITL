@@ -3042,6 +3042,7 @@ export const es = {
   "fps.needHost": "Con varios equipos, escribe cada huella como EQUIPO=HUELLA (EQUIPO:PUERTO=HUELLA si no es el 22; IPv6 con puerto entre corchetes): una huella sin equipo valdría para cualquiera.",
   "common.advanced": "Opciones avanzadas",
   "common.advanced.changed": "{label} · cambiadas: {n}",
+  "security.csr.subject": "Datos del sujeto",
 };
 
 export type Key = keyof typeof es;
