@@ -506,12 +506,16 @@ test("con la ronda 1 sin equipos terminados la grilla se arma con los eventos: c
   });
   render(<PatrolView core={core} />);
   await screen.findByRole("heading", { name: "nocturno" });
-  await screen.findByText("Estado por equipo"); // la grilla vacía ya está montada y escucha los eventos
-  act(() => {
-    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } });
-    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.6:22", state: "DEVICE_STATE_CONNECTING" } });
+  await screen.findByText("Estado por equipo");
+  // La grilla se suscribe en su efecto, que puede correr después de que el título ya está en el DOM (con carga, en el CI de
+  // Windows): se reemiten los eventos hasta que la grilla los toma. Son idempotentes (mismo estado por equipo).
+  await waitFor(() => {
+    act(() => {
+      core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } });
+      core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.6:22", state: "DEVICE_STATE_CONNECTING" } });
+    });
+    expect(screen.getByRole("row", { name: /10\.0\.0\.5:22/ })).toBeInTheDocument();
   });
-  expect(await screen.findByRole("row", { name: /10\.0\.0\.5:22/ })).toBeInTheDocument();
   expect(screen.getByRole("row", { name: /10\.0\.0\.6:22/ })).toBeInTheDocument();
   expect(core.getRun).toHaveBeenCalledTimes(1); // los eventos no vuelven a pedir la ronda
 });
