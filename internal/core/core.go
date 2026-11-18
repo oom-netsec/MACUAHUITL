@@ -70,6 +70,7 @@ type job struct {
 	release   func()
 	paused    bool
 	closed    bool       // ya publicó (o nunca publicará) su "closed": manifest y zip hechos; solo entonces un Subscribe tardío lo da por terminado
+	removed   bool       // ya se quitó del historial (o está en eso): persistJob no escribe y ArmJob responde NotFound. Se lee bajo persistMu o c.mu
 	closing   bool       // finish ya corre: state pasa a completed/cancelled hasta tener manifest y zip
 	cancelReq bool       // CancelJob llegó con el trabajo en "arming": ArmJob lo cancela antes de entregarlo al planificador
 	rounds    int        // rondas terminadas, para el manifest
@@ -155,6 +156,7 @@ type Core struct {
 	activity    time.Time
 	stop        chan struct{}
 	watchers    sync.WaitGroup
+	pinned      []func() []service.PinnedJob     // trabajos en uso por otros flujos (backup, change, adhoc): no se quitan
 	busy        []func(context.Context) []string // fuentes de trabajo vivo de los servicios (Shutdown las consulta)
 	cancelServe context.CancelFunc               // termina Serve (Shutdown); nil si no sirve
 	closers     []func()                         // de los servicios (service.Deps.OnClose); corren antes de cerrar la base
@@ -599,6 +601,10 @@ func (c *Core) persistJob(j *job) {
 	j.persistMu.Lock() // antes de c.mu; nadie toma persistMu con c.mu en la mano
 	defer j.persistMu.Unlock()
 	c.mu.Lock()
+	if j.removed { // un guardado tardío no resucita la fila que removeJobs borró
+		c.mu.Unlock()
+		return
+	}
 	b, _ := json.Marshal(j.spec) // el Spec no contiene secretos, solo IDs de credenciales
 	h, _ := json.Marshal(j.jobHistory)
 	name, state := j.spec.Name, j.state

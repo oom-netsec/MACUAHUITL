@@ -144,6 +144,7 @@ func init() {
 func init() {
 	add(map[string]entry{
 		"patrol.err.job_missing": {Es: "trabajo {id} no existe", En: "job {id} does not exist", Args: []string{"id"}},
+		"patrol.err.remove_args": {Es: "indica job_ids o all_finished, pero no ambos ni ninguno", En: "provide job_ids or all_finished, but not both and not neither"},
 	})
 }
 

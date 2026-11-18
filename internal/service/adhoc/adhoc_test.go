@@ -174,3 +174,15 @@ func TestStartAdhocAuditaLosComandosEnmascarados(t *testing.T) {
 		t.Fatalf("auditoría:\n%s", got)
 	}
 }
+
+// Un lote sin leer está «en uso»; AdhocResult lo libera al entregarlo (46c).
+func TestPinnedAdhocSinLeer(t *testing.T) {
+	s := &adhocSvc{cmds: map[string][]string{"j1": {"show clock"}}}
+	if p := s.pinned(); len(p) != 1 || p[0] != (service.PinnedJob{ID: "j1", Reason: "adhoc_unread"}) {
+		t.Fatalf("pinned = %v", p)
+	}
+	s.forget("j1")
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("pinned = %v", p)
+	}
+}

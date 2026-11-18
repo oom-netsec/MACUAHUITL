@@ -553,11 +553,28 @@ func firstNonEmpty(ss ...string) string {
 	return ""
 }
 
-// Module registra el servicio Backup y, al cerrarse el núcleo, detiene a sus vigilantes.
-type Module struct{}
+// pinned son los trabajos que el respaldo todavía vigila o importa (s.jobs).
+func (s *backupSvc) pinned() []service.PinnedJob {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []service.PinnedJob
+	for id := range s.jobs {
+		out = append(out, service.PinnedJob{ID: id, Reason: "backup_import"})
+	}
+	return out
+}
 
-func (Module) Register(r ipc.Registrar, d service.Deps) {
+// Module registra el servicio Backup y, al cerrarse el núcleo, detiene a sus vigilantes. Pinned, si no es nil,
+// recibe de dónde leer los trabajos que no se deben quitar.
+type Module struct {
+	Pinned func(func() []service.PinnedJob)
+}
+
+func (m Module) Register(r ipc.Registrar, d service.Deps) {
 	s := newSvc(d)
 	d.OnClose(s.close)
+	if m.Pinned != nil {
+		m.Pinned(s.pinned)
+	}
 	v1.RegisterBackupServiceServer(r, s)
 }

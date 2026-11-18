@@ -346,8 +346,11 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 	}
 	s.c.markActive()
 	s.c.mu.Lock()
-	spec, state := j.spec, j.state
+	spec, state, gone := j.spec, j.state, j.removed
 	s.c.mu.Unlock()
+	if gone {
+		return service.Err(st.Context(), codes.NotFound, "patrol.err.job_missing", i18n.A("id", r.JobId))
+	}
 	if state != "created" {
 		return service.Err(st.Context(), codes.FailedPrecondition, "patrol.svc.login_after_arm", i18n.A("state", state))
 	}
@@ -375,6 +378,10 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	// Un solo armado a la vez: el estado pasa a "arming" en la misma sección en que se revisa.
 	c.mu.Lock()
+	if j.removed { // la quita llegó entre getJob y c.mu: o gana ella o gana ArmJob, nunca los dos
+		c.mu.Unlock()
+		return nil, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", r.JobId))
+	}
 	if j.state != "created" {
 		st := j.state
 		c.mu.Unlock()
@@ -662,6 +669,10 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	}
 	s.c.audit("job.cancel", j.id, "")
 	s.c.mu.Lock()
+	if j.removed {
+		s.c.mu.Unlock()
+		return nil, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", r.JobId))
+	}
 	created := j.state == "created"
 	if j.state == "arming" {
 		j.cancelReq = true // ArmJob la atiende antes de armar en el planificador
@@ -734,6 +745,9 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 	}
 	s.c.mu.Lock()
 	defer s.c.mu.Unlock()
+	if j.removed {
+		return nil, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", r.JobId))
+	}
 	out := &v1.GetRunResponse{}
 	if j.writer != nil {
 		out.OutputPath = j.writer.Dir()

@@ -615,3 +615,16 @@ func TestVentanaDelTrabajoArmadoTarde(t *testing.T) {
 		t.Error("dentro del Until real del trabajo: debía aceptarse")
 	}
 }
+
+// Los trabajos que el respaldo vigila están «en uso» hasta que los suelta (46c).
+func TestPinnedBackupVigilados(t *testing.T) {
+	s := newSvc(jobDeps{servicetest.New(t), &service.JobInfo{}})
+	s.jobs["j1"] = &tracked{}
+	if p := s.pinned(); len(p) != 1 || p[0] != (service.PinnedJob{ID: "j1", Reason: "backup_import"}) {
+		t.Fatalf("pinned = %v", p)
+	}
+	s.forget("j1", nil, false)
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("pinned = %v", p)
+	}
+}
