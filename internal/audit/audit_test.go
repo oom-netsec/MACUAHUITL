@@ -344,6 +344,11 @@ func TestExportLentoNoBloqueaAppend(t *testing.T) {
 		t.Skip("llena 100000 entradas")
 	}
 	l, _ := newLog(t)
+	// Lo que se mide es que el Export no retenga la única conexión, no la durabilidad: sin fsync por commit, un
+	// FlushFileBuffers lento del runner de Windows no cuenta como bloqueo (mismo caso que la prueba del vigía de store).
+	if _, err := l.db.Exec(`PRAGMA synchronous = OFF`); err != nil {
+		t.Fatal(err)
+	}
 	const total = 100000
 	tx, err := l.db.Begin()
 	if err != nil {
