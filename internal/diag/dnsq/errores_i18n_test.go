@@ -3,6 +3,7 @@ package dnsq
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,5 +75,13 @@ func TestErroresDNSEn(t *testing.T) {
 	}
 	if e.Error() != "dnsq: https://x: DoH respondió HTTP 502" {
 		t.Errorf("es: %q", e.Error())
+	}
+}
+
+// 43e-1: sin resolv.conf el error es del catálogo y pide -s, no «open …».
+func TestSystemResolversSinArchivoPideS(t *testing.T) {
+	_, err := SystemResolvers(filepath.Join(t.TempDir(), "no-existe"))
+	if err == nil || !strings.Contains(err.Error(), "-s") || strings.Contains(err.Error(), "open") {
+		t.Fatalf("err = %v", err)
 	}
 }
