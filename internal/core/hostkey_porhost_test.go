@@ -47,3 +47,31 @@ func TestArmJobCampoViejoConVariosDestinosEsAmbiguo(t *testing.T) {
 		t.Fatalf("estado = %s", st)
 	}
 }
+
+// CaptureChange reenvía accepted_host_keys a ArmJob: con el host del trabajo arma; con otro host no.
+func TestCaptureChangeHuellaPorHost(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	ch := v1.NewChangeServiceClient(h.conn)
+	spec := &v1.JobSpec{Name: "cambio-hk", Targets: []*v1.Target{h.target}, DefaultCredentialId: cred, OutputDir: h.out,
+		Schedule: &v1.Schedule{IntervalSeconds: 60, Rounds: 5}}
+	cr, err := ch.CreateChange(ctx(t), &v1.CreateChangeRequest{Spec: spec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pre, err := ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE})
+	if err != nil || pre.Armed {
+		t.Fatalf("sin huella = %+v %v", pre, err)
+	}
+	fp := h.loginTest(t, pre.JobId)[0].HostKeyFingerprint
+	pre, err = ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE,
+		AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: "10.9.9.9:22", Fingerprint: fp}}})
+	if err != nil || pre.Armed {
+		t.Fatalf("la huella de otro host no debe armar: %+v %v", pre, err)
+	}
+	pre, err = ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE,
+		AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: h.target.Address + ":" + strconv.Itoa(int(h.target.Port)), Fingerprint: fp}}})
+	if err != nil || !pre.Armed {
+		t.Fatalf("campo nuevo = %+v %v", pre, err)
+	}
+}

@@ -134,6 +134,8 @@ func TestHostKeyIDNormaliza(t *testing.T) {
 		{"10.0.0.1", 2222, "10.0.0.1:2222"},
 		{"2001:DB8::1", 22, "[2001:db8::1]:22"},
 		{"2001:db8::1", 0, "[2001:db8::1]:22"},
+		{"2001:db8:0::1", 22, "[2001:db8::1]:22"},
+		{"2001:0DB8::1", 22, "[2001:db8::1]:22"},
 	}
 	for _, c := range cases {
 		if got := HostKeyID(c.host, c.port); got != c.want {
@@ -224,16 +226,23 @@ func TestHuellaDeUnPuertoNoCubreOtro(t *testing.T) {
 	}
 }
 
-func TestLegacyUnknownSoloCubreUnknown(t *testing.T) {
-	kh, _ := openKH(t)
-	kb, k := newKey(t), newKey(t)
-	kh.Add("10.0.0.2:22", kb)
-	cb := kh.Callback(HostKeyPolicy{LegacyUnknown: map[string]bool{Fingerprint(k): true}}, nil)
-	var he *HostKeyError
-	if err := cb("10.0.0.2:22", remote, k); !errors.As(err, &he) || he.Status != HostKeyChanged {
-		t.Fatalf("LegacyUnknown no cubre changed: %v", err)
+// Una entrada vieja con IPv6 no canónica sigue siendo conocida y queda migrada a la clave canónica.
+func TestKnownHostsMigraIPv6NoCanonica(t *testing.T) {
+	kh, p := openKH(t)
+	key := newKey(t)
+	line := "[2001:0db8:0:0::1]:22 " + strings.TrimSpace(string(ssh.MarshalAuthorizedKey(key))) + "\n"
+	if err := os.WriteFile(p, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if err := cb("10.0.0.1:22", remote, k); err != nil {
-		t.Fatalf("LegacyUnknown cubre unknown de cualquier host: %v", err)
+	if s, err := kh.Check("[2001:db8::1]:22", key); err != nil || s != HostKeyKnown {
+		t.Fatalf("status = %v, %v", s, err)
+	}
+	b, _ := os.ReadFile(p)
+	if !strings.HasPrefix(string(b), "[2001:db8::1]:22 ") || strings.Contains(string(b), "0db8") {
+		t.Fatalf("known_hosts sin migrar: %q", b)
+	}
+	// También se reconoce marcando con la grafía vieja.
+	if s, _ := kh.Check("[2001:0db8::1]:22", key); s != HostKeyKnown {
+		t.Fatalf("grafía vieja: %v", s)
 	}
 }

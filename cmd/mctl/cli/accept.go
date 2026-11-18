@@ -44,3 +44,20 @@ func HostPort(host string, port uint32) string {
 	}
 	return host + ":" + strconv.Itoa(int(port))
 }
+
+// Without quita de los destinos los que --exclude descarta (por EQUIPO[:PUERTO] o solo por EQUIPO), para contar
+// los que de verdad quedan.
+func Without(devs, exclude []string) []string {
+	var out []string
+	for _, d := range devs {
+		addr, _, _ := SplitHost(d)
+		skip := false
+		for _, x := range exclude {
+			skip = skip || x == d || x == addr
+		}
+		if !skip {
+			out = append(out, d)
+		}
+	}
+	return out
+}

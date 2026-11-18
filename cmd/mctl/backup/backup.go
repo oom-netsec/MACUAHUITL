@@ -57,7 +57,7 @@ func (f *runFlags) start(c *cli.Env) (job string, scheduled bool, rep *v1.ToolRe
 	if len(f.devs) == 0 || f.cred == "" || f.keep < 0 || f.rounds < 0 || f.every < 0 {
 		return "", false, nil, errors.New("uso: mctl " + runUsage)
 	}
-	fps, keys, err := cli.AcceptKeys(f.accept, f.devs)
+	fps, keys, err := cli.AcceptKeys(f.accept, cli.Without(f.devs, f.exclude))
 	if err != nil {
 		return "", false, nil, err
 	}

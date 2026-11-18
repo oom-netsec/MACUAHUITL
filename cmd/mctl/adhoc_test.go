@@ -63,3 +63,20 @@ func TestRunAdhocAcceptPorEquipo(t *testing.T) {
 		t.Fatalf("texto = %q", out)
 	}
 }
+
+// Los destinos se cuentan después de --exclude: -d A -d B --exclude B con una huella sola vale para A.
+func TestRunAdhocAcceptContandoExcluidos(t *testing.T) {
+	e := startCore(t)
+	must(t, "maestra\nmaestra\n", "vault", "create")
+	cred := strings.TrimSpace(must(t, "pw-lab\nen-lab\n", "cred", "add", "--label", "lab", "--user", "admin"))
+	ap := netip.MustParseAddrPort(e.target)
+	dev := fmt.Sprintf("%s:%d", ap.Addr(), ap.Port())
+	out, _ := mctl(t, "", "run", "-d", dev, "-c", "show version", "--cred", cred)
+	job := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(out)[1]
+	lt, _ := mctl(t, "", "job", "logintest", job)
+	fp := regexp.MustCompile(`SHA256:\S+`).FindString(lt)
+	out = must(t, "", "run", "-d", dev, "-d", "10.9.9.9:22", "--exclude", "10.9.9.9:22", "-c", "show version", "--cred", cred, "--accept", fp)
+	if !strings.Contains(out, "== SW-LAB-01") {
+		t.Fatalf("texto = %q", out)
+	}
+}

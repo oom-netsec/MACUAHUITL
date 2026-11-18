@@ -55,7 +55,7 @@ func runBatch(c *cli.Env, args []string) error {
 		}
 		text += "\n" + string(b)
 	}
-	fps, keys, err := cli.AcceptKeys(accept, devs)
+	fps, keys, err := cli.AcceptKeys(accept, cli.Without(devs, exclude))
 	if err != nil {
 		return err
 	}
