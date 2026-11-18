@@ -15,6 +15,7 @@ func init() {
 		"mctl.common_a.accept_host_key":  e("{cause}\nsi esa huella es la del equipo, repite con --accept-host-key {fp}", "{cause}\nif that fingerprint is the device's, repeat with --accept-host-key {fp}"),
 		"mctl.import_a.bad_all":          e("--all={value:q}: use renombrar, reemplazar u omitir", "--all={value:q}: use rename, replace or skip"),
 		"mctl.import_a.bad_decision":     e("--decision {value:q}: use ID=renombrar|reemplazar|omitir", "--decision {value:q}: use ID=rename|replace|skip"),
+		"mctl.import_a.decision_unknown": e("--decision {id:q}: no es un ID EN EL RESPALDO ni una etiqueta del respaldo (el ID EN LA BÓVEDA no sirve aquí)", "--decision {id:q}: not a BACKUP ID or a label in the backup (the VAULT ID does not work here)"),
 		"mctl.import_a.missing": e("no se importó nada: falta decidir {n} conflicto(s); use --decision ID=renombrar|reemplazar|omitir o --all=ACCIÓN: {ids}",
 			"nothing was imported: {n} conflict(s) still need a decision; use --decision ID=rename|replace|skip or --all=ACTION: {ids}"),
 
@@ -99,7 +100,7 @@ func init() {
 		"mctl.vault.phrase_mismatch":          e("las frases no coinciden", "the passphrases do not match"),
 		"mctl.vault.backup_done":              e("respaldo de {n} credenciales en {path}", "backup of {n} credentials in {path}"),
 		"mctl.vault.backup_no_perms":          e("aviso: el sistema de archivos no admitió los permisos 0600; el contenido va cifrado, pero cuida quién puede leer el archivo", "warning: the file system did not accept the 0600 permissions; the content is encrypted, but watch who can read the file"),
-		"mctl.vault.import_header":            e("ID\tETIQUETA\tESTADO", "ID\tLABEL\tSTATE"),
+		"mctl.vault.import_header":            e("ID EN EL RESPALDO\tETIQUETA\tESTADO\tID EN LA BÓVEDA", "BACKUP ID\tLABEL\tSTATE\tVAULT ID"),
 		"mctl.vault.imported":                 e("importadas: {created} nuevas, {replaced} reemplazadas, {renamed} renombradas, {skipped} omitidas, {same} iguales", "imported: {created} new, {replaced} replaced, {renamed} renamed, {skipped} skipped, {same} unchanged"),
 
 		// security

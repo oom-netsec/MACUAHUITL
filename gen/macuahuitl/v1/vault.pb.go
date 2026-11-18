@@ -1518,7 +1518,8 @@ type VaultBackupItem struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // ID de la credencial dentro del respaldo (las decisiones van por él)
 	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
-	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"` // nueva | igual | conflicto_etiqueta | reservada (se omite)
+	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`                       // nueva | igual | conflicto_etiqueta | reservada (se omite)
+	TargetId      string                 `protobuf:"bytes,5,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"` // ID de la credencial de la bóveda con la que coincide; solo en igual y conflicto_etiqueta, vacío en los demás
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1577,6 +1578,13 @@ func (x *VaultBackupItem) GetUsername() string {
 func (x *VaultBackupItem) GetState() string {
 	if x != nil {
 		return x.State
+	}
+	return ""
+}
+
+func (x *VaultBackupItem) GetTargetId() string {
+	if x != nil {
+		return x.TargetId
 	}
 	return ""
 }
@@ -1916,12 +1924,13 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
 	"\n" +
 	"passphrase\x18\x02 \x01(\fR\n" +
-	"passphrase\"i\n" +
+	"passphrase\"\x86\x01\n" +
 	"\x0fVaultBackupItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
 	"\busername\x18\x03 \x01(\tR\busername\x12\x14\n" +
-	"\x05state\x18\x04 \x01(\tR\x05state\"\x88\x01\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x12\x1b\n" +
+	"\ttarget_id\x18\x05 \x01(\tR\btargetId\"\x88\x01\n" +
 	"\x1bPreviewBackupImportResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1d\n" +
 	"\n" +

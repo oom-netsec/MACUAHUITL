@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -133,12 +134,13 @@ func backupImport(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
+	var tbl bytes.Buffer
+	tw := tabwriter.NewWriter(&tbl, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, cli.T("mctl.vault.import_header"))
 	var req []*v1.VaultBackupDecision
 	var missing []string
 	for _, it := range p.Items {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", it.Id, it.Label, cli.StateText(it.State))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Id, it.Label, cli.StateText(it.State), it.TargetId)
 		a, ok := dec[it.Id]
 		if !ok {
 			a, ok = dec[it.Label]
@@ -154,6 +156,19 @@ func backupImport(c *cli.Env, args []string) error {
 		req = append(req, &v1.VaultBackupDecision{Id: it.Id, Action: a})
 	}
 	tw.Flush()
+	for _, l := range strings.Split(strings.TrimRight(tbl.String(), "\n"), "\n") {
+		fmt.Fprintln(c.Out, strings.TrimRight(l, " ")) // las filas sin ID en la bóveda no dejan espacios al final
+	}
+	// Una clave que no es ni ID del respaldo ni etiqueta no se ignora: suele ser el ID de la bóveda.
+	known := map[string]bool{}
+	for _, it := range p.Items {
+		known[it.Id], known[it.Label] = true, true
+	}
+	for k := range dec {
+		if !known[k] {
+			return cli.Err("mctl.import_a.decision_unknown", "id", k)
+		}
+	}
 	if onlyPreview {
 		return nil
 	}

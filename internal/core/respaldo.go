@@ -327,6 +327,9 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 	for _, it := range items {
 		if it.State == "" {
 			it.State = plan[it.Id].state
+			if it.State == estIgual || it.State == estConflicto {
+				it.TargetId = plan[it.Id].target
+			}
 		}
 	}
 	now := s.c.o.Now()
