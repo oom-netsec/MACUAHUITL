@@ -722,7 +722,7 @@ test("Agregar credencial: solo se ve el formulario elegido, lo escrito se conser
   expect(screen.getByLabelText("Etiqueta")).toHaveValue("core");
 });
 
-test("Respaldo: exportar e importar se eligen; lo que no se ve no se muestra y la frase escrita se conserva", async () => {
+test("Respaldo: exportar e importar se eligen; lo que no se ve no se muestra (las frases se vacían al cambiar: ver la prueba de abajo)", async () => {
   render(<VaultView core={fakeCore()} />);
   await userEvent.type(await screen.findByLabelText("Frase del respaldo"), "una-frase-larga-1");
   expect(screen.queryByLabelText("Frase del respaldo a importar")).toBeNull();
@@ -730,8 +730,6 @@ test("Respaldo: exportar e importar se eligen; lo que no se ve no se muestra y l
   expect(screen.queryByLabelText("Frase del respaldo")).toBeNull();
   expect(screen.queryByRole("button", { name: "Exportar respaldo…" })).toBeNull();
   expect(screen.getByLabelText("Frase del respaldo a importar")).toBeVisible();
-  await userEvent.click(screen.getByRole("radio", { name: "Exportar respaldo" }));
-  expect(screen.getByLabelText("Frase del respaldo")).toHaveValue("una-frase-larga-1");
 });
 
 test("importar: con un archivo elegido y la pestaña Pegar activa solo viaja lo pegado", async () => {
@@ -741,4 +739,35 @@ test("importar: con un archivo elegido y la pestaña Pegar activa solo viaja lo 
   await userEvent.type(keyBox(), "PEGADA");
   await send();
   await waitFor(() => expect(core.vaultImportKey).toHaveBeenCalledWith({ label: "pi", username: "root", privateKey: "PEGADA" }));
+});
+
+test("tras Cancelar, volver a Importar llave SSH muestra un formulario vacío", async () => {
+  await openImport({ vaultImportKey: vi.fn(() => new Promise(() => {})) });
+  await userEvent.type(keyBox(), "PRIVADA");
+  await send();
+  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Importar llave SSH" }));
+  expect(screen.getByLabelText("Etiqueta de la llave importada")).toHaveValue("");
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  expect(keyBox()).toHaveValue("");
+});
+
+test("al elegir un archivo, la privada pegada se descarta (no queda en un panel oculto)", async () => {
+  await openImport({ pickPath: vi.fn(async () => "/x/id") });
+  await userEvent.type(keyBox(), "PEGADA");
+  await userEvent.click(screen.getByRole("radio", { name: "Archivo" }));
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  expect(keyBox()).toHaveValue("");
+});
+
+test("cambiar entre Exportar e Importar respaldo vacía las frases del modo que se deja", async () => {
+  render(<VaultView core={fakeCore()} />);
+  await userEvent.type(await screen.findByLabelText("Frase del respaldo"), "frase-del-respaldo-1");
+  await impMode();
+  await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "otra-frase-larga");
+  await userEvent.click(screen.getByRole("radio", { name: "Exportar respaldo" }));
+  expect(screen.getByLabelText("Frase del respaldo")).toHaveValue("");
+  await impMode();
+  expect(screen.getByLabelText("Frase del respaldo a importar")).toHaveValue("");
 });

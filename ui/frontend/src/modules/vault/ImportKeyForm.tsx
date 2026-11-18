@@ -10,7 +10,7 @@ import { useT } from "../../lib/i18n";
 export const MAX_KEY_BYTES = 64 * 1024;
 
 // Importar una privada existente: por archivo (solo viaja la ruta) o pegada. La privada pegada y la frase viven solo en este estado
-// y se vacían en cuanto el núcleo responde, bien o mal, y al desmontar. Nada va a localStorage ni a logs.
+// y se vacían en cuanto el núcleo responde, bien o mal, al elegir un archivo y al cerrar la bóveda. Nada va a localStorage ni a logs.
 export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone: () => void; onClose: () => void }) {
   const t = useT();
   const [label, setLabel] = useState("");
@@ -62,7 +62,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
       setText(""); setPass(""); setBusy(false);
     }
   };
-  const pick = async () => { const p = await core.pickPath({ title: t("vault.import.file") }).catch(() => ""); if (p) setPath(p); };
+  const pick = async () => { const p = await core.pickPath({ title: t("vault.import.file") }).catch(() => ""); if (p) { setPath(p); setText(""); } }; // elegido un archivo, la privada pegada no se guarda «por si acaso»
 
   if (res) {
     return (
@@ -85,7 +85,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
           <Field label={t("vault.import.label")} value={label} onChange={setLabel} w="md" />
           <Field label={t("vault.import.user")} value={user} onChange={setUser} w="md" />
         </div>
-        <Segmented legend={t("vault.import.source")} value={mode} onChange={setMode} options={[["file", t("vault.import.srcFile")], ["paste", t("vault.import.srcPaste")]]} />
+        <Segmented legend={t("vault.import.source")} value={mode} onChange={(m) => { setMode(m); setErr(""); }} options={[["file", t("vault.import.srcFile")], ["paste", t("vault.import.srcPaste")]]} />
         {file ? (
         <div className="actions">
           <button type="button" onClick={pick}>{t("vault.import.pick")}</button>

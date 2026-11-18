@@ -3117,6 +3117,7 @@ export const es = {
   "vault.backup.mode": "Respaldo",
   "vault.backup.modeExport": "Exportar respaldo",
   "vault.backup.modeImport": "Importar respaldo",
+  "vault.add.kind": "Tipo de credencial",
 };
 
 export type Key = keyof typeof es;

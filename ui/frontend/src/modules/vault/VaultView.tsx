@@ -96,7 +96,7 @@ export function VaultView({ core }: { core: CoreAPI }) {
           }} />
           {keyShown && <PublicKey key={keyShown.id + keyShown.publicKey} k={keyShown} onClose={() => setKeyShown(null)} />}
           <Section title={t("vault.add")}>
-            <Segmented legend={t("vault.add")} value={add} onChange={setAdd}
+            <Segmented legend={t("vault.add.kind")} value={add} onChange={setAdd}
               options={[["password", t("vault.add.password")], ["key", t("vault.add.key")], ["import", t("vault.add.import")]]} />
             <Panels value={add} panels={{
               password: <CredentialForm core={core} onDone={changed} setMsg={setMsg} />,

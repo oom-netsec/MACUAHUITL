@@ -3118,4 +3118,5 @@ export const en: Record<Key, string> = {
   "vault.backup.mode": "Backup",
   "vault.backup.modeExport": "Export backup",
   "vault.backup.modeImport": "Import backup",
+  "vault.add.kind": "Credential type",
 };

@@ -74,7 +74,7 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
 
   return (
     <Section title={t("vault.backup")} description={t("vault.backup.desc")}>
-      <Segmented legend={t("vault.backup.mode")} value={mode} onChange={setMode} options={[["export", t("vault.backup.modeExport")], ["import", t("vault.backup.modeImport")]]} />
+      <Segmented legend={t("vault.backup.mode")} value={mode} onChange={(m) => { setMode(m); setF1(""); setF2(""); setImp(""); setSure(false); }} options={[["export", t("vault.backup.modeExport")], ["import", t("vault.backup.modeImport")]]} />
       {mode === "export" ? (
         <>
       <div className="field-row">
