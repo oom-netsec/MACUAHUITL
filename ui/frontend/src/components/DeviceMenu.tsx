@@ -7,7 +7,7 @@ import { useT } from "../lib/i18n";
 import type { Key } from "../lib/i18n/es";
 
 const ACTIONS: [string, Key][] = [
-  ["terminal", "device.ssh"], ["console", "device.console"], ["ping", "nav.ping"], ["traceroute", "nav.traceroute"],
+  ["terminal", "device.ssh"], ["console", "device.console"], ["ping", "device.ping"], ["traceroute", "device.traceroute"],
   ["backup", "device.backup"], ["fleet", "device.fleet"],
 ];
 
@@ -51,6 +51,11 @@ export function DeviceMenu({ name, address, children }: { name: string; address:
     if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus(); }
     else if (e.key === "Escape") { e.preventDefault(); close(); }
   };
+  // Ping y traceroute son una sola vista («ping»): el destino va a su buzón y la herramienta al buzón «ping-tool».
+  const pick = (id: string) => {
+    if (id !== "traceroute") return go(id, address);
+    go("ping", address); go("ping", id, "ping-tool");
+  };
   const label = t("device.actions", { name });
   return (
     <span className="device-menu" ref={box} onKeyDown={onKey} onContextMenu={(e) => { e.preventDefault(); setOpen(true); }}>
@@ -59,7 +64,7 @@ export function DeviceMenu({ name, address, children }: { name: string; address:
         aria-controls={open ? menu : undefined} onClick={() => setOpen((o) => !o)}>⋯</button>
       {open && createPortal(
         <div ref={pop} className="popover menu fixed" style={pos} role="menu" id={menu} aria-label={label}>
-          {ACTIONS.map(([id, k]) => <button key={id} role="menuitem" className="quiet" onClick={() => { close(false); go(id, address); }}>{t(k)}</button>)}
+          {ACTIONS.map(([id, k]) => <button key={id} role="menuitem" className="quiet" onClick={() => { close(false); pick(id); }}>{t(k)}</button>)}
           <button role="menuitem" className="quiet" onClick={() => { close(); void core?.copyText(address).catch(() => {}); }}>{t("device.copyIp")}</button>
         </div>, document.body)}
     </span>

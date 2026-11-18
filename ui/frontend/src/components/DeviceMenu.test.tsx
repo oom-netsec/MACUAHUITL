@@ -27,6 +27,14 @@ test("el botón ⋯ abre las acciones del equipo y lleva al módulo con la direc
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });
 
+test("Traceroute abre la vista combinada con el destino y la herramienta en su buzón", async () => {
+  const { go } = setup();
+  await userEvent.click(screen.getByRole("button", { name: "Acciones de SW1-ACC-03" }));
+  await userEvent.click(screen.getByRole("menuitem", { name: "Traceroute" }));
+  expect(go).toHaveBeenCalledWith("ping", "10.20.3.11");
+  expect(go).toHaveBeenCalledWith("ping", "traceroute", "ping-tool");
+});
+
 test("clic derecho sobre el equipo abre el mismo menú; copiar IP usa el portapapeles", async () => {
   const { core } = setup();
   fireEvent.contextMenu(screen.getByText("SW1-ACC-03"));

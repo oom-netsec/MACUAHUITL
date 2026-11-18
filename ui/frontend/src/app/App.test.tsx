@@ -96,14 +96,14 @@ test("un grupo abre su panel al dar click y elegir una opción lo cierra", async
   render(<App core={fakeCore()} />);
   const g = item(/^Diagnóstico/);
   expect(g).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByRole("button", { name: "Traceroute" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "nmap" })).not.toBeInTheDocument();
   await userEvent.click(g);
   expect(g).toHaveAttribute("aria-expanded", "true");
-  await userEvent.click(screen.getByRole("button", { name: "Traceroute" }));
+  await userEvent.click(screen.getByRole("button", { name: "nmap" }));
   expect(g).toHaveAttribute("aria-expanded", "false");
-  expect(await screen.findByRole("heading", { name: "Traceroute" })).toBeVisible();
+  expect(await screen.findByRole("heading", { name: "nmap" })).toBeVisible();
   expect(g).toHaveAttribute("aria-current", "page");
-  expect(g).toHaveTextContent("Traceroute");
+  expect(g).toHaveTextContent("nmap");
 });
 
 test("pasar el mouse por un grupo abre su panel", async () => {
@@ -117,9 +117,9 @@ test("teclado: flecha derecha abre el grupo, las flechas recorren y Escape regre
   const g = item(/^Diagnóstico/);
   act(() => g.focus());
   await userEvent.keyboard("{ArrowRight}");
-  expect(screen.getByRole("button", { name: "Ping" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Ping y traceroute" })).toHaveFocus();
   await userEvent.keyboard("{ArrowDown}");
-  expect(screen.getByRole("button", { name: "Traceroute" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "nmap" })).toHaveFocus();
   await userEvent.keyboard("{ArrowUp}{ArrowUp}");
   expect(screen.getByRole("button", { name: "Captura" })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
@@ -142,7 +142,7 @@ test("un diagnóstico en curso se marca en la barra aunque cambies de módulo", 
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
   render(<App core={core} />);
   await userEvent.click(item(/^Diagnóstico/));
-  await userEvent.click(screen.getByRole("button", { name: "Ping" }));
+  await userEvent.click(screen.getByRole("button", { name: "Ping y traceroute" }));
   await userEvent.type(await screen.findByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await userEvent.click(item(/^Patrol/));
