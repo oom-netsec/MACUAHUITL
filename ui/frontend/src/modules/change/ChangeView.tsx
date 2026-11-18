@@ -33,7 +33,7 @@ function worst(devs: DeviceReport[], t: (k: Key) => string): { tone: Tone; label
 
 function PrePost({ core }: { core: CoreAPI }) {
   const t = useT();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
@@ -93,7 +93,7 @@ function PrePost({ core }: { core: CoreAPI }) {
           <Field label={t("change.targets")} value={targets} onChange={setTargets} w="lg" mono />
         </div>
         <div className="field-row">
-          <CredentialSelect creds={creds} vault={vault} value={cred} onChange={setCred} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
           <Field label={t("change.outDir")} value={out} onChange={setOut} w="lg" mono />
         </div>
         <div className="actions">

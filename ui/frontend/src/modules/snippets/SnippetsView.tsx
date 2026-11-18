@@ -21,7 +21,7 @@ type Platform = "" | "ios" | "ios-xe";
 export function SnippetsView({ core }: { core: CoreAPI }) {
   const t = useT();
   const tx = useTx();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
   const [equipo, setEquipo] = useState("");
   const [platform, setPlatform] = useState<Platform>("");
@@ -104,7 +104,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       <Section title={t("snippets.section.target")}>
         <div className="field-row">
           <Field label={t("assist.device")} value={equipo} onChange={edit(setEquipo)} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} value={credId} onChange={edit(setCredId)} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={edit(setCredId)} />
           <Select<Platform> label={t("snippets.platform")} value={platform} onChange={edit(setPlatform)} w="sm" options={[["", t("snippets.platform.all")], ["ios", "IOS"], ["ios-xe", "IOS-XE"]]} />
         </div>
       </Section>

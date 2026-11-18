@@ -16,7 +16,7 @@ type Shut = "" | "shut" | "noshut";
 
 export function PortsView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
   const [equipo, setEquipo] = useState("");
   const [ifaces, setIfaces] = useState("");
@@ -64,7 +64,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
       <Section title={t("ports.section.target")}>
         <div className="field-row">
           <Field label={t("assist.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} value={credId} onChange={setCredId} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
         </div>
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>

@@ -50,7 +50,7 @@ test("el hook vuelve a listar cuando la bóveda cambia", async () => {
 
 function Host({ creds, initial = "", ...p }: { creds: Credential[]; initial?: string } & Partial<React.ComponentProps<typeof CredentialSelect>>) {
   const [v, setV] = useState(initial);
-  return <><CredentialSelect creds={creds} value={v} onChange={setV} {...p} /><span data-testid="v">{v}</span></>;
+  return <><CredentialSelect creds={creds} vault="open" value={v} onChange={setV} {...p} /><span data-testid="v">{v}</span></>;
 }
 
 test("etiqueta «Credencial» por omisión, opciones «etiqueta (usuario)» y ayuda como descripción", () => {
@@ -99,5 +99,24 @@ test("bóveda inexistente ofrece crearla; abierta y vacía no muestra aviso", ()
   const { rerender } = render(<Host creds={[]} vault="absent" />);
   expect(screen.getByRole("button", { name: "Crear bóveda" })).toBeInTheDocument();
   rerender(<Host creds={[]} vault="open" />);
+  expect(screen.queryByRole("status")).toBeNull();
+});
+
+test("mientras carga, o con la bóveda cerrada, el valor elegido no se toca (editar un host no pierde su credencial)", async () => {
+  const { rerender } = render(<Host creds={[]} initial="c9" vault="loading" />);
+  rerender(<Host creds={[]} initial="c9" vault="locked" />);
+  await act(async () => {});
+  expect(screen.getByTestId("v")).toHaveTextContent("c9");
+  rerender(<Host creds={[cred("a"), cred("c9")]} initial="c9" vault="open" />);
+  await act(async () => {});
+  expect(screen.getByTestId("v")).toHaveTextContent("c9");
+});
+
+test("si el núcleo no responde se ve el error; notice={false} lo calla junto con el de bóveda cerrada", () => {
+  const { rerender } = render(<Host creds={[]} vault="error" vaultError="sin núcleo" />);
+  expect(screen.getByRole("alert")).toHaveTextContent("No se pudo leer la bóveda: sin núcleo");
+  rerender(<Host creds={[]} vault="error" vaultError="sin núcleo" notice={false} />);
+  expect(screen.queryByRole("alert")).toBeNull();
+  rerender(<Host creds={[]} vault="locked" notice={false} />);
   expect(screen.queryByRole("status")).toBeNull();
 });

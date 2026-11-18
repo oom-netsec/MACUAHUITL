@@ -32,7 +32,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [advOpen, setAdvOpen] = useState(false);
   const [failed, setFailed] = useState(0); // envíos rechazados por validación: dispara el foco al primer campo inválido
   const formRef = useRef<HTMLDivElement>(null);
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -109,7 +109,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
         </div>
       </div>
       {usesCred(f.proto) && (
-        <CredentialSelect creds={creds} vault={vault} hint={ssh ? t("transfer.cred.need") : t("transfer.cred.anon")} error={shown("cred")} value={f.cred} onChange={(cred) => set({ cred })} optional />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} hint={ssh ? t("transfer.cred.need") : t("transfer.cred.anon")} error={shown("cred")} value={f.cred} onChange={(cred) => set({ cred })} optional />
       )}
       {f.dir === "get" ? (
         <PathField label={t("transfer.destDir")} hint={t("transfer.destDir.hint")} value={f.destDir} onChange={(destDir) => set({ destDir })} pick={() => core.pickPath({ title: t("transfer.destDir"), directory: true })} />

@@ -185,7 +185,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
           <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />
         </div>
         <div className="field-row">
-          <CredentialSelect creds={credList} vault={editing.hiddenCred ? undefined : vault} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
+          <CredentialSelect creds={credList} vault={vault} notice={!editing.hiddenCred} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
             hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} optional extra={credExtra} />
         </div>
         {hasStartCommand(f.platform) && (

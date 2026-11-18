@@ -33,24 +33,29 @@ type Props = {
   creds: Credential[]; value: string; onChange: (id: string) => void;
   label?: string; hint?: string; error?: string; w?: Width;
   optional?: boolean; // la primera opción es «ninguna» y es el valor por defecto
-  vault?: VaultGate; // si se pasa y la bóveda no existe o está cerrada, avisa y ofrece abrirla o crearla
+  vault: VaultGate; // del hook: la regla del valor por defecto solo corre con la lista ya leída
+  vaultError?: string; // texto del hook cuando vault = error
+  notice?: boolean; // false: la vista ya avisa de la bóveda por su cuenta
   extra?: [string, string]; // valor que no está en la lista (p. ej. credencial oculta con la bóveda cerrada) pero debe conservarse
 };
 
-export function CredentialSelect({ creds, value, onChange, label, hint, error, w = "md", optional, vault, extra }: Props) {
+export function CredentialSelect({ creds, value, onChange, label, hint, error, w = "md", optional, vault, vaultError, notice = true, extra }: Props) {
   const t = useT();
   const go = useNav();
   // Regla única del valor por defecto: se conserva el actual si sigue disponible; si no, la primera credencial (o «ninguna» con optional).
+  // Mientras carga, o con la bóveda cerrada, no se sabe si el valor existe: no se toca (editar un host no pierde su credencial).
   useEffect(() => {
+    if (vault !== "open") return;
     if (value && (creds.some((c) => c.id === value) || extra?.[0] === value)) return;
     const d = optional ? "" : creds[0]?.id ?? "";
     if (d !== value) onChange(d);
-  }, [creds, value, optional, extra, onChange]);
-  const closed = vault === "absent" || vault === "locked";
+  }, [vault, creds, value, optional, extra, onChange]);
+  const closed = notice && (vault === "absent" || vault === "locked");
   return (
     <>
       <Select label={label ?? t("assist.cred")} hint={hint} error={error} w={w} value={value} onChange={onChange}
         options={[...(optional ? [["", t("cred.none")] as [string, string]] : []), ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), ...(extra ? [extra] : [])]} />
+      {notice && vault === "error" && <Notice kind="error">{t("cred.vault.error", { error: vaultError ?? "" })}</Notice>}
       {closed && (
         <Notice kind="info">
           {t(vault === "absent" ? "cred.vault.absent" : "cred.vault.locked")}

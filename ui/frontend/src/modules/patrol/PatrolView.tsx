@@ -111,7 +111,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
           )}
           {job
             ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} onRemoved={async () => { await refreshJobs(); setSelected(null); focusNew(); }} subscribe={subscribeJobs} />
-            : <NewJobForm core={core} creds={creds} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
+            : <NewJobForm core={core} creds={creds} vault={vault} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
         </div>
         <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)}
           onClearFinished={async (ids) => {

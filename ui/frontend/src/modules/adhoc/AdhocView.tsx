@@ -31,7 +31,7 @@ export function parseTarget(s: string): { address: string; port: number } {
 // maxWaitMs: tope de la espera del resultado; pasado, se deja de preguntar (el trabajo sigue en Patrol).
 export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {
   const t = useT();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   const [commands, setCommands] = useState(["show version", "show ip interface brief"].join("\n"));
@@ -75,7 +75,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
 
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
-      <CredentialSelect creds={creds} vault={vault} value={cred} onChange={setCred} w="lg" />
+      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} w="lg" />
       <TextArea label={t("adhoc.devices")} value={devices} onChange={setDevices} rows={3} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />

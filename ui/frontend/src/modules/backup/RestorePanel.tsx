@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
-import { CredentialSelect } from "../../components/CredentialSelect";
+import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
@@ -30,7 +30,7 @@ function Refused({ items, title }: { items: RestoreRefusal[]; title: string }) {
   );
 }
 
-export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; onClose: () => void }) {
+export function RestorePanel({ core, entry, creds, vault, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; vault: VaultGate; onClose: () => void }) {
   const t = useT();
   const [credId, setCredId] = useState("");
   const [equipo, setEquipo] = useState(guessAddress(entry.device));
@@ -77,7 +77,7 @@ export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; e
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">
         <Field label={t("backup.restore.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-        <CredentialSelect creds={creds} value={credId} onChange={setCredId} />
+        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
       </div>
       <div className="field-row">
         <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />

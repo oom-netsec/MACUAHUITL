@@ -3037,6 +3037,7 @@ export const es = {
   "cred.vault.absent": "No existe una bóveda.",
   "cred.vault.locked": "La bóveda está cerrada.",
   "visibility.snmp.credHint": "v2c: contraseña = comunidad; v3: contraseña = auth, enable = priv",
+  "cred.vault.error": "No se pudo leer la bóveda: {error}",
 };
 
 export type Key = keyof typeof es;

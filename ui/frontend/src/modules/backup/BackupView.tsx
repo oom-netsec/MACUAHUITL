@@ -26,7 +26,7 @@ import { parseFingerprints } from "../../lib/hostkeys";
 
 export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {
   const t = useT();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   useInbox("backup", setDevices); // desde el menú de equipo
@@ -108,7 +108,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   return (
     <Page title={t("backup.title")} description={<>{t("backup.intro.a")}<code>outputs/respaldos/</code>{t("backup.intro.b")}</>}>
       <Section title={t("backup.sec.run")}>
-        <CredentialSelect creds={creds} vault={vault} value={cred} onChange={setCred} />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
         <TextArea label={t("backup.devices")} value={devices} onChange={setDevices} rows={3} />
         <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
         <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
@@ -136,7 +136,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <button className="quiet" onClick={reload}>{t("backup.refresh")}</button>
         </div>
       </Section>
-      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} onClose={() => { // el foco vuelve al «Restaurar» de la fila; si no, caería en <body>
+      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} vault={vault} onClose={() => { // el foco vuelve al «Restaurar» de la fila; si no, caería en <body>
         const id = restoring.id;
         setRestoring(null);
         [...document.querySelectorAll<HTMLElement>("[data-restore]")].find((b) => b.dataset.restore === id)?.focus();

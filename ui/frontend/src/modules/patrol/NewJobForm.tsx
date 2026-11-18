@@ -1,7 +1,7 @@
 import { pathProblem } from "../../lib/paths";
 import { useEffect, useState } from "react";
 import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
-import { CredentialSelect } from "../../components/CredentialSelect";
+import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useCoreLang, useT } from "../../lib/i18n";
@@ -24,7 +24,7 @@ export function parseTargets(text: string): string[] {
 }
 
 // Crea el trabajo; el Login Test y el armado se hacen después, desde el detalle del trabajo.
-export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: Credential[]; onCreated: (id: string) => void }) {
+export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; creds: Credential[]; vault: VaultGate; onCreated: (id: string) => void }) {
   const t = useT();
   const coreLang = useCoreLang();
   const contentVer = useScriptsVersion(); // instalar, quitar o importar un paquete cambia el catálogo de playbooks
@@ -105,7 +105,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
       <Section title={`1 · ${t("patrol.step.targets")}`}>
         <div className="field-row">
           <Field label={t("patrol.name")} value={name} onChange={setName} w="md" />
-          <CredentialSelect creds={creds} value={cred} onChange={setCred} w="lg" />
+          <CredentialSelect creds={creds} vault={vault} notice={false} value={cred} onChange={setCred} w="lg" />
         </div>
         <TextArea label={t("patrol.targets")} hint={t("patrol.targets.hint")} value={targets} onChange={setTargets} rows={4} mono />
         <p className="hint count">{t("patrol.deviceCount", { n: devices.length })}</p>

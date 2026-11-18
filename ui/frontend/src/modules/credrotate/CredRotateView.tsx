@@ -11,7 +11,7 @@ import "./credrotate.css";
 
 export function CredRotateView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const { creds, vault } = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
   const [update, setUpdate] = useState("");
   const [equipo, setEquipo] = useState("");
@@ -48,13 +48,13 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
       <Section title={t("credrotate.section.target")}>
         <div className="field-row">
           <Field label={t("assist.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} value={credId} onChange={setCredId} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
         </div>
       </Section>
       <Section title={t("credrotate.section.secret")}>
         <div className="field-row">
           <Field label={t("credrotate.user")} value={user} onChange={setUser} w="md" mono />
-          <CredentialSelect creds={creds} value={update} onChange={setUpdate} label={t("credrotate.vault")} optional w="lg" />
+          <CredentialSelect creds={creds} vault={vault} notice={false} value={update} onChange={setUpdate} label={t("credrotate.vault")} optional w="lg" />
         </div>
         <Check label={t("credrotate.generate")} checked={generate} onChange={setGenerate} />
         {!generate && <Field label={t("credrotate.secret")} type="password" value={secret} onChange={setSecret} autoComplete="new-password" w="md" />}
