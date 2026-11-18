@@ -336,7 +336,7 @@ func TestAddPinnedSeConsultaSinTomarElMutexDelNucleo(t *testing.T) {
 	h.core.addPinned(func() []service.PinnedJob {
 		// Si removeJobs tuviera c.mu mientras espera esta consulta, esta goroutine nunca lo obtendría.
 		got := make(chan struct{})
-		go func() { h.core.mu.Lock(); h.core.mu.Unlock(); close(got) }()
+		go func() { h.core.mu.Lock(); _ = len(h.core.jobs); h.core.mu.Unlock(); close(got) }()
 		select {
 		case <-got:
 		case <-time.After(5 * time.Second):

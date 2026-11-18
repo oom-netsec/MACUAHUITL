@@ -787,7 +787,7 @@ func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
 	out := map[string][]*v1.SubscribeResponse{}
 	for _, id := range ids {
 		j, ok := c.jobs[id]
-		if !ok { // quitado entre la validación de Subscribe y aquí: solo se quitan cerrados, así que cuenta como cerrado
+		if !ok { // quitado entre la validación de Subscribe y aquí (era cerrado o created, nunca activo): cuenta como cerrado
 			out[id] = append(out[id], &v1.SubscribeResponse{At: timestamppb.New(c.o.Now()), JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: "closed"}}})
 			continue
 		}
