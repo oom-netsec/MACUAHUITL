@@ -288,20 +288,17 @@ func TestHostSinCredencialPregunta(t *testing.T) {
 		}
 		cancel()
 		wait(t, done)
+		a := ""
+		for _, l := range strings.Split(r.d.AuditText(), "\n") { // solo la línea de terminal.open
+			if strings.Contains(l, `"action":"terminal.open"`) && strings.Contains(l, "host="+c.id) {
+				a = l
+			}
+		}
+		if !strings.Contains(a, `credential=typed`) || !strings.Contains(a, "startup=") {
+			t.Fatalf("%s: auditoría sin credential=typed, host= o startup=:\n%s", c.id, a)
+		}
 		r.d.DB().Exec(`DELETE FROM hosts WHERE id=?`, c.id) // la dirección es única
 	}
-}
-
-// username con host_id solo vale si el host no trae credencial; con credencial se rechaza sin tocar el equipo.
-func TestHostConCredencialYUsernameRechaza(t *testing.T) {
-	h := newHRig(t)
-	h.addHost("h1", "linux", h.host, h.keyID, "")
-	o := h.open("h1", "", true)
-	o.Username = "admin"
-	_, done, cancel := h.session(o)
-	err := wait(t, done)
-	cancel()
-	h.nada(err, codes.InvalidArgument, "terminal.err.username_with_credential")
 }
 
 // Un Cisco con contraseña, por host_id o con la dirección a mano, sigue como hoy: shell con vt100 y sin exec.
@@ -356,4 +353,22 @@ func TestHostConUsernameRechaza(t *testing.T) {
 	err := wait(t, done)
 	cancel()
 	h.nada(err, codes.InvalidArgument, "terminal.err.username_with_credential")
+}
+
+// Un host sin credencial valida el usuario (sin controles) y la orden de inicio como cualquier otro, sin conectar.
+func TestHostTecleadoRechazaUsuarioYOrdenDistinta(t *testing.T) {
+	h := newHRig(t)
+	h.addHost("h1", "linux", h.host, "", startup)
+	o := h.open("h1", startup, true)
+	o.Username = "a\x1b[2J"
+	_, done, cancel := h.session(o)
+	err := wait(t, done)
+	cancel()
+	h.nada(err, codes.InvalidArgument, "terminal.err.username")
+	o = h.open("h1", "cmd /c echo otro", true)
+	o.Username = "admin"
+	_, done, cancel = h.session(o)
+	err = wait(t, done)
+	cancel()
+	h.nada(err, codes.FailedPrecondition, "terminal.err.startup_changed")
 }

@@ -95,6 +95,13 @@ func answer(t *testing.T, st v1.TerminalService_OpenTerminalClient, seq uint32, 
 
 // TestE2ETecleada: terminal sin credencial por el ipc real contra un simulador con MFA. Huella nueva primero (sin preguntas; la UI
 // reenvía solo el usuario), luego «login as:», la ronda MFA y opened; nada de lo tecleado queda en la auditoría.
+func send(t *testing.T, st v1.TerminalService_OpenTerminalClient, m *v1.OpenTerminalRequest) {
+	t.Helper()
+	if err := st.Send(m); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestE2ETecleada(t *testing.T) {
 	const otp, pw = "246810", "MARCA-E2E-clave-9f3"
 	h := newHarness(t, nil)
@@ -109,7 +116,7 @@ func TestE2ETecleada(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Send(req)
+	send(t, st, req)
 	var rerr error
 	for rerr == nil {
 		var r *v1.OpenTerminalResponse
@@ -127,7 +134,7 @@ func TestE2ETecleada(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Send(req)
+	send(t, st, req)
 	m := recvPrompt(t, st)
 	if m.Name != "MFA" || len(m.Prompts) != 2 {
 		t.Fatalf("MFA = %+v", m)
@@ -137,7 +144,7 @@ func TestE2ETecleada(t *testing.T) {
 	if err != nil || r.Opened != "admin@"+open.Address+":"+strconv.Itoa(int(open.Port)) {
 		t.Fatalf("opened = %+v %v", r, err)
 	}
-	st.Send(&v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Data{Data: []byte("show version\r")}})
+	send(t, st, &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Data{Data: []byte("show version\r")}})
 	var got strings.Builder
 	for !strings.Contains(got.String(), "Cisco") {
 		r, err := st.Recv()
@@ -154,12 +161,46 @@ func TestE2ETecleada(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st.Send(req)
+	send(t, st, req)
 	l := recvPrompt(t, st)
 	if len(l.Prompts) != 1 || !l.Prompts[0].Echo {
 		t.Fatalf("login = %+v", l)
 	}
 	answer(t, st, l.Seq, "admin")
+	m = recvPrompt(t, st)
+	answer(t, st, m.Seq, pw, otp)
+	if r, err := st.Recv(); err != nil || r.Opened == "" {
+		t.Fatalf("opened = %+v %v", r, err)
+	}
+	st.CloseSend()
+
+	// Usuario vacío con huella nueva: «login as:» primero, luego la huella sin más preguntas; el reintento reenvía el usuario respondido.
+	addr2, _ := simulator.Start(t, simulator.Config{Hostname: "SW-MFA2", Username: "admin", Password: pw, OTP: otp, Transcripts: transcripts()}) // otra llave de host: la anterior ya quedó confiada
+	ap2 := netip.MustParseAddrPort(addr2)
+	fresh := &v1.TerminalOpen{Address: ap2.Addr().String(), Port: uint32(ap2.Port())}
+	st, err = tc.OpenTerminal(ctx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	send(t, st, &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: fresh}})
+	l = recvPrompt(t, st)
+	answer(t, st, l.Seq, "admin")
+	for rerr = nil; rerr == nil; {
+		var r *v1.OpenTerminalResponse
+		if r, rerr = st.Recv(); rerr == nil && r.AuthPrompt != nil {
+			t.Fatal("preguntó de nuevo antes de verificar la huella")
+		}
+	}
+	if !strings.Contains(rerr.Error(), "SHA256:") {
+		t.Fatalf("huella nueva tras el login: %v", rerr)
+	}
+	fresh.Username = "admin"
+	fresh.AcceptedHostKeyFingerprints = []string{regexp.MustCompile(`SHA256:[^\s\\"]+`).FindString(rerr.Error())}
+	st, err = tc.OpenTerminal(ctx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	send(t, st, &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: fresh}})
 	m = recvPrompt(t, st)
 	answer(t, st, m.Seq, pw, otp)
 	if r, err := st.Recv(); err != nil || r.Opened == "" {
