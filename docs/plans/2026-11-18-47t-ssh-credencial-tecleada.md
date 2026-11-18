@@ -4,14 +4,16 @@ Pedido del dueño (vía Release): SSH sin credencial guardada, al estilo PuTTY/S
 equipo (password y keyboard-interactive, MFA/OTP con varias preguntas) en la propia terminal. Seis PRs chicos de núcleo
 y uno de Front; cada uno con su prueba roja primero. Leído en origin/main 6072fedc y x/crypto v0.59.0. Telnet, fuera.
 
-## Decisiones (a confirmar por Release)
+## Decisiones (confirmadas por Release, 2026-11-18)
 
 - **Modo tecleado implícito:** una pestaña con `address` y sin `credential_id`, o con `host_id` de un host sin
   credencial. Sin flag nuevo (el único cliente es el puente, que sale junto con el núcleo).
 - **Usuario en el open:** `TerminalOpen.username` opcional; vacío → el núcleo pregunta «login as:» antes de marcar
   (`ClientConfig.User` no cambia a mitad del handshake, x/crypto client.go:281-282). En «Confiar y reintentar» la UI
   reenvía el usuario.
-- **Sin bóveda:** el modo tecleado no necesita la bóveda abierta. La credencial guardada no cambia.
+- **Sin bóveda:** el modo tecleado no necesita la bóveda abierta, pero la auditoría `terminal.open` se escribe igual con
+  la bóveda cerrada (prueba propia). La credencial guardada no cambia.
+- En «Confiar y reintentar» la UI reenvía solo el usuario, nunca respuestas: el equipo vuelve a preguntar.
 - **Banner SSH** (`BannerCallback`): no se muestra hoy y no entra.
 
 ## Lo que hay hoy
@@ -35,6 +37,14 @@ y uno de Front; cada uno con su prueba roja primero. Leído en origin/main 6072f
 - Simulador: keyboard-interactive con «Password:» hasta 3 veces dentro de un intento (simulator.go:42, :203-219); sin
   ronda de dos preguntas.
 
+## 47t-0 Cancelación del handshake (antes de 47t-2, toca a todos los llamadores)
+
+`stop := context.AfterFunc(ctx, func(){ conn.Close() })` durante el handshake de `OpenSSH`, y `stop()` en cuanto el
+handshake termina (con éxito o error): cancelar el ctx después no cierra una sesión ya abierta, salvo que ese sea el
+contrato de hoy en algún llamador (revisarlo en Patrol, assist, metrics, transfer y terminal y decirlo). Pruebas rojas:
+un ctx cancelado con el handshake colgado (servidor que no contesta) hace volver `OpenSSH` en <1 s; cancelar el ctx
+después del handshake no cierra la sesión. Suite completa de transport, core y service en Linux y Windows.
+
 ## 47t-1 Simulador con MFA
 
 `Config.OTP`: una ronda `name="MFA"`, `instruction="Enter password and code"`, preguntas «Password: » (echo false) y
@@ -54,11 +64,13 @@ echo exactos. Linux y Windows (test/simulator ya está en windows-pkgs).
   keyboard-interactive si está permitido, si no password; sin ninguno, `ErrTypedNoMethod`.
 - Cada ronda de keyboard-interactive se relaya tal cual (también sin preguntas, por la instrucción). Password: una
   pregunta `{user}@{host}'s password: ` con echo false.
-- Saneo del texto del equipo: fuera C0/C1 salvo `\n`; como máximo 16 preguntas y 1 KiB por texto (`ErrTypedPrompt`).
+- Saneo del texto del equipo en name, instruction y el texto de cada pregunta: fuera C0/C1 (salvo `\n` en la
+  instrucción) y Unicode de formato; tope por campo (name 128 bytes, instruction 1 KiB, cada texto 256 bytes) y 16
+  preguntas por ronda; si pasa, `ErrTypedPrompt` (un equipo hostil no inunda la terminal).
 - Respuestas: tantas como preguntas, 1 KiB máximo; se pasan a `string` para x/crypto y el `[]byte` se pone en ceros al
   instante.
 - Deadline: se quita mientras se espera a `Ask` y se repone después (la espera la acota el servicio).
-- Cancelación: `context.AfterFunc(ctx, conn.Close)` durante el handshake, para todos los llamadores.
+- Cancelación: la de 47t-0.
 - No se usa `RetryableAuthMethod`: cuenta por método y no ve los fallos entre métodos.
 
 Pruebas rojas (Linux y Windows): `TestAskRelayaMFA`, `TestAskTopeTresIntentos` (`Attempts==3`, `Conns==1`),
@@ -133,7 +145,7 @@ la UI borra sus variables; cerrar la pestaña cancela y el núcleo aborta.
 
 ## Orden
 
-47t-1 → 47t-2 → 47t-3 (en paralelo con 47t-4) → 47t-4 → 47t-5 → 47t-6 → Front (con el proto de 47t-4 en main).
+47t-0 → 47t-1 → 47t-2 → 47t-3 (en paralelo con 47t-4) → 47t-4 → 47t-5 → 47t-6 → Front (con el proto de 47t-4 en main).
 
 ## Riesgos
 
