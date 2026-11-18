@@ -125,7 +125,7 @@ func patrolCasos(t *testing.T, lang string) map[string]string {
 func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	h := newHarness(t, nil)
+	h := newHarnessReloj(t, nil) // las dos rondas salen una tras otra por evento, no por lo que tarde cada una
 	cred := h.ready(t)
 	cfg := simulator.Config{Hostname: "SW-LAB-02", Username: "admin", Password: "MARKER-PW", Enable: "MARKER-EN", Transcripts: transcripts(), DropDuringCommand: "show running-config"}
 	if fail {
@@ -159,6 +159,7 @@ func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]stri
 		if err != nil {
 			t.Fatal(err)
 		}
+		h.siguienteRonda(e)
 		if d := e.GetDeviceStateChanged(); d != nil && d.Detail != "" {
 			details = append(details, d.Detail)
 			if len(reasons) > 0 {

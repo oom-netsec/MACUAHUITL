@@ -145,6 +145,9 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 				defer a.running.Store(false)
 				s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.start", Index: round})
 				s.r.RunRound(ctx, jobID, round, targets, f)
+				// Libera la ronda antes de anunciar su fin: quien reacciona a round.end (y adelanta el reloj) no debe
+				// ver la siguiente ronda omitida por «ya hay una corriendo».
+				a.running.Store(false)
 				s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.end", Index: round})
 			}(round)
 		}

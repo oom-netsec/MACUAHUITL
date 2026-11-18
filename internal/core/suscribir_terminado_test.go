@@ -23,10 +23,13 @@ func (h *harness) jobClosed(job string) bool {
 	return h.core.jobs[job].closed
 }
 
-// closedJob arma, cancela y espera a que el trabajo cierre de verdad (manifest y zip hechos).
+// closedJob arma, cancela y espera a que el trabajo cierre de verdad (manifest y zip hechos). La ronda 2 queda a una
+// hora (dentro de la ventana de dos): el trabajo no puede completarse solo antes del cancel, vaya como vaya la carga.
 func (h *harness) closedJob(t *testing.T, cred string) string {
 	t.Helper()
-	job, _ := h.arm(t, cred)
+	spec := h.spec(cred)
+	spec.WindowHours, spec.Schedule = 2, &v1.Schedule{IntervalSeconds: 3600, Rounds: 2}
+	job, _ := h.armSpec(t, spec)
 	if _, err := h.patrol.CancelJob(ctx(t), &v1.CancelJobRequest{JobId: job}); err != nil {
 		t.Fatal(err)
 	}
