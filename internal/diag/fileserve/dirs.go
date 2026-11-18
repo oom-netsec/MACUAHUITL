@@ -391,8 +391,6 @@ func checkRecvOwn(dir string, root *os.Root) error {
 	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", sys.WhoCodes(who)))
 }
 
-// dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
-// RECEPCIÓN, en el idioma loc: escritores ajenos, volumen sin permisos por usuario o permisos que no se pudieron leer.
 // DirWarning es un aviso de carpeta: Code es la clave estable del catálogo, Text el aviso en el idioma pedido (sin la
 // orden) y Cmd la orden que lo corrige (chmod o icacls), vacía si no hay una segura. hint es la línea de la ayuda, con la orden.
 type DirWarning struct {
@@ -403,6 +401,8 @@ type DirWarning struct {
 // DirWarningsIn son los avisos de dirWarnings ya estructurados, para quien los muestra aparte de la ayuda.
 func DirWarningsIn(loc string, c Config) []DirWarning { return dirWarnings(loc, c) }
 
+// dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
+// RECEPCIÓN, en el idioma loc: escritores ajenos, volumen sin permisos por usuario o permisos que no se pudieron leer.
 func dirWarnings(loc string, c Config) []DirWarning {
 	type d struct{ dir, kind string }
 	var dirs []d

@@ -218,4 +218,14 @@ func TestDirWarningsInEstructurados(t *testing.T) {
 	if ws := DirWarningsIn(i18n.En, c); len(ws) != 1 || ws[0].Code != "fileserve.hint.warn_noperms_from" || ws[0].Cmd != "" {
 		t.Fatalf("volumen sin permisos: %+v", ws)
 	}
+	fijaEscritores(t, sys.Writers{}, errors.New("boom"))
+	ws = DirWarningsIn(i18n.En, c)
+	if len(ws) != 1 || ws[0].Code != "fileserve.hint.warn_unverified" || !strings.Contains(ws[0].Text, "boom") || !strings.Contains(ws[0].Text, dir) {
+		t.Fatalf("sin verificar: %+v", ws)
+	}
+	for _, code := range []string{"fileserve.hint.warn_from_writable", "fileserve.hint.warn_from_writable_cmd", "fileserve.hint.warn_noperms_from", "fileserve.hint.warn_noperms_recv", "fileserve.hint.warn_unverified"} {
+		if !i18n.Has(code) {
+			t.Errorf("falta en el catálogo: %s", code)
+		}
+	}
 }
