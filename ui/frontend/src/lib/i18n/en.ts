@@ -1775,7 +1775,6 @@ export const en: Record<Key, string> = {
   "transfer.c.path": "Remote path",
   "transfer.c.path.hint": "File on the server, for example /images/c9300.bin.",
   "transfer.url.out": "Resulting URL",
-  "transfer.adv": "Advanced options",
   "transfer.paste": "Paste a URL",
   "transfer.paste.hint": "Fills protocol, host, port and path from a full URL.",
   "transfer.paste.err": "Not a valid URL for this direction (tftp, ftp, scp, sftp; http and https only for download).",
@@ -3042,4 +3041,6 @@ export const en: Record<Key, string> = {
   "cred.pick": "Choose a credential",
   "fps.accepted.hint.multi": "One device: SHA256:…; several: DEVICE=SHA256:… (DEVICE:PORT=SHA256:… if not 22; an IPv6 with a port goes in brackets: [2001:db8::1]:2222=SHA256:…), separated by spaces or commas",
   "fps.needHost": "With several devices, write each fingerprint as DEVICE=FINGERPRINT (DEVICE:PORT=FINGERPRINT if not 22; IPv6 with a port in brackets): a fingerprint without a device would be valid for any of them.",
+  "common.advanced": "Advanced options",
+  "common.advanced.changed": "{label} · changed: {n}",
 };

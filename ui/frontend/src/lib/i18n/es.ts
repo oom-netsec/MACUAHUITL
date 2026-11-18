@@ -1773,7 +1773,6 @@ export const es = {
   "transfer.c.path": "Ruta remota",
   "transfer.c.path.hint": "Archivo en el servidor, por ejemplo /imagenes/c9300.bin.",
   "transfer.url.out": "URL que se enviará",
-  "transfer.adv": "Opciones avanzadas",
   "transfer.paste": "Pegar una URL",
   "transfer.paste.hint": "Llena el protocolo, el equipo, el puerto y la ruta a partir de una URL completa.",
   "transfer.paste.err": "No es una URL válida para este sentido (tftp, ftp, scp, sftp; http y https solo para descargar).",
@@ -3041,6 +3040,8 @@ export const es = {
   "cred.pick": "Elige una credencial",
   "fps.accepted.hint.multi": "Con un equipo: SHA256:…; con varios: EQUIPO=SHA256:… (EQUIPO:PUERTO=SHA256:… si no es el 22; una IPv6 con puerto va entre corchetes: [2001:db8::1]:2222=SHA256:…), separadas por espacios o comas",
   "fps.needHost": "Con varios equipos, escribe cada huella como EQUIPO=HUELLA (EQUIPO:PUERTO=HUELLA si no es el 22; IPv6 con puerto entre corchetes): una huella sin equipo valdría para cualquiera.",
+  "common.advanced": "Opciones avanzadas",
+  "common.advanced.changed": "{label} · cambiadas: {n}",
 };
 
 export type Key = keyof typeof es;
