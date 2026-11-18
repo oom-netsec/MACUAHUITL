@@ -119,7 +119,7 @@ func TestTransferLs(t *testing.T) {
 	startCore(t)
 	base := transfertest.HTTPIndex(t, "<a href=\"../\">up</a>\n<a href=\"r1.cfg\">r1.cfg</a> 2026-11-06 10:15  1K\n<a href=\"sub/\">sub/</a> 2026-11-05 08:30  -\n<a href=\"evil%E2%80%AEgnp.exe\">x</a>\n")
 	out := must(t, "", "transfer", "ls", base+"/imagenes/")
-	for _, want := range []string{"dir ", "sub/", "file", "r1.cfg", "1024", "2026-11-06 10:15", "2 entradas (http)"} {
+	for _, want := range []string{"dir ", "sub/", "file", "r1.cfg", "1024", "2026-11-06 10:15 UTC", "2 entradas (http)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("falta %q en:\n%s", want, out)
 		}

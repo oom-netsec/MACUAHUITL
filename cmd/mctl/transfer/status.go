@@ -128,7 +128,7 @@ func serveLine(t transferEvent, at time.Time, tr func(string, ...any) string) st
 	if t.Rejected {
 		mark = tr("mctl.transfer.rejected")
 	}
-	return fmt.Sprintf("%s  %s %s %s  %s  %d bytes  %s  %s %s%s", at.Format("15:04:05"), clean(t.Proto), dir, clean(t.Client), clean(t.File), t.Bytes, t.Duration.Round(time.Millisecond), res, clean(t.Error), mark)
+	return fmt.Sprintf("%s  %s %s %s  %s  %d bytes  %s  %s %s%s", cli.TimeSecOf(at), clean(t.Proto), dir, clean(t.Client), clean(t.File), t.Bytes, t.Duration.Round(time.Millisecond), res, clean(t.Error), mark)
 }
 
 // progressLoop imprime una línea `progreso` (word, ya en el idioma de mctl: no toca el idioma global desde otra goroutine) por sesión activa cada `every`, hasta que ctx termina. Un error de la consulta

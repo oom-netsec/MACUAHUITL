@@ -217,7 +217,7 @@ func serve(proto string) func(*cli.Env, []string) error {
 				Duration                    time.Duration
 			}
 			json.Unmarshal([]byte(r.TransferJson), &t)
-			fmt.Fprintf(c.Out, "%s  %s  %s  %d bytes  %s  %s %s\n", time.Now().Format("15:04:05"), t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error)
+			fmt.Fprintf(c.Out, "%s  %s  %s  %d bytes  %s  %s %s\n", cli.TimeSecOf(time.Now()), t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error)
 		}
 	}
 }

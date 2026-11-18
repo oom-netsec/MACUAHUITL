@@ -570,7 +570,7 @@ func (s *backupSvc) ListBackups(ctx context.Context, r *v1.ListBackupsRequest) (
 		if e.Masked {
 			m, anyMasked = i18n.Msg(loc, "backup.list.masked", nil), true
 		}
-		fmt.Fprintf(&b, "%s  %s  %s  %d bytes%s\n", e.ID, e.At.Format("2006-01-02 15:04:05Z"), e.Kind, e.Bytes, m)
+		b.WriteString(listLine(e, m))
 	}
 	if len(es) == 0 {
 		b.WriteString(i18n.Msg(loc, "backup.list.none", nil) + "\n")
@@ -639,4 +639,9 @@ func guardadoPorOtro(st backup.Store, device string, kind backup.Kind, at time.T
 	return slices.ContainsFunc(es, func(e backup.Entry) bool {
 		return e.Kind == kind && e.At.Equal(at) && e.SHA256 == h && e.Job != job
 	})
+}
+
+// listLine es una fila de `backup list`: la hora va local y con zona.
+func listLine(e backup.Entry, masked string) string {
+	return fmt.Sprintf("%s  %s  %s  %d bytes%s\n", e.ID, i18n.FmtLocal(e.At, i18n.LocalSec), e.Kind, e.Bytes, masked)
 }

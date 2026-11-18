@@ -338,7 +338,7 @@ func ls(c *cli.Env, args []string) error {
 			size = strconv.FormatInt(e.Size, 10)
 		}
 		if e.ModifiedMs > 0 {
-			mod = time.UnixMilli(e.ModifiedMs).UTC().Format("2006-01-02 15:04")
+			mod = cli.Time(e.ModifiedMs)
 		}
 		name := e.Name
 		if e.Type == "dir" {

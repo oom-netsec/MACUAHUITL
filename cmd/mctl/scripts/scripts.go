@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -65,7 +64,7 @@ func readCommands(c *cli.Env, file string) ([]string, error) {
 	return out, nil
 }
 
-func ts(ms int64) string { return time.UnixMilli(ms).UTC().Format("2006-01-02 15:04") }
+func ts(ms int64) string { return cli.Time(ms) }
 
 func star(fav bool) string {
 	if fav {

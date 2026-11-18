@@ -190,7 +190,7 @@ func printSample(c *cli.Env, js string) {
 		fmt.Fprintln(c.Out, js)
 		return
 	}
-	fmt.Fprintf(c.Out, "== %s %s\n", s.Time.Local().Format("15:04:05"), s.System["sysName"])
+	fmt.Fprintf(c.Out, "== %s %s\n", cli.TimeSecOf(s.Time), s.System["sysName"])
 	for _, i := range s.Interfaces {
 		fmt.Fprintf(c.Out, "  %-24s %-6s in %s  out %s  err %d/%d\n", i.Name, i.Oper, bps(i.InBps), bps(i.OutBps), i.InErrors, i.OutErrors)
 	}
@@ -369,7 +369,7 @@ func printFlows(c *cli.Env, js string, final bool) {
 		fmt.Fprintln(c.Out, js)
 		return
 	}
-	fmt.Fprintln(c.Out, cli.T("mctl.visibility.flows_line", "time", time.Now().Format("15:04:05"), "flows", s.Flows, "bytes", s.Bytes, "errors", s.Errors))
+	fmt.Fprintln(c.Out, cli.T("mctl.visibility.flows_line", "time", cli.TimeSecOf(time.Now()), "flows", s.Flows, "bytes", s.Bytes, "errors", s.Errors))
 	if !final {
 		return
 	}
