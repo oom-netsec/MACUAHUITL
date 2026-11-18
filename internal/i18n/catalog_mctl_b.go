@@ -13,11 +13,15 @@ func init() {
 		"mctl.restore.assist_active": e("MODO ASISTIDO ACTIVO. Ejecución {run}: cada paso que cambia la red pide confirmación.", "ASSISTED MODE ACTIVE. Run {run}: every step that changes the network asks for confirmation."),
 		"mctl.restore.plan_only":     e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --assisted.", "Only the plan was shown: nothing was changed. To apply it add --assisted."),
 
+		// --accept
+		"mctl.accept.form":      e("--accept {value:q}: use HUELLA o EQUIPO=HUELLA", "--accept {value:q}: use FINGERPRINT or DEVICE=FINGERPRINT"),
+		"mctl.accept.need_host": e("con varios destinos indica a qué equipo corresponde la huella: --accept EQUIPO={fp}", "with several targets say which device the fingerprint belongs to: --accept DEVICE={fp}"),
+
 		// patrol
 		"mctl.patrol.param_form":          e("--param {param:q}: use nombre=valor", "--param {param:q}: use name=value"),
 		"mctl.patrol.param_dup":           e("--param {name:q} repetido", "--param {name:q} given more than once"),
 		"mctl.patrol.login_fail":          e("{addr}  FALLA  {step}  {detail}", "{addr}  FAILED  {step}  {detail}"),
-		"mctl.patrol.login_fp":            e("  huella={fp} (confírmala con: mctl job arm --accept {fp} {id})", "  fingerprint={fp} (confirm it with: mctl job arm --accept {fp} {id})"),
+		"mctl.patrol.login_fp":            e("  huella={fp} (confírmala con: mctl job arm --accept {addr}={fp} {id})", "  fingerprint={fp} (confirm it with: mctl job arm --accept {addr}={fp} {id})"),
 		"mctl.patrol.login_failed":        e("{n} equipos no pasaron el Login Test", "{n} {n|device|devices} failed the Login Test"),
 		"mctl.patrol.arm_need_id":         e("job arm necesita un ID", "job arm needs an ID"),
 		"mctl.patrol.armed":               e("armado; la llave de la bóveda queda en memoria hasta {until}", "armed; the vault key stays in memory until {until}"),

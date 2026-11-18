@@ -53,10 +53,14 @@ func set(c *cli.Env, args []string) error {
 	if vlan < 0 || vlan > 4094 || voice < 0 || voice > 4094 { // antes de convertir a uint32: -1 no puede volverse 4294967295
 		return cli.Err("mctl.ports.vlan_range")
 	}
+	fps, keys, err := cli.AcceptKeys(accept, []string{cli.HostPort(host, port)})
+	if err != nil {
+		return err
+	}
 	req := &v1.PlanPortsRequest{
 		Target:     &v1.AssistTarget{Name: host, Address: host, Port: port, CredentialId: credID},
 		Interfaces: fs.Args()[1:], Vlan: uint32(vlan), Voice: uint32(voice), WriteMemory: writeMem,
-		AcceptedHostKeyFingerprints: accept,
+		AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys,
 	}
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {

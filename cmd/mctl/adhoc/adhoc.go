@@ -14,7 +14,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-const usage = "run -d EQUIPO[:PUERTO]... (-c COMANDO... | -f ARCHIVO) --cred ID [--accept HUELLA] [--exclude EQUIPO] [--csv|--md|--json] [--timeout 10m]"
+const usage = "run -d EQUIPO[:PUERTO]... (-c COMANDO... | -f ARCHIVO) --cred ID [--accept [EQUIPO=]HUELLA] [--exclude EQUIPO] [--csv|--md|--json] [--timeout 10m]"
 
 // target acepta "host" o "host:puerto" (un solo ':'; IPv6 va sin puerto).
 func target(s string) (*v1.Target, error) {
@@ -55,7 +55,11 @@ func runBatch(c *cli.Env, args []string) error {
 		}
 		text += "\n" + string(b)
 	}
-	req := &v1.StartAdhocRequest{CredentialId: cred, Commands: text, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude}
+	fps, keys, err := cli.AcceptKeys(accept, devs)
+	if err != nil {
+		return err
+	}
+	req := &v1.StartAdhocRequest{CredentialId: cred, Commands: text, AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys, ExcludedDeviceIds: exclude}
 	for _, d := range devs {
 		t, err := target(d)
 		if err != nil {
@@ -100,5 +104,5 @@ func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "run", Run: runBatch}}}
 }
 
-const help = `  run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept HUELLA] [--csv|--md|--json]
+const help = `  run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept [EQUIPO=]HUELLA] [--csv|--md|--json]
         (lote de solo lectura: un trabajo de Patrol de una ronda; todo comando pasa por CheckDenied)`

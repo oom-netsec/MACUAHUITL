@@ -66,7 +66,11 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 		if fs.NArg() != 1 {
 			return cli.Err("mctl.change.need_id", "name", name)
 		}
-		r, err := v1.NewChangeServiceClient(c.Conn).CaptureChange(context.Background(), &v1.CaptureChangeRequest{ChangeId: fs.Arg(0), Phase: phase, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
+		fps, keys, err := cli.AcceptKeys(accept, nil)
+		if err != nil {
+			return err
+		}
+		r, err := v1.NewChangeServiceClient(c.Conn).CaptureChange(context.Background(), &v1.CaptureChangeRequest{ChangeId: fs.Arg(0), Phase: phase, AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys, ExcludedDeviceIds: exclude})
 		if err != nil {
 			return err
 		}
@@ -412,7 +416,7 @@ func complianceCheck(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
+const help = `  change create -f cambio.yaml | pre|post [--accept [EQUIPO=]HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
          diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]

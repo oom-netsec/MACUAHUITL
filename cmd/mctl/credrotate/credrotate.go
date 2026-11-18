@@ -42,9 +42,13 @@ func rotate(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	fps, keys, err := cli.AcceptKeys(accept, []string{cli.HostPort(host, port)})
+	if err != nil {
+		return err
+	}
 	req := &v1.PlanCredRotateRequest{Target: &v1.AssistTarget{Name: host, Address: host, Port: port, CredentialId: credID}, User: user,
 		UpdateCredentialId: update, WriteMemory: true, // write memory es obligatorio en la rotación
-		AcceptedHostKeyFingerprints: accept}
+		AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys}
 	if !gen {
 		b, err := c.Secret(cli.T("mctl.credrotate.prompt", "user", user))
 		if err != nil {

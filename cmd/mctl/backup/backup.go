@@ -16,7 +16,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
-const runUsage = "backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]"
+const runUsage = "backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept [EQUIPO=]HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]"
 
 // target acepta "host" o "host:puerto" (un solo ':'; IPv6 va sin puerto).
 func target(s string) (*v1.Target, error) {
@@ -57,8 +57,12 @@ func (f *runFlags) start(c *cli.Env) (job string, scheduled bool, rep *v1.ToolRe
 	if len(f.devs) == 0 || f.cred == "" || f.keep < 0 || f.rounds < 0 || f.every < 0 {
 		return "", false, nil, errors.New("uso: mctl " + runUsage)
 	}
+	fps, keys, err := cli.AcceptKeys(f.accept, f.devs)
+	if err != nil {
+		return "", false, nil, err
+	}
 	req := &v1.StartBackupRequest{CredentialId: f.cred, Startup: f.startup, Keep: uint32(f.keep), IncludeSecrets: f.secrets,
-		IntervalSeconds: uint32(f.every / time.Second), Rounds: uint32(f.rounds), AcceptedHostKeyFingerprints: f.accept, ExcludedDeviceIds: f.exclude}
+		IntervalSeconds: uint32(f.every / time.Second), Rounds: uint32(f.rounds), AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys, ExcludedDeviceIds: f.exclude}
 	for _, d := range f.devs {
 		t, err := target(d)
 		if err != nil {

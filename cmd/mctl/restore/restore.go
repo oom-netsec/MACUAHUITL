@@ -49,9 +49,13 @@ func diff(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	fps, keys, err := cli.AcceptKeys(accept, []string{cli.HostPort(addr, port)})
+	if err != nil {
+		return err
+	}
 	cl := v1.NewAssistServiceClient(c.Conn)
 	res, err := cl.PlanRestore(context.Background(), &v1.PlanRestoreRequest{Target: &v1.AssistTarget{Name: addr, Address: addr, Port: port, CredentialId: credID},
-		BackupId: fs.Arg(1), ManagementInterface: mgmt, MaxLines: uint32(maxLines), AllowPartial: partial, WriteMemory: writeMe, AcceptedHostKeyFingerprints: accept})
+		BackupId: fs.Arg(1), ManagementInterface: mgmt, MaxLines: uint32(maxLines), AllowPartial: partial, WriteMemory: writeMe, AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys})
 	if err != nil {
 		return err
 	}
