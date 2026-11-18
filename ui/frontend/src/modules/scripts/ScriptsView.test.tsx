@@ -240,6 +240,25 @@ test("un script de configuración de varias líneas no se envía: ofrece Copiar 
   expect(go).not.toHaveBeenCalled();
 });
 
+test("con needsCopy la cabecera ofrece «Copiar comandos» con texto, y si el portapapeles falla se ve el error", async () => {
+  const { core } = setup();
+  await screen.findByText("L2 · STP");
+  await open("Config · VLAN y puerto de acceso");
+  await userEvent.click(screen.getByRole("button", { name: "Copiar comandos" }));
+  await waitFor(() => expect(core.copyText).toHaveBeenCalledWith("configure terminal\nvlan 10\nend"));
+  (core.copyText as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("portapapeles bloqueado"));
+  await userEvent.click(screen.getByRole("button", { name: "Copiar comandos" }));
+  expect(await screen.findByText(/portapapeles bloqueado/)).toBeInTheDocument();
+});
+
+test("sin needsCopy no hay «Copiar comandos» en la cabecera: la acción es Enviar a la terminal", async () => {
+  setup();
+  await screen.findByText("L2 · STP");
+  await open("L2 · STP");
+  expect(screen.getByRole("button", { name: "Enviar a la terminal" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Copiar comandos" })).not.toBeInTheDocument();
+});
+
 test("un script de configuración de una sola línea sí se envía", async () => {
   const { go } = setup();
   await mine();

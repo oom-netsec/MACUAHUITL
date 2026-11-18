@@ -158,6 +158,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
                 <>
                   {!needsCopy(sel) &&
                     <button type="button" className="sm" title={t("scripts.sendHint")} onClick={() => go("terminal", encodeInsert({ name: sel.name, text: scriptText(sel.commands), readOnly: sel.readOnly }), "terminal-insert")}><Icon name="terminal" />{t("scripts.send")}</button>}
+                  {needsCopy(sel) && <CopyButton value={sel.commands.join("\n")} label={t("scripts.copyWhat", { name: sel.name })} text={t("scripts.copyCmds")} onError={(e) => setErr(errorText(e))} />}
                   <button type="button" className="sm" onClick={() => duplicate(sel)}>{t("scripts.dup")}</button>
                   {sel.origin === "usuario" && (
                     <>
@@ -175,7 +176,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
               {needsCopy(sel) && <Notice kind="warn">{t("scripts.noSend")}</Notice>}
               {sel.description && <p>{sel.description}</p>}
               {sel.tags.length > 0 && <p className="scr-meta"><span className="hint">{t("scripts.tags")}</span>{sel.tags.map((x) => <Badge key={x}>{x}</Badge>)}</p>}
-              <div className="scr-cmdhead"><strong>{t("scripts.commands")}</strong><CopyButton value={sel.commands.join("\n")} label={t("scripts.copyWhat", { name: sel.name })} /></div>
+              <div className="scr-cmdhead"><strong>{t("scripts.commands")}</strong><CopyButton value={sel.commands.join("\n")} label={t("scripts.copyWhat", { name: sel.name })} onError={(e) => setErr(errorText(e))} /></div>
               <pre className="scr-cmds">{sel.commands.map((c, i) => <code key={i} className="scr-line">{c}</code>)}</pre>
               {sel.origin === "biblioteca" && <p className="hint">{t("scripts.libNote")}</p>}
             </ResultPanel>

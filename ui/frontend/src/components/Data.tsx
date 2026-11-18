@@ -7,23 +7,25 @@ import { Icon } from "./Icon";
 import { Badge, type Tone } from "./Page";
 
 // Copia IP, MAC, hash, huella, comando o ruta. Confirma en el mismo lugar, sin mover nada.
-export function CopyButton({ value, label }: { value: string; label: string }) {
+export function CopyButton({ value, label, text, onError }: { value: string; label: string; text?: string; onError?: (e: unknown) => void }) {
   const t = useT();
   const core = useContext(CoreContext);
   const [done, setDone] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const copy = async () => {
-    try { await (core ? core.copyText(value) : navigator.clipboard?.writeText(value)); } catch { return; }
+    try { await (core ? core.copyText(value) : navigator.clipboard?.writeText(value)); } catch (e) { onError?.(e); return; }
     setDone(true);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setDone(false), 1400);
   };
   return (
     <span className="copy">
-      <button type="button" className="quiet icon sm" aria-label={t("data.copy", { label })} title={t("data.copy", { label })} onClick={copy}>
-        <Icon name={done ? "ok" : "copy"} size={14} />
-      </button>
+      {text
+        ? <button type="button" className="sm" onClick={copy}><Icon name={done ? "ok" : "copy"} size={14} />{text}</button>
+        : <button type="button" className="quiet icon sm" aria-label={t("data.copy", { label })} title={t("data.copy", { label })} onClick={copy}>
+            <Icon name={done ? "ok" : "copy"} size={14} />
+          </button>}
       <span role="status" className="sr">{done ? t("data.copied") : ""}</span>
     </span>
   );
