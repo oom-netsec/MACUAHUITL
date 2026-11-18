@@ -67,7 +67,7 @@ func TestListDevicesDescubreOutputDirDeLosTrabajos(t *testing.T) {
 	// Las carpetas de lote de respaldo (dentro de outputs/) no son raíces aparte.
 	lote := filepath.Join(d.Out, "respaldos", ".trabajos", "lote-1")
 	if _, err := d.DB().Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at) VALUES('j2','lote',?,'completed','2026-11-06T11:00:00Z')`,
-		`{"Name":"lote","OutputDir":"`+lote+`"}`); err != nil {
+		`{"Name":"lote","OutputDir":`+strconv.Quote(lote)+`}`); err != nil {
 		t.Fatal(err)
 	}
 	if roots := service.JobOutputRoots(d); len(roots) != 1 || roots[0] != raiz {
