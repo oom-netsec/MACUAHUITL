@@ -18,7 +18,8 @@ type fakeTransfer struct {
 
 func (f fakeTransfer) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartServerServer) error {
 	st.Send(&v1.StartServerResponse{Event: &v1.StartServerResponse_Ready{Ready: &v1.ServerReady{ServerId: "s1", Protocol: r.Protocol, Listening: "127.0.0.1:6969",
-		RecvDir: r.RecvDir, FromDir: r.FromDir, User: "mac", Password: "pw"}}})
+		RecvDir: r.RecvDir, FromDir: r.FromDir, User: "mac", Password: "pw",
+		Warnings: []*v1.ServerWarning{{Code: "fileserve.hint.warn_from_writable", Message: "otros pueden escribir /f", Cmd: "chmod go-w /f"}}}}})
 	st.Send(&v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: `{"File":"a.cfg"}`}})
 	select {
 	case <-f.stopped:
@@ -75,7 +76,7 @@ func TestTransferBridge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec.waitFor(t, `transfer:ready {"files":null,"fingerprints":null,"fromDir":"/f","hint":"","listening":"127.0.0.1:6969","password":"pw","protocol":"tftp","recvDir":"/r","runId":"`+id+`","serverId":"s1","user":"mac"}`)
+	rec.waitFor(t, `transfer:ready {"files":null,"fingerprints":null,"fromDir":"/f","hint":"","listening":"127.0.0.1:6969","password":"pw","protocol":"tftp","recvDir":"/r","runId":"`+id+`","serverId":"s1","user":"mac","warnings":[{"code":"fileserve.hint.warn_from_writable","message":"otros pueden escribir /f","cmd":"chmod go-w /f"}]}`)
 	rec.waitFor(t, `transfer:msg {"runId":"`+id+`","transfer":"{\"File\":\"a.cfg\"}"}`)
 	if ok, err := b.TransferStop("s1"); err != nil || !ok {
 		t.Fatalf("%v %v", ok, err)

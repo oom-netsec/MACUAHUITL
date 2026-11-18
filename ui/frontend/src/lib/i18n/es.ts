@@ -3038,6 +3038,7 @@ export const es = {
   "patrol.phase.ARM_FAILED": "No arrancó (antes de armar)",
   "settings.storage.err.sin_unidad": "En Windows la carpeta debe empezar con una letra de unidad (C:\\...); no se aceptan rutas de red ni de dispositivo.",
   "transfer.recvDirOpen.cmd": "Orden para quitar la escritura ajena (cópiala y córrela tú; la app nunca la aplica)",
+  "transfer.warn.cmd": "Orden para corregir la carpeta",
 };
 
 export type Key = keyof typeof es;

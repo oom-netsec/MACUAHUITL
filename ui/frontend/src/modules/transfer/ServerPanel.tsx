@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -67,6 +67,12 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {r.protocol === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
       {r.protocol === "tftp" && r.recvDir && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
       {s.legacy && <Notice kind="warn">{t("transfer.legacyWarn")}</Notice>}
+      {r.warnings?.map((w, i) => (
+        <Fragment key={`${w.code}-${i}`}>
+          <Notice kind="warn">{w.message}</Notice>
+          {w.cmd && !s.done && <Console label={t("transfer.warn.cmd")} text={w.cmd} copy={core.copyText} />}
+        </Fragment>
+      ))}
       <dl className="stats">
         <div><dt>{t("transfer.addr")}</dt><dd className="mono">{r.listening} <CopyButton value={r.listening} label={t("transfer.addr")} /></dd></div>
         {r.user && <div><dt>{t("transfer.user")}</dt><dd className="mono">{r.user} <CopyButton value={r.user} label={t("transfer.user")} /></dd></div>}

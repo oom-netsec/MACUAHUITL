@@ -454,3 +454,23 @@ test("done vacía el lote pendiente: ninguna línea se pierde y el orden se cons
   expect(rows[1]).toHaveTextContent("f0");
   expect(rows[3]).toHaveTextContent("f2");
 });
+
+// 43d-2b: los avisos de carpeta de ServerReady.warnings: el texto como aviso y la orden en una consola copiable.
+test("avisos de carpeta del servidor: texto como aviso y orden aparte; sin orden no hay consola; cerrado, sin orden", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ warnings: [
+    { code: "fileserve.hint.warn_from_writable", message: "Otros usuarios pueden escribir en /srv/img.", cmd: "chmod go-w '/srv/img'" },
+    { code: "fileserve.hint.warn_unverified", message: "No se pudieron revisar los permisos de /srv/img.", cmd: "" },
+  ] }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const notes = within(card).getAllByRole("status").map((n) => n.textContent);
+  expect(notes).toContain("Otros usuarios pueden escribir en /srv/img.");
+  expect(notes).toContain("No se pudieron revisar los permisos de /srv/img.");
+  expect(notes.join("")).not.toContain("chmod"); // la orden nunca va dentro del texto del aviso
+  const fix = within(card).getByRole("log", { name: "Orden para corregir la carpeta" });
+  expect(fix).toHaveTextContent("chmod go-w '/srv/img'");
+  expect(within(card).getAllByRole("log", { name: "Orden para corregir la carpeta" })).toHaveLength(1);
+  act(() => core.emitTransfer({ runId: "r1", done: true }));
+  await waitFor(() => expect(within(card).queryByRole("log", { name: "Orden para corregir la carpeta" })).toBeNull());
+  expect(within(card).getByText("Otros usuarios pueden escribir en /srv/img.")).toBeInTheDocument();
+});

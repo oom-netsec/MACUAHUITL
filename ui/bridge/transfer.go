@@ -33,7 +33,7 @@ type TransferServeDTO struct {
 }
 
 // TransferServe abre un servidor y emite transfer:ready {runId, serverId, protocol, listening, hint,
-// user, password, fingerprints, recvDir, fromDir, files}, transfer:msg {runId, transfer} por cada
+// user, password, fingerprints, recvDir, fromDir, files, warnings[{code, message, cmd}]}, transfer:msg {runId, transfer} por cada
 // transferencia o rechazo y transfer:done {runId, error?, cleanup?}. Se detiene con TransferStop(serverId)
 // o con DiagCancel(runId).
 func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
@@ -71,8 +71,13 @@ func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
 				continue
 			}
 			if rd := r.GetReady(); rd != nil {
+				warns := []ServerWarningDTO{}
+				for _, w := range rd.Warnings {
+					warns = append(warns, ServerWarningDTO{Code: w.Code, Message: w.Message, Cmd: w.Cmd})
+				}
 				b.emit("transfer:ready", map[string]any{"runId": id, "serverId": rd.ServerId, "protocol": rd.Protocol, "listening": rd.Listening,
-					"hint": rd.Hint, "user": rd.User, "password": rd.Password, "fingerprints": rd.Fingerprints, "recvDir": rd.RecvDir, "fromDir": rd.FromDir, "files": rd.Files})
+					"hint": rd.Hint, "user": rd.User, "password": rd.Password, "fingerprints": rd.Fingerprints, "recvDir": rd.RecvDir, "fromDir": rd.FromDir, "files": rd.Files,
+					"warnings": warns})
 				continue
 			}
 			b.emit("transfer:msg", map[string]any{"runId": id, "transfer": r.GetTransferJson()})
@@ -220,6 +225,13 @@ func (b *Bridge) TransferPut(d TransferPutDTO) (TransferResultDTO, error) {
 			AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
 		return resultDTO(r.GetResult()), err
 	})
+}
+
+// ServerWarningDTO: aviso de carpeta del servidor (43d-2b); la UI muestra message como texto y cmd aparte, copiable.
+type ServerWarningDTO struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Cmd     string `json:"cmd"`
 }
 
 type TransferHintDTO struct {
