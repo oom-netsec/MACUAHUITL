@@ -224,21 +224,21 @@ func (s *assistSvc) busyLocked(keys []string) (string, bool) {
 	return "", false
 }
 
-// connErr traduce los errores de conexión a códigos gRPC. La huella de una llave nueva va en el mensaje.
+// connErr traduce los errores de conexión a códigos gRPC; ErrFrom conserva reason y metadata (llave de host).
 func connErr(ctx context.Context, err error) error {
 	var he *transport.HostKeyError
 	switch {
 	case err == nil:
 		return nil
 	case errors.As(err, &he):
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
-		return status.Error(codes.PermissionDenied, err.Error())
+		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	if s := service.VaultErr(ctx, err); status.Code(s) != codes.Internal {
 		return s
 	}
-	return status.Error(codes.Unavailable, err.Error())
+	return service.ErrFrom(ctx, codes.Unavailable, err)
 }
 
 func (s *assistSvc) vault(ctx context.Context) error {
