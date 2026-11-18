@@ -3,6 +3,9 @@ package service
 import (
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -170,5 +173,24 @@ func TestOutputsIlegibleSinApiCruda(t *testing.T) {
 	}
 	if causaSistema(errors.New("otro")).Error() != "otro" {
 		t.Fatal("un error que no es PathError pasa igual")
+	}
+}
+
+// Por el camino de CheckOutputs: un fallo que no es «no existe» sale sin llamada cruda. En Linux EvalSymlinks devuelve el errno pelado, así que el *PathError de os.Stat (el de Windows) no se alcanza aquí.
+func TestCheckOutputsIlegibleSinLlamadaCruda(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("el error de «no es una carpeta» es otro en Windows")
+	}
+	f := filepath.Join(t.TempDir(), "archivo")
+	if err := os.WriteFile(f, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := CheckOutputs(filepath.Join(f, "sub"), NewCoreSettings("fabrica", t.TempDir()), true)
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "prefs.outputs.ilegible" {
+		t.Fatalf("err = %v", err)
+	}
+	if s := i18n.In(i18n.En, err); strings.Contains(s, "lstat") || strings.Contains(s, "stat ") || !strings.Contains(s, "not a directory") {
+		t.Fatalf("%q", s)
 	}
 }

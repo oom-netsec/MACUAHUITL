@@ -251,7 +251,7 @@ func get(c *cli.Env, args []string) error {
 		Sha256: sha256, Md5: md5, Sha512: sha512, Insecure: insecure, AcceptedHostKeyFingerprints: accepted, MaxBytes: maxBytes,
 		TimeoutSeconds: int32(timeout / time.Second), LegacySsh: legacy})
 	if err != nil {
-		return hostKeyHelp(err)
+		return cli.HostKeyHelp(err)
 	}
 	fmt.Fprintln(c.Out, r.Result.Report)
 	return nil
@@ -291,7 +291,7 @@ func put(c *cli.Env, args []string) error {
 	r, err := v1.NewTransferServiceClient(c.Conn).Put(context.Background(), &v1.PutRequest{Url: fs.Arg(0), FromDir: d, Name: name, CredentialId: cred,
 		AcceptedHostKeyFingerprints: accepted, MaxBytes: maxBytes, TimeoutSeconds: int32(timeout / time.Second), LegacySsh: legacy})
 	if err != nil {
-		return hostKeyHelp(err)
+		return cli.HostKeyHelp(err)
 	}
 	fmt.Fprintln(c.Out, r.Result.Report)
 	return nil
@@ -322,7 +322,7 @@ func ls(c *cli.Env, args []string) error {
 	r, err := v1.NewTransferServiceClient(c.Conn).Browse(context.Background(), &v1.BrowseRequest{Url: fs.Arg(0), CredentialId: cred, Path: path, MaxEntries: int32(maxEntries),
 		Insecure: insecure, LegacySsh: legacy, AcceptedHostKeyFingerprints: accepted, TimeoutSeconds: int32(timeout / time.Second)})
 	if err != nil {
-		return hostKeyHelp(err)
+		return cli.HostKeyHelp(err)
 	}
 	if asJSON {
 		b, err := protojson.MarshalOptions{Indent: "  ", EmitUnpopulated: true}.Marshal(r)
@@ -355,15 +355,6 @@ func ls(c *cli.Env, args []string) error {
 		fmt.Fprintln(c.Out, cli.T("mctl.transfer.truncated"))
 	}
 	return nil
-}
-
-// hostKeyHelp explica cómo aceptar una llave de host nueva, sin aceptarla por el usuario.
-func hostKeyHelp(err error) error {
-	if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && (strings.Contains(err.Error(), "llave de host") || strings.Contains(err.Error(), "host key")) {
-		fp := strings.Fields(err.Error()[i:])[0]
-		return cli.ErrWrap("mctl.common_a.accept_host_key", err, "fp", fp)
-	}
-	return err
 }
 
 func stop(c *cli.Env, args []string) error {

@@ -1,6 +1,8 @@
 package vault
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -31,5 +33,24 @@ func TestVaultSinTartamudeo(t *testing.T) {
 	}
 	if _, err := OpenBackup(p+".no", pw("frase-larga-1234")); err == nil || strings.Count(err.Error(), "vault:") != 1 {
 		t.Fatalf("OpenBackup inexistente: %v", err)
+	}
+}
+
+// wrap y textErr conservan la cadena: errors.Is/As siguen alcanzando la causa del sistema.
+func TestVaultErroresConservanLaCausa(t *testing.T) {
+	v, p := newVault(t)
+	if _, err := Open(p + ".no"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Open: %v", err)
+	}
+	if _, err := OpenBackup(p+".no", pw("frase-larga-1234")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("OpenBackup: %v", err)
+	}
+	if err := os.Mkdir(p+".bak", 0o700); err != nil {
+		t.Fatal(err)
+	}
+	_, err := v.Put(cred("core", "pw", "en"))
+	var le *os.LinkError // el rename del .bak, a través de textErr
+	if !errors.As(err, &le) {
+		t.Errorf("el .bak perdió la causa: %v", err)
 	}
 }

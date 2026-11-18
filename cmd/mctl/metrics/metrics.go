@@ -205,10 +205,7 @@ func portsStatus(c *cli.Env, args []string) error {
 	}
 	r, err := v1.NewMetricsServiceClient(c.Conn).GetPortStatus(context.Background(), req)
 	if err != nil {
-		if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && (strings.Contains(err.Error(), "llave de host") || strings.Contains(err.Error(), "host key")) {
-			return cli.ErrWrap("mctl.common_a.accept_host_key", err, "fp", strings.Fields(err.Error()[i:])[0])
-		}
-		return err
+		return cli.HostKeyHelp(err)
 	}
 	if asJSON {
 		b, err := protojson.MarshalOptions{Indent: "  ", EmitUnpopulated: true}.Marshal(r)

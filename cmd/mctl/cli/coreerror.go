@@ -45,3 +45,16 @@ func CoreError(err error) error {
 	}
 	return errors.New(st.Message())
 }
+
+// HostKeyHelp explica cómo aceptar una llave de host nueva, sin aceptarla por el usuario; el status del núcleo se
+// envuelve ya sin «rpc error: code = …».
+func HostKeyHelp(err error) error {
+	err = CoreError(err)
+	if err == nil {
+		return nil
+	}
+	if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && (strings.Contains(err.Error(), "llave de host") || strings.Contains(err.Error(), "host key")) {
+		return ErrWrap("mctl.common_a.accept_host_key", err, "fp", strings.Fields(err.Error()[i:])[0])
+	}
+	return err
+}

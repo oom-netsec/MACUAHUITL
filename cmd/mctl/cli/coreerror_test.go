@@ -71,3 +71,14 @@ func TestCoreErrorMensajeVacio(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// La ayuda de llave de host envuelve el status sin su prefijo «rpc error: code = … desc = ».
+func TestHostKeyHelpSinPrefijoRPC(t *testing.T) {
+	err := HostKeyHelp(status.Error(codes.FailedPrecondition, "host key desconocida SHA256:abcd efgh"))
+	if err == nil || strings.Contains(err.Error(), "rpc error") || !strings.Contains(err.Error(), "SHA256:abcd") {
+		t.Fatalf("got %v", err)
+	}
+	if got := HostKeyHelp(status.Error(codes.Internal, "otra cosa")).Error(); got != "otra cosa" {
+		t.Fatalf("got %q", got)
+	}
+}
