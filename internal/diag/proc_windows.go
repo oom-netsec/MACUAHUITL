@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -85,14 +84,15 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	// En el heap y con KeepAlive: el wrapper de x/sys recibe un uintptr y, si el stack creciera, el kernel leería la copia vieja.
-	info := new(windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION)
+	// LazyProc.Call lleva //go:uintptrescapes: info escapa al heap y no se mueve con el stack mientras dura la llamada.
+	// El wrapper SetInformationJobObject de x/sys recibe un uintptr sin esa marca, y el kernel leería una copia vieja del stack.
+	var info windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
 	info.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(info)), uint32(unsafe.Sizeof(*info))); err != nil {
+	if r, _, e := procSetInformationJobObject.Call(uintptr(job), uintptr(windows.JobObjectExtendedLimitInformation),
+		uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info)); r == 0 {
 		windows.CloseHandle(job)
-		return nil, nil, err
+		return nil, nil, e
 	}
-	runtime.KeepAlive(info)
 	cmd.SysProcAttr = &windows.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED | windows.CREATE_NO_WINDOW}
 	cmd.WaitDelay = 3 * time.Second
 	// Las DLL que falten se buscan junto a la herramienta, no en el cwd heredado.
@@ -138,6 +138,8 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 		}
 	}, nil
 }
+
+var procSetInformationJobObject = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetInformationJobObject")
 
 // terminateJob es la costura de las pruebas: comprueban que no se termina un job ya cerrado.
 var terminateJob = windows.TerminateJobObject

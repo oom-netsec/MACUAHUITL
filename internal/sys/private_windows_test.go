@@ -382,8 +382,10 @@ func TestForeignWritersSoloLecturaYSoloHerencia(t *testing.T) {
 	}
 	const authUsers = "S-1-5-11"
 	var entries []windows.EXPLICIT_ACCESS
+	var keep []*windows.SID
 	for _, s := range []string{userString(t), authUsers} {
 		sid, _ := windows.StringToSid(s)
+		keep = append(keep, sid)
 		inh := uint32(windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT)
 		if s == authUsers {
 			inh |= 0x8 // INHERIT_ONLY_ACE
@@ -392,6 +394,7 @@ func TestForeignWritersSoloLecturaYSoloHerencia(t *testing.T) {
 			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(sid)}})
 	}
 	acl, err := windows.ACLFromEntries(entries, nil)
+	runtime.KeepAlive(keep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,23 +406,32 @@ func TestForeignWritersSoloLecturaYSoloHerencia(t *testing.T) {
 	}
 }
 
-// Los SID de protect y ReadOnlyDir viajan en el EXPLICIT_ACCESS como uintptr: con el GC forzado entre medio, la DACL
-// tiene que seguir llevando los SID correctos.
+// Los SID de protect y ReadOnlyDir viajan en el EXPLICIT_ACCESS como uintptr: el hijo, con GC agresivo y
+// GODEBUG=clobberfree=1 (los objetos liberados se rellenan con basura), tiene que ver siempre la DACL correcta.
 func TestProtectYReadOnlyDirConGCForzado(t *testing.T) {
+	cmd := exec.Command(os.Args[0], "-test.run=^TestProtectGCHijo$")
+	cmd.Env = append(os.Environ(), "MCTL_SYS_GC_HIJO=1", "GODEBUG=clobberfree=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("hijo: %v\n%s", err, out)
+	}
+}
+
+func TestProtectGCHijo(t *testing.T) {
+	if os.Getenv("MCTL_SYS_GC_HIJO") != "1" {
+		t.Skip("solo como hijo de TestProtectYReadOnlyDirConGCForzado")
+	}
+	defer debug.SetGCPercent(debug.SetGCPercent(1))
 	user, err := currentSID()
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := user.String()
-	for i := 0; i < 30; i++ {
-		runtime.GC()
-		debug.FreeOSMemory()
+	for i := 0; i < 200; i++ {
 		d := t.TempDir()
 		if err := protect(d, true); err != nil {
 			t.Fatal(err)
 		}
 		runtime.GC()
-		debug.FreeOSMemory()
 		if ok, err := IsPrivate(d); err != nil || !ok {
 			t.Fatalf("vuelta %d: IsPrivate = %v, %v", i, ok, err)
 		}
@@ -428,7 +440,6 @@ func TestProtectYReadOnlyDirConGCForzado(t *testing.T) {
 			t.Fatal(err)
 		}
 		runtime.GC()
-		debug.FreeOSMemory()
 		_, _, aces, err := readACL(d)
 		if err != nil {
 			t.Fatal(err)

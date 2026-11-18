@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -61,6 +62,7 @@ func TestReadConcurrenteSerializado(t *testing.T) {
 	}
 	cli, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, 0, 0)
 	if err != nil {
+		windows.CloseHandle(srv)
 		t.Fatal(err)
 	}
 	defer windows.CloseHandle(cli)
@@ -88,7 +90,14 @@ func TestReadConcurrenteSerializado(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	wg.Wait()
+	fin := make(chan struct{})
+	go func() { wg.Wait(); close(fin) }()
+	select {
+	case <-fin:
+	case <-time.After(10 * time.Second):
+		windows.CancelIoEx(srv, nil)
+		t.Fatal("los lectores no terminaron en 10 s")
+	}
 	close(got)
 	tot := 0
 	for k := range got {

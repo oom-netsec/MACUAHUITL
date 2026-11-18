@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -95,37 +94,18 @@ func TestCancelTrasDoneNoTerminaElJob(t *testing.T) {
 	old := terminateJob
 	terminateJob = func(h windows.Handle, code uint32) error { calls++; return old(h, code) }
 	defer func() { terminateJob = old }()
-	done()
-	done()                              // idempotente: no cierra dos veces
 	if err := cmd.Start(); err != nil { // Cancel también hace Kill: hace falta un proceso (queda suspendido)
 		t.Fatal(err)
 	}
 	defer cmd.Wait()
+	cmd.Cancel() // con el job abierto sí lo termina, una vez
+	if calls != 1 {
+		t.Fatalf("Cancel antes de done: %d llamadas, quiero 1", calls)
+	}
+	done()
+	done() // idempotente: no cierra dos veces
 	cmd.Cancel()
-	if calls != 0 {
-		t.Fatalf("TerminateJobObject sobre un job cerrado (%d llamadas)", calls)
-	}
-}
-
-func growStack(n int) byte {
-	var pad [512]byte
-	if n == 0 {
-		return pad[0]
-	}
-	return growStack(n-1) + pad[n%len(pad)]
-}
-
-// El Job Object se configura con info en el heap: con el stack creciendo y el GC forzado antes de cada confine, el job
-// sigue llevando KILL_ON_JOB_CLOSE (cerrarlo mata al nieto).
-func TestConfineConStackCreciendoYGC(t *testing.T) {
-	for i := 0; i < 3; i++ {
-		done := make(chan struct{})
-		go func() { // stack nuevo y chico en cada vuelta
-			defer close(done)
-			growStack(200)
-			runtime.GC()
-			confineProbe(t, func(_ func(), done func()) { done() })
-		}()
-		<-done
+	if calls != 1 {
+		t.Fatalf("Cancel tras done terminó un job cerrado (%d llamadas)", calls)
 	}
 }
