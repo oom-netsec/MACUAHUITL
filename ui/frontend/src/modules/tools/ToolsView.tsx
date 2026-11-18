@@ -1,3 +1,4 @@
+import { Advanced } from "../../components/Advanced";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CoreAPI, SyslogEvent } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -68,9 +69,9 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("pcap.title")} description={t("pcap.desc")}>
       <PathField label={t("pcap.path")} hint={t("pcap.path.hint")} value={path} onChange={setPath} pick={pick} />
-      <div className="field-row">
+      <Advanced changed={top !== "20" ? 1 : 0}>
         <Field label={t("pcap.top")} type="number" value={top} onChange={setTop} w="sm" />
-      </div>
+      </Advanced>
       <div className="actions">
         <button className="primary" disabled={!path || r.busy} aria-busy={r.busy} onClick={() => r.run(run)}>{t("pcap.analyze")}{runKbd}</button>
       </div>
@@ -145,9 +146,13 @@ export function TlsPanel({ core }: { core: CoreAPI }) {
     <Page title={t("tls.title")} description={t("tls.desc")}>
       <div className="field-row">
         <Field label={t("tls.host")} value={host} onChange={setHost} w="lg" mono />
-        <Field label={t("tls.port")} type="number" value={port} onChange={setPort} w="xs" mono />
-        <Field label={t("tls.sni")} hint={t("tls.sni.hint")} value={sni} onChange={setSni} w="lg" mono />
       </div>
+      <Advanced changed={Number(port !== "443") + Number(sni !== "")}>
+        <div className="field-row">
+          <Field label={t("tls.port")} type="number" value={port} onChange={setPort} w="xs" mono />
+          <Field label={t("tls.sni")} hint={t("tls.sni.hint")} value={sni} onChange={setSni} w="lg" mono />
+        </div>
+      </Advanced>
       <div className="actions">
         <button className="primary" disabled={!host || r.busy} aria-busy={r.busy} onClick={() => r.run(async () => {
           const p = Number(port) || 443;
