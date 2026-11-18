@@ -621,7 +621,7 @@ test("evento entre GetRun y el montaje de la grilla: el equipo aparece con su es
   const row = await screen.findByRole("row", { name: /10\.0\.0\.7:22/ });
   expect(within(row).getByText("Completado")).toBeInTheDocument();
   expect(screen.queryByRole("row", { name: /10\.9\.9\.9:22/ })).toBeNull();
-  // Después de montar, la grilla sigue en vivo (sin duplicar el evento ya aplicado).
+  // Después de montar, la grilla sigue en vivo.
   act(() => core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.7:22", state: "DEVICE_STATE_FAILED" } }));
   expect(within(screen.getByRole("row", { name: /10\.0\.0\.7:22/ })).getByText("Fallido")).toBeInTheDocument();
 });
@@ -638,4 +638,15 @@ test("un evento guardado más viejo que GetRun no pisa el estado terminal que tr
   await act(async () => resolveRun([{ target: "10.0.0.7:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]));
   const row = await screen.findByRole("row", { name: /10\.0\.0\.7:22/ });
   expect(within(row).getByText("Completado")).toBeInTheDocument();
+});
+
+test("DeviceGrid marca el búfer como escuchando al montar y lo suelta al desmontar; aplica lo guardado una vez", () => {
+  const core = fakeCore();
+  const early = { events: [{ jobId: "j1", deviceStateChanged: { deviceId: "10.0.0.8:22", state: "DEVICE_STATE_COMPLETED" } }], live: false };
+  const { unmount } = render(<DeviceGrid core={core} jobId="j1" devices={[]} early={early} />);
+  expect(early.live).toBe(true);
+  expect(early.events).toHaveLength(0);
+  expect(within(screen.getByRole("row", { name: /10\.0\.0\.8:22/ })).getByText("Completado")).toBeInTheDocument();
+  unmount();
+  expect(early.live).toBe(false);
 });

@@ -39,7 +39,9 @@ export function DeviceGrid({ core, jobId, devices: known, initial, cpu, early }:
         return { ...r, [d.deviceId]: next };
       });
     };
-    // GetRun solo trae equipos que ya terminaron la ronda: su estado manda sobre un evento guardado, que es igual o más viejo.
+    // GetRun solo trae equipos que ya terminaron la ronda: su estado manda sobre un evento guardado, que en la misma ronda es igual o
+    // más viejo. shortcut: si la ronda siguiente empezó mientras GetRun estaba en curso, el evento nuevo de ese equipo se descarta y
+    // la fila queda con la ronda anterior hasta su próximo evento; CoreEvent no trae la ronda para distinguirlo.
     early?.events.splice(0).filter((e) => !initial?.[(e.deviceStateChanged ?? e.commandProgress)?.deviceId ?? ""]).forEach(apply);
     if (early) early.live = true;
     const off = core.onEvent(apply);

@@ -29,8 +29,10 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   // Eventos de equipos que llegan mientras la grilla se arma (GetRun en curso, o justo después de armar): la grilla los aplica al montar.
   const early = useRef<EarlyEvents>({ events: [], live: false }).current;
   useEffect(() => core.onEvent((e) => {
-    // shortcut: tope de 5000 eventos guardados, de sobra para el hueco de un GetRun; más allá, la ronda siguiente corrige la grilla.
-    if (!early.live && e.jobId === job.id && (e.deviceStateChanged || e.commandProgress) && early.events.length < 5000) early.events.push(e);
+    if (early.live || e.jobId !== job.id || !(e.deviceStateChanged || e.commandProgress)) return;
+    early.events.push(e);
+    // shortcut: tope de 5000 eventos (de sobra para el hueco de un GetRun); se quedan los más nuevos, que son los que valen.
+    if (early.events.length > 5000) early.events.shift();
   }), [core, job.id, early]);
 
   const { metrics, error: metricsErr } = useMetrics(core, job);
