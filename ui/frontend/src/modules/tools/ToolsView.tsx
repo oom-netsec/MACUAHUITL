@@ -170,7 +170,7 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
   const t = useT();
   const [host, setHost] = useState("127.0.0.1");
   const [port, setPort] = useState("5514");
-  const { ips } = useLocalIPs(core);
+  const { ips, err: ipsErr } = useLocalIPs(core);
   const [proto, setProto] = useState<"udp" | "tcp">("udp");
   const [any, setAny] = useState(false);
   const [save, setSave] = useState(false);
@@ -255,9 +255,10 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
     <Page title={t("syslog.title")} description={t("syslog.desc")}>
       <Section title={t("syslog.section.listen")}>
         <div className="field-row">
-          <ListenField label={t("syslog.addr")} value={host} onChange={(v) => { setHost(v); touch("addr"); }} any={any} onAny={setAny} ips={ips} port={port} onPort={(v) => { setPort(v); touch("addr"); }} portError={o.errors.addr} />
+          <ListenField label={t("syslog.addr")} hint={ipsErr || undefined} value={host} onChange={(v) => { setHost(v); touch("addr"); }} any={any} onAny={setAny} ips={ips} port={port} onPort={(v) => { setPort(v); touch("addr"); }} portError={o.errors.addr} />
           <Select label={t("syslog.proto")} value={proto} onChange={setProto} options={[["udp", "UDP"], ["tcp", "TCP"]]} w="xs" />
         </div>
+        {any && <Notice kind="warn">{t("listen.any.warn")}</Notice>}
         <Check label={t("syslog.save")} checked={save} onChange={setSave} disabled={!!runId} />
         {runId && <p className="hint">{t("syslog.locked")}</p>}
         <p className="hint">{t("syslog.hint")}</p>

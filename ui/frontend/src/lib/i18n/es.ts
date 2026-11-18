@@ -3052,7 +3052,7 @@ export const es = {
   "need.fixFields": "corregir los campos marcados",
   "need.bindIP": "elegir la dirección de escucha",
   "need.portValid": "poner un puerto válido",
-  "need.listen": "indicar la dirección de escucha (o elegir cualquiera)",
+  "need.listen": "indicar la dirección de escucha (o elegir «Todas las interfaces»)",
   "need.serveFiles": "elegir los archivos o la carpeta a servir",
   "need.aclText": "pegar la ACL a importar",
   "need.backupSure": "marcar que entiendes el aviso",
@@ -3119,6 +3119,7 @@ export const es = {
   "listen.all": "Todas las interfaces (0.0.0.0)",
   "job.other": "Otra carpeta…",
   "job.other.label": "ID o ruta del trabajo",
+  "listen.any.warn": "Cualquier equipo de la red podrá inyectar datos falsos (syslog, traps o flujos) en la evidencia mientras esté abierto.",
 };
 
 export type Key = keyof typeof es;

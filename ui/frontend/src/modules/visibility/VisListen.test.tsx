@@ -24,6 +24,22 @@ test.each(["Traps", "Flujos"] as const)("%s: «Dirección de escucha» es un sel
   expect(screen.queryByLabelText(/Escuchar en todas las interfaces/)).toBeNull();
 });
 
+test.each(["Traps", "Flujos"] as const)("%s: con «Todas» sale un aviso de que cualquier equipo de la red puede inyectar datos; con una IP no", async (tab) => {
+  await setup(tab);
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Dirección de escucha"), "Todas las interfaces (0.0.0.0)");
+  expect(screen.getByText(/Cualquier equipo de la red podrá inyectar/)).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("Dirección de escucha"), "192.0.2.10");
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+});
+
+test.each(["Traps", "Flujos"] as const)("%s: si falla la carga de interfaces, el error sale como pista bajo el select", async (tab) => {
+  const core = fakeCore({ listInterfaces: vi.fn(async () => { throw new Error("sin interfaces"); }) });
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: tab }));
+  expect(await screen.findByText("sin interfaces")).toHaveClass("hint");
+});
+
 const cases = [["Traps", "trapsStart", "1162"], ["Flujos", "flowsStart", "2055"]] as const;
 const sent = (core: Awaited<ReturnType<typeof setup>>, fn: "trapsStart" | "flowsStart") => (core[fn] as unknown as Mock).mock.calls.at(-1)!.slice(0, 2);
 

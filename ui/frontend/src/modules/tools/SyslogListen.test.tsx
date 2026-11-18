@@ -42,3 +42,17 @@ test("syslog: con «Todas» no se envía la IP elegida: va 0.0.0.0 con el puerto
   await listen();
   expect(core.syslogStart).toHaveBeenLastCalledWith("0.0.0.0:5514", "udp", true, false, {});
 });
+
+test("syslog: con «Todas» sale el aviso de que cualquier equipo de la red puede inyectar syslog; con una IP no", async () => {
+  await setup();
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+  await userEvent.selectOptions(sel(), "Todas las interfaces (0.0.0.0)");
+  expect(screen.getByText(/Cualquier equipo de la red podrá inyectar/)).toBeInTheDocument();
+  await userEvent.selectOptions(sel(), "192.0.2.10");
+  expect(screen.queryByText(/inyectar/)).toBeNull();
+});
+
+test("syslog: si falla la carga de interfaces, el error sale como pista bajo el select", async () => {
+  render(<SyslogPanel core={fakeCore({ listInterfaces: vi.fn(async () => { throw new Error("sin interfaces"); }) })} />);
+  expect(await screen.findByText("sin interfaces")).toHaveClass("hint");
+});

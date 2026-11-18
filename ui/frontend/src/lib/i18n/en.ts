@@ -3053,7 +3053,7 @@ export const en: Record<Key, string> = {
   "need.fixFields": "fix the highlighted fields",
   "need.bindIP": "choose the listen address",
   "need.portValid": "enter a valid port",
-  "need.listen": "enter the listen address (or choose any)",
+  "need.listen": "enter the listen address (or choose \"All interfaces\")",
   "need.serveFiles": "choose the files or folder to serve",
   "need.aclText": "paste the ACL to import",
   "need.backupSure": "tick that you understand the warning",
@@ -3120,4 +3120,5 @@ export const en: Record<Key, string> = {
   "listen.all": "All interfaces (0.0.0.0)",
   "job.other": "Other folder…",
   "job.other.label": "Job ID or path",
+  "listen.any.warn": "Any device on the network will be able to inject fake data (syslog, traps or flows) into the evidence while this is open.",
 };

@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { ListenField, joinListen, splitHostPort } from "./ListenField";
+import { ListenField, joinListen, useLocalIPs } from "./ListenField";
+import { fakeCore } from "../lib/fake";
 
 const ips: [string, string][] = [["192.0.2.10", "eth0"], ["127.0.0.1", "lo"]];
 function Host({ start = "192.0.2.10", port, spy }: { start?: string; port?: string; spy?: (s: { v: string; any: boolean; port: string }) => void }) {
@@ -49,10 +50,15 @@ test("sin port no hay campo de puerto", () => {
   expect(screen.queryByLabelText("Puerto")).toBeNull();
 });
 
-test("splitHostPort y joinListen son inversos, también con IPv6", () => {
-  expect(splitHostPort("127.0.0.1:5514")).toEqual({ host: "127.0.0.1", port: "5514" });
-  expect(splitHostPort("[::1]:5514")).toEqual({ host: "::1", port: "5514" });
-  expect(splitHostPort("host")).toEqual({ host: "host", port: "" });
+test("joinListen pone corchetes solo al IPv6", () => {
   expect(joinListen("127.0.0.1", "5514")).toBe("127.0.0.1:5514");
   expect(joinListen("::1", "5514")).toBe("[::1]:5514");
+});
+
+test("useLocalIPs no ofrece IPv6 link-local (fe80::/10): sin zona el bind falla", async () => {
+  const core = fakeCore({ listInterfaces: vi.fn(async () => [{ name: "eth0", up: true, loopback: false, hardwareAddr: "", addresses: ["192.0.2.10/24", "fe80::1/64", "FE80::2/64", "febf::3/64", "fec0::4/64", "2001:db8::1/64"] }]) });
+  function H() { const { ips } = useLocalIPs(core); return <ul>{ips.map(([ip]) => <li key={ip}>{ip}</li>)}</ul>; }
+  render(<H />);
+  await screen.findByText("192.0.2.10");
+  expect(screen.getAllByRole("listitem").map((x) => x.textContent)).toEqual(["192.0.2.10", "fec0::4", "2001:db8::1"]);
 });

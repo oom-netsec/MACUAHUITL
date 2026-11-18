@@ -570,7 +570,7 @@ test("Abrir servidor nombra la IP y los archivos que faltan y deja de hacerlo al
   setup();
   const go = () => screen.getByRole("button", { name: "Abrir servidor" });
   expect(go()).toBeDisabled();
-  expect(go()).toHaveAccessibleDescription("Falta: indicar la dirección de escucha (o elegir cualquiera), elegir los archivos o la carpeta a servir.");
+  expect(go()).toHaveAccessibleDescription("Falta: indicar la dirección de escucha (o elegir «Todas las interfaces»), elegir los archivos o la carpeta a servir.");
   await screen.findByRole("option", { name: /192.0.2.10/ });
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
   expect(go()).toHaveAccessibleDescription("Falta: elegir los archivos o la carpeta a servir.");

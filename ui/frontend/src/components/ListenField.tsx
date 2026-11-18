@@ -10,16 +10,12 @@ const ALL = "0.0.0.0";
 export function useLocalIPs(core: CoreAPI) {
   const [ips, setIps] = useState<[string, string][]>([]);
   const [err, clear] = useCoreLoad((live) => core.listInterfaces().then((l) => {
-    if (live()) setIps((l ?? []).filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as [string, string])));
+    if (live()) setIps((l ?? []).filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as [string, string])).filter(([ip]) => !/^fe[89ab]/i.test(ip))); // fe80::/10 sin zona no se puede enlazar
   }), [core]);
   return { ips, err, clear };
 }
 
-// «host:puerto» ↔ partes; el IPv6 va entre corchetes solo al unir.
-export function splitHostPort(s: string): { host: string; port: string } {
-  const i = s.lastIndexOf(":");
-  return i < 0 ? { host: s, port: "" } : { host: s.slice(0, i).replace(/^\[|\]$/g, ""), port: s.slice(i + 1) };
-}
+// «host:puerto»; el IPv6 va entre corchetes solo al unir.
 export const joinListen = (host: string, port: string) => (host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`);
 
 // Un solo «Escuchar en»: IP local o «Todas». Elegir «Todas» solo marca `any`; lo que se envía lo decide la vista (con any, 0.0.0.0).
