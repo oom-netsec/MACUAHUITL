@@ -77,7 +77,7 @@ func resolveDir(dir string, st *CoreSettings) (string, error) {
 	if !filepath.IsAbs(dir) {
 		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
 	}
-	if slices.Contains(strings.Split(dir, string(filepath.Separator)), "..") {
+	if slices.Contains(strings.FieldsFunc(dir, func(r rune) bool { return r < 0x80 && os.IsPathSeparator(uint8(r)) }), "..") { // en Windows también «/»: C:\a/../b
 		return "", outputsErr("prefs.outputs.punto_punto", "dir", dir)
 	}
 	// shortcut: EvalSymlinks ya resolvió (y abrió SMB si el enlace apuntaba a una UNC) antes de poder comprobar el destino. Solo el propio
