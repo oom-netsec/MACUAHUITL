@@ -577,7 +577,7 @@ func (c *Core) deps(j *job) patrol.Deps {
 	c.mu.Lock()
 	v, verified := c.vault, j.verified
 	c.mu.Unlock()
-	return patrol.Deps{Guard: c.guard, Hosts: c.hosts, Vault: v, Audit: c.log, Now: c.o.Now, Playbooks: j.catalog(c), MissingPack: c.missingPack,
+	return patrol.Deps{JobID: j.id, Guard: c.guard, Hosts: c.hosts, Vault: v, Audit: c.log, Now: c.o.Now, Playbooks: j.catalog(c), MissingPack: c.missingPack,
 		PrimaryVerified: verified, RetryBackoff: c.o.RetryBackoff}
 }
 

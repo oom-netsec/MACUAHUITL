@@ -142,15 +142,64 @@ func jobCancel(c *cli.Env, args []string) error {
 }
 
 func jobList(c *cli.Env, args []string) error {
-	if _, err := cli.Flags("job list", args, nil); err != nil {
+	var all bool
+	if _, err := cli.Flags("job list", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&all, "all", false, "incluye los trabajos de días anteriores (Past jobs)")
+	}); err != nil {
 		return err
 	}
-	r, err := v1.NewPatrolServiceClient(c.Conn).ListJobs(context.Background(), &v1.ListJobsRequest{IncludePast: true}) // hasta 46e (job list --all): como antes, todos
+	r, err := v1.NewPatrolServiceClient(c.Conn).ListJobs(context.Background(), &v1.ListJobsRequest{IncludePast: all})
 	if err != nil {
 		return err
 	}
 	for _, j := range r.Jobs {
-		fmt.Fprintf(c.Out, "%s  %s  %s\n", j.JobId, j.Name, j.State)
+		fin := "-" // activo o creado: aún no termina
+		if j.FinishedAt != nil {
+			fin = j.FinishedAt.AsTime().Local().Format("2006-01-02 15:04:05")
+		}
+		fmt.Fprintf(c.Out, "%s  %s  %s  %s\n", j.JobId, j.Name, j.State, fin)
+	}
+	return nil
+}
+
+// jobRm quita trabajos del historial (la evidencia en disco no se toca). Los saltados (activos, en uso) no son un error:
+// se listan con su motivo y el código de salida sigue en 0; solo InvalidArgument e Internal del núcleo salen con error.
+func jobRm(c *cli.Env, args []string) error {
+	fs, err := cli.Flags("job rm", args, nil)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return cli.Err("mctl.patrol.rm_need_id")
+	}
+	return removeJobs(c, &v1.RemoveJobsRequest{JobIds: fs.Args()})
+}
+
+// jobClear quita todos los terminados; --finished es obligatorio para que no se confunda con borrar todo.
+func jobClear(c *cli.Env, args []string) error {
+	var finished bool
+	fs, err := cli.Flags("job clear", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&finished, "finished", false, "quita del historial todos los trabajos terminados (obligatorio)")
+	})
+	if err != nil {
+		return err
+	}
+	if !finished || fs.NArg() != 0 {
+		return cli.Err("mctl.patrol.clear_need_finished")
+	}
+	return removeJobs(c, &v1.RemoveJobsRequest{AllFinished: true})
+}
+
+func removeJobs(c *cli.Env, req *v1.RemoveJobsRequest) error {
+	r, err := v1.NewPatrolServiceClient(c.Conn).RemoveJobs(context.Background(), req)
+	if err != nil {
+		return err
+	}
+	for _, id := range r.RemovedIds {
+		fmt.Fprintln(c.Out, cli.T("mctl.patrol.removed", "id", id))
+	}
+	for _, s := range r.Skipped {
+		fmt.Fprintln(c.Out, cli.T("mctl.patrol.skipped", "id", s.JobId, "reason", s.Reason))
 	}
 	return nil
 }
@@ -232,7 +281,8 @@ func jobWatch(c *cli.Env, args []string) error {
 
 // help son las líneas de este área en mctl --help.
 const help = `  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
-        cancel ID | list | watch ID
+        cancel ID | list [--all] | watch ID
+        rm ID... | clear --finished   (quitan del historial; la evidencia en disco no se borra)
   playbooks [--platform P]`
 
 // Area registra los comandos de patrol.
@@ -243,6 +293,8 @@ func Area() cli.Area {
 		{Name: "job arm", Run: jobArm},
 		{Name: "job cancel", Run: jobCancel},
 		{Name: "job list", Run: jobList},
+		{Name: "job rm", Run: jobRm},
+		{Name: "job clear", Run: jobClear},
 		{Name: "job watch", Run: jobWatch},
 		{Name: "playbooks", Run: playbooks},
 	}}

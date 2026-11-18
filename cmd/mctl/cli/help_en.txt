@@ -11,7 +11,8 @@
          export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);
          each conflict needs a decision per ID or label, or --all; if one is missing nothing is imported)
   job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept FINGERPRINT]... [--exclude DEVICE]... ID
-        cancel ID | list | watch ID
+        cancel ID | list [--all] | watch ID
+        rm ID... | clear --finished   (remove from history; the evidence on disk is not deleted)
   playbooks [--platform P]
   audit verify | export
   (any command: --no-color or NO_COLOR turn color off; with --json or without a TTY there is no color)
@@ -107,7 +108,7 @@
   backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
         (saves show running-config in the backups folder, outputs/respaldos/DEVICE/, with 0600; a Patrol job: read-only.
          With --every and --rounds it is scheduled and the core saves each round)
-  backup collect JOB [--keep N] [--json]   saves what a job has collected (idempotent)
+  backup collect (JOB | --dir FOLDER) [--keep N] [--json]   saves what a job (or the folder of a run already removed from history) has collected (idempotent)
   backup list [DEVICE] [--json]            saved backups (flags those with masked secrets)
   backup diff ID_A ID_B | ID_A --now -d DEVICE --cred ID [--json]
         (differences between two backups, or against the current running config: takes a new one; without volatile lines)
