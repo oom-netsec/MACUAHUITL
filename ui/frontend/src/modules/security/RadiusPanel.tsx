@@ -26,8 +26,13 @@ export function RadiusPanel({ core }: { core: CoreAPI }) {
   const [f, set] = useForm(initial);
   const r = useResult<Probe<RadiusReportData>>();
   const go = () => {
-    void r.run(() => probe(core.secRadiusReport, core.secRadius, { host: f.host, authPort: Number(f.authPort) || 1812, acctPort: Number(f.acctPort) || 1813, ...s.values, method: f.method,
-      nasIp: f.nasIp, nasId: f.nasId, portType: f.portType, serviceType: f.serviceType, called: f.called, calling: f.calling, statusServer: f.statusServer, accounting: f.accounting }));
+    // Con Status-Server la UI oculta atributos y usuario: eso no viaja (vacío/por defecto).
+    const sso = f.statusServer;
+    const attrs = sso ? { method: "", nasIp: "", nasId: "", portType: "", serviceType: "", called: "", calling: "", accounting: false }
+      : { method: f.method, nasIp: f.nasIp, nasId: f.nasId, portType: f.portType, serviceType: f.serviceType, called: f.called, calling: f.calling, accounting: f.accounting };
+    const who = sso ? { credId: "", username: "", password: "" } : {};
+    void r.run(() => probe(core.secRadiusReport, core.secRadius, { host: f.host, authPort: Number(f.authPort) || 1812, acctPort: attrs.accounting ? Number(f.acctPort) || 1813 : 0,
+      ...s.values, ...who, ...attrs, statusServer: sso }));
     s.clear();
   };
   return (

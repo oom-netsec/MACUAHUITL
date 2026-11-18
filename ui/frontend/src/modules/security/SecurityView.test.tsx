@@ -222,3 +222,84 @@ test("pki: la contraseña de la llave y las del export se vacían tras enviarse"
   await waitFor(() => expect(core.secPkiExport).toHaveBeenCalledWith(expect.objectContaining({ exportPassword: "epw" })));
   expect(screen.getByLabelText("Contraseña del PKCS#12")).toHaveValue("");
 });
+
+test("radius con Status-Server no manda lo que la UI oculta", async () => {
+  const core = fakeCore({ secRadius: vi.fn(async () => "ok") });
+  render(<SecurityView core={core} />);
+  await userEvent.type(screen.getByLabelText("Servidor"), "ise01");
+  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3");
+  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
+  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.selectOptions(screen.getByLabelText("Método"), "chap");
+  await userEvent.type(screen.getByLabelText("NAS-IP-Address"), "1.1.1.1");
+  await userEvent.click(screen.getByLabelText(/Accounting/));
+  await userEvent.click(screen.getByLabelText(/Solo Status-Server/));
+  await userEvent.click(screen.getByRole("button", { name: "Probar" }));
+  await waitFor(() => expect(core.secRadius).toHaveBeenCalled());
+  expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ secret: "s3", statusServer: true, method: "", nasIp: "", nasId: "", portType: "", serviceType: "", called: "", calling: "",
+    accounting: false, acctPort: 0, credId: "", username: "", password: "" }));
+});
+
+test("radius sin accounting no manda el puerto de accounting", async () => {
+  const core = fakeCore({ secRadius: vi.fn(async () => "ok") });
+  render(<SecurityView core={core} />);
+  await userEvent.type(screen.getByLabelText("Servidor"), "ise01");
+  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3");
+  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
+  await userEvent.click(screen.getByRole("button", { name: "Probar" }));
+  await waitFor(() => expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ acctPort: 0, method: "pap", accounting: false })));
+});
+
+test("exportar DER manda solo el certificado", async () => {
+  const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
+  await userEvent.type(screen.getByLabelText("Cadena (PEM, opcional)"), "CHAIN");
+  await userEvent.type(screen.getByLabelText("Llave sellada a exportar"), "SEALED");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave a exportar"), "kp");
+  await userEvent.type(screen.getByLabelText("Contraseña del PKCS#12"), "ep");
+  await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/x");
+  await userEvent.selectOptions(screen.getByLabelText("Formato"), "der");
+  await userEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(core.secPkiExport).toHaveBeenCalledWith({ format: "der", cert: "C", chain: "", sealedKey: "", keyPassword: "", exportPassword: "", plainKey: false, path: "/x" }));
+});
+
+test("exportar PEM con llave en claro manda llave y contraseña de llave, sin contraseña de p12", async () => {
+  const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
+  await userEvent.type(screen.getByLabelText("Contraseña del PKCS#12"), "ep");
+  await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/x");
+  await userEvent.selectOptions(screen.getByLabelText("Formato"), "pem");
+  await userEvent.click(screen.getByLabelText(/SIN cifrar/));
+  await userEvent.type(screen.getByLabelText("Llave sellada a exportar"), "SEALED");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave a exportar"), "kp");
+  await userEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(core.secPkiExport).toHaveBeenCalledWith({ format: "pem", cert: "C", chain: "", sealedKey: "SEALED", keyPassword: "kp", exportPassword: "", plainKey: true, path: "/x" }));
+});
+
+test("exportar PEM sin llave en claro no manda llave ni plainKey de otro formato", async () => {
+  const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
+  await userEvent.type(screen.getByLabelText("Llave sellada a exportar"), "SEALED");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave a exportar"), "kp");
+  await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/x");
+  await userEvent.selectOptions(screen.getByLabelText("Formato"), "pem");
+  await userEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(core.secPkiExport).toHaveBeenCalledWith(expect.objectContaining({ format: "pem", sealedKey: "", keyPassword: "", plainKey: false })));
+});
+
+test("csr con llave sellada no manda el algoritmo oculto", async () => {
+  const core = fakeCore({ secPkiCsr: vi.fn(async () => ({ pem: "P", key: "K", text: "t" })) });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.type(screen.getByLabelText("CN"), "ise01.lab");
+  await userEvent.type(screen.getByLabelText(/Llave sellada existente/), "SEALED");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave"), "kpw");
+  await userEvent.click(screen.getByRole("button", { name: "Generar CSR" }));
+  await waitFor(() => expect(core.secPkiCsr).toHaveBeenCalledWith(expect.objectContaining({ sealedKey: "SEALED", algorithm: "" })));
+});
