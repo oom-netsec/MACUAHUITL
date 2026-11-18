@@ -89,7 +89,7 @@ test("la tarjeta de SCP muestra las huellas de las llaves de host", async () => 
 test("el registro en vivo, Detener y la lista que sobrevive al cambiar de pestaña", async () => {
   const core = await openServer(setup());
   act(() => {
-    core.emitTransfer({ runId: "r1", ready: ready({ recvDir: "/o/recibidos/x" }) });
+    core.emitTransfer({ runId: "r1", ready: ready({ recvDir: "/o/recibidos/x", fromDir: "", files: [] }) });
     core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.1", File: "r1-config.txt", Bytes: 2048, Duration: 1e9, Result: "ok", Dir: "write-text", dirCode: "write", SHA256: "f".repeat(64) } });
     core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.9", File: "x", Bytes: 0, Duration: 0, Result: "error", Rejected: true, Error: "no publicado" } });
   });
@@ -590,4 +590,13 @@ test("servidor: recibir no pide carpeta de envío y una ruta inválida oculta no
   expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeEnabled();
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ write: true, fromDir: "" }));
+});
+
+test("tarjeta en modo recibir: la orden de IOS solo sube (sin descarga ni marcador de archivo)", async () => {
+  const core = setup();
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ recvDir: "/o/rx", fromDir: "", files: [] }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const log = within(card).getByRole("log", { name: "Comandos de IOS" });
+  expect(log).toHaveTextContent("copy running-config tftp://192.0.2.10/r1-config.txt");
+  expect(log.textContent).not.toMatch(/flash:/);
 });
