@@ -70,17 +70,19 @@ type opts struct {
 	m    map[string]string
 	used map[string]bool
 	err  error
-	tool Tool
+	tool string // clave de validOptions: la herramienta, con «/modo» en iperf3
+	win  bool
 }
 
 // validOptions son las claves que buildPlan lee por herramienta, ordenadas: se listan cuando llega una desconocida.
 // Una prueba cruza esta tabla con buildPlan para que no se desincronice.
-var validOptions = map[Tool][]string{
-	Ping:       {"continuous", "count", "df", "duration", "family", "interval", "size", "source", "sweep_end", "sweep_start", "sweep_step", "timeout", "tos", "ttl"},
-	Traceroute: {"max_hops"},
-	Nmap:       {"ports", "scan", "service_detection", "skip_discovery", "timing"},
-	Iperf3:     {"bind", "mode", "parallel", "port", "reverse", "seconds", "udp"},
-	Pcap:       {"filter", "interface", "packets", "seconds"},
+var validOptions = map[string][]string{
+	"ping":          {"continuous", "count", "df", "duration", "family", "interval", "size", "source", "sweep_end", "sweep_start", "sweep_step", "timeout", "tos", "ttl"},
+	"traceroute":    {"max_hops"},
+	"nmap":          {"ports", "scan", "service_detection", "skip_discovery", "timing"},
+	"iperf3/client": {"mode", "parallel", "port", "reverse", "seconds", "udp"},
+	"iperf3/server": {"bind", "mode", "port", "seconds"},
+	"pcap":          {"filter", "interface", "packets", "seconds"},
 }
 
 func (o *opts) str(key string, allowed ...string) (string, bool) {
@@ -148,6 +150,21 @@ func (o *opts) fail(err error) {
 	}
 }
 
+// validKeys son las claves que acepta esta herramienta (y modo); en Windows sin las que ping no tiene allá.
+func (o *opts) validKeys() []string {
+	ks := validOptions[o.tool]
+	if !o.win || o.tool != string(Ping) {
+		return ks
+	}
+	out := make([]string, 0, len(ks))
+	for _, k := range ks {
+		if k != "tos" && k != "interval" {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 func (o *opts) done() error {
 	if o.err != nil {
 		return o.err
@@ -159,7 +176,7 @@ func (o *opts) done() error {
 	sort.Strings(keys) // el primero (en orden) es el que se reporta: error estable
 	for _, k := range keys {
 		if !o.used[k] {
-			return i18n.New("diag.err.option", i18n.A("key", k, "valid", strings.Join(validOptions[o.tool], ", ")))
+			return i18n.New("diag.err.option", i18n.A("key", k, "valid", strings.Join(o.validKeys(), ", ")))
 		}
 	}
 	return nil
@@ -189,7 +206,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 }
 
 func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, err error) {
-	o := &opts{m: r.Options, used: map[string]bool{}, tool: r.Tool}
+	o := &opts{m: r.Options, used: map[string]bool{}, tool: string(r.Tool), win: win}
 	switch r.Tool {
 	case Ping:
 		host, err := one(r, false)
@@ -251,6 +268,10 @@ func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, e
 		bin, argv = "nmap", append(argv, "-n", "-oG", "-", host)
 	case Iperf3:
 		mode, _ := o.str("mode", "client", "server")
+		o.tool += "/client"
+		if mode == "server" {
+			o.tool = "iperf3/server"
+		}
 		switch mode {
 		case "client", "":
 			host, err := one(r, false)
