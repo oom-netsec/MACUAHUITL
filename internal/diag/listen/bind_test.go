@@ -79,6 +79,26 @@ func TestBindEnUso(t *testing.T) {
 	}
 }
 
+// 43e-6: el servicio OpenSSH de Windows ocupa el 22: pista propia, mismo reason (contrato del ADR 0004).
+func TestBindEnUsoOpenSSHWindows(t *testing.T) {
+	for _, tc := range []struct {
+		goos  string
+		errno error
+		port  int
+		ssh   bool
+	}{{"windows", syscall.Errno(10048), 22, true}, {"windows", syscall.Errno(10048), 2222, false}, {"linux", syscall.EADDRINUSE, 22, false}} {
+		c := bindErr(t, tc.goos, tc.errno, tc.port)
+		es, en := c.Localize(i18n.Es), c.Localize("en")
+		if c.Reason() != "fileserve.err.port_in_use" || strings.Contains(es, "OpenSSH") != tc.ssh || strings.Contains(en, "OpenSSH") != tc.ssh {
+			t.Errorf("%v: %s %q %q", tc, c.Reason(), es, en)
+		}
+	}
+	// EACCES en Linux no se confunde con «en uso»
+	if c := bindErr(t, "linux", syscall.EACCES, 22); c.Reason() == "fileserve.err.port_in_use" {
+		t.Error("EACCES tomado por en uso")
+	}
+}
+
 func TestBindOtroErrorSeConserva(t *testing.T) {
 	orig := errors.New("boom")
 	err := bindFor("linux", "listen", orig, 69)

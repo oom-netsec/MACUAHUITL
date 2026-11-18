@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -66,9 +67,10 @@ const (
 
 // Ready es lo que el usuario necesita saber al abrir el servidor.
 type Ready struct {
-	Addr         string
-	User, Pass   string   // FTP, SCP y SFTP: de un solo servidor, generados al abrir
-	Fingerprints []string // SCP y SFTP: huellas SHA256 de las llaves de host efímeras
+	Addr             string
+	User, Pass       string // FTP, SCP y SFTP: de un solo servidor, generados al abrir
+	FingerprintKinds []string
+	Fingerprints     []string // SCP y SFTP: huellas SHA256 de las llaves de host efímeras
 }
 
 type Config struct {
@@ -213,6 +215,9 @@ func RedirectCleanupAddr(proto, listening string) string {
 	if err != nil || perr != nil {
 		return ""
 	}
+	if s, ok := standard[proto]; ok && !isWindows() && p == s.port { // en Linux, en el puerto estándar no se sugirió redirección
+		return ""
+	}
 	return RedirectCleanup(proto, host, p)
 }
 
@@ -230,10 +235,12 @@ func HintIn(loc, proto, listen string, files []string) string {
 	b.WriteString(i18n.Msg(loc, "fileserve.hint.head", nil) + "\n")
 	for _, f := range files {
 		name := filepath.Base(f)
-		if proto == "tftp" {
+		if strings.ContainsRune(name, ' ') && proto != "http" {
+			fmt.Fprintf(&b, "  %s\n", i18n.Msg(loc, "fileserve.hint.name_spaces", i18n.A("name", name, "proto", strings.ToUpper(proto))))
+		} else if proto == "tftp" {
 			fmt.Fprintf(&b, "  copy tftp://%s/%s flash:\n", strings.TrimSuffix(net.JoinHostPort(h, "0"), ":0"), name) // [IPv6] entre corchetes
 		} else {
-			fmt.Fprintf(&b, "  copy http://%s/%s flash:\n", net.JoinHostPort(h, p), name)
+			fmt.Fprintf(&b, "  copy http://%s/%s flash:\n", net.JoinHostPort(h, p), url.PathEscape(name))
 		}
 	}
 	if proto == "tftp" {

@@ -38,6 +38,8 @@ func bindFor(goos, prefix string, err error, port int) error {
 	}
 	args := i18n.A("port", port)
 	switch {
+	case inUse && goos == "windows" && port == 22: // el servicio OpenSSH de Windows suele ocuparlo; mismo reason
+		return i18n.Wrap("fileserve.err.port_in_use_openssh", err, args)
 	case inUse:
 		return i18n.Wrap("fileserve.err.port_in_use", err, args)
 	case denied && goos == "linux" && port < 1024:

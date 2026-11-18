@@ -114,6 +114,7 @@ func Browse(ctx context.Context, r Request, path string, max int) (Listing, erro
 		return Listing{}, err
 	}
 	ls.Path = path
+	sinEspacios(&ls, r.URL.Scheme)
 	sort.SliceStable(ls.Entries, func(i, j int) bool {
 		a, b := ls.Entries[i], ls.Entries[j]
 		if (a.Type == "dir") != (b.Type == "dir") {
@@ -286,6 +287,18 @@ func (r *Request) sftpList(ctx context.Context, path string) (Listing, error) {
 	return ls, nil
 }
 
+// sinEspacios marca no descargables los nombres con espacio donde la ruta remota no los admite (todo menos ftp y sftp).
+func sinEspacios(ls *Listing, scheme string) {
+	if scheme == "ftp" || scheme == "sftp" {
+		return
+	}
+	for i := range ls.Entries {
+		if strings.ContainsRune(ls.Entries[i].Name, ' ') {
+			ls.Entries[i].Downloadable = false
+		}
+	}
+}
+
 // ---- HTTP(S): índice HTML simple ----
 
 func (r *Request) httpList(ctx context.Context, path string) (Listing, error) {
@@ -309,6 +322,9 @@ func (r *Request) httpList(ctx context.Context, path string) (Listing, error) {
 		return Listing{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound { // nuestro servidor publica sin índice a propósito
+		return Listing{}, i18n.New("xfer.err.no_index", nil)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return Listing{}, fmt.Errorf("HTTP %s", resp.Status)
 	}

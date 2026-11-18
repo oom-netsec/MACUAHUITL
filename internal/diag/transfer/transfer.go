@@ -156,12 +156,31 @@ func remotePath(u *url.URL) (string, error) {
 		return "", i18n.New("xfer.err.name_url", nil)
 	}
 	for _, c := range p {
+		if c == ' ' && (u.Scheme == "ftp" || u.Scheme == "sftp") { // %20 decodificado; CR/LF y lo demás siguen fuera
+			if spaceAtEdge(p) {
+				return "", i18n.New("xfer.err.name_url", nil)
+			}
+			continue
+		}
+		if c == ' ' && u.Scheme == "scp" {
+			return "", i18n.New("xfer.err.scp_space", nil)
+		}
 		ok := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-/:@+,=~", c)
 		if !ok {
 			return "", i18n.New("xfer.err.char", i18n.A("char", strconv.QuoteRune(c)))
 		}
 	}
 	return p, nil
+}
+
+// spaceAtEdge dice si algún tramo de la ruta empieza o termina en espacio (crearía nombres remotos con espacios al borde).
+func spaceAtEdge(p string) bool {
+	for _, seg := range strings.Split(p, "/") {
+		if seg != "" && (seg[0] == ' ' || seg[len(seg)-1] == ' ') {
+			return true
+		}
+	}
+	return false
 }
 
 type sink struct {

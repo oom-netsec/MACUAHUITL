@@ -168,8 +168,8 @@ func serve(c *cli.Env, args []string) error {
 			return err
 		}
 		if cl := r.GetClosed(); cl != nil {
-			if cl.Cleanup != "" {
-				fmt.Fprintln(out, cli.T("mctl.transfer.closed", "cmd", cleanLines(cl.Cleanup)))
+			if l := closedLineFor(runtime.GOOS, cl.Cleanup); l != "" {
+				fmt.Fprintln(out, l)
 			}
 			continue
 		}
@@ -460,4 +460,16 @@ func Area() cli.Area {
 		{Name: "transfer hint", Run: hint},
 		{Name: "transfer status", Run: status},
 	}}
+}
+
+// closedLine es el pie de cierre; sin comando que quitar (vacío o solo espacios) no hay pie.
+func closedLineFor(goos, cleanup string) string {
+	cmd := cleanLines(strings.TrimSpace(cleanup))
+	if cmd == "" {
+		return ""
+	}
+	if goos == "windows" { // ahí no hay redirección: la regla es de firewall
+		return cli.T("mctl.transfer.closed_win", "cmd", cmd)
+	}
+	return cli.T("mctl.transfer.closed", "cmd", cmd)
 }

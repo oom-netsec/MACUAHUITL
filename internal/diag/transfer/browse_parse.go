@@ -45,8 +45,11 @@ func remoteOK(name string) bool {
 	if name == "" || strings.HasPrefix(name, "-") {
 		return false
 	}
+	if name[0] == ' ' || name[len(name)-1] == ' ' { // el espacio interior lo admiten ftp y sftp (remotePath); scp y http lo filtra Browse
+		return false
+	}
 	for _, c := range name {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-:@+,=~", c)) {
+		if !(c == ' ' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-:@+,=~", c)) {
 			return false
 		}
 	}

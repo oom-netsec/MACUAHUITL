@@ -27,7 +27,7 @@ func erroresEs(t *testing.T) map[string]string {
 		_, err := Port(u(s))
 		put("puerto_"+n, err)
 	}
-	for n, s := range map[string]string{"vacia": "ftp://h/", "caracter": "ftp://h/a b", "opcion": "scp://h/-x", "ok": "ftp://h/a.cfg"} {
+	for n, s := range map[string]string{"vacia": "ftp://h/", "caracter": "tftp://h/a b", "opcion": "scp://h/-x", "ok": "ftp://h/a.cfg"} {
 		_, err := remotePath(u(s))
 		put("ruta_"+n, err)
 	}
