@@ -63,14 +63,14 @@ func TestChangeBridge(t *testing.T) {
 	if r := (<-fc.got).(*v1.CreateChangeRequest); r.Spec.Name != "crq" || r.Spec.Targets[0].Address != "192.0.2.1" {
 		t.Fatalf("create = %+v", r)
 	}
-	cp, err := b.ChangeCapture("ch1", "post", []string{"SHA256:x"}, nil)
+	cp, err := b.ChangeCapture("ch1", "post", []string{"SHA256:x"}, nil, nil)
 	if err != nil || cp.JobID != "j1" || cp.Armed || cp.Detail == "" {
 		t.Fatalf("capture = %+v %v", cp, err)
 	}
 	if r := (<-fc.got).(*v1.CaptureChangeRequest); r.Phase != v1.ChangePhase_CHANGE_PHASE_POST || r.AcceptedHostKeyFingerprints[0] != "SHA256:x" {
 		t.Fatalf("capture req = %+v", r)
 	}
-	if _, err := b.ChangeCapture("ch1", "durante", nil, nil); err == nil {
+	if _, err := b.ChangeCapture("ch1", "durante", nil, nil, nil); err == nil {
 		t.Fatal("unknown phase accepted")
 	}
 	ls, err := b.ListChanges()

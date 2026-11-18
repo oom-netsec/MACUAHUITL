@@ -35,7 +35,7 @@ func TestAdhocBridge(t *testing.T) {
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterAdhocServiceServer(r, f) })
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	Start(ctx, b)
-	st, err := b.AdhocStart([]AdhocTargetDTO{{Address: "192.0.2.1", Port: 2222}}, "c1", "show clock", []string{"SHA256:x"})
+	st, err := b.AdhocStart([]AdhocTargetDTO{{Address: "192.0.2.1", Port: 2222}}, "c1", "show clock", []string{"SHA256:x"}, nil)
 	if err != nil || !st.Armed || st.JobID != "j1" {
 		t.Fatalf("start %+v %v", st, err)
 	}

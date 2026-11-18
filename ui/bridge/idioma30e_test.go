@@ -20,7 +20,7 @@ func TestValidacionesDelPuenteEsYEn(t *testing.T) {
 		{"rondas", "rondas 0 y 2 inválidas", "invalid rounds 0 and 2", func(b *Bridge) error { _, e := b.AnalysisDiff("j", 0, 2, ""); return e }},
 		{"instante", `instante "x" inválido: usa RFC 3339 (2026-11-04T10:09:18Z)`, `invalid instant "x": use RFC 3339 (2026-11-04T10:09:18Z)`,
 			func(b *Bridge) error { _, e := b.AnalysisTimeline("j", "x", 0, "", ""); return e }},
-		{"fase", `fase "x" desconocida`, `unknown phase "x"`, func(b *Bridge) error { _, e := b.ChangeCapture("c", "x", nil, nil); return e }},
+		{"fase", `fase "x" desconocida`, `unknown phase "x"`, func(b *Bridge) error { _, e := b.ChangeCapture("c", "x", nil, nil, nil); return e }},
 		{"calculadora", `calculadora "x" desconocida`, `unknown calculator "x"`, func(b *Bridge) error { _, e := b.Calc("x", "{}"); return e }},
 		{"umbral", "umbral inválido", "invalid threshold", func(b *Bridge) error { _, e := b.ForensicLeaks("j", "", -1, 0); return e }},
 		{"guardar ruta", "guardar: la ruta debe ser absoluta", "save: the path must be absolute", func(b *Bridge) error { return b.WriteFile("r.txt", "x", "utf8", false) }},

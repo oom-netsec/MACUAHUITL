@@ -141,12 +141,13 @@ func (b *Bridge) JobMetrics(q MetricsQueryDTO) (JobMetricsDTO, error) {
 
 // PortStatusQueryDTO: con Job (ID o carpeta absoluta) lee la evidencia; sin Job consulta en vivo a Device por SSH.
 type PortStatusQueryDTO struct {
-	Job          string   `json:"job"`
-	Device       string   `json:"device"`
-	Port         int      `json:"port"`
-	CredentialID string   `json:"credentialId"`
-	HostKeys     []string `json:"acceptedHostKeys"`
-	LegacySSH    bool     `json:"legacySsh"`
+	Job          string               `json:"job"`
+	Device       string               `json:"device"`
+	Port         int                  `json:"port"`
+	CredentialID string               `json:"credentialId"`
+	HostKeys     []string             `json:"acceptedHostKeys"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	LegacySSH    bool                 `json:"legacySsh"`
 }
 
 type PortInfoDTO struct {
@@ -194,7 +195,7 @@ type PortStatusDTO struct {
 
 // PortStatus devuelve los puertos físicos de un switch para dibujar su frente.
 func (b *Bridge) PortStatus(q PortStatusQueryDTO) (PortStatusDTO, error) {
-	req := &v1.GetPortStatusRequest{Device: q.Device, Port: uint32(q.Port), CredentialId: q.CredentialID, AcceptedHostKeyFingerprints: q.HostKeys, LegacySsh: q.LegacySSH}
+	req := &v1.GetPortStatusRequest{Device: q.Device, Port: uint32(q.Port), CredentialId: q.CredentialID, AcceptedHostKeyFingerprints: q.HostKeys, AcceptedHostKeys: protoKeys(q.AcceptedKeys), LegacySsh: q.LegacySSH}
 	if filepath.IsAbs(q.Job) {
 		req.Dir = q.Job
 	} else {

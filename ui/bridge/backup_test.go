@@ -43,7 +43,7 @@ func TestBackupBridge(t *testing.T) {
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterBackupServiceServer(r, fb) })
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	Start(ctx, b)
-	st, err := b.BackupStart([]AdhocTargetDTO{{Address: "192.0.2.1", Port: 2222}}, "c1", true, 7, 3600, 3, false, []string{"SHA256:x"})
+	st, err := b.BackupStart([]AdhocTargetDTO{{Address: "192.0.2.1", Port: 2222}}, "c1", true, 7, 3600, 3, false, []string{"SHA256:x"}, nil)
 	if err != nil || !st.Armed || st.JobID != "j1" || len(fb.got.Targets) != 1 || fb.got.Targets[0].Port != 2222 || !fb.got.Startup || fb.got.Keep != 7 || fb.got.IntervalSeconds != 3600 || fb.got.Rounds != 3 || fb.got.IncludeSecrets {
 		t.Fatalf("start %+v %v %+v", st, err, fb.got)
 	}
