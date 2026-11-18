@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -69,6 +70,17 @@ type opts struct {
 	m    map[string]string
 	used map[string]bool
 	err  error
+	tool Tool
+}
+
+// validOptions son las claves que buildPlan lee por herramienta, ordenadas: se listan cuando llega una desconocida.
+// Una prueba cruza esta tabla con buildPlan para que no se desincronice.
+var validOptions = map[Tool][]string{
+	Ping:       {"continuous", "count", "df", "duration", "family", "interval", "size", "source", "sweep_end", "sweep_start", "sweep_step", "timeout", "tos", "ttl"},
+	Traceroute: {"max_hops"},
+	Nmap:       {"ports", "scan", "service_detection", "skip_discovery", "timing"},
+	Iperf3:     {"bind", "mode", "parallel", "port", "reverse", "seconds", "udp"},
+	Pcap:       {"filter", "interface", "packets", "seconds"},
 }
 
 func (o *opts) str(key string, allowed ...string) (string, bool) {
@@ -140,9 +152,14 @@ func (o *opts) done() error {
 	if o.err != nil {
 		return o.err
 	}
+	keys := make([]string, 0, len(o.m))
 	for k := range o.m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys) // el primero (en orden) es el que se reporta: error estable
+	for _, k := range keys {
 		if !o.used[k] {
-			return i18n.New("diag.err.option", i18n.A("key", k))
+			return i18n.New("diag.err.option", i18n.A("key", k, "valid", strings.Join(validOptions[o.tool], ", ")))
 		}
 	}
 	return nil
@@ -172,7 +189,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 }
 
 func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, err error) {
-	o := &opts{m: r.Options, used: map[string]bool{}}
+	o := &opts{m: r.Options, used: map[string]bool{}, tool: r.Tool}
 	switch r.Tool {
 	case Ping:
 		host, err := one(r, false)

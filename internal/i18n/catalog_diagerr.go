@@ -12,7 +12,7 @@ func init() {
 		"diag.err.target_kind":       e("destino {target:q} no es IP, nombre ni CIDR", "target {target:q} is not an IP, a name or a CIDR", "target"),
 		"diag.err.one_of":            e("{key} debe ser uno de {values}", "{key} must be one of {values}", "key", "values"),
 		"diag.err.number":            e("{key} debe ser un número entre {lo} y {hi}", "{key} must be a number between {lo} and {hi}", "key", "lo", "hi"),
-		"diag.err.option":            e("opción {key:q} no existe para esta herramienta", "option {key:q} does not exist for this tool", "key"),
+		"diag.err.option":            e("opción {key:q} no existe para esta herramienta; las válidas son: {valid}", "option {key:q} does not exist for this tool; the valid ones are: {valid}", "key", "valid"),
 		"diag.err.one_target":        e("se necesita exactamente un destino", "exactly one target is needed"),
 		"diag.err.ports":             e("ports {value:q} inválido; usa 22,80,443-445", "invalid ports {value:q}; use 22,80,443-445", "value"),
 		"diag.err.iperf_client":      e("iperf3 cliente: {cause}", "iperf3 client: {cause}", "cause"),
