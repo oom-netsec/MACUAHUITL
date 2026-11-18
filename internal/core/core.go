@@ -59,6 +59,7 @@ type Options struct {
 type job struct {
 	jobHistory
 	id        string
+	createdAt time.Time // de la fila (created_at); la poda cuenta desde aquí los created
 	spec      patrol.Spec
 	pbs       []playbook.Playbook // catálogo al crearse el trabajo: instalar o quitar un paquete no lo cambia
 	state     string              // created, arming, armed, completed, cancelled, failed (núcleo caído con el trabajo armado)
@@ -156,6 +157,7 @@ type Core struct {
 	activity    time.Time
 	stop        chan struct{}
 	watchers    sync.WaitGroup
+	pruner      sync.WaitGroup                   // la goroutine de poda: Close la espera sin tope antes de db.Close (a diferencia de watchers, adhoc_test espera watchers y la poda no termina hasta c.stop)
 	pinned      []func() []service.PinnedJob     // trabajos en uso por otros flujos (backup, change, adhoc): no se quitan
 	busy        []func(context.Context) []string // fuentes de trabajo vivo de los servicios (Shutdown las consulta)
 	cancelServe context.CancelFunc               // termina Serve (Shutdown); nil si no sirve
@@ -412,6 +414,12 @@ func (c *Core) Serve(ctx context.Context, l ipc.Listener) error {
 	defer cancel()
 	c.mu.Lock()
 	c.cancelServe = cancel
+	select {
+	case <-c.stop: // Close ya corre: no se arranca la poda (Add con Wait en vuelo)
+	default:
+		c.pruner.Add(1)
+		go c.pruneLoop()
+	}
 	c.mu.Unlock()
 	return ipc.Serve(ctx, l, func(s ipc.Registrar) {
 		d := coreDeps{c}
@@ -447,6 +455,7 @@ func (c *Core) Close() {
 	case <-done:
 	case <-time.After(30 * time.Second):
 	}
+	c.pruner.Wait() // una pasada en curso termina antes de cerrar la base; sin tope: sus esperas son cortas (una tx) y cerrar debajo perdería auditoría
 	c.respaldos.wipeAll()
 	c.db.Close()
 }
@@ -635,7 +644,7 @@ func (c *Core) loadJobs() {
 			fails = append(fails, [2]string{"", i18n.English(err)})
 			continue
 		}
-		j := &job{id: id, state: state, pbs: c.catalog(), results: map[int][]patrol.DeviceResult{}}
+		j := &job{id: id, state: state, createdAt: parseCreated(created), pbs: c.catalog(), results: map[int][]patrol.DeviceResult{}}
 		if err := json.Unmarshal([]byte(spec), &j.spec); err != nil {
 			fails = append(fails, [2]string{id, i18n.English(err)})
 			continue
@@ -692,7 +701,12 @@ func (j *job) endedAt(createdAt string) time.Time {
 			return j.Phases[i].At
 		}
 	}
-	t, _ := time.Parse(time.RFC3339, createdAt) // shortcut: ilegible → cero (nunca past ni podado); solo persistJob escribe created_at y siempre en RFC 3339
+	t := parseCreated(createdAt) // shortcut: ilegible → cero (nunca past ni podado); solo persistJob escribe created_at y siempre en RFC 3339
+	return t
+}
+
+func parseCreated(s string) time.Time {
+	t, _ := time.Parse(time.RFC3339, s)
 	return t
 }
 

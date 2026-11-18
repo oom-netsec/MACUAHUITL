@@ -318,7 +318,7 @@ func (s *patrolSvc) CreateJob(ctx context.Context, r *v1.CreateJobRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	j := &job{id: service.NewID(), spec: spec, state: "created", pbs: s.c.catalog(), results: map[int][]patrol.DeviceResult{}}
+	j := &job{id: service.NewID(), createdAt: s.c.o.Now(), spec: spec, state: "created", pbs: s.c.catalog(), results: map[int][]patrol.DeviceResult{}}
 	s.c.mu.Lock()
 	s.c.jobs[j.id] = j
 	s.c.mu.Unlock()

@@ -173,3 +173,60 @@ func (s *patrolSvc) RemoveJobs(ctx context.Context, r *v1.RemoveJobsRequest) (*v
 	}
 	return &v1.RemoveJobsResponse{Removed: int32(len(removed)), RemovedIds: removed, Skipped: skipped}, nil
 }
+
+// jobRetention: cuánto vive un trabajo terminado en el historial (fijo por decisión del dueño). Se cuenta desde finished_at
+// (en los created, desde created_at).
+const jobRetention = 7 * 24 * time.Hour
+
+// pruneEvery es cada cuánto corre la poda tras la pasada inmediata.
+const pruneEvery = time.Hour
+
+// pruneJobs quita del historial los trabajos quitables con 7 días o más; devuelve cuántos quitó. Idempotente.
+// Elige candidatos bajo c.mu y lo suelta: removeJobs revalida y hace el DELETE sin sostener c.mu.
+func (c *Core) pruneJobs() int {
+	now := c.o.Now().Round(0) // sin lectura monotónica: esa no avanza con el equipo suspendido y la poda llegaría tarde
+	var ids []string
+	c.mu.Lock()
+	for id, j := range c.jobs {
+		ref := j.FinishedAt
+		if j.state == "created" {
+			ref = j.createdAt
+		} else if !isFinal(j.state) {
+			continue
+		}
+		if !ref.IsZero() && !j.isActive() && now.Sub(ref) >= jobRetention {
+			ids = append(ids, id)
+		}
+	}
+	c.mu.Unlock()
+	select {
+	case <-c.stop: // el núcleo está cerrando: Close no espera una pasada que aún no tocó la base
+		return 0
+	default:
+	}
+	if len(ids) == 0 {
+		return 0
+	}
+	removed, _, _ := c.removeJobs(ids, "age_7d") // un fallo ya queda auditado (job.remove_failed) y la siguiente hora reintenta
+	return len(removed)
+}
+
+// pruneLoop poda al arrancar y luego cada pruneEvery, hasta c.stop. Close la espera (c.pruner) antes de cerrar la base.
+func (c *Core) pruneLoop() {
+	defer c.pruner.Done()
+	t := time.NewTicker(pruneEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.stop:
+			return
+		default:
+		}
+		c.pruneJobs()
+		select {
+		case <-c.stop:
+			return
+		case <-t.C:
+		}
+	}
+}
