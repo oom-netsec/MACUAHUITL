@@ -3117,6 +3117,8 @@ export const es = {
   "ssh.auth.sendFail": "No se pudo enviar la respuesta. Si la sesión sigue abierta, el equipo volverá a preguntar.",
   "ssh.hostKey.ack": "Entiendo que la llave de este equipo cambió",
   "listen.all": "Todas las interfaces (0.0.0.0)",
+  "job.other": "Otra carpeta…",
+  "job.other.label": "ID o ruta del trabajo",
 };
 
 export type Key = keyof typeof es;

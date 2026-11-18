@@ -43,7 +43,7 @@ export function FlapSection({ core }: { core: CoreAPI }) {
     <>
       <Intro text={t("forensic.flap.intro")} />
       <Section title={t("forensic.section.source")}>
-        <SourcePicker value={src} onChange={setSrc} />
+        <SourcePicker core={core} value={src} onChange={setSrc} />
       </Section>
       <Advanced label={t("forensic.section.thresholds")} changed={Number(count !== "3") + Number(win !== "60") + Number(delta !== "3")}>
         <div className="field-row">

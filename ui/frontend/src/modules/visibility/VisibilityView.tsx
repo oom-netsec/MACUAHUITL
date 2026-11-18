@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { JobField } from "../../components/JobField";
 import { ListenField, joinListen, useLocalIPs } from "../../components/ListenField";
 import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
@@ -122,7 +123,7 @@ function TopoPanel({ core }: { core: CoreAPI }) {
     <>
       <Section title={t("visibility.sec.source")} description={t("visibility.topo.note")}>
         <div className="field-row">
-          <Field label={t("visibility.topo.src")} value={src} onChange={setSrc} w="lg" mono />
+          <JobField core={core} label={t("visibility.topo.src")} value={src} onChange={setSrc} />
         </div>
         <Advanced changed={pcap !== "" ? 1 : 0}>
           <Field label={t("visibility.topo.pcap")} value={pcap} onChange={setPcap} w="lg" mono />

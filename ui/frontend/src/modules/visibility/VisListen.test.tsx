@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import type { Mock } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { VisibilityView } from "./VisibilityView";
 import { fakeCore } from "../../lib/fake";
@@ -13,7 +14,7 @@ async function setup(tab: "Traps" | "Flujos") {
 }
 const listen = () => userEvent.click(screen.getByRole("button", { name: "Escuchar" }));
 
-test.each([["Traps", "trapsStart", "1162"], ["Flujos", "flowsStart", "2055"]] as const)("%s: «Dirección de escucha» es un select con las IP de interfaces arriba y «Todas» al final; la casilla ya no existe", async (tab) => {
+test.each(["Traps", "Flujos"] as const)("%s: «Dirección de escucha» es un select con las IP de interfaces arriba y «Todas» al final; la casilla ya no existe", async (tab) => {
   await setup(tab);
   const o = within(screen.getByLabelText("Dirección de escucha")).getAllByRole("option").map((x) => x.textContent);
   expect(o).toContain("192.0.2.10 · eth0");
@@ -24,7 +25,7 @@ test.each([["Traps", "trapsStart", "1162"], ["Flujos", "flowsStart", "2055"]] as
 });
 
 const cases = [["Traps", "trapsStart", "1162"], ["Flujos", "flowsStart", "2055"]] as const;
-const sent = (core: Awaited<ReturnType<typeof setup>>, fn: "trapsStart" | "flowsStart") => core[fn].mock.calls.at(-1)!.slice(0, 2);
+const sent = (core: Awaited<ReturnType<typeof setup>>, fn: "trapsStart" | "flowsStart") => (core[fn] as unknown as Mock).mock.calls.at(-1)!.slice(0, 2);
 
 test.each(cases)("%s: sin tocar nada se envía lo mismo que antes (127.0.0.1 con su puerto, sin «todas»)", async (tab, fn, port) => {
   const core = await setup(tab);
@@ -47,5 +48,19 @@ test.each(cases)("%s: con «Todas» no se envía la IP elegida: va 0.0.0.0 con e
   await userEvent.selectOptions(screen.getByLabelText("Dirección de escucha"), "Todas las interfaces (0.0.0.0)");
   await listen();
   expect(sent(core, fn)).toEqual([`0.0.0.0:${port}`, true]);
-  expect(JSON.stringify(core[fn].mock.calls.at(-1))).not.toContain("192.0.2.10");
+  expect(JSON.stringify((core[fn] as unknown as Mock).mock.calls.at(-1))).not.toContain("192.0.2.10");
+});
+
+test("topología: «Trabajo o carpeta» elige un trabajo y envía su ID; «Otra carpeta…» envía la ruta", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j-new", name: "Lab nuevo", state: "completed", finishedAt: "2026-11-17T10:00:00Z" }]), topoBuild: vi.fn(async () => ({ text: "", json: "", svg: "" })) });
+  render(<VisibilityView core={core} />);
+  await screen.findByRole("option", { name: /Lab nuevo/ });
+  await userEvent.selectOptions(screen.getByLabelText(/Trabajo o carpeta/), "j-new");
+  await userEvent.click(screen.getByRole("button", { name: "Construir" }));
+  expect(core.topoBuild).toHaveBeenLastCalledWith("j-new", "");
+  await userEvent.selectOptions(screen.getByLabelText(/Trabajo o carpeta/), "Otra carpeta…");
+  await userEvent.clear(screen.getByLabelText("ID o ruta del trabajo"));
+  await userEvent.type(screen.getByLabelText("ID o ruta del trabajo"), "/x");
+  await userEvent.click(screen.getByRole("button", { name: "Construir" }));
+  expect(core.topoBuild).toHaveBeenLastCalledWith("/x", "");
 });

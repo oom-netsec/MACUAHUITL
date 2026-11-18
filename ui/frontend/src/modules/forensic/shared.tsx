@@ -1,4 +1,6 @@
 import { Field, Select, TextArea } from "../../components/Field";
+import { JobField } from "../../components/JobField";
+import type { CoreAPI } from "../../lib/core";
 import { EmptyState, ResultPanel } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
@@ -60,7 +62,7 @@ export function toSource(s: SourceState): LogSource | null {
 export const sourceMissing = (t: (k: "need.text" | "need.path" | "need.job") => string, s: SourceState) => !toSource(s) && t(s.kind === "path" ? "need.path" : s.kind === "job" ? "need.job" : "need.text");
 
 // SourcePicker elige de dónde salen los mensajes: texto pegado, archivo local, captura del receptor syslog o show logging de un trabajo de Patrol.
-export function SourcePicker({ value, onChange }: { value: SourceState; onChange: (s: SourceState) => void }) {
+export function SourcePicker({ core, value, onChange }: { core: CoreAPI; value: SourceState; onChange: (s: SourceState) => void }) {
   const t = useT();
   const set = (p: Partial<SourceState>) => onChange({ ...value, ...p });
   return (
@@ -74,7 +76,7 @@ export function SourcePicker({ value, onChange }: { value: SourceState; onChange
       {value.kind === "capture" && <p className="hint">{t("forensic.src.captureNote")}</p>}
       {value.kind === "job" && (
         <div className="field-row">
-          <Field label={t("forensic.src.jobLabel")} value={value.job} onChange={(job) => set({ job })} w="lg" mono />
+          <JobField core={core} label={t("forensic.src.jobLabel")} value={value.job} onChange={(job) => set({ job })} />
           <Field label={t("forensic.src.device")} value={value.device} onChange={(device) => set({ device })} w="md" mono />
         </div>
       )}

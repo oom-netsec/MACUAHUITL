@@ -3118,4 +3118,6 @@ export const en: Record<Key, string> = {
   "ssh.auth.sendFail": "The answer could not be sent. If the session is still open, the device will ask again.",
   "ssh.hostKey.ack": "I understand this device's host key changed",
   "listen.all": "All interfaces (0.0.0.0)",
+  "job.other": "Other folder…",
+  "job.other.label": "Job ID or path",
 };
