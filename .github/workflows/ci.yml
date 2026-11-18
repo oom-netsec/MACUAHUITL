@@ -203,8 +203,10 @@ jobs:
         run: |
           mkdir -p bin-win
           for f in macuahuitl.exe macuahuitld.exe mctl.exe; do echo "binario de prueba" > "bin-win/$f"; done
-          command -v makensis >/dev/null || export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          command -v makensis >/dev/null || { choco install nsis -y --no-progress >/dev/null && export PATH="$PATH:/c/Program Files (x86)/NSIS"; }
+          # NSIS: la imagen del runner ya no siempre lo trae, y choco puede dejarlo en cualquiera de las dos carpetas.
+          nsis() { for d in "/c/Program Files (x86)/NSIS" "/c/Program Files/NSIS"; do [ -x "$d/makensis.exe" ] && export PATH="$PATH:$d" && return 0; done; return 1; }
+          command -v makensis >/dev/null || nsis || { choco install nsis -y --no-progress && nsis; } || true
+          command -v makensis >/dev/null || { echo "::error::makensis no está en el PATH tras choco install nsis"; exit 1; }
           VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
           TEST_DELETE_DATA=1 VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/prueba-borrado.exe
       - name: instalar, desinstalar y que /S no borre los datos
@@ -242,8 +244,10 @@ jobs:
           go build -tags wails,production -ldflags -H=windowsgui -o bin-win/macuahuitl.exe ./ui
       - name: instalador NSIS
         run: |
-          command -v makensis >/dev/null || export PATH="$PATH:/c/Program Files (x86)/NSIS"
-          command -v makensis >/dev/null || { choco install nsis -y --no-progress >/dev/null && export PATH="$PATH:/c/Program Files (x86)/NSIS"; }
+          # NSIS: la imagen del runner ya no siempre lo trae, y choco puede dejarlo en cualquiera de las dos carpetas.
+          nsis() { for d in "/c/Program Files (x86)/NSIS" "/c/Program Files/NSIS"; do [ -x "$d/makensis.exe" ] && export PATH="$PATH:$d" && return 0; done; return 1; }
+          command -v makensis >/dev/null || nsis || { choco install nsis -y --no-progress && nsis; } || true
+          command -v makensis >/dev/null || { echo "::error::makensis no está en el PATH tras choco install nsis"; exit 1; }
           VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
       - name: windows-e2e (usuarios estándar, pipe, bóveda, Patrol, instalador)
         shell: pwsh
