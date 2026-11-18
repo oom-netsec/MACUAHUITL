@@ -22,7 +22,7 @@ const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 160
 test("traps: sin tocar las opciones se pide la escucha con {} y con lo escrito, solo eso", async () => {
   const core = await setup("Traps");
   await listen();
-  expect(core.trapsStart).toHaveBeenCalledWith("127.0.0.1:1162", false, false, "", "SHA", "AES", {});
+  expect(core.trapsStart).toHaveBeenCalledWith("127.0.0.1:1162", false, false, "", "", "", {});
   act(() => core.emitVis("traps", { runId: "t1", done: true }));
   await openOpts();
   await userEvent.click(screen.getByLabelText("Guardar en archivo"));
@@ -31,7 +31,7 @@ test("traps: sin tocar las opciones se pide la escucha con {} y con lo escrito, 
   await userEvent.selectOptions(screen.getByLabelText("Formato"), "jsonl");
   await userEvent.type(screen.getByLabelText("Plantilla del nombre"), "cap_{{fecha}");
   await listen();
-  expect(core.trapsStart).toHaveBeenLastCalledWith("127.0.0.1:1162", false, true, "", "SHA", "AES", { ratePerSource: 50, maxFiles: 5, format: "jsonl", nameTemplate: "cap_{fecha}" });
+  expect(core.trapsStart).toHaveBeenLastCalledWith("127.0.0.1:1162", false, true, "", "", "", { ratePerSource: 50, maxFiles: 5, format: "jsonl", nameTemplate: "cap_{fecha}" });
 });
 
 test("flujos: el top sigue siendo un argumento y las opciones van al final", async () => {
