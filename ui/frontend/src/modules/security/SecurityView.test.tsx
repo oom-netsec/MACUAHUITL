@@ -5,6 +5,8 @@ import { SecurityView } from "./SecurityView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
+// Las cuatro herramientas de PKI se eligen primero.
+const pki = (n: string) => userEvent.click(screen.getByRole("radio", { name: n }));
 const creds = [{ id: "c1", label: "ise-secreto", username: "-", hasEnable: false, hasSshKey: false }];
 
 test("radius con secreto escrito y usuario de prueba", async () => {
@@ -69,6 +71,7 @@ test("la CA de laboratorio avisa y firma con lo que acaba de crear", async () =>
   });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("CA de laboratorio");
   expect(screen.getByText(/solo de laboratorio/i)).toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Nombre de la CA"), "Lab CA");
   await userEvent.type(screen.getByLabelText("Contraseña de la llave de la CA"), "capw");
@@ -84,12 +87,14 @@ test("exportar exige ruta y decodificar muestra el resumen", async () => {
   const core = fakeCore({ secPkiExport: vi.fn(async () => "/home/x/ise.p12"), secPkiDecode: vi.fn(async () => "SHA-256 ABC") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("Exportar certificado");
   expect(screen.getByRole("button", { name: "Exportar" })).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
   await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/home/x/ise.p12");
   await userEvent.click(screen.getByRole("button", { name: "Exportar" }));
   expect(await screen.findByText(/ise.p12/)).toBeInTheDocument();
   expect(core.secPkiExport).toHaveBeenCalledWith(expect.objectContaining({ format: "p12", cert: "C", path: "/home/x/ise.p12", plainKey: false }));
+  await pki("Decodificar certificado");
   await userEvent.type(screen.getByLabelText("Certificado o CSR a decodificar"), "PEM");
   await userEvent.click(screen.getByRole("button", { name: "Decodificar certificado" }));
   expect(await screen.findByText(/SHA-256 ABC/)).toBeInTheDocument();
@@ -178,6 +183,7 @@ test("pki: la cadena es una lista con cuenta regresiva (aviso a 30 días, vencid
   const core = fakeCore({ secPkiDecode: vi.fn(async () => pkiText) });
   render(<CoreContext.Provider value={core}><SecurityView core={core} /></CoreContext.Provider>);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("Decodificar certificado");
   await userEvent.type(screen.getByLabelText("Certificado o CSR a decodificar"), "PEM");
   await userEvent.click(screen.getByRole("button", { name: "Decodificar certificado" }));
   const chain = await screen.findByRole("list", { name: "Cadena de certificados" });
@@ -216,6 +222,7 @@ test("pki: la contraseña de la llave y las del export se vacían tras enviarse"
   await userEvent.click(screen.getByRole("button", { name: "Generar CSR" }));
   await waitFor(() => expect(core.secPkiCsr).toHaveBeenCalled());
   expect(screen.getByLabelText("Contraseña de la llave")).toHaveValue("");
+  await pki("Exportar certificado");
   await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
   await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/home/x/a.p12");
   await userEvent.type(screen.getByLabelText("Contraseña del PKCS#12"), "epw");
@@ -255,6 +262,7 @@ test("exportar DER manda solo el certificado", async () => {
   const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("Exportar certificado");
   await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
   await userEvent.type(screen.getByLabelText("Cadena (PEM, opcional)"), "CHAIN");
   await userEvent.type(screen.getByLabelText("Llave sellada a exportar"), "SEALED");
@@ -270,6 +278,7 @@ test("exportar PEM con llave en claro manda llave y contraseña de llave, sin co
   const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("Exportar certificado");
   await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
   await userEvent.type(screen.getByLabelText("Contraseña del PKCS#12"), "ep");
   await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/x");
@@ -285,6 +294,7 @@ test("exportar PEM sin llave en claro no manda llave ni plainKey de otro formato
   const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("Exportar certificado");
   await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
   await userEvent.type(screen.getByLabelText("Llave sellada a exportar"), "SEALED");
   await userEvent.type(screen.getByLabelText("Contraseña de la llave a exportar"), "kp");
@@ -382,12 +392,51 @@ test("PKI: Generar CSR, Crear CA, Firmar y Exportar nombran lo que falta", async
   await userEvent.type(screen.getByLabelText("Contraseña de la llave"), "k");
   expect(b("Generar CSR")).toBeEnabled();
   expect(b("Generar CSR")).not.toHaveAccessibleDescription();
+  await pki("CA de laboratorio");
   expect(b("Crear CA")).toHaveAccessibleDescription("Falta: indicar el nombre, escribir la contraseña de la CA.");
+  await userEvent.click(b("Firmar con una CA existente"));
   expect(b("Firmar")).toHaveAccessibleDescription("Falta: pegar el certificado de la CA, pegar la llave sellada de la CA, pegar la solicitud (CSR), escribir la contraseña de la CA.");
+  await pki("Exportar certificado");
   expect(b("Exportar")).toHaveAccessibleDescription("Falta: pegar el certificado, indicar la ruta.");
+  await pki("CA de laboratorio");
   await userEvent.type(screen.getByLabelText("Nombre de la CA"), "CA");
   await userEvent.type(screen.getByLabelText("Contraseña de la llave de la CA"), "p");
   expect(b("Crear CA")).toBeEnabled();
   expect(b("Crear CA")).not.toHaveAccessibleDescription();
   expect(b("Firmar")).toHaveAccessibleDescription("Falta: pegar el certificado de la CA, pegar la llave sellada de la CA, pegar la solicitud (CSR).");
+});
+
+test("PKI: solo se ve la herramienta elegida y lo escrito se conserva al cambiar y volver", async () => {
+  const core = fakeCore({ secPkiExport: vi.fn(async () => "/x") });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  expect(screen.getByRole("radio", { name: "Generar CSR" })).toBeChecked();
+  expect(screen.getByLabelText("CN")).toBeVisible();
+  expect(screen.queryByLabelText("Certificado (PEM)")).toBeNull(); // ni se montó
+  expect(screen.queryByLabelText("Nombre de la CA")).toBeNull();
+  await userEvent.type(screen.getByLabelText("CN"), "ise01.lab");
+  await pki("Exportar certificado");
+  expect(screen.getByLabelText("CN")).not.toBeVisible();
+  expect(screen.getByLabelText("Certificado (PEM)")).toBeVisible();
+  await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
+  await pki("Generar CSR");
+  expect(screen.getByLabelText("CN")).toHaveValue("ise01.lab");
+  expect(screen.getByLabelText("Certificado (PEM)")).not.toBeVisible();
+  await pki("Exportar certificado");
+  expect(screen.getByLabelText("Certificado (PEM)")).toHaveValue("C");
+});
+
+test("CA: Firmar no se ve hasta Crear CA o elegir una CA existente, y Crear CA lo rellena", async () => {
+  const core = fakeCore({ secPkiCaInit: vi.fn(async () => ({ pem: "CA-PEM", key: "CA-KEY", text: "x" })) });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await pki("CA de laboratorio");
+  expect(screen.queryByLabelText("CSR a firmar")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Firmar" })).toBeNull();
+  await userEvent.type(screen.getByLabelText("Nombre de la CA"), "Lab");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave de la CA"), "pw");
+  await userEvent.click(screen.getByRole("button", { name: "Crear CA" }));
+  expect(await screen.findByDisplayValue("CA-PEM")).toBeVisible();
+  expect(screen.getByDisplayValue("CA-KEY")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Firmar con una CA existente" })).toBeNull();
 });

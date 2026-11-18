@@ -143,6 +143,7 @@ test("decodificar certificado usa el informe estructurado y muestra autofirmado 
   const core = fakeCore({ secPkiDecodeReport: vi.fn(async () => rep), secPkiDecode: vi.fn(async () => "no debe llamarse") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Decodificar certificado" }));
   await userEvent.type(shown("Certificado o CSR a decodificar"), "PEM");
   await userEvent.click(screen.getByRole("button", { name: "Decodificar certificado" }));
   expect(await screen.findByText("Autofirmado")).toBeInTheDocument();
