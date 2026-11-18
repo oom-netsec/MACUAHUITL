@@ -3045,6 +3045,9 @@ export const es = {
   "diag.pcap.req.windows": "Requisitos: Wireshark instalado (incluye dumpcap.exe) con Npcap.",
   "visibility.priv.cisco": "{alg} (Cisco IOS)",
   "visibility.priv.rfc": "{alg} (RFC, Blumenthal)",
+  "cred.none": "(ninguna)",
+  "cred.vault.absent": "No existe una bóveda.",
+  "cred.vault.locked": "La bóveda está cerrada.",
 };
 
 export type Key = keyof typeof es;

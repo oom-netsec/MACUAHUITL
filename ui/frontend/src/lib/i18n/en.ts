@@ -3046,4 +3046,7 @@ export const en: Record<Key, string> = {
   "diag.pcap.req.windows": "Requirements: Wireshark installed (includes dumpcap.exe) with Npcap.",
   "visibility.priv.cisco": "{alg} (Cisco IOS)",
   "visibility.priv.rfc": "{alg} (RFC, Blumenthal)",
+  "cred.none": "(none)",
+  "cred.vault.absent": "No vault exists.",
+  "cred.vault.locked": "The vault is locked.",
 };
