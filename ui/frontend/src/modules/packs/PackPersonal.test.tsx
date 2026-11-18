@@ -123,3 +123,21 @@ test("exportar: el editor inválido dice por qué y sin nada que exportar no se 
   expect(within(d).getByRole("button", { name: "Exportar" })).toBeDisabled();
   expect(core.pickSavePath).not.toHaveBeenCalled();
 });
+
+test("exportar: nombre, descripción, autor y licencia van en «Metadatos (opcional)», cuentan y se siguen enviando", async () => {
+  const exp = vi.fn(async () => exportBase);
+  const { d } = await openExport({ packExport: exp });
+  const det = within(d).getByLabelText("Autor (opcional)").closest("details")!;
+  expect(det.open).toBe(false);
+  expect(det.querySelector("summary")).toHaveTextContent("Metadatos (opcional)");
+  for (const l of ["Nombre (opcional)", "Descripción (opcional)", "Licencia (opcional)"]) expect(det).toContainElement(within(d).getByLabelText(l));
+  expect(det).not.toContainElement(within(d).getByLabelText(/Editor y nombre/));
+  expect(det).not.toContainElement(within(d).getByRole("button", { name: "Exportar" }));
+  await userEvent.type(within(d).getByLabelText(/Editor y nombre/), "yo/mis");
+  await userEvent.click(await within(d).findByRole("checkbox", { name: /Mi script/ }));
+  await userEvent.type(within(d).getByLabelText("Autor (opcional)"), "Yo");
+  await userEvent.type(within(d).getByLabelText("Licencia (opcional)"), "MIT");
+  expect(det.querySelector("summary")).toHaveTextContent("Metadatos (opcional) · cambiadas: 2");
+  await userEvent.click(within(d).getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(exp).toHaveBeenCalledWith(expect.objectContaining({ author: "Yo", license: "MIT", name: "", description: "" })));
+});

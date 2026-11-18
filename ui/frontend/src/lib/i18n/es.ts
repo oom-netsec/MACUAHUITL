@@ -3045,6 +3045,7 @@ export const es = {
   "backup.restore.maxLines.bad": "Entre 0 y 1000 (0 = sin tope).",
   "calc.bgp.more": "Más atributos",
   "change.upgrade.integrity": "Verificar integridad (opcional)",
+  "packs.export.meta": "Metadatos (opcional)",
 };
 
 export type Key = keyof typeof es;
