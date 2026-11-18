@@ -2259,6 +2259,7 @@ export const en: Record<Key, string> = {
   "hosts.data.template.note": "The template's example values are written by the core and may be in Spanish; they are file content, not interface text.",
   "ssh.credPick": "Choose a credential",
   "hosts.pick.open": "Choose from the address book",
+  "hosts.pick.done": "Done",
   "hosts.pick.noCred": "This host has no credential in the vault: choose one",
   "hosts.err.nameDup": "A host with this name already exists.",
   "hosts.err.addrDup": "A saved host already uses this address and port.",

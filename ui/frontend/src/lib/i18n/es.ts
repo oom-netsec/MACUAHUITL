@@ -2257,6 +2257,7 @@ export const es = {
   "hosts.data.template.note": "Los valores de ejemplo de la plantilla los escribe el núcleo y pueden venir en español; son contenido del archivo.",
   "ssh.credPick": "Elige una credencial",
   "hosts.pick.open": "Elegir de la libreta",
+  "hosts.pick.done": "Listo",
   "hosts.pick.noCred": "Este host no tiene credencial en la bóveda: elige una",
   "hosts.err.nameDup": "Ya hay un host con este nombre.",
   "hosts.err.addrDup": "Esta dirección y puerto ya están en la libreta.",

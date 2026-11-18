@@ -124,3 +124,11 @@ test("equipo de la libreta: etiqueta común, rellena campo y credencial, y el pl
   await userEvent.click(planBtn());
   expect(core.assistPlanCredRotate).toHaveBeenCalledWith({ target: { name: "10.9.0.1", address: "10.9.0.1", credentialId: BOOK_CRED }, user: "tech", newSecret: NEW, writeMemory: true });
 });
+
+test("la credencial elegida a mano no la pisa un host de la libreta", async () => {
+  render(<CredRotateView core={fakeCore({ listCredentials: vi.fn(async () => bookCreds) })} />);
+  await screen.findAllByRole("option", { name: "admin lab (root)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), bookCreds[1].id);
+  await pickHost("LAB-CORE"); // trae otra credencial
+  expect(screen.getByLabelText("Credencial")).toHaveValue(bookCreds[1].id);
+});

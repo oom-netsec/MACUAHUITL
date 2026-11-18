@@ -3,7 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { TargetField } from "../inventory/TargetField";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { planTarget } from "../../lib/targets";
@@ -62,6 +62,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
   // Todo lo que entra en la petición (campos, equipo, credencial, huellas, write memory, plataforma) deja obsoleto el plan y cualquier respuesta pendiente.
   const stale = () => { seq.current++; setPlan(null); };
   const edit = <T,>(set: (v: T) => void) => (v: T) => { stale(); set(v); };
+  const bookCred = useBookCredential(creds, credId, edit(setCredId));
   const pick = (x: SnippetTemplate) => { stale(); setSel(x); setValues(initialValues(x)); setPlanned(false); clearMsgs(); };
   // Cambiar un dato también quita el rechazo que el núcleo dio a ese campo.
   const setVal = (name: string, v: string) => {
@@ -107,8 +108,8 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("snippets.section.target")}>
         <div className="field-row">
-          <TargetField core={core} value={equipo} onChange={edit(setEquipo)} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) edit(setCredId)(id); }} />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={edit(setCredId)} />
+          <TargetField core={core} value={equipo} onChange={edit(setEquipo)} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
           <Select<Platform> label={t("snippets.platform")} value={platform} onChange={edit(setPlatform)} w="sm" options={[["", t("snippets.platform.all")], ["ios", "IOS"], ["ios-xe", "IOS-XE"]]} />
         </div>
       </Section>

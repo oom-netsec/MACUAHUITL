@@ -14,6 +14,7 @@ export const LABEL_MANY = "Equipos (IP o nombre, con :puerto opcional)";
 // Abre «Elegir de la libreta» y elige el host por nombre.
 export async function pickHost(name: "LAB-CORE" | "LAB-AP" | "OFI-SW", last = false) {
   const bs = await screen.findAllByRole("button", { name: "Elegir de la libreta" });
-  await userEvent.click(last ? bs[bs.length - 1] : bs[0]); // last: el campo del panel, cuando la vista tiene otro antes
+  const b = last ? bs[bs.length - 1] : bs[0];
+  if (b.getAttribute("aria-expanded") !== "true") await userEvent.click(b); // el selector queda abierto tras elegir; last: el campo del panel, cuando la vista tiene otro antes
   await userEvent.selectOptions(await screen.findByLabelText("Host de la libreta"), sampleHosts.find((h) => h.name === name)!.id);
 }

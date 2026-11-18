@@ -3,7 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { TargetField } from "../inventory/TargetField";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { planTarget } from "../../lib/targets";
@@ -18,6 +18,7 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [update, setUpdate] = useState("");
   const [equipo, setEquipo] = useState("");
   const [user, setUser] = useState("");
@@ -53,8 +54,8 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("credrotate.section.target")}>
         <div className="field-row">
-          <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) setCredId(id); }} />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
+          <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
         </div>
       </Section>
       <Section title={t("credrotate.section.secret")}>

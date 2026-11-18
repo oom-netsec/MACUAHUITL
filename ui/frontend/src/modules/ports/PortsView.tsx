@@ -2,7 +2,7 @@ import { useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
-import { TargetField } from "../inventory/TargetField";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -23,6 +23,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [equipo, setEquipo] = useState("");
   const [ifaces, setIfaces] = useState("");
   const [vlan, setVlan] = useState("");
@@ -87,8 +88,8 @@ export function PortsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("ports.section.target")}>
         <div className="field-row">
-          <TargetField core={core} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) setCredId(id); }} />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
+          <TargetField core={core} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
         </div>
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>

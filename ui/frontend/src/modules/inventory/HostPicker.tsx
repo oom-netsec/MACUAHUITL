@@ -22,10 +22,19 @@ export function useHosts(core: CoreAPI): Host[] {
 }
 
 // Elegir un host de la libreta (búsqueda + lista agrupada por carpeta) para rellenar equipo y credencial. Escribir a mano sigue valiendo.
-export function HostPicker({ core, onPick }: { core: CoreAPI; onPick: (h: Host) => void }) {
+// hosts: la lista ya cargada por quien lo usa (evita pedirla dos veces); filter: oculta los que no sirven a esa vista.
+export function HostPicker({ core, hosts, filter, onPick }: { core: CoreAPI; hosts?: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
+  return hosts ? <HostList hosts={hosts} filter={filter} onPick={onPick} /> : <Loaded core={core} filter={filter} onPick={onPick} />;
+}
+
+function Loaded({ core, filter, onPick }: { core: CoreAPI; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
+  return <HostList hosts={useHosts(core)} filter={filter} onPick={onPick} />;
+}
+
+function HostList({ hosts: all, filter, onPick }: { hosts: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
   const t = useT();
   const id = useId();
-  const hosts = useHosts(core);
+  const hosts = useMemo(() => (filter ? all.filter(filter) : all), [all, filter]);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(""); // el host elegido ("" = ninguno): el select muestra lo elegido y no un valor fijo
   useEffect(() => { setSel((s) => (hosts.some((h) => h.id === s) ? s : "")); }, [hosts]);

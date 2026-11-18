@@ -3,7 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
 import { Advanced } from "../../components/Advanced";
-import { TargetField } from "../inventory/TargetField";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
@@ -38,6 +38,7 @@ function Refused({ items, title }: { items: RestoreRefusal[]; title: string }) {
 export function RestorePanel({ core, entry, creds, vault, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; vault: VaultGate; onClose: () => void }) {
   const t = useT();
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [equipo, setEquipo] = useState(guessAddress(entry.device));
   const [mgmt, setMgmt] = useState("");
   const [maxLines, setMaxLines] = useState("200");
@@ -83,8 +84,8 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
       <AssistBanner active={active} />
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">
-        <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={(id) => { if (!credId && creds.some((c) => c.id === id)) setCredId(id); }} />
-        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
+        <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={bookCred.onPickCredential} />
+        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={bookCred.onChange} />
       </div>
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
