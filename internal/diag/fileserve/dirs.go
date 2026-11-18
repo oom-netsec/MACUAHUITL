@@ -393,7 +393,17 @@ func checkRecvOwn(dir string, root *os.Root) error {
 
 // dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
 // RECEPCIÓN, en el idioma loc: escritores ajenos, volumen sin permisos por usuario o permisos que no se pudieron leer.
-func dirWarnings(loc string, c Config) []string {
+// DirWarning es un aviso de carpeta: Code es la clave estable del catálogo, Text el aviso en el idioma pedido (sin la
+// orden) y Cmd la orden que lo corrige (chmod o icacls), vacía si no hay una segura. hint es la línea de la ayuda, con la orden.
+type DirWarning struct {
+	Code, Text, Cmd string
+	hint            string
+}
+
+// DirWarningsIn son los avisos de dirWarnings ya estructurados, para quien los muestra aparte de la ayuda.
+func DirWarningsIn(loc string, c Config) []DirWarning { return dirWarnings(loc, c) }
+
+func dirWarnings(loc string, c Config) []DirWarning {
 	type d struct{ dir, kind string }
 	var dirs []d
 	if c.FromDir != "" {
@@ -405,7 +415,15 @@ func dirWarnings(loc string, c Config) []string {
 	if c.Write && c.RecvDir != "" {
 		dirs = append(dirs, d{c.RecvDir, "recv"})
 	}
-	var out []string
+	var out []DirWarning
+	add := func(code, cmd string, a i18n.Args) {
+		w := DirWarning{Code: code, Text: i18n.Msg(loc, code, a), Cmd: cmd}
+		w.hint = w.Text
+		if cmd != "" {
+			w.hint = i18n.Msg(loc, code+"_cmd", a)
+		}
+		out = append(out, w)
+	}
 	seen := map[string]bool{}
 	for _, e := range dirs {
 		dir := e.dir
@@ -420,15 +438,11 @@ func dirWarnings(loc string, c Config) []string {
 		who := w.Who
 		switch {
 		case errors.Is(err, errors.ErrUnsupported), len(who) > 0 && w.NoChmod && !w.ForeignOwner && e.kind == "recv":
-			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_noperms_"+e.kind, i18n.A("dir", dir)))
+			add("fileserve.hint.warn_noperms_"+e.kind, "", i18n.A("dir", dir))
 		case err != nil:
-			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_unverified", i18n.A("dir", dir, "err", err.Error())))
+			add("fileserve.hint.warn_unverified", "", i18n.A("dir", dir, "err", err.Error()))
 		case len(who) > 0 && e.kind == "from": // en recepción esto ya se rechazó
-			code := "fileserve.hint.warn_from_writable"
-			if fix != "" {
-				code += "_cmd"
-			}
-			out = append(out, i18n.Msg(loc, code, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix)))
+			add("fileserve.hint.warn_from_writable", fix, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix))
 		}
 	}
 	return out

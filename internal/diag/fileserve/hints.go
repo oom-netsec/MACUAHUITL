@@ -29,7 +29,7 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 	var b strings.Builder
 	line := func(f string, a ...any) { fmt.Fprintf(&b, "  "+f+"\n", a...) }
 	for _, w := range dirWarnings(loc, c) {
-		line("%s", w) // avisos de las carpetas publicada y de recepción (escritores ajenos, volumen sin permisos)
+		line("%s", w.hint) // avisos de las carpetas publicada y de recepción (escritores ajenos, volumen sin permisos)
 	}
 	b.WriteString(t("fileserve.hint.head") + "\n")
 	switch c.Proto {

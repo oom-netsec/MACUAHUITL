@@ -202,3 +202,20 @@ func TestRecepcionVolumenSinChmodAvisaYNoRechaza(t *testing.T) {
 		t.Error("dueño ajeno se rechaza")
 	}
 }
+
+// DirWarningsIn da los mismos avisos que la ayuda pero estructurados (código, texto, orden aparte) para que la UI no
+// tenga que leer el texto de la ayuda; la orden solo viaja en Cmd cuando hay una segura.
+func TestDirWarningsInEstructurados(t *testing.T) {
+	dir := realTemp(t)
+	fijaEscritores(t, sys.Writers{Who: []string{"S-1-1-0"}, User: "S-1-5-21-1-2-3-1001"}, nil)
+	c := Config{Addr: "127.0.0.1:6969", Proto: "tftp", FromDir: dir}
+	ws := DirWarningsIn(i18n.En, c)
+	if len(ws) != 1 || ws[0].Code != "fileserve.hint.warn_from_writable" || !strings.HasPrefix(ws[0].Cmd, `icacls "`+dir+`"`) ||
+		!strings.Contains(ws[0].Text, "firmware image") || strings.Contains(ws[0].Text, "icacls") || !strings.Contains(ServerHintIn(i18n.En, c, Ready{Addr: c.Addr}, nil), ws[0].Cmd) {
+		t.Fatalf("avisos = %+v", ws)
+	}
+	fijaEscritores(t, sys.Writers{}, errors.ErrUnsupported)
+	if ws := DirWarningsIn(i18n.En, c); len(ws) != 1 || ws[0].Code != "fileserve.hint.warn_noperms_from" || ws[0].Cmd != "" {
+		t.Fatalf("volumen sin permisos: %+v", ws)
+	}
+}
