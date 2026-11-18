@@ -128,7 +128,9 @@ test("equipo de la libreta: etiqueta común, rellena campo y credencial, y el pl
 test("la credencial elegida a mano no la pisa un host de la libreta", async () => {
   render(<CredRotateView core={fakeCore({ listCredentials: vi.fn(async () => bookCreds) })} />);
   await screen.findAllByRole("option", { name: "admin lab (root)" });
-  await userEvent.selectOptions(screen.getByLabelText("Credencial"), bookCreds[1].id);
-  await pickHost("LAB-CORE"); // trae otra credencial
+  await pickHost("LAB-CORE"); // la credencial viene de la libreta
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), bookCreds[1].id); // y luego el ingeniero elige otra
+  await pickHost("LAB-AP");
+  await pickHost("LAB-CORE"); // trae otra vez la primera: no pisa la elegida a mano
   expect(screen.getByLabelText("Credencial")).toHaveValue(bookCreds[1].id);
 });
