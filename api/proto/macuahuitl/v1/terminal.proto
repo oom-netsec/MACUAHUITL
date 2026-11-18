@@ -8,7 +8,7 @@ option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahui
 
 // Terminal SSH interactiva (Fase 16b). Es manual: lo que el ingeniero teclea va directo al
 // equipo, sin pasar por el modo asistido ni por listas cerradas. La sesión usa el EgressGuard,
-// la credencial de la bóveda y la verificación estricta de la llave de host. Se graba lo que
+// la credencial (de la bóveda o tecleada, ver TerminalOpen.username) y la verificación estricta de la llave de host. Se graba lo que
 // devuelve el equipo y lo tecleado, salvo lo que se escribe en un prompt de contraseña o secreto.
 service TerminalService {
   // El primer mensaje debe ser `open`; después, `data` o `resize`. Cerrar el envío (o cancelar,
@@ -38,9 +38,9 @@ message TerminalOpen {
   // La orden de inicio que la UI le mostró al usuario antes de conectar. Si no es igual a la guardada, el núcleo no
   // conecta (FailedPrecondition): lo que corre es lo que se vio. Vacío = el host no debe tener orden de inicio.
   string expected_startup_command = 9;
-  // Fase 47t: sin credential_id (y sin host_id) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
+  // Fase 47t: sin credential_id (o con un host_id cuyo host no tiene credencial) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
   // por el stream (AuthPrompt/AuthAnswer) lo que el equipo pregunte. username es opcional y solo va en ese modo; vacío =
-  // el núcleo pregunta «login as:» antes de marcar. Con credential_id se rechaza (terminal.err.username_with_credential).
+  // el núcleo pregunta «login as:» antes de marcar. Con credential_id, o con el host_id de un host con credencial, se rechaza (terminal.err.username_with_credential).
   string username = 11; // 10 es accepted_host_keys (huellas por host)
 }
 

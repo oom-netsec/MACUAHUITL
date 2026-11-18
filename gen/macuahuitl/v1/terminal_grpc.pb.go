@@ -28,7 +28,7 @@ const (
 //
 // Terminal SSH interactiva (Fase 16b). Es manual: lo que el ingeniero teclea va directo al
 // equipo, sin pasar por el modo asistido ni por listas cerradas. La sesión usa el EgressGuard,
-// la credencial de la bóveda y la verificación estricta de la llave de host. Se graba lo que
+// la credencial (de la bóveda o tecleada, ver TerminalOpen.username) y la verificación estricta de la llave de host. Se graba lo que
 // devuelve el equipo y lo tecleado, salvo lo que se escribe en un prompt de contraseña o secreto.
 type TerminalServiceClient interface {
 	// El primer mensaje debe ser `open`; después, `data` o `resize`. Cerrar el envío (o cancelar,
@@ -64,7 +64,7 @@ type TerminalService_OpenTerminalClient = grpc.BidiStreamingClient[OpenTerminalR
 //
 // Terminal SSH interactiva (Fase 16b). Es manual: lo que el ingeniero teclea va directo al
 // equipo, sin pasar por el modo asistido ni por listas cerradas. La sesión usa el EgressGuard,
-// la credencial de la bóveda y la verificación estricta de la llave de host. Se graba lo que
+// la credencial (de la bóveda o tecleada, ver TerminalOpen.username) y la verificación estricta de la llave de host. Se graba lo que
 // devuelve el equipo y lo tecleado, salvo lo que se escribe en un prompt de contraseña o secreto.
 type TerminalServiceServer interface {
 	// El primer mensaje debe ser `open`; después, `data` o `resize`. Cerrar el envío (o cancelar,

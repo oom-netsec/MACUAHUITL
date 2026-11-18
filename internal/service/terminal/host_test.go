@@ -259,17 +259,49 @@ func TestHostCiscoConPasswordSigueIgual(t *testing.T) {
 	}
 }
 
-func TestHostSinCredencialOInexistente(t *testing.T) {
+func TestHostInexistente(t *testing.T) {
 	h := newHRig(t)
-	h.addHost("h1", "linux", h.host, "", "")
-	_, done, cancel := h.session(h.open("h1", "", true))
+	_, done, cancel := h.session(h.open("nada", "", true))
 	err := wait(t, done)
 	cancel()
-	h.nada(err, codes.FailedPrecondition, "terminal.err.host_no_credential")
-	_, done, cancel = h.session(h.open("nada", "", true))
-	err = wait(t, done)
-	cancel()
 	h.nada(err, codes.NotFound, "terminal.err.host_not_found")
+}
+
+// Un host de la libreta sin credencial pasa a modo tecleado: pregunta y abre, con y sin orden de inicio.
+func TestHostSinCredencialPregunta(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp, Exec: func(cmd string) string { return "salida:" + cmd + "\n" }})
+	for _, c := range []struct{ id, plat, cmd string }{{"c1", "ios-xe", ""}, {"l1", "linux", startup}} {
+		if _, err := r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at)
+			VALUES(?,?,?,?,?,'','[]','','',?,'t','t')`, c.id, c.id, r.host, r.port, c.plat, c.cmd); err != nil {
+			t.Fatal(err)
+		}
+		st, done, cancel := r.session(&v1.TerminalOpen{HostId: c.id, ExpectedStartupCommand: c.cmd, Username: "admin", AcceptedHostKeyFingerprints: r.open.AcceptedHostKeyFingerprints})
+		m, _ := st.prompt(t)
+		st.answer(m.Seq, "pw", otp)
+		if ev := <-st.out; !strings.HasPrefix(ev.Opened, "admin@") {
+			t.Fatalf("%s: primer evento = %+v", c.id, ev)
+		}
+		if c.cmd != "" {
+			st.waitFor(t, "salida:"+c.cmd)
+		} else {
+			st.waitFor(t, "SW1>")
+		}
+		cancel()
+		wait(t, done)
+		r.d.DB().Exec(`DELETE FROM hosts WHERE id=?`, c.id) // la dirección es única
+	}
+}
+
+// username con host_id solo vale si el host no trae credencial; con credencial se rechaza sin tocar el equipo.
+func TestHostConCredencialYUsernameRechaza(t *testing.T) {
+	h := newHRig(t)
+	h.addHost("h1", "linux", h.host, h.keyID, "")
+	o := h.open("h1", "", true)
+	o.Username = "admin"
+	_, done, cancel := h.session(o)
+	err := wait(t, done)
+	cancel()
+	h.nada(err, codes.InvalidArgument, "terminal.err.username_with_credential")
 }
 
 // Un Cisco con contraseña, por host_id o con la dirección a mano, sigue como hoy: shell con vt100 y sin exec.
