@@ -202,3 +202,20 @@ test("con varios equipos una huella sola no se manda; con EQUIPO=HUELLA sí", as
     accept: [], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }, { host: "sw2:2222", fingerprint: "SHA256:def" }],
   })));
 });
+
+test("las opciones avanzadas del respaldo van plegadas, cuentan los cambios y el aviso de secretos queda fuera", async () => {
+  render(<BackupView core={withCreds()} />);
+  const det = screen.getByText("Opciones avanzadas").closest("details")!;
+  expect(det.open).toBe(false);
+  expect(det).toContainElement(screen.getByLabelText("Incluir también el startup-config"));
+  expect(det).toContainElement(screen.getByLabelText("Guardar sin enmascarar secretos"));
+  expect(det).toContainElement(screen.getByLabelText(/Respaldos a conservar/));
+  expect(det).not.toContainElement(screen.getByLabelText(/Programar cada/));
+  await userEvent.click(screen.getByLabelText("Incluir también el startup-config"));
+  await userEvent.click(screen.getByLabelText("Guardar sin enmascarar secretos"));
+  await userEvent.clear(screen.getByLabelText(/Respaldos a conservar/));
+  await userEvent.type(screen.getByLabelText(/Respaldos a conservar/), "5");
+  expect(screen.getByText("Opciones avanzadas · cambiadas: 3")).toBeInTheDocument();
+  expect(det.open).toBe(false);
+  expect(det).not.toContainElement(screen.getByRole("status"));
+});

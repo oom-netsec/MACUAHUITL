@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
+import { Advanced } from "../../components/Advanced";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, errorText } from "../../components/Field";
@@ -82,13 +83,15 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
         <Field label={t("backup.restore.device")} value={equipo} onChange={setEquipo} w="lg" mono />
         <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
       </div>
-      <div className="field-row">
-        <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />
-        <Field label={t("backup.restore.maxLines")} type="number" value={maxLines} onChange={setMaxLines} w="sm" mono />
-      </div>
-      <Check label={t("backup.restore.partial")} checked={partial} onChange={setPartial} />
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
+      <Advanced changed={[mgmt.trim() !== "", maxLines !== "200", partial].filter(Boolean).length} forceOpen={(!!reason || refused.length > 0) && !mgmt.trim()}>
+        <div className="field-row">
+          <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />
+          <Field label={t("backup.restore.maxLines")} type="number" value={maxLines} onChange={setMaxLines} w="sm" mono />
+        </div>
+        <Check label={t("backup.restore.partial")} checked={partial} onChange={setPartial} />
+      </Advanced>
       <div className="actions">
         <button disabled={!canPlan || active} onClick={doPlan}>{t("backup.restore.plan")}</button>
         <button onClick={onClose} disabled={active}>{t("backup.restore.close")}</button>
