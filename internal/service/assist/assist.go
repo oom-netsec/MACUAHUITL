@@ -318,7 +318,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	planID := service.NewID()
 	gid := "plan-" + planID
 	if err := s.d.Guard().Allow(ctx, gid, []string{t.Address}); err != nil {
-		return "", assist.Plan{}, status.Error(codes.PermissionDenied, err.Error())
+		return "", assist.Plan{}, service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	defer s.d.Guard().Revoke(gid)
 	acc := map[string]bool{}
@@ -602,7 +602,7 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 	}
 	runID := service.NewID()
 	if err := s.d.Guard().Allow(ctx, runID, []string{rec.t.host}); err != nil {
-		return "", status.Error(codes.PermissionDenied, err.Error())
+		return "", service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	v := s.d.Vault()
 	creds := []string{rec.t.cred}
