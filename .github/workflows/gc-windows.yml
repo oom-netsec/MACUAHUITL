@@ -1,0 +1,69 @@
+# Caza manual de corrupción de memoria en Windows («fatal error: found pointer to free object», job 134645916949).
+# No corre en PRs: se lanza a mano (workflow_dispatch) o con un push a una rama caza-gc/*, para no frenar el CI. gccheckmark verifica el marcado del GC y
+# clobberfree pisa la memoria liberada, así un puntero colgante falla cerca de su origen; la variante -race (cgo)
+# detecta además carreras sobre los buffers que Windows llena.
+name: gc-windows
+
+on:
+  push:
+    branches: ["caza-gc/**"] # para correrlo desde una rama sin esperar a que esté en main
+  workflow_dispatch:
+    inputs:
+      count:
+        description: repeticiones de cada prueba (-count)
+        default: "20"
+      pkgs:
+        description: paquetes a probar
+        default: "./cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/..."
+
+permissions:
+  contents: read
+
+jobs:
+  gccheck:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      CGO_ENABLED: "0"
+      GODEBUG: gccheckmark=1,clobberfree=1
+      GOGC: "10" # GC más seguido: más oportunidades de ver el puntero colgante
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: TEMP en formato largo
+        run: |
+          echo "TMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
+          echo "TEMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
+      - name: pruebas con el GC estricto
+        env:
+          COUNT: ${{ inputs.count || '20' }}
+          PKGS: ${{ inputs.pkgs || './cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/...' }}
+        run: go test -tags=storewatch -count="$COUNT" -timeout 110m $PKGS
+
+  race:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      CGO_ENABLED: "1"
+      GODEBUG: clobberfree=1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: TEMP en formato largo
+        run: |
+          echo "TMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
+          echo "TEMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
+      - name: pruebas con -race
+        env:
+          PKGS: ${{ inputs.pkgs || './cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/...' }}
+        run: go test -race -tags=storewatch -count=3 -timeout 110m $PKGS
