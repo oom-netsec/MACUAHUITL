@@ -3,7 +3,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -121,11 +124,31 @@ func (c *Core) removeJobs(ids []string, reason string) (removed []string, skippe
 		removed = append(removed, q.j.id)
 		c.bus.Publish(engine.Event{JobID: q.j.id, Kind: engine.JobState, State: "closed"}) // un Subscribe a un id quitado (p. ej. un created) termina
 		c.audit(action, q.j.id, fmt.Sprintf("name=%q dir=%q state=%s finished=%s reason=%s", q.name, q.dir, q.state, q.finished, reason))
+		if q.state == "created" { // nunca se armó: su lote-* solo puede estar vacía
+			c.removeEmptyLote(q.root)
+		}
 	}
 	if err != nil {
 		return nil, nil, err
 	}
 	return removed, skipped, nil
+}
+
+// removeEmptyLote borra la carpeta lote-* que StartAdhoc/StartBackup crearon para un trabajo que nunca se armó. Solo si está
+// estrictamente dentro de las salidas, se llama lote-* y es una carpeta real (no un enlace); os.Remove falla si tiene archivos,
+// y no se usa RemoveAll: la evidencia nunca se borra. Los errores se ignoran.
+func (c *Core) removeEmptyLote(dir string) {
+	if dir == "" || !strings.HasPrefix(filepath.Base(dir), "lote-") {
+		return
+	}
+	rel, err := filepath.Rel(c.settings.Outputs(), dir)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return
+	}
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() { // Lstat: un enlace no es IsDir
+		return
+	}
+	os.Remove(dir)
 }
 
 // deleteJobs borra las filas del lote y guarda sus raíces en una sola tx corta (foreign_keys: hijos primero).
