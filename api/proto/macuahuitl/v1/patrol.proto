@@ -171,6 +171,8 @@ enum JobPhaseKind {
   JOB_PHASE_KIND_FAILED = 10;
   // El Login Test que repite el armado, sin interacción, justo antes de armar.
   JOB_PHASE_KIND_ARM_CHECK_DONE = 11;
+  // El armado falló y el trabajo sigue en created; reason y args llevan el motivo.
+  JOB_PHASE_KIND_ARM_FAILED = 12;
 }
 
 message JobPhase {

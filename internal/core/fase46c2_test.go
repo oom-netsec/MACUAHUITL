@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,5 +71,39 @@ func TestQuitarCreatedBorraSoloLaLoteVacia(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Un ArmJob fallido deja la fase ARM_FAILED con el código del error y sus argumentos; el trabajo sigue en created (46c2).
+func TestArmJobFallidoDejaLaFaseArmFailed(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	for _, c := range []struct {
+		nombre, reason, arg string
+		excluir             bool
+	}{
+		{"sin equipos", "patrol.svc.no_devices_left", "", true},
+		{"login", "patrol.svc.login_failed", "failed", false},
+	} {
+		cj, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: &v1.JobSpec{Name: c.nombre, Targets: []*v1.Target{h.target}, DefaultCredentialId: cred,
+			CustomCommands: "show clock", OutputDir: h.out, WindowHours: 1}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := &v1.ArmJobRequest{JobId: cj.JobId}
+		if c.excluir {
+			req.ExcludedDeviceIds = []string{h.target.Address}
+		}
+		if _, err := h.patrol.ArmJob(ctx(t), req); err == nil {
+			t.Fatalf("%s: debía fallar", c.nombre)
+		}
+		s := h.summary(t, cj.JobId)
+		ph := s.Phases[len(s.Phases)-1]
+		if s.State != "created" || s.FinishedAt != nil || ph.Kind != v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED || ph.Reason != c.reason {
+			t.Fatalf("%s: estado=%s finished=%v última fase=%+v", c.nombre, s.State, s.FinishedAt, ph)
+		}
+		if _, ok := ph.Args[c.arg]; c.arg != "" && !ok {
+			t.Errorf("%s: sin arg %s: %v", c.nombre, c.arg, ph.Args)
+		}
 	}
 }

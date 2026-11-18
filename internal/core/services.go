@@ -396,7 +396,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	var undo []func()
 	inhibited := false // power.inhibit ya está en la bitácora: si el armado se deshace, también va power.release
 	// reason es el motivo en inglés para la auditoría (no depende del idioma del cliente).
-	fail := func(err error, reason string) (*v1.ArmJobResponse, error) {
+	fail := func(err error, reason string, cause error) (*v1.ArmJobResponse, error) {
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
 		}
@@ -420,6 +420,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 			c.guard.Revoke(j.id)
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
 			c.closeCancelled(j)
+		} else {
+			c.addArmFailed(j, cause) // el motivo queda en el trabajo, que sigue en «created»
 		}
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
 		c.audit("job.arm_failed", j.id, reason)
@@ -438,7 +440,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	if len(keep) == 0 {
-		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.no_devices_left", nil), "no devices left")
+		e := i18n.New("patrol.svc.no_devices_left", nil)
+		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, e), "no devices left", e)
 	}
 	spec.Targets = keep // copia local: un armado fallido no altera el trabajo
 	accepted := map[string]bool{}
@@ -463,7 +466,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, "phase.ok_failed", i18n.A("ok", len(res)-len(failed), "failed", len(failed)))
 	if len(failed) > 0 {
-		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.login_failed", i18n.A("failed", strings.Join(failed, "; "))), "login test failed: "+strings.Join(failed, "; "))
+		e := i18n.New("patrol.svc.login_failed", i18n.A("failed", strings.Join(failed, "; ")))
+		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, e), "login test failed: "+strings.Join(failed, "; "), e)
 	}
 	until := c.o.Now().Round(0).Add(time.Duration(spec.WindowHours) * time.Hour) // sin lectura monotónica: no avanza con el sistema suspendido
 	creds := []string{spec.DefaultCredentialID}
@@ -478,12 +482,12 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	gen := c.sleepGen // una suspensión durante el armado cierra la ventana que crea Arm
 	c.mu.Unlock()
 	if err := v.Arm(j.id, until, creds); err != nil {
-		return fail(service.VaultErr(ctx, err), i18n.English(err))
+		return fail(service.VaultErr(ctx, err), i18n.English(err), err)
 	}
 	undo = append(undo, func() { v.Disarm(j.id) })
 	w, err := patrol.NewWriter(spec.OutputDir, spec, c.o.Now())
 	if err != nil {
-		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, err), i18n.English(err))
+		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, err), i18n.English(err), err)
 	}
 	for _, ch := range changes {
 		w.NoteHostKeyChange(ch)
@@ -526,7 +530,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	cancelled := j.cancelReq
 	c.mu.Unlock()
 	if cancelled { // fail deshace el armado, devuelve el trabajo a como estaba y lo cierra cancelado
-		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled")), "cancelled while arming")
+		e := i18n.New("patrol.svc.job_state", i18n.A("state", "cancelled"))
+		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, e), "cancelled while arming", e)
 	}
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	// Antes de Arm, que lanza la ronda 1 en otra goroutine: así job.arm y power.inhibit quedan antes de device.round.
@@ -536,7 +541,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	inhibited = true
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
-		return fail(service.ErrFrom(ctx, codes.InvalidArgument, err), i18n.English(err))
+		return fail(service.ErrFrom(ctx, codes.InvalidArgument, err), i18n.English(err), err)
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()

@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -679,6 +680,21 @@ func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, code string, args 
 	if code != "" {
 		p.Detail, p.Reason, p.Args = i18n.Msg(i18n.Es, code, args), code, i18n.Metadata(code, args)
 	}
+	c.appendPhase(j, p, round)
+}
+
+// addArmFailed deja en el trabajo (que vuelve a «created») el motivo de un ArmJob fallido: el código del catálogo del
+// error y sus argumentos; sin código, solo el texto en inglés.
+func (c *Core) addArmFailed(j *job, cause error) {
+	var ie *i18n.Error
+	if errors.As(cause, &ie) {
+		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, 0, ie.Code, ie.Args)
+		return
+	}
+	c.appendPhase(j, phase{At: c.o.Now(), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED.String(), Detail: i18n.English(cause)}, 0)
+}
+
+func (c *Core) appendPhase(j *job, p phase, round int) {
 	c.mu.Lock()
 	// Se decide por el estado del job y no por el tipo de fase: una FAILED de round_zip_failed o close_failed llega con el job en curso.
 	if isFinal(j.state) && j.FinishedAt.IsZero() {
