@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ArmResult, CoreAPI, Job, JobPhase, LoginResult } from "../../lib/core";
 import { Check, ConfirmButton, Notice, errorText } from "../../components/Field";
 import { Badge, EmptyState, Section } from "../../components/Page";
 import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
-import { DeviceGrid, type Row } from "./DeviceGrid";
+import { DeviceGrid, type EarlyEvents, type Row } from "./DeviceGrid";
 import { MetricsPanel, useMetrics } from "./MetricsPanel";
 import { perRound } from "./metrics";
 import { tones, useStateLabel } from "./JobsPanel";
@@ -25,6 +25,15 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState<"" | "login" | "arm">("");
   const [grid, setGrid] = useState<{ devices: string[]; initial?: Record<string, Row> } | null>(null);
+
+  // Eventos de equipos que llegan mientras la grilla se arma (GetRun en curso, o justo después de armar): la grilla los aplica al montar.
+  const early = useRef<EarlyEvents>({ events: [], live: false }).current;
+  useEffect(() => core.onEvent((e) => {
+    if (early.live || e.jobId !== job.id || !(e.deviceStateChanged || e.commandProgress)) return;
+    early.events.push(e);
+    // shortcut: tope de 5000 eventos (de sobra para el hueco de un GetRun); se quedan los más nuevos, que son los que valen.
+    if (early.events.length > 5000) early.events.shift();
+  }), [core, job.id, early]);
 
   const { metrics, error: metricsErr } = useMetrics(core, job);
   // CPU de 1 min por ronda y por dirección, para las filas de la grilla.
@@ -174,7 +183,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
 
       {grid && (
         <Section title={t("patrol.grid.title")}>
-          <DeviceGrid core={core} jobId={job.id} devices={grid.devices} initial={grid.initial} cpu={cpu} />
+          <DeviceGrid core={core} jobId={job.id} devices={grid.devices} initial={grid.initial} cpu={cpu} early={early} />
         </Section>
       )}
     </section>
