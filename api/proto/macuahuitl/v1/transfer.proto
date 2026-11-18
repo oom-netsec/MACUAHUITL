@@ -68,6 +68,14 @@ message ServerReady {
   string recv_dir = 8;                // vacío si no recibe
   string from_dir = 9;
   repeated string files = 10;         // nombres que se pueden leer ahora
+  repeated ServerWarning warnings = 11; // avisos de las carpetas (publicada y de recepción); también van en hint
+}
+
+// ServerWarning es un aviso de carpeta del servidor: la UI muestra message como texto y cmd en una consola copiable.
+message ServerWarning {
+  string code = 1;                    // clave estable del catálogo (p. ej. fileserve.hint.warn_from_writable)
+  string message = 2;                 // el aviso en el idioma pedido, sin la orden
+  string cmd = 3;                     // orden que lo corrige (chmod o icacls); vacía si no hay una segura
 }
 
 message StartServerResponse {

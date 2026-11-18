@@ -17,6 +17,14 @@ func ServerHint(c Config, r Ready, names []string) string { return ServerHintIn(
 
 // ServerHintIn es ServerHint con el texto en el idioma dado; los comandos no cambian.
 func ServerHintIn(loc string, c Config, r Ready, names []string) string {
+	h, _ := ServerHintWarnings(loc, c, r, names)
+	return h
+}
+
+// ServerHintWarnings es ServerHintIn y, aparte, los avisos de carpeta que lleva: una sola lectura de permisos, así la
+// ayuda y los avisos estructurados no pueden decir cosas distintas.
+func ServerHintWarnings(loc string, c Config, r Ready, names []string) (string, []DirWarning) {
+	ws := dirWarnings(loc, c)
 	t := func(code string, kv ...any) string { return i18n.Msg(loc, code, i18n.A(kv...)) }
 	host, port, _ := net.SplitHostPort(r.Addr)
 	if ip, err := netip.ParseAddr(host); err == nil && ip.IsUnspecified() {
@@ -28,8 +36,8 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 	}
 	var b strings.Builder
 	line := func(f string, a ...any) { fmt.Fprintf(&b, "  "+f+"\n", a...) }
-	for _, w := range dirWarnings(loc, c) {
-		line("%s", w) // avisos de las carpetas publicada y de recepción (escritores ajenos, volumen sin permisos)
+	for _, w := range ws {
+		line("%s", w.hint) // avisos de las carpetas publicada y de recepción (escritores ajenos, volumen sin permisos)
 	}
 	b.WriteString(t("fileserve.hint.head") + "\n")
 	switch c.Proto {
@@ -89,5 +97,5 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 			b.WriteString("  " + t("fileserve.hint.redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
 		}
 	}
-	return b.String()
+	return b.String(), ws
 }

@@ -180,7 +180,8 @@ type ServerReady struct {
 	Fingerprints  []string               `protobuf:"bytes,7,rep,name=fingerprints,proto3" json:"fingerprints,omitempty"`      // scp, sftp: huellas SHA256 de las llaves de host efímeras
 	RecvDir       string                 `protobuf:"bytes,8,opt,name=recv_dir,json=recvDir,proto3" json:"recv_dir,omitempty"` // vacío si no recibe
 	FromDir       string                 `protobuf:"bytes,9,opt,name=from_dir,json=fromDir,proto3" json:"from_dir,omitempty"`
-	Files         []string               `protobuf:"bytes,10,rep,name=files,proto3" json:"files,omitempty"` // nombres que se pueden leer ahora
+	Files         []string               `protobuf:"bytes,10,rep,name=files,proto3" json:"files,omitempty"`       // nombres que se pueden leer ahora
+	Warnings      []*ServerWarning       `protobuf:"bytes,11,rep,name=warnings,proto3" json:"warnings,omitempty"` // avisos de las carpetas (publicada y de recepción); también van en hint
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -285,6 +286,74 @@ func (x *ServerReady) GetFiles() []string {
 	return nil
 }
 
+func (x *ServerReady) GetWarnings() []*ServerWarning {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+// ServerWarning es un aviso de carpeta del servidor: la UI muestra message como texto y cmd en una consola copiable.
+type ServerWarning struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`       // clave estable del catálogo (p. ej. fileserve.hint.warn_from_writable)
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"` // el aviso en el idioma pedido, sin la orden
+	Cmd           string                 `protobuf:"bytes,3,opt,name=cmd,proto3" json:"cmd,omitempty"`         // orden que lo corrige (chmod o icacls); vacía si no hay una segura
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ServerWarning) Reset() {
+	*x = ServerWarning{}
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServerWarning) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServerWarning) ProtoMessage() {}
+
+func (x *ServerWarning) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServerWarning.ProtoReflect.Descriptor instead.
+func (*ServerWarning) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ServerWarning) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ServerWarning) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ServerWarning) GetCmd() string {
+	if x != nil {
+		return x.Cmd
+	}
+	return ""
+}
+
 type StartServerResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Event:
@@ -299,7 +368,7 @@ type StartServerResponse struct {
 
 func (x *StartServerResponse) Reset() {
 	*x = StartServerResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +380,7 @@ func (x *StartServerResponse) String() string {
 func (*StartServerResponse) ProtoMessage() {}
 
 func (x *StartServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +393,7 @@ func (x *StartServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartServerResponse.ProtoReflect.Descriptor instead.
 func (*StartServerResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *StartServerResponse) GetEvent() isStartServerResponse_Event {
@@ -392,7 +461,7 @@ type ServerClosed struct {
 
 func (x *ServerClosed) Reset() {
 	*x = ServerClosed{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -404,7 +473,7 @@ func (x *ServerClosed) String() string {
 func (*ServerClosed) ProtoMessage() {}
 
 func (x *ServerClosed) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -417,7 +486,7 @@ func (x *ServerClosed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerClosed.ProtoReflect.Descriptor instead.
 func (*ServerClosed) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ServerClosed) GetCleanup() string {
@@ -436,7 +505,7 @@ type StopServerRequest struct {
 
 func (x *StopServerRequest) Reset() {
 	*x = StopServerRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +517,7 @@ func (x *StopServerRequest) String() string {
 func (*StopServerRequest) ProtoMessage() {}
 
 func (x *StopServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +530,7 @@ func (x *StopServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopServerRequest.ProtoReflect.Descriptor instead.
 func (*StopServerRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StopServerRequest) GetServerId() string {
@@ -480,7 +549,7 @@ type StopServerResponse struct {
 
 func (x *StopServerResponse) Reset() {
 	*x = StopServerResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -492,7 +561,7 @@ func (x *StopServerResponse) String() string {
 func (*StopServerResponse) ProtoMessage() {}
 
 func (x *StopServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -505,7 +574,7 @@ func (x *StopServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopServerResponse.ProtoReflect.Descriptor instead.
 func (*StopServerResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StopServerResponse) GetStopped() bool {
@@ -523,7 +592,7 @@ type ListServersRequest struct {
 
 func (x *ListServersRequest) Reset() {
 	*x = ListServersRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -535,7 +604,7 @@ func (x *ListServersRequest) String() string {
 func (*ListServersRequest) ProtoMessage() {}
 
 func (x *ListServersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -548,7 +617,7 @@ func (x *ListServersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServersRequest.ProtoReflect.Descriptor instead.
 func (*ListServersRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{7}
 }
 
 type ServerInfo struct {
@@ -568,7 +637,7 @@ type ServerInfo struct {
 
 func (x *ServerInfo) Reset() {
 	*x = ServerInfo{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +649,7 @@ func (x *ServerInfo) String() string {
 func (*ServerInfo) ProtoMessage() {}
 
 func (x *ServerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +662,7 @@ func (x *ServerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerInfo.ProtoReflect.Descriptor instead.
 func (*ServerInfo) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ServerInfo) GetServerId() string {
@@ -668,7 +737,7 @@ type ListServersResponse struct {
 
 func (x *ListServersResponse) Reset() {
 	*x = ListServersResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -680,7 +749,7 @@ func (x *ListServersResponse) String() string {
 func (*ListServersResponse) ProtoMessage() {}
 
 func (x *ListServersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -693,7 +762,7 @@ func (x *ListServersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListServersResponse.ProtoReflect.Descriptor instead.
 func (*ListServersResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListServersResponse) GetServers() []*ServerInfo {
@@ -718,7 +787,7 @@ type TransferResult struct {
 
 func (x *TransferResult) Reset() {
 	*x = TransferResult{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -730,7 +799,7 @@ func (x *TransferResult) String() string {
 func (*TransferResult) ProtoMessage() {}
 
 func (x *TransferResult) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -743,7 +812,7 @@ func (x *TransferResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferResult.ProtoReflect.Descriptor instead.
 func (*TransferResult) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TransferResult) GetPath() string {
@@ -815,7 +884,7 @@ type GetRequest struct {
 
 func (x *GetRequest) Reset() {
 	*x = GetRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -827,7 +896,7 @@ func (x *GetRequest) String() string {
 func (*GetRequest) ProtoMessage() {}
 
 func (x *GetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -840,7 +909,7 @@ func (x *GetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRequest.ProtoReflect.Descriptor instead.
 func (*GetRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetRequest) GetUrl() string {
@@ -936,7 +1005,7 @@ type GetResponse struct {
 
 func (x *GetResponse) Reset() {
 	*x = GetResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -948,7 +1017,7 @@ func (x *GetResponse) String() string {
 func (*GetResponse) ProtoMessage() {}
 
 func (x *GetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -961,7 +1030,7 @@ func (x *GetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResponse.ProtoReflect.Descriptor instead.
 func (*GetResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{11}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetResponse) GetResult() *TransferResult {
@@ -987,7 +1056,7 @@ type PutRequest struct {
 
 func (x *PutRequest) Reset() {
 	*x = PutRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -999,7 +1068,7 @@ func (x *PutRequest) String() string {
 func (*PutRequest) ProtoMessage() {}
 
 func (x *PutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1012,7 +1081,7 @@ func (x *PutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutRequest.ProtoReflect.Descriptor instead.
 func (*PutRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{12}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PutRequest) GetUrl() string {
@@ -1080,7 +1149,7 @@ type PutResponse struct {
 
 func (x *PutResponse) Reset() {
 	*x = PutResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1092,7 +1161,7 @@ func (x *PutResponse) String() string {
 func (*PutResponse) ProtoMessage() {}
 
 func (x *PutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1105,7 +1174,7 @@ func (x *PutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutResponse.ProtoReflect.Descriptor instead.
 func (*PutResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{13}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PutResponse) GetResult() *TransferResult {
@@ -1126,7 +1195,7 @@ type RedirectHintRequest struct {
 
 func (x *RedirectHintRequest) Reset() {
 	*x = RedirectHintRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1138,7 +1207,7 @@ func (x *RedirectHintRequest) String() string {
 func (*RedirectHintRequest) ProtoMessage() {}
 
 func (x *RedirectHintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1151,7 +1220,7 @@ func (x *RedirectHintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RedirectHintRequest.ProtoReflect.Descriptor instead.
 func (*RedirectHintRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{14}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RedirectHintRequest) GetProtocol() string {
@@ -1189,7 +1258,7 @@ type RedirectHintResponse struct {
 
 func (x *RedirectHintResponse) Reset() {
 	*x = RedirectHintResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1201,7 +1270,7 @@ func (x *RedirectHintResponse) String() string {
 func (*RedirectHintResponse) ProtoMessage() {}
 
 func (x *RedirectHintResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1214,7 +1283,7 @@ func (x *RedirectHintResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RedirectHintResponse.ProtoReflect.Descriptor instead.
 func (*RedirectHintResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RedirectHintResponse) GetStandardPort() int32 {
@@ -1275,7 +1344,7 @@ type BrowseRequest struct {
 
 func (x *BrowseRequest) Reset() {
 	*x = BrowseRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1287,7 +1356,7 @@ func (x *BrowseRequest) String() string {
 func (*BrowseRequest) ProtoMessage() {}
 
 func (x *BrowseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1300,7 +1369,7 @@ func (x *BrowseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowseRequest.ProtoReflect.Descriptor instead.
 func (*BrowseRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BrowseRequest) GetUrl() string {
@@ -1374,7 +1443,7 @@ type RemoteEntry struct {
 
 func (x *RemoteEntry) Reset() {
 	*x = RemoteEntry{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1386,7 +1455,7 @@ func (x *RemoteEntry) String() string {
 func (*RemoteEntry) ProtoMessage() {}
 
 func (x *RemoteEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1399,7 +1468,7 @@ func (x *RemoteEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoteEntry.ProtoReflect.Descriptor instead.
 func (*RemoteEntry) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RemoteEntry) GetName() string {
@@ -1463,7 +1532,7 @@ type BrowseResponse struct {
 
 func (x *BrowseResponse) Reset() {
 	*x = BrowseResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1475,7 +1544,7 @@ func (x *BrowseResponse) String() string {
 func (*BrowseResponse) ProtoMessage() {}
 
 func (x *BrowseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1488,7 +1557,7 @@ func (x *BrowseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowseResponse.ProtoReflect.Descriptor instead.
 func (*BrowseResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *BrowseResponse) GetPath() string {
@@ -1536,7 +1605,7 @@ type GetManyRequest struct {
 
 func (x *GetManyRequest) Reset() {
 	*x = GetManyRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1548,7 +1617,7 @@ func (x *GetManyRequest) String() string {
 func (*GetManyRequest) ProtoMessage() {}
 
 func (x *GetManyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1561,7 +1630,7 @@ func (x *GetManyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetManyRequest.ProtoReflect.Descriptor instead.
 func (*GetManyRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetManyRequest) GetUrl() string {
@@ -1636,7 +1705,7 @@ type GetStreamRequest struct {
 
 func (x *GetStreamRequest) Reset() {
 	*x = GetStreamRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1648,7 +1717,7 @@ func (x *GetStreamRequest) String() string {
 func (*GetStreamRequest) ProtoMessage() {}
 
 func (x *GetStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1661,7 +1730,7 @@ func (x *GetStreamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStreamRequest.ProtoReflect.Descriptor instead.
 func (*GetStreamRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetStreamRequest) GetRequest() *GetRequest {
@@ -1680,7 +1749,7 @@ type PutStreamRequest struct {
 
 func (x *PutStreamRequest) Reset() {
 	*x = PutStreamRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1692,7 +1761,7 @@ func (x *PutStreamRequest) String() string {
 func (*PutStreamRequest) ProtoMessage() {}
 
 func (x *PutStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1705,7 +1774,7 @@ func (x *PutStreamRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutStreamRequest.ProtoReflect.Descriptor instead.
 func (*PutStreamRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *PutStreamRequest) GetRequest() *PutRequest {
@@ -1724,7 +1793,7 @@ type GetStreamResponse struct {
 
 func (x *GetStreamResponse) Reset() {
 	*x = GetStreamResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1736,7 +1805,7 @@ func (x *GetStreamResponse) String() string {
 func (*GetStreamResponse) ProtoMessage() {}
 
 func (x *GetStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1749,7 +1818,7 @@ func (x *GetStreamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStreamResponse.ProtoReflect.Descriptor instead.
 func (*GetStreamResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{22}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetStreamResponse) GetEvent() *TransferEvent {
@@ -1768,7 +1837,7 @@ type PutStreamResponse struct {
 
 func (x *PutStreamResponse) Reset() {
 	*x = PutStreamResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1780,7 +1849,7 @@ func (x *PutStreamResponse) String() string {
 func (*PutStreamResponse) ProtoMessage() {}
 
 func (x *PutStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1793,7 +1862,7 @@ func (x *PutStreamResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PutStreamResponse.ProtoReflect.Descriptor instead.
 func (*PutStreamResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{23}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PutStreamResponse) GetEvent() *TransferEvent {
@@ -1812,7 +1881,7 @@ type GetManyResponse struct {
 
 func (x *GetManyResponse) Reset() {
 	*x = GetManyResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1824,7 +1893,7 @@ func (x *GetManyResponse) String() string {
 func (*GetManyResponse) ProtoMessage() {}
 
 func (x *GetManyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1837,7 +1906,7 @@ func (x *GetManyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetManyResponse.ProtoReflect.Descriptor instead.
 func (*GetManyResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{24}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetManyResponse) GetEvent() *TransferEvent {
@@ -1861,7 +1930,7 @@ type TransferEvent struct {
 
 func (x *TransferEvent) Reset() {
 	*x = TransferEvent{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1873,7 +1942,7 @@ func (x *TransferEvent) String() string {
 func (*TransferEvent) ProtoMessage() {}
 
 func (x *TransferEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1886,7 +1955,7 @@ func (x *TransferEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferEvent.ProtoReflect.Descriptor instead.
 func (*TransferEvent) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{25}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *TransferEvent) GetEvent() isTransferEvent_Event {
@@ -1959,7 +2028,7 @@ type TransferProgress struct {
 
 func (x *TransferProgress) Reset() {
 	*x = TransferProgress{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1971,7 +2040,7 @@ func (x *TransferProgress) String() string {
 func (*TransferProgress) ProtoMessage() {}
 
 func (x *TransferProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1984,7 +2053,7 @@ func (x *TransferProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferProgress.ProtoReflect.Descriptor instead.
 func (*TransferProgress) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{26}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *TransferProgress) GetIndex() int32 {
@@ -2042,7 +2111,7 @@ type FileResult struct {
 
 func (x *FileResult) Reset() {
 	*x = FileResult{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2054,7 +2123,7 @@ func (x *FileResult) String() string {
 func (*FileResult) ProtoMessage() {}
 
 func (x *FileResult) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2067,7 +2136,7 @@ func (x *FileResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileResult.ProtoReflect.Descriptor instead.
 func (*FileResult) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{27}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *FileResult) GetIndex() int32 {
@@ -2115,7 +2184,7 @@ type BatchSummary struct {
 
 func (x *BatchSummary) Reset() {
 	*x = BatchSummary{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2127,7 +2196,7 @@ func (x *BatchSummary) String() string {
 func (*BatchSummary) ProtoMessage() {}
 
 func (x *BatchSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2140,7 +2209,7 @@ func (x *BatchSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchSummary.ProtoReflect.Descriptor instead.
 func (*BatchSummary) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{28}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *BatchSummary) GetOk() int32 {
@@ -2166,7 +2235,7 @@ type ListTransferSessionsRequest struct {
 
 func (x *ListTransferSessionsRequest) Reset() {
 	*x = ListTransferSessionsRequest{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2178,7 +2247,7 @@ func (x *ListTransferSessionsRequest) String() string {
 func (*ListTransferSessionsRequest) ProtoMessage() {}
 
 func (x *ListTransferSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2191,7 +2260,7 @@ func (x *ListTransferSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTransferSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListTransferSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{29}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListTransferSessionsRequest) GetServerId() string {
@@ -2211,7 +2280,7 @@ type ListTransferSessionsResponse struct {
 
 func (x *ListTransferSessionsResponse) Reset() {
 	*x = ListTransferSessionsResponse{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2223,7 +2292,7 @@ func (x *ListTransferSessionsResponse) String() string {
 func (*ListTransferSessionsResponse) ProtoMessage() {}
 
 func (x *ListTransferSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2236,7 +2305,7 @@ func (x *ListTransferSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTransferSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListTransferSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{30}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListTransferSessionsResponse) GetSessions() []*TransferSession {
@@ -2276,7 +2345,7 @@ type TransferRejection struct {
 
 func (x *TransferRejection) Reset() {
 	*x = TransferRejection{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2288,7 +2357,7 @@ func (x *TransferRejection) String() string {
 func (*TransferRejection) ProtoMessage() {}
 
 func (x *TransferRejection) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2301,7 +2370,7 @@ func (x *TransferRejection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferRejection.ProtoReflect.Descriptor instead.
 func (*TransferRejection) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{31}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *TransferRejection) GetServerId() string {
@@ -2398,7 +2467,7 @@ type TransferSession struct {
 
 func (x *TransferSession) Reset() {
 	*x = TransferSession{}
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2410,7 +2479,7 @@ func (x *TransferSession) String() string {
 func (*TransferSession) ProtoMessage() {}
 
 func (x *TransferSession) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[32]
+	mi := &file_macuahuitl_v1_transfer_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2423,7 +2492,7 @@ func (x *TransferSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransferSession.ProtoReflect.Descriptor instead.
 func (*TransferSession) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{32}
+	return file_macuahuitl_v1_transfer_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *TransferSession) GetId() string {
@@ -2545,7 +2614,7 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\n" +
 	"legacy_ssh\x18\f \x01(\bR\tlegacySsh\x12(\n" +
 	"\x10passive_port_min\x18\r \x01(\rR\x0epassivePortMin\x12(\n" +
-	"\x10passive_port_max\x18\x0e \x01(\rR\x0epassivePortMax\"\x98\x02\n" +
+	"\x10passive_port_max\x18\x0e \x01(\rR\x0epassivePortMax\"\xd2\x02\n" +
 	"\vServerReady\x12\x1b\n" +
 	"\tserver_id\x18\x01 \x01(\tR\bserverId\x12\x1a\n" +
 	"\bprotocol\x18\x02 \x01(\tR\bprotocol\x12\x1c\n" +
@@ -2557,7 +2626,12 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\brecv_dir\x18\b \x01(\tR\arecvDir\x12\x19\n" +
 	"\bfrom_dir\x18\t \x01(\tR\afromDir\x12\x14\n" +
 	"\x05files\x18\n" +
-	" \x03(\tR\x05files\"\xb0\x01\n" +
+	" \x03(\tR\x05files\x128\n" +
+	"\bwarnings\x18\v \x03(\v2\x1c.macuahuitl.v1.ServerWarningR\bwarnings\"O\n" +
+	"\rServerWarning\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x10\n" +
+	"\x03cmd\x18\x03 \x01(\tR\x03cmd\"\xb0\x01\n" +
 	"\x13StartServerResponse\x122\n" +
 	"\x05ready\x18\x01 \x01(\v2\x1a.macuahuitl.v1.ServerReadyH\x00R\x05ready\x12%\n" +
 	"\rtransfer_json\x18\x02 \x01(\tH\x00R\ftransferJson\x125\n" +
@@ -2765,87 +2839,89 @@ func file_macuahuitl_v1_transfer_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_transfer_proto_rawDescData
 }
 
-var file_macuahuitl_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_macuahuitl_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_macuahuitl_v1_transfer_proto_goTypes = []any{
 	(*StartServerRequest)(nil),           // 0: macuahuitl.v1.StartServerRequest
 	(*ServerReady)(nil),                  // 1: macuahuitl.v1.ServerReady
-	(*StartServerResponse)(nil),          // 2: macuahuitl.v1.StartServerResponse
-	(*ServerClosed)(nil),                 // 3: macuahuitl.v1.ServerClosed
-	(*StopServerRequest)(nil),            // 4: macuahuitl.v1.StopServerRequest
-	(*StopServerResponse)(nil),           // 5: macuahuitl.v1.StopServerResponse
-	(*ListServersRequest)(nil),           // 6: macuahuitl.v1.ListServersRequest
-	(*ServerInfo)(nil),                   // 7: macuahuitl.v1.ServerInfo
-	(*ListServersResponse)(nil),          // 8: macuahuitl.v1.ListServersResponse
-	(*TransferResult)(nil),               // 9: macuahuitl.v1.TransferResult
-	(*GetRequest)(nil),                   // 10: macuahuitl.v1.GetRequest
-	(*GetResponse)(nil),                  // 11: macuahuitl.v1.GetResponse
-	(*PutRequest)(nil),                   // 12: macuahuitl.v1.PutRequest
-	(*PutResponse)(nil),                  // 13: macuahuitl.v1.PutResponse
-	(*RedirectHintRequest)(nil),          // 14: macuahuitl.v1.RedirectHintRequest
-	(*RedirectHintResponse)(nil),         // 15: macuahuitl.v1.RedirectHintResponse
-	(*BrowseRequest)(nil),                // 16: macuahuitl.v1.BrowseRequest
-	(*RemoteEntry)(nil),                  // 17: macuahuitl.v1.RemoteEntry
-	(*BrowseResponse)(nil),               // 18: macuahuitl.v1.BrowseResponse
-	(*GetManyRequest)(nil),               // 19: macuahuitl.v1.GetManyRequest
-	(*GetStreamRequest)(nil),             // 20: macuahuitl.v1.GetStreamRequest
-	(*PutStreamRequest)(nil),             // 21: macuahuitl.v1.PutStreamRequest
-	(*GetStreamResponse)(nil),            // 22: macuahuitl.v1.GetStreamResponse
-	(*PutStreamResponse)(nil),            // 23: macuahuitl.v1.PutStreamResponse
-	(*GetManyResponse)(nil),              // 24: macuahuitl.v1.GetManyResponse
-	(*TransferEvent)(nil),                // 25: macuahuitl.v1.TransferEvent
-	(*TransferProgress)(nil),             // 26: macuahuitl.v1.TransferProgress
-	(*FileResult)(nil),                   // 27: macuahuitl.v1.FileResult
-	(*BatchSummary)(nil),                 // 28: macuahuitl.v1.BatchSummary
-	(*ListTransferSessionsRequest)(nil),  // 29: macuahuitl.v1.ListTransferSessionsRequest
-	(*ListTransferSessionsResponse)(nil), // 30: macuahuitl.v1.ListTransferSessionsResponse
-	(*TransferRejection)(nil),            // 31: macuahuitl.v1.TransferRejection
-	(*TransferSession)(nil),              // 32: macuahuitl.v1.TransferSession
+	(*ServerWarning)(nil),                // 2: macuahuitl.v1.ServerWarning
+	(*StartServerResponse)(nil),          // 3: macuahuitl.v1.StartServerResponse
+	(*ServerClosed)(nil),                 // 4: macuahuitl.v1.ServerClosed
+	(*StopServerRequest)(nil),            // 5: macuahuitl.v1.StopServerRequest
+	(*StopServerResponse)(nil),           // 6: macuahuitl.v1.StopServerResponse
+	(*ListServersRequest)(nil),           // 7: macuahuitl.v1.ListServersRequest
+	(*ServerInfo)(nil),                   // 8: macuahuitl.v1.ServerInfo
+	(*ListServersResponse)(nil),          // 9: macuahuitl.v1.ListServersResponse
+	(*TransferResult)(nil),               // 10: macuahuitl.v1.TransferResult
+	(*GetRequest)(nil),                   // 11: macuahuitl.v1.GetRequest
+	(*GetResponse)(nil),                  // 12: macuahuitl.v1.GetResponse
+	(*PutRequest)(nil),                   // 13: macuahuitl.v1.PutRequest
+	(*PutResponse)(nil),                  // 14: macuahuitl.v1.PutResponse
+	(*RedirectHintRequest)(nil),          // 15: macuahuitl.v1.RedirectHintRequest
+	(*RedirectHintResponse)(nil),         // 16: macuahuitl.v1.RedirectHintResponse
+	(*BrowseRequest)(nil),                // 17: macuahuitl.v1.BrowseRequest
+	(*RemoteEntry)(nil),                  // 18: macuahuitl.v1.RemoteEntry
+	(*BrowseResponse)(nil),               // 19: macuahuitl.v1.BrowseResponse
+	(*GetManyRequest)(nil),               // 20: macuahuitl.v1.GetManyRequest
+	(*GetStreamRequest)(nil),             // 21: macuahuitl.v1.GetStreamRequest
+	(*PutStreamRequest)(nil),             // 22: macuahuitl.v1.PutStreamRequest
+	(*GetStreamResponse)(nil),            // 23: macuahuitl.v1.GetStreamResponse
+	(*PutStreamResponse)(nil),            // 24: macuahuitl.v1.PutStreamResponse
+	(*GetManyResponse)(nil),              // 25: macuahuitl.v1.GetManyResponse
+	(*TransferEvent)(nil),                // 26: macuahuitl.v1.TransferEvent
+	(*TransferProgress)(nil),             // 27: macuahuitl.v1.TransferProgress
+	(*FileResult)(nil),                   // 28: macuahuitl.v1.FileResult
+	(*BatchSummary)(nil),                 // 29: macuahuitl.v1.BatchSummary
+	(*ListTransferSessionsRequest)(nil),  // 30: macuahuitl.v1.ListTransferSessionsRequest
+	(*ListTransferSessionsResponse)(nil), // 31: macuahuitl.v1.ListTransferSessionsResponse
+	(*TransferRejection)(nil),            // 32: macuahuitl.v1.TransferRejection
+	(*TransferSession)(nil),              // 33: macuahuitl.v1.TransferSession
 }
 var file_macuahuitl_v1_transfer_proto_depIdxs = []int32{
-	1,  // 0: macuahuitl.v1.StartServerResponse.ready:type_name -> macuahuitl.v1.ServerReady
-	3,  // 1: macuahuitl.v1.StartServerResponse.closed:type_name -> macuahuitl.v1.ServerClosed
-	7,  // 2: macuahuitl.v1.ListServersResponse.servers:type_name -> macuahuitl.v1.ServerInfo
-	9,  // 3: macuahuitl.v1.GetResponse.result:type_name -> macuahuitl.v1.TransferResult
-	9,  // 4: macuahuitl.v1.PutResponse.result:type_name -> macuahuitl.v1.TransferResult
-	17, // 5: macuahuitl.v1.BrowseResponse.entries:type_name -> macuahuitl.v1.RemoteEntry
-	10, // 6: macuahuitl.v1.GetStreamRequest.request:type_name -> macuahuitl.v1.GetRequest
-	12, // 7: macuahuitl.v1.PutStreamRequest.request:type_name -> macuahuitl.v1.PutRequest
-	25, // 8: macuahuitl.v1.GetStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	25, // 9: macuahuitl.v1.PutStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	25, // 10: macuahuitl.v1.GetManyResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	26, // 11: macuahuitl.v1.TransferEvent.progress:type_name -> macuahuitl.v1.TransferProgress
-	27, // 12: macuahuitl.v1.TransferEvent.file:type_name -> macuahuitl.v1.FileResult
-	28, // 13: macuahuitl.v1.TransferEvent.done:type_name -> macuahuitl.v1.BatchSummary
-	9,  // 14: macuahuitl.v1.FileResult.result:type_name -> macuahuitl.v1.TransferResult
-	32, // 15: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
-	31, // 16: macuahuitl.v1.ListTransferSessionsResponse.rejections:type_name -> macuahuitl.v1.TransferRejection
-	0,  // 17: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
-	4,  // 18: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
-	6,  // 19: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
-	10, // 20: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
-	12, // 21: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
-	14, // 22: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
-	16, // 23: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
-	20, // 24: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
-	21, // 25: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
-	19, // 26: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
-	29, // 27: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
-	2,  // 28: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
-	5,  // 29: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
-	8,  // 30: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
-	11, // 31: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
-	13, // 32: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
-	15, // 33: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
-	18, // 34: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
-	22, // 35: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
-	23, // 36: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
-	24, // 37: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
-	30, // 38: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	2,  // 0: macuahuitl.v1.ServerReady.warnings:type_name -> macuahuitl.v1.ServerWarning
+	1,  // 1: macuahuitl.v1.StartServerResponse.ready:type_name -> macuahuitl.v1.ServerReady
+	4,  // 2: macuahuitl.v1.StartServerResponse.closed:type_name -> macuahuitl.v1.ServerClosed
+	8,  // 3: macuahuitl.v1.ListServersResponse.servers:type_name -> macuahuitl.v1.ServerInfo
+	10, // 4: macuahuitl.v1.GetResponse.result:type_name -> macuahuitl.v1.TransferResult
+	10, // 5: macuahuitl.v1.PutResponse.result:type_name -> macuahuitl.v1.TransferResult
+	18, // 6: macuahuitl.v1.BrowseResponse.entries:type_name -> macuahuitl.v1.RemoteEntry
+	11, // 7: macuahuitl.v1.GetStreamRequest.request:type_name -> macuahuitl.v1.GetRequest
+	13, // 8: macuahuitl.v1.PutStreamRequest.request:type_name -> macuahuitl.v1.PutRequest
+	26, // 9: macuahuitl.v1.GetStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	26, // 10: macuahuitl.v1.PutStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	26, // 11: macuahuitl.v1.GetManyResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	27, // 12: macuahuitl.v1.TransferEvent.progress:type_name -> macuahuitl.v1.TransferProgress
+	28, // 13: macuahuitl.v1.TransferEvent.file:type_name -> macuahuitl.v1.FileResult
+	29, // 14: macuahuitl.v1.TransferEvent.done:type_name -> macuahuitl.v1.BatchSummary
+	10, // 15: macuahuitl.v1.FileResult.result:type_name -> macuahuitl.v1.TransferResult
+	33, // 16: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
+	32, // 17: macuahuitl.v1.ListTransferSessionsResponse.rejections:type_name -> macuahuitl.v1.TransferRejection
+	0,  // 18: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
+	5,  // 19: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
+	7,  // 20: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
+	11, // 21: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
+	13, // 22: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
+	15, // 23: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
+	17, // 24: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
+	21, // 25: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
+	22, // 26: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
+	20, // 27: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
+	30, // 28: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
+	3,  // 29: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
+	6,  // 30: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
+	9,  // 31: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
+	12, // 32: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
+	14, // 33: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
+	16, // 34: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
+	19, // 35: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
+	23, // 36: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
+	24, // 37: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
+	25, // 38: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
+	31, // 39: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
+	29, // [29:40] is the sub-list for method output_type
+	18, // [18:29] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_transfer_proto_init() }
@@ -2853,12 +2929,12 @@ func file_macuahuitl_v1_transfer_proto_init() {
 	if File_macuahuitl_v1_transfer_proto != nil {
 		return
 	}
-	file_macuahuitl_v1_transfer_proto_msgTypes[2].OneofWrappers = []any{
+	file_macuahuitl_v1_transfer_proto_msgTypes[3].OneofWrappers = []any{
 		(*StartServerResponse_Ready)(nil),
 		(*StartServerResponse_TransferJson)(nil),
 		(*StartServerResponse_Closed)(nil),
 	}
-	file_macuahuitl_v1_transfer_proto_msgTypes[25].OneofWrappers = []any{
+	file_macuahuitl_v1_transfer_proto_msgTypes[26].OneofWrappers = []any{
 		(*TransferEvent_Progress)(nil),
 		(*TransferEvent_File)(nil),
 		(*TransferEvent_Done)(nil),
@@ -2869,7 +2945,7 @@ func file_macuahuitl_v1_transfer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_transfer_proto_rawDesc), len(file_macuahuitl_v1_transfer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

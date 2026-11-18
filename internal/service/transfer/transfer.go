@@ -181,9 +181,10 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 		// Ni la contraseña ni la llave privada se auditan: solo qué se abrió, dónde y con qué reglas.
 		s.d.Audit("transfer.serve.open", rd.Addr, fmt.Sprintf("server=%s proto=%s read_from=%q files=%q write=%t receive_into=%q origins=%v all=%t duration=%s legacy_ssh=%t limits=%d/%d",
 			id, r.Protocol, from, r.Files, r.Write, recv, r.Allow, r.AllowAny, dur, cfg.Legacy && (r.Protocol == "scp" || r.Protocol == "sftp"), cfg.MaxFile, cfg.MaxTotal))
+		hint, ws := fileserve.ServerHintWarnings(loc, cfg, rd, names)
 		k.events <- &v1.StartServerResponse{Event: &v1.StartServerResponse_Ready{Ready: &v1.ServerReady{
-			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: fileserve.ServerHintIn(loc, cfg, rd, names),
-			User: rd.User, Password: rd.Pass, Fingerprints: rd.Fingerprints, RecvDir: recv, FromDir: from, Files: names}}}
+			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: hint,
+			User: rd.User, Password: rd.Pass, Fingerprints: rd.Fingerprints, RecvDir: recv, FromDir: from, Files: names, Warnings: warnings(ws)}}}
 	}
 	err = fileserve.Serve(sctx, cfg)
 	// Cierre de seguridad: lo que siga activo al volver Serve falló por el cierre; se audita como cualquier otra.
@@ -352,3 +353,12 @@ func redacted(raw string) string {
 }
 
 var userinfoRe = regexp.MustCompile(`://[^/@]*@`)
+
+// warnings son los avisos de carpeta de la ayuda, estructurados para la UI.
+func warnings(ws []fileserve.DirWarning) []*v1.ServerWarning {
+	var out []*v1.ServerWarning
+	for _, w := range ws {
+		out = append(out, &v1.ServerWarning{Code: w.Code, Message: w.Text, Cmd: w.Cmd})
+	}
+	return out
+}
