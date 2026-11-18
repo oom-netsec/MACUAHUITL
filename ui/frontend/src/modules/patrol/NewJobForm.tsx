@@ -2,6 +2,7 @@ import { pathProblem } from "../../lib/paths";
 import { useEffect, useState } from "react";
 import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
+import { Advanced } from "../../components/Advanced";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useCoreLang, useT } from "../../lib/i18n";
@@ -122,6 +123,15 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
         ))}
         <TextArea label={t("patrol.commands")} hint={t("patrol.commands.hint")} value={cmds} onChange={setCmds} rows={4} mono />
         <PathField label={t("patrol.outDir")} value={out} onChange={setOut} pick={() => core.pickPath({ title: t("patrol.outDir"), directory: true })} />
+      </Section>
+      <Section title={`3 · ${t("patrol.step.schedule")}`}>
+        <div className="field-row">
+          <Field label={t("patrol.interval")} hint={t("patrol.interval.hint")} type="number" value={minutes} onChange={setMinutes} w="sm" />
+          <Field label={t("patrol.cron")} hint={t("patrol.cron.hint")} value={cron} onChange={setCron} w="sm" mono />
+          <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint")} error={roundsErr} type="number" value={rounds} onChange={setRounds} w="sm" />
+        </div>
+      </Section>
+      <Advanced changed={[split !== "SPLIT_STRATEGY_PER_ROUND", zip !== "ZIP_POLICY_AT_END", zip !== "ZIP_POLICY_NONE" && delLoose, hours !== "4", !mask, acceptChanged].filter(Boolean).length}>
         <div className="field-row">
           <Select label={t("patrol.split")} value={split} onChange={setSplit} w="md"
             options={[["SPLIT_STRATEGY_PER_ROUND", t("patrol.split.perRound")], ["SPLIT_STRATEGY_CONSOLIDATED", t("patrol.split.consolidated")]]} />
@@ -129,21 +139,12 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
             options={[["ZIP_POLICY_AT_END", t("patrol.zip.atEnd")], ["ZIP_POLICY_PER_ROUND", t("patrol.zip.perRound")], ["ZIP_POLICY_NONE", t("patrol.zip.none")]]} />
         </div>
         {zip !== "ZIP_POLICY_NONE" && <Check label={t("patrol.deleteLoose")} checked={delLoose} onChange={setDelLoose} />}
-      </Section>
-      <Section title={`3 · ${t("patrol.step.schedule")}`}>
-        <div className="field-row">
-          <Field label={t("patrol.interval")} hint={t("patrol.interval.hint")} type="number" value={minutes} onChange={setMinutes} w="sm" />
-          <Field label={t("patrol.cron")} hint={t("patrol.cron.hint")} value={cron} onChange={setCron} w="sm" mono />
-          <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint")} error={roundsErr} type="number" value={rounds} onChange={setRounds} w="sm" />
-          <Field label={t("patrol.window")} hint={t("patrol.window.hint")} type="number" value={hours} onChange={setHours} w="sm" />
-        </div>
-      </Section>
-      <Section title={`4 · ${t("patrol.step.safety")}`}>
+        <Field label={t("patrol.window")} hint={t("patrol.window.hint")} type="number" value={hours} onChange={setHours} w="sm" />
         <Check label={t("patrol.mask")} checked={mask} onChange={setMask} />
-        {!mask && <Notice kind="error">{t("patrol.mask.off")}</Notice>}
         <Check label={t("patrol.acceptKeys")} checked={acceptChanged} onChange={setAcceptChanged} />
-        {acceptChanged && <Notice kind="error">{t("patrol.acceptKeys.on")}</Notice>}
-      </Section>
+      </Advanced>
+      {!mask && <Notice kind="error">{t("patrol.mask.off")}</Notice>}
+      {acceptChanged && <Notice kind="error">{t("patrol.acceptKeys.on")}</Notice>}
       {err && <Notice kind="error">{err}</Notice>}
       <div className="actions">
         <button type="submit" className="primary" aria-busy={busy} disabled={busy}>{t("patrol.create")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
