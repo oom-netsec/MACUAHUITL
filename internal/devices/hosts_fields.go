@@ -71,7 +71,7 @@ var HostFields = []FieldSpec{
 	campo("folder", "texto", false, [3]string{"Lab", "Lab", "Office"},
 		"Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.",
 		func(h *FileHost) *string { return &h.Folder }),
-	{Name: "tags", Type: "lista", Examples: [3]string{"core;dc-1", "acceso", "wifi"},
+	{Name: "tags", Type: "lista", Examples: [3]string{"core;dc-1", "access", "wifi"},
 		Description: "Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.",
 		get:         func(h FileHost) string { return strings.Join(h.Tags, ";") },
 		set: func(h *FileHost, v string) error {

@@ -59,7 +59,7 @@ export const sampleHostsFormat: HostsFormat = { fields: sampleHostFields, maxRow
 
 const templateRows = [
   ["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "admin lab", "Floor 2", ""],
-  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "acceso", "", "", ""],
+  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "access", "", "", ""],
   ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Office", "wifi", "", "", ""],
 ];
 const sampleTemplate = (format: HostFileFormat) => ({

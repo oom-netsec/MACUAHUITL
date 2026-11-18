@@ -171,7 +171,7 @@ func (s *ftpSession) run() {
 	br, ip := bufio.NewReaderSize(ic, 1024), hostOf(nc.RemoteAddr())
 	s.rw = bufio.NewWriter(ic)
 	defer s.closePasv()
-	s.reply(220, "MACUAHUITL servidor temporal de archivos")
+	s.reply(220, "MACUAHUITL temporary file server")
 	var user string
 	authed, fails := false, 0
 	for {
@@ -181,42 +181,42 @@ func (s *ftpSession) run() {
 		}
 		cmd, arg, err := parseFTP(line)
 		if err != nil {
-			s.reply(500, "orden no válida")
+			s.reply(500, "invalid command")
 			continue
 		}
 		switch cmd {
 		case "QUIT":
-			s.reply(221, "adiós")
+			s.reply(221, "goodbye")
 			return
 		case "NOOP":
 			s.reply(200, "ok")
 			continue
 		case "USER":
 			user, authed = arg, false
-			s.reply(331, "contraseña requerida")
+			s.reply(331, "password required")
 			continue
 		case "PASS":
 			if user == "" {
-				s.reply(503, "primero USER")
+				s.reply(503, "USER first")
 				continue
 			}
 			if credsOK(user, arg, s.c.User, s.c.Pass) {
 				authed = true
 				ic.setUntil(time.Time{})
-				s.reply(230, "sesión iniciada")
+				s.reply(230, "logged in")
 				continue
 			}
 			s.lim.fail(ip)
 			if fails++; fails >= ftpLoginFail || s.lim.blocked(ip) {
-				s.reply(421, "demasiados intentos")
+				s.reply(421, "too many attempts")
 				return
 			}
 			user = ""
-			s.reply(530, "credenciales incorrectas")
+			s.reply(530, "invalid credentials")
 			continue
 		}
 		if !authed {
-			s.reply(530, "inicia sesión")
+			s.reply(530, "log in first")
 			continue
 		}
 		if !s.authedCmd(cmd, arg) {
@@ -235,23 +235,23 @@ func (s *ftpSession) authedCmd(cmd, arg string) bool {
 		s.rw.Flush()
 	case "TYPE":
 		if u := strings.ToUpper(arg); u == "I" || u == "L 8" || strings.HasPrefix(u, "A") {
-			s.reply(200, "tipo binario") // siempre se transfiere en binario
+			s.reply(200, "binary type") // siempre se transfiere en binario
 		} else {
-			s.reply(504, "tipo no soportado")
+			s.reply(504, "type not supported")
 		}
 	case "MODE", "STRU":
 		if a := strings.ToUpper(arg); a == "S" || a == "F" {
 			s.reply(200, "ok")
 		} else {
-			s.reply(504, "no soportado")
+			s.reply(504, "not supported")
 		}
 	case "PWD", "XPWD":
-		s.reply(257, `"/" es el directorio actual`)
+		s.reply(257, `"/" is the current directory`)
 	case "CWD", "XCWD":
 		if arg == "/" || arg == "." || arg == "" {
 			s.reply(250, "ok")
 		} else {
-			s.reply(550, "solo existe /")
+			s.reply(550, "only / exists")
 		}
 	case "CDUP":
 		s.reply(250, "ok")
@@ -264,11 +264,11 @@ func (s *ftpSession) authedCmd(cmd, arg string) bool {
 			s.openPasv(true)
 		}
 	case "PORT", "EPRT":
-		s.reply(502, "modo activo deshabilitado: usa PASV (en IOS: ip ftp passive)")
+		s.reply(502, "active mode is disabled: use PASV (on IOS: ip ftp passive)")
 	case "SIZE":
 		f, fi, err := s.src.open(arg)
 		if err != nil {
-			s.reply(550, "archivo no publicado")
+			s.reply(550, "file not published")
 			break
 		}
 		f.Close()
@@ -281,9 +281,9 @@ func (s *ftpSession) authedCmd(cmd, arg string) bool {
 		s.stor(arg)
 	case "APPE", "STOU", "DELE", "RNFR", "RNTO", "MKD", "XMKD", "RMD", "XRMD", "SITE", "REST", "ABOR":
 		s.rejected(why("request_rejected", "type", cmd))
-		s.reply(550, "operación no permitida")
+		s.reply(550, "operation not permitted")
 	default:
-		s.reply(502, "orden no implementada")
+		s.reply(502, "command not implemented")
 	}
 	return true
 }
@@ -302,7 +302,7 @@ func (s *ftpSession) openPasv(ext bool) {
 	ip, _ := netip.AddrFromSlice(local.IP)
 	ip = ip.Unmap()
 	if !ext && !ip.Is4() {
-		s.reply(522, "usa EPSV en IPv6")
+		s.reply(522, "use EPSV on IPv6")
 		return
 	}
 	var ln net.Listener
@@ -320,7 +320,7 @@ func (s *ftpSession) openPasv(ext bool) {
 		}
 	}
 	if err != nil || ln == nil {
-		s.reply(425, "no hay puertos pasivos libres")
+		s.reply(425, "no free passive ports")
 		return
 	}
 	s.pasv = ln
@@ -369,13 +369,13 @@ func (c *ctxConn) Close() error { c.stop(); return c.Conn.Close() }
 
 func (s *ftpSession) list(namesOnly bool) {
 	if s.pasv == nil {
-		s.reply(425, "usa PASV primero")
+		s.reply(425, "use PASV first")
 		return
 	}
-	s.reply(150, "listado")
+	s.reply(150, "listing")
 	dc, err := s.dataConn()
 	if err != nil {
-		s.reply(425, "sin conexión de datos")
+		s.reply(425, "no data connection")
 		return
 	}
 	defer dc.Close()
@@ -389,20 +389,20 @@ func (s *ftpSession) list(namesOnly bool) {
 	}
 	w.Flush()
 	dc.Close()
-	s.reply(226, "listado completo")
+	s.reply(226, "listing complete")
 }
 
 func (s *ftpSession) retr(name string) {
 	t := Transfer{Proto: "ftp", Dir: "lectura", Client: s.client, File: name, Result: "error"}
 	if !s.src.enabled() {
-		s.reply(550, "lectura deshabilitada")
+		s.reply(550, "reading disabled")
 		t.Error, t.ReasonT, t.Rejected, t.Cause = "lectura deshabilitada", lit("lectura deshabilitada"), true, CauseReadDisabled
 		s.c.OnTransfer(t)
 		return
 	}
 	f, fi, err := s.src.open(name)
 	if err != nil {
-		s.reply(550, "archivo no publicado")
+		s.reply(550, "file not published")
 		t.Error, t.ReasonT, t.Rejected, t.Cause = "archivo no publicado", lit("archivo no publicado"), true, CauseNotFound
 		s.c.OnTransfer(t)
 		return
@@ -410,14 +410,14 @@ func (s *ftpSession) retr(name string) {
 	defer f.Close()
 	t.Path = f.Name()
 	if s.pasv == nil {
-		s.reply(425, "usa PASV primero")
+		s.reply(425, "use PASV first")
 		return
 	}
 	start := time.Now()
-	s.reply(150, "enviando")
+	s.reply(150, "sending")
 	dc, err := s.dataConn()
 	if err != nil {
-		s.reply(425, "sin conexión de datos")
+		s.reply(425, "no data connection")
 		t.Error, t.ReasonT = "sin conexión de datos", lit("sin conexión de datos")
 		s.c.OnTransfer(t)
 		return
@@ -428,10 +428,10 @@ func (s *ftpSession) retr(name string) {
 	t.Bytes, t.Duration = n, time.Since(start)
 	if err != nil {
 		t.setErr(err)
-		s.reply(426, "transferencia interrumpida")
+		s.reply(426, "transfer interrupted")
 	} else {
 		t.Result = "ok"
-		s.reply(226, "transferencia completa")
+		s.reply(226, "transfer complete")
 	}
 	s.c.OnTransfer(t)
 }
@@ -444,11 +444,11 @@ func (s *ftpSession) stor(name string) {
 		s.c.OnTransfer(t)
 	}
 	if s.rcv == nil {
-		fail(550, CauseWriteDisabled, "escritura deshabilitada")
+		fail(550, CauseWriteDisabled, "escritura deshabilitada", "writing disabled")
 		return
 	}
 	if s.pasv == nil {
-		s.reply(425, "usa PASV primero")
+		s.reply(425, "use PASV first")
 		return
 	}
 	rf, err := s.rcv.create(name, 0)
@@ -457,19 +457,19 @@ func (s *ftpSession) stor(name string) {
 		fail(550, CauseOther, errExists.Error(), errExists.Localize(i18n.En)) // 43e-9: el cable va en inglés
 		return
 	case errors.Is(err, errTooBig), errors.Is(err, errTotal), errors.Is(err, errTooMany):
-		fail(552, CauseOther, err.Error())
+		fail(552, CauseOther, err.Error(), i18n.English(err))
 		return
 	case err != nil:
-		fail(553, CauseOther, "nombre no permitido")
+		fail(553, CauseOther, "nombre no permitido", "name not allowed")
 		return
 	}
 	t.File = rf.name
 	start := time.Now()
-	s.reply(150, "recibiendo")
+	s.reply(150, "receiving")
 	dc, err := s.dataConn()
 	if err != nil {
 		rf.abort()
-		s.reply(425, "sin conexión de datos")
+		s.reply(425, "no data connection")
 		return
 	}
 	t.Live = s.c.start(t, 0) // STOR no anuncia tamaño
@@ -484,7 +484,7 @@ func (s *ftpSession) stor(name string) {
 		if errors.Is(err, errTooBig) || errors.Is(err, errTotal) {
 			code = 552
 		}
-		s.reply(code, "transferencia abortada: "+oneLine(err.Error()))
+		s.reply(code, "transfer aborted: "+oneLine(i18n.English(err)))
 		s.c.OnTransfer(t)
 		return
 	}
@@ -492,10 +492,10 @@ func (s *ftpSession) stor(name string) {
 	t.Bytes, t.SHA256, t.Path = n, sum, rf.path
 	if err != nil {
 		t.setErr(err)
-		s.reply(451, "error al guardar")
+		s.reply(451, "error while saving")
 	} else {
 		t.Result = "ok"
-		s.reply(226, "recibido")
+		s.reply(226, "received")
 	}
 	s.c.OnTransfer(t)
 }

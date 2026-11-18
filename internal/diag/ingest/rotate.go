@@ -85,7 +85,7 @@ func (s Sink) Validate() error {
 		return bad("max_files")
 	}
 	switch s.Format {
-	case "", "texto", "crudo", "jsonl", "text", "raw":
+	case "", "texto", "crudo", "jsonl":
 		return nil
 	}
 	return bad("format", "value", s.Format)
@@ -154,24 +154,13 @@ func NewWriter(s Sink, now func() time.Time) (*Writer, error) {
 	return w, nil
 }
 
-// canonFormat lleva el alias en inglés (text, raw) al valor que entienden los Record y el archivo de prefs.
-func canonFormat(f string) string {
-	switch f {
-	case "text":
-		return "texto"
-	case "raw":
-		return "crudo"
-	}
-	return f
-}
-
 // Write guarda el evento en el archivo de su origen (o el único, sin {origen}).
 func (w *Writer) Write(r Record) error {
 	key := ""
 	if w.perOrigin {
 		key = fileOrigin(SourceIP(r.Origin()))
 	}
-	line := r.Line(canonFormat(w.s.Format))
+	line := r.Line(w.s.Format)
 	now := w.now()
 	of := w.files[key]
 	if of != nil && w.due(of, len(line), now) {

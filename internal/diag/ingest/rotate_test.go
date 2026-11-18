@@ -381,17 +381,11 @@ func TestRetentionRegexMatchesEveryNameItCreates(t *testing.T) {
 	}
 }
 
-// 43e-9: en inglés el formato se pide text|raw; valen igual que texto|crudo (el valor guardado en prefs sigue siendo el español).
-func TestFormatoEnInglesEsAlias(t *testing.T) {
+// 43e-9: el núcleo solo conoce texto|crudo|jsonl (lo que guarda prefs); text y raw los normaliza mctl con cli.WireFormat.
+func TestFormatoEnInglesNoEsDelNucleo(t *testing.T) {
 	for _, f := range []string{"text", "raw"} {
-		if err := (Sink{Dir: "/x", Template: "s_{fecha}", MaxFiles: 1, Format: f}).Validate(); err != nil {
-			t.Errorf("%s: %v", f, err)
+		if (Sink{Dir: "/x", Template: "s_{fecha}", MaxFiles: 1, Format: f}).Validate() == nil {
+			t.Errorf("%s: el núcleo no debe aceptarlo", f)
 		}
-	}
-	r := newReloj()
-	w, abiertos, _ := newSink(t, r, func(s *Sink) { s.Format = "raw" })
-	w.Write(msg("192.0.2.1:1", "hola"))
-	if b, _ := os.ReadFile((*abiertos)[0]); string(b) != "hola\n" {
-		t.Fatalf("raw = %q", b)
 	}
 }

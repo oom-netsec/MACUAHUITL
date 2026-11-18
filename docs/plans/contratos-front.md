@@ -662,7 +662,7 @@ Diferencias con syslog:
 | Qué cuenta la tasa | mensajes | traps (un datagrama cada uno) | **datagramas de exportación**, no registros: uno puede traer decenas de flujos |
 | Defaults de tasa | 100/s por origen, 1000/s global | los de syslog | **1000/s por exportador y 5000/s global** (ráfaga 2x), porque un exportador real manda muchos más datagramas que un equipo syslog |
 | Cuándo rige el tope | siempre | siempre | **solo con `save`**: sin archivo no se aplica (el resumen en memoria ya está acotado) |
-| `nameTemplate` por defecto | `syslog_{fecha}_{hora}` | `traps_{fecha}_{hora}` | `flujos_{fecha}_{hora}` |
+| `nameTemplate` por defecto | `syslog_{fecha}_{hora}` | `traps_{fecha}_{hora}` | `flows_{fecha}_{hora}` |
 | `{origen}` | IP del emisor | IP del agente (sin puerto) | IP del exportador |
 | Formato por defecto | `texto` | `texto` (`.log`) | `texto` (`.log`) |
 
@@ -675,7 +675,7 @@ Doble de pruebas: `fakeVisibility()` (ya dentro de `fakeCore()`) tiene `emitVis(
 
 La vista Visibilidad usa para traps y flujos las mismas piezas que el receptor syslog. Viven en `ui/frontend/src/components/ingest/` y se parametrizan con `kind` (`syslog | traps | flows`): `ingestOpts.ts` (formulario, validación, `buildOpts`, nombre de ejemplo, `rangeOf` y `kindKey`), `IngestOptions.tsx` (bloque «Opciones» plegado con los grupos «Contra inundación» y «Archivos»), `IngestStatus.tsx` (línea de estado y aviso de descartes) y `useIngest.ts` (`useIngestOpts`: formulario, errores de inicio junto a su campo, archivo actual y descartes; `useBatch`: juntado cada 100 ms con tope). `trapsStart` y `flowsStart` mandan `opts` (`{}` = todos los defaults); el resto del contrato es el de la sección anterior.
 
-- **Defaults que muestra la ayuda** («Por defecto N · Rango a–b»): traps igual que syslog (100/s por origen, 1000/s global); flujos 1000 datagramas/s por exportador y 5000/s global (mismos rangos que syslog). Plantillas: `syslog_{fecha}_{hora}`, `traps_{fecha}_{hora}`, `flujos_{fecha}_{hora}`. Formato `texto` en los tres.
+- **Defaults que muestra la ayuda** («Por defecto N · Rango a–b»): traps igual que syslog (100/s por origen, 1000/s global); flujos 1000 datagramas/s por exportador y 5000/s global (mismos rangos que syslog). Plantillas: `syslog_{fecha}_{hora}`, `traps_{fecha}_{hora}`, `flows_{fecha}_{hora}`. Formato `texto` en los tres.
 - **Flujos sin «Guardar cada flujo en archivo»**: no hay tope ni descartes en el núcleo, así que la vista no muestra los campos de tasa, ráfaga ni cola y no los manda aunque se hayan escrito (se conservan si se activa guardar). Con guardar, la tasa cuenta datagramas de exportación y la ayuda lo dice.
 - **Errores de inicio**: un rechazo de `trapsStart`/`flowsStart` y un `done{error}` del stream pasan por el mismo mapeo; si nombran un campo (tasa, ráfaga, cola, rotación, plantilla, formato, dirección) se marcan junto a él y se abren las opciones (no la dirección); si no, van en un aviso.
 - **Eventos**: `outputPath` del evento `listening` es la carpeta; `rotatedPath` actualiza «Archivo actual» (con `{origen}` en la plantilla: «Un archivo por origen en <carpeta>»); `drops` pinta el aviso (frase fija en la región viva; cifras y top de orígenes o exportadores fuera de ella). El conteo de la línea de estado son traps recibidos o, en flujos, los flujos contados del resumen.
