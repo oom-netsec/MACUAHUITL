@@ -22,6 +22,8 @@ message StartAdhocRequest {
   // Un comando por línea.
   string commands = 3;
   repeated string accepted_host_key_fingerprints = 4;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 6;
   repeated string excluded_device_ids = 5;
 }
 

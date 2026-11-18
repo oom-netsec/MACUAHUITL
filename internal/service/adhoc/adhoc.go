@@ -66,7 +66,7 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 		shown[i] = mask.Cmd("", c)
 	}
 	s.d.Audit("adhoc.start", cj.JobId, fmt.Sprintf("devices=%d commands=%q", len(r.Targets), shown))
-	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
+	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		// El trabajo queda creado: se revisa con LoginTest y se arma con ArmJob, como cualquier otro.
 		return &v1.StartAdhocResponse{JobId: cj.JobId, Detail: status.Convert(err).Message()}, nil

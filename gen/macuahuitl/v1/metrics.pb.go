@@ -769,9 +769,11 @@ type GetPortStatusRequest struct {
 	Port                        uint32                 `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`                                    // en vivo: puerto SSH; 0 = 22
 	CredentialId                string                 `protobuf:"bytes,5,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"` // en vivo: credencial de la bóveda
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,6,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	LegacySsh                   bool                   `protobuf:"varint,7,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"` // en vivo: equipos con SSH antiguo (se audita)
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,8,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	LegacySsh        bool               `protobuf:"varint,7,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"` // en vivo: equipos con SSH antiguo (se audita)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetPortStatusRequest) Reset() {
@@ -842,6 +844,13 @@ func (x *GetPortStatusRequest) GetCredentialId() string {
 func (x *GetPortStatusRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *GetPortStatusRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -1249,7 +1258,7 @@ var File_macuahuitl_v1_metrics_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_metrics_proto_rawDesc = "" +
 	"\n" +
-	"\x1bmacuahuitl/v1/metrics.proto\x12\rmacuahuitl.v1\"\xbd\x01\n" +
+	"\x1bmacuahuitl/v1/metrics.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\xbd\x01\n" +
 	"\x14GetJobMetricsRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x10\n" +
 	"\x03dir\x18\x02 \x01(\tR\x03dir\x12\x16\n" +
@@ -1319,14 +1328,15 @@ const file_macuahuitl_v1_metrics_proto_rawDesc = "" +
 	"\x06reboot\x18\x0f \x01(\bR\x06reboot\"<\n" +
 	"\vRebootEvent\x12\x14\n" +
 	"\x05round\x18\x01 \x01(\x05R\x05round\x12\x17\n" +
-	"\aboot_ms\x18\x02 \x01(\x03R\x06bootMs\"\xf4\x01\n" +
+	"\aboot_ms\x18\x02 \x01(\x03R\x06bootMs\"\xc2\x02\n" +
 	"\x14GetPortStatusRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x10\n" +
 	"\x03dir\x18\x02 \x01(\tR\x03dir\x12\x16\n" +
 	"\x06device\x18\x03 \x01(\tR\x06device\x12\x12\n" +
 	"\x04port\x18\x04 \x01(\rR\x04port\x12#\n" +
 	"\rcredential_id\x18\x05 \x01(\tR\fcredentialId\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x1d\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\b \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x1d\n" +
 	"\n" +
 	"legacy_ssh\x18\a \x01(\bR\tlegacySsh\"\xfd\x01\n" +
 	"\x15GetPortStatusResponse\x12\x16\n" +
@@ -1399,6 +1409,7 @@ var file_macuahuitl_v1_metrics_proto_goTypes = []any{
 	(*PortInfo)(nil),              // 11: macuahuitl.v1.PortInfo
 	(*PortChannel)(nil),           // 12: macuahuitl.v1.PortChannel
 	(*ChannelMember)(nil),         // 13: macuahuitl.v1.ChannelMember
+	(*AcceptedHostKey)(nil),       // 14: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_metrics_proto_depIdxs = []int32{
 	2,  // 0: macuahuitl.v1.GetJobMetricsResponse.devices:type_name -> macuahuitl.v1.DeviceMetrics
@@ -1408,18 +1419,19 @@ var file_macuahuitl_v1_metrics_proto_depIdxs = []int32{
 	8,  // 4: macuahuitl.v1.DeviceMetrics.reboots:type_name -> macuahuitl.v1.RebootEvent
 	5,  // 5: macuahuitl.v1.MemorySeries.points:type_name -> macuahuitl.v1.MemoryPoint
 	7,  // 6: macuahuitl.v1.InterfaceSeries.points:type_name -> macuahuitl.v1.InterfacePoint
-	11, // 7: macuahuitl.v1.GetPortStatusResponse.ports:type_name -> macuahuitl.v1.PortInfo
-	12, // 8: macuahuitl.v1.GetPortStatusResponse.channels:type_name -> macuahuitl.v1.PortChannel
-	13, // 9: macuahuitl.v1.PortChannel.members:type_name -> macuahuitl.v1.ChannelMember
-	0,  // 10: macuahuitl.v1.MetricsService.GetJobMetrics:input_type -> macuahuitl.v1.GetJobMetricsRequest
-	9,  // 11: macuahuitl.v1.MetricsService.GetPortStatus:input_type -> macuahuitl.v1.GetPortStatusRequest
-	1,  // 12: macuahuitl.v1.MetricsService.GetJobMetrics:output_type -> macuahuitl.v1.GetJobMetricsResponse
-	10, // 13: macuahuitl.v1.MetricsService.GetPortStatus:output_type -> macuahuitl.v1.GetPortStatusResponse
-	12, // [12:14] is the sub-list for method output_type
-	10, // [10:12] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	14, // 7: macuahuitl.v1.GetPortStatusRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	11, // 8: macuahuitl.v1.GetPortStatusResponse.ports:type_name -> macuahuitl.v1.PortInfo
+	12, // 9: macuahuitl.v1.GetPortStatusResponse.channels:type_name -> macuahuitl.v1.PortChannel
+	13, // 10: macuahuitl.v1.PortChannel.members:type_name -> macuahuitl.v1.ChannelMember
+	0,  // 11: macuahuitl.v1.MetricsService.GetJobMetrics:input_type -> macuahuitl.v1.GetJobMetricsRequest
+	9,  // 12: macuahuitl.v1.MetricsService.GetPortStatus:input_type -> macuahuitl.v1.GetPortStatusRequest
+	1,  // 13: macuahuitl.v1.MetricsService.GetJobMetrics:output_type -> macuahuitl.v1.GetJobMetricsResponse
+	10, // 14: macuahuitl.v1.MetricsService.GetPortStatus:output_type -> macuahuitl.v1.GetPortStatusResponse
+	13, // [13:15] is the sub-list for method output_type
+	11, // [11:13] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_metrics_proto_init() }
@@ -1427,6 +1439,7 @@ func file_macuahuitl_v1_metrics_proto_init() {
 	if File_macuahuitl_v1_metrics_proto != nil {
 		return
 	}
+	file_macuahuitl_v1_common_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

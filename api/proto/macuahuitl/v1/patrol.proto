@@ -116,6 +116,8 @@ message ArmJobRequest {
   repeated string excluded_device_ids = 2;
   // Huellas aceptadas por el ingeniero en este Login Test.
   repeated string accepted_host_key_fingerprints = 3;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 4;
 }
 message ArmJobResponse {
   google.protobuf.Timestamp window_ends_at = 1;

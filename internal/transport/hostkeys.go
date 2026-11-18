@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -58,8 +59,35 @@ func (e *HostKeyError) status() string { return [...]string{"known", "unknown", 
 
 // HostKeyPolicy es la decisión del trabajo sobre llaves no conocidas.
 type HostKeyPolicy struct {
-	Accepted      map[string]bool // huellas aceptadas por el ingeniero en el Login Test
-	AcceptChanged bool            // casilla del trabajo; por defecto false (spec §12.2)
+	// Accepted: huellas aceptadas por el ingeniero, por equipo (clave de HostKeyID). Cubre unknown y changed
+	// solo en ese host:puerto.
+	Accepted map[string]map[string]bool
+	// LegacyUnknown: transición para huellas guardadas sin host. Cubre unknown de cualquier host, nunca changed.
+	LegacyUnknown map[string]bool
+	AcceptChanged bool // casilla del trabajo; por defecto false (spec §12.2)
+}
+
+// HostKeyID es la clave host:puerto con la que known_hosts guarda un equipo y con la que se atan las huellas
+// aceptadas: la dirección tal como se marca, host en minúsculas, puerto 22 si es 0, IPv6 entre corchetes.
+func HostKeyID(host string, port uint16) string {
+	if port == 0 {
+		port = 22
+	}
+	return net.JoinHostPort(strings.ToLower(host), strconv.Itoa(int(port)))
+}
+
+// ParseHostKeyID normaliza lo que escribe el usuario: «host», «host:puerto», «[v6]:puerto», «v6» o «[v6]».
+func ParseHostKeyID(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	host, ps, err := net.SplitHostPort(s)
+	if err != nil { // sin puerto
+		host, ps = strings.Trim(s, "[]"), "22"
+	}
+	port, perr := strconv.ParseUint(ps, 10, 16)
+	if host == "" || perr != nil || port == 0 {
+		return "", fmt.Errorf("transport: destino de llave de host inválido: %q", s)
+	}
+	return HostKeyID(host, uint16(port)), nil
 }
 
 // KnownHosts es el registro de llaves de host de la app. Formato propio, una línea por equipo:
@@ -188,14 +216,16 @@ func (k *KnownHosts) Callback(p HostKeyPolicy, onEvent func(audit.Entry)) ssh.Ho
 			return err
 		}
 		fp := Fingerprint(key)
+		id, _ := hostKeyID(hostport) // check ya lo validó
+		byHost := p.Accepted[id][fp]
 		switch {
 		case status == HostKeyKnown:
 			return nil
-		case status == HostKeyChanged && (p.Accepted[fp] || p.AcceptChanged):
+		case status == HostKeyChanged && (byHost || p.AcceptChanged):
 			// Toda llave cambiada aceptada queda con la huella anterior y la nueva (spec §12.2).
 			onEvent(audit.Entry{Action: "hostkey.accepted_changed", Target: hostport, Detail: old + " -> " + fp})
 			return k.add(hostport, key)
-		case p.Accepted[fp]:
+		case status == HostKeyUnknown && (byHost || p.LegacyUnknown[fp]):
 			onEvent(audit.Entry{Action: "hostkey.accepted", Target: hostport, Detail: fp})
 			return k.add(hostport, key)
 		}

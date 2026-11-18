@@ -444,9 +444,13 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, e), "no devices left", e)
 	}
 	spec.Targets = keep // copia local: un armado fallido no altera el trabajo
-	accepted := map[string]bool{}
-	for _, fp := range r.AcceptedHostKeyFingerprints {
-		accepted[fp] = true
+	ids := make([]string, len(spec.Targets))
+	for i, t := range spec.Targets {
+		ids[i] = patrol.HostKeyID(t)
+	}
+	accepted, err := service.HostKeyAccepts(ctx, ids, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys)
+	if err != nil {
+		return fail(err, "invalid accepted host keys", err)
 	}
 	// Login Test obligatorio al armar, con las huellas que confirmó el ingeniero (spec §12.2).
 	res := patrol.LoginTest(ctx, c.deps(j), j.id, spec, true, accepted)

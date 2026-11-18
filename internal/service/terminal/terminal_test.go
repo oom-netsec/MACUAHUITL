@@ -319,3 +319,25 @@ func TestRechazosAlAbrirQuedanAuditados(t *testing.T) {
 		}
 	}
 }
+
+// El campo nuevo ata la huella al equipo: la de otro host no entra, la del host sí.
+func TestHuellaPorHostEnLaTerminal(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	fp := r.open.AcceptedHostKeyFingerprints[0]
+	ep := r.host + ":" + strconv.Itoa(int(r.port))
+	o := &v1.TerminalOpen{Name: "SW1", Address: r.host, Port: uint32(r.port), CredentialId: r.open.CredentialId,
+		AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: "10.9.9.9", Fingerprint: fp}}}
+	_, done, cancel := r.session(o)
+	defer cancel()
+	if err := wait(t, done); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("la huella de otro host no debe entrar: %v", err)
+	}
+	o.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: ep, Fingerprint: fp}}
+	st, done, cancel2 := r.session(o)
+	defer cancel2()
+	st.waitFor(t, "SW1>")
+	close(st.in)
+	if err := wait(t, done); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -28,8 +28,10 @@ type TerminalOpen struct {
 	Port                        uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"` // 0 = 22
 	CredentialId                string                 `protobuf:"bytes,4,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,5,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	Rows                        uint32                 `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"` // 0 = 24
-	Cols                        uint32                 `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"` // 0 = 200
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,10,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	Rows             uint32             `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"` // 0 = 24
+	Cols             uint32             `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"` // 0 = 200
 	// Fase 44: abrir un host guardado de la libreta. host_id es EXCLUSIVO: el núcleo toma la dirección, el puerto, la
 	// credencial y la orden de inicio del host, y si el pedido trae además address, port o credential_id lo rechaza con
 	// InvalidArgument (terminal.err.host_and_address), sin conectar: no se combina un host guardado con otra dirección u
@@ -106,6 +108,13 @@ func (x *TerminalOpen) GetCredentialId() string {
 func (x *TerminalOpen) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *TerminalOpen) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -352,13 +361,15 @@ var File_macuahuitl_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\"\xb5\x02\n" +
+	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\x83\x03\n" +
 	"\fTerminalOpen\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\rR\x04port\x12#\n" +
 	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x12\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\n" +
+	" \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x12\n" +
 	"\x04rows\x18\x06 \x01(\rR\x04rows\x12\x12\n" +
 	"\x04cols\x18\a \x01(\rR\x04cols\x12\x17\n" +
 	"\ahost_id\x18\b \x01(\tR\x06hostId\x128\n" +
@@ -396,17 +407,19 @@ var file_macuahuitl_v1_terminal_proto_goTypes = []any{
 	(*TerminalSize)(nil),         // 1: macuahuitl.v1.TerminalSize
 	(*OpenTerminalRequest)(nil),  // 2: macuahuitl.v1.OpenTerminalRequest
 	(*OpenTerminalResponse)(nil), // 3: macuahuitl.v1.OpenTerminalResponse
+	(*AcceptedHostKey)(nil),      // 4: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_terminal_proto_depIdxs = []int32{
-	0, // 0: macuahuitl.v1.OpenTerminalRequest.open:type_name -> macuahuitl.v1.TerminalOpen
-	1, // 1: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
-	2, // 2: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
-	3, // 3: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: macuahuitl.v1.TerminalOpen.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	0, // 1: macuahuitl.v1.OpenTerminalRequest.open:type_name -> macuahuitl.v1.TerminalOpen
+	1, // 2: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
+	2, // 3: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
+	3, // 4: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_terminal_proto_init() }
@@ -414,6 +427,7 @@ func file_macuahuitl_v1_terminal_proto_init() {
 	if File_macuahuitl_v1_terminal_proto != nil {
 		return
 	}
+	file_macuahuitl_v1_common_proto_init()
 	file_macuahuitl_v1_terminal_proto_msgTypes[2].OneofWrappers = []any{
 		(*OpenTerminalRequest_Open)(nil),
 		(*OpenTerminalRequest_Data)(nil),

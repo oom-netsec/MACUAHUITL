@@ -155,7 +155,7 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	s.jobs[cj.JobId] = &tracked{masked: !r.IncludeSecrets, keep: keep, lote: lote, root: out, from: now.Add(-time.Minute), until: now.Add(win)}
 	s.jobsMu.Unlock()
 	s.d.Audit("backup.start", cj.JobId, fmt.Sprintf("devices=%d startup=%v keep=%d interval=%ds rounds=%d masked=%v", len(r.Targets), r.Startup, keep, r.IntervalSeconds, r.Rounds, !r.IncludeSecrets))
-	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
+	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		os.Remove(lote) // vacía; Patrol la recrea si luego se arma
 		// Queda creado: se revisa con LoginTest y se arma con ArmJob; CollectBackups lo guarda al terminar.

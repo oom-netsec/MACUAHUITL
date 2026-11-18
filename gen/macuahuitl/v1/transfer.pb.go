@@ -875,11 +875,13 @@ type GetRequest struct {
 	Sha512                      string                 `protobuf:"bytes,7,opt,name=sha512,proto3" json:"sha512,omitempty"`
 	Insecure                    bool                   `protobuf:"varint,8,opt,name=insecure,proto3" json:"insecure,omitempty"` // https sin verificar el certificado (se audita)
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,9,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	MaxBytes                    int64                  `protobuf:"varint,10,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`                   // 0 = 2 GiB
-	TimeoutSeconds              int32                  `protobuf:"varint,11,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // 0 = 30 min; máximo 4 h
-	LegacySsh                   bool                   `protobuf:"varint,12,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`                // scp y sftp hacia equipos con SSH antiguo (se audita)
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,13,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	MaxBytes         int64              `protobuf:"varint,10,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`                   // 0 = 2 GiB
+	TimeoutSeconds   int32              `protobuf:"varint,11,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // 0 = 30 min; máximo 4 h
+	LegacySsh        bool               `protobuf:"varint,12,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`                // scp y sftp hacia equipos con SSH antiguo (se audita)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetRequest) Reset() {
@@ -975,6 +977,13 @@ func (x *GetRequest) GetAcceptedHostKeyFingerprints() []string {
 	return nil
 }
 
+func (x *GetRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
+	}
+	return nil
+}
+
 func (x *GetRequest) GetMaxBytes() int64 {
 	if x != nil {
 		return x.MaxBytes
@@ -1047,11 +1056,13 @@ type PutRequest struct {
 	Name                        string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`                      // archivo regular de primer nivel de from_dir
 	CredentialId                string                 `protobuf:"bytes,4,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,5,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	MaxBytes                    int64                  `protobuf:"varint,6,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
-	TimeoutSeconds              int32                  `protobuf:"varint,7,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
-	LegacySsh                   bool                   `protobuf:"varint,8,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,9,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	MaxBytes         int64              `protobuf:"varint,6,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	TimeoutSeconds   int32              `protobuf:"varint,7,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
+	LegacySsh        bool               `protobuf:"varint,8,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PutRequest) Reset() {
@@ -1115,6 +1126,13 @@ func (x *PutRequest) GetCredentialId() string {
 func (x *PutRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *PutRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -1334,12 +1352,14 @@ type BrowseRequest struct {
 	CredentialId                string                 `protobuf:"bytes,2,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"` // bóveda; obligatoria para scp y sftp, opcional en ftp
 	Path                        string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`                                     // carpeta remota; vacío = la de la URL
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,4,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	Insecure                    bool                   `protobuf:"varint,5,opt,name=insecure,proto3" json:"insecure,omitempty"` // https sin verificar el certificado (se audita)
-	LegacySsh                   bool                   `protobuf:"varint,6,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
-	MaxEntries                  int32                  `protobuf:"varint,7,opt,name=max_entries,json=maxEntries,proto3" json:"max_entries,omitempty"`             // 0 = 2000; máximo 20000
-	TimeoutSeconds              int32                  `protobuf:"varint,8,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // 0 = 30 s; máximo 300
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,9,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	Insecure         bool               `protobuf:"varint,5,opt,name=insecure,proto3" json:"insecure,omitempty"` // https sin verificar el certificado (se audita)
+	LegacySsh        bool               `protobuf:"varint,6,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
+	MaxEntries       int32              `protobuf:"varint,7,opt,name=max_entries,json=maxEntries,proto3" json:"max_entries,omitempty"`             // 0 = 2000; máximo 20000
+	TimeoutSeconds   int32              `protobuf:"varint,8,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // 0 = 30 s; máximo 300
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *BrowseRequest) Reset() {
@@ -1396,6 +1416,13 @@ func (x *BrowseRequest) GetPath() string {
 func (x *BrowseRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *BrowseRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -1595,12 +1622,14 @@ type GetManyRequest struct {
 	DestDir                     string                 `protobuf:"bytes,3,opt,name=dest_dir,json=destDir,proto3" json:"dest_dir,omitempty"` // carpeta local; vacío = outputs/recibidos/<sello>/
 	CredentialId                string                 `protobuf:"bytes,4,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,5,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	Insecure                    bool                   `protobuf:"varint,6,opt,name=insecure,proto3" json:"insecure,omitempty"`
-	MaxBytes                    int64                  `protobuf:"varint,7,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`                   // por archivo; 0 = 2 GiB
-	TimeoutSeconds              int32                  `protobuf:"varint,8,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // por archivo; 0 = 30 min
-	LegacySsh                   bool                   `protobuf:"varint,9,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,10,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	Insecure         bool               `protobuf:"varint,6,opt,name=insecure,proto3" json:"insecure,omitempty"`
+	MaxBytes         int64              `protobuf:"varint,7,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`                   // por archivo; 0 = 2 GiB
+	TimeoutSeconds   int32              `protobuf:"varint,8,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"` // por archivo; 0 = 30 min
+	LegacySsh        bool               `protobuf:"varint,9,opt,name=legacy_ssh,json=legacySsh,proto3" json:"legacy_ssh,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetManyRequest) Reset() {
@@ -1664,6 +1693,13 @@ func (x *GetManyRequest) GetCredentialId() string {
 func (x *GetManyRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *GetManyRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -2597,7 +2633,7 @@ var File_macuahuitl_v1_transfer_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmacuahuitl/v1/transfer.proto\x12\rmacuahuitl.v1\"\xc9\x03\n" +
+	"\x1cmacuahuitl/v1/transfer.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\xc9\x03\n" +
 	"\x12StartServerRequest\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x16\n" +
 	"\x06listen\x18\x02 \x01(\tR\x06listen\x12\x1b\n" +
@@ -2664,7 +2700,7 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x06sha256\x18\x04 \x01(\tR\x06sha256\x12\x1a\n" +
 	"\bverified\x18\x05 \x01(\tR\bverified\x12\x18\n" +
 	"\aseconds\x18\x06 \x01(\x01R\aseconds\x12\x16\n" +
-	"\x06report\x18\a \x01(\tR\x06report\"\xfa\x02\n" +
+	"\x06report\x18\a \x01(\tR\x06report\"\xc8\x03\n" +
 	"\n" +
 	"GetRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x19\n" +
@@ -2675,21 +2711,23 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x03md5\x18\x06 \x01(\tR\x03md5\x12\x16\n" +
 	"\x06sha512\x18\a \x01(\tR\x06sha512\x12\x1a\n" +
 	"\binsecure\x18\b \x01(\bR\binsecure\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\t \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x1b\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\t \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\r \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x1b\n" +
 	"\tmax_bytes\x18\n" +
 	" \x01(\x03R\bmaxBytes\x12'\n" +
 	"\x0ftimeout_seconds\x18\v \x01(\x05R\x0etimeoutSeconds\x12\x1d\n" +
 	"\n" +
 	"legacy_ssh\x18\f \x01(\bR\tlegacySsh\"D\n" +
 	"\vGetResponse\x125\n" +
-	"\x06result\x18\x01 \x01(\v2\x1d.macuahuitl.v1.TransferResultR\x06result\"\x9c\x02\n" +
+	"\x06result\x18\x01 \x01(\v2\x1d.macuahuitl.v1.TransferResultR\x06result\"\xea\x02\n" +
 	"\n" +
 	"PutRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x19\n" +
 	"\bfrom_dir\x18\x02 \x01(\tR\afromDir\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12#\n" +
 	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x1b\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\t \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x1b\n" +
 	"\tmax_bytes\x18\x06 \x01(\x03R\bmaxBytes\x12'\n" +
 	"\x0ftimeout_seconds\x18\a \x01(\x05R\x0etimeoutSeconds\x12\x1d\n" +
 	"\n" +
@@ -2706,12 +2744,13 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x06setcap\x18\x03 \x01(\tR\x06setcap\x12\x16\n" +
 	"\x06remove\x18\x04 \x01(\tR\x06remove\x12\x12\n" +
 	"\x04note\x18\x05 \x01(\tR\x04note\x12\x1b\n" +
-	"\tnote_code\x18\x06 \x01(\tR\bnoteCode\"\xa4\x02\n" +
+	"\tnote_code\x18\x06 \x01(\tR\bnoteCode\"\xf2\x02\n" +
 	"\rBrowseRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12#\n" +
 	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12\x12\n" +
 	"\x04path\x18\x03 \x01(\tR\x04path\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x04 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x1a\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x04 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\t \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x1a\n" +
 	"\binsecure\x18\x05 \x01(\bR\binsecure\x12\x1d\n" +
 	"\n" +
 	"legacy_ssh\x18\x06 \x01(\bR\tlegacySsh\x12\x1f\n" +
@@ -2732,13 +2771,15 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x124\n" +
 	"\aentries\x18\x02 \x03(\v2\x1a.macuahuitl.v1.RemoteEntryR\aentries\x12\x1c\n" +
 	"\ttruncated\x18\x03 \x01(\bR\ttruncated\x12\x16\n" +
-	"\x06method\x18\x04 \x01(\tR\x06method\"\xbe\x02\n" +
+	"\x06method\x18\x04 \x01(\tR\x06method\"\x8c\x03\n" +
 	"\x0eGetManyRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x14\n" +
 	"\x05names\x18\x02 \x03(\tR\x05names\x12\x19\n" +
 	"\bdest_dir\x18\x03 \x01(\tR\adestDir\x12#\n" +
 	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x1a\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\n" +
+	" \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12\x1a\n" +
 	"\binsecure\x18\x06 \x01(\bR\binsecure\x12\x1b\n" +
 	"\tmax_bytes\x18\a \x01(\x03R\bmaxBytes\x12'\n" +
 	"\x0ftimeout_seconds\x18\b \x01(\x05R\x0etimeoutSeconds\x12\x1d\n" +
@@ -2875,53 +2916,58 @@ var file_macuahuitl_v1_transfer_proto_goTypes = []any{
 	(*ListTransferSessionsResponse)(nil), // 31: macuahuitl.v1.ListTransferSessionsResponse
 	(*TransferRejection)(nil),            // 32: macuahuitl.v1.TransferRejection
 	(*TransferSession)(nil),              // 33: macuahuitl.v1.TransferSession
+	(*AcceptedHostKey)(nil),              // 34: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_transfer_proto_depIdxs = []int32{
 	2,  // 0: macuahuitl.v1.ServerReady.warnings:type_name -> macuahuitl.v1.ServerWarning
 	1,  // 1: macuahuitl.v1.StartServerResponse.ready:type_name -> macuahuitl.v1.ServerReady
 	4,  // 2: macuahuitl.v1.StartServerResponse.closed:type_name -> macuahuitl.v1.ServerClosed
 	8,  // 3: macuahuitl.v1.ListServersResponse.servers:type_name -> macuahuitl.v1.ServerInfo
-	10, // 4: macuahuitl.v1.GetResponse.result:type_name -> macuahuitl.v1.TransferResult
-	10, // 5: macuahuitl.v1.PutResponse.result:type_name -> macuahuitl.v1.TransferResult
-	18, // 6: macuahuitl.v1.BrowseResponse.entries:type_name -> macuahuitl.v1.RemoteEntry
-	11, // 7: macuahuitl.v1.GetStreamRequest.request:type_name -> macuahuitl.v1.GetRequest
-	13, // 8: macuahuitl.v1.PutStreamRequest.request:type_name -> macuahuitl.v1.PutRequest
-	26, // 9: macuahuitl.v1.GetStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	26, // 10: macuahuitl.v1.PutStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	26, // 11: macuahuitl.v1.GetManyResponse.event:type_name -> macuahuitl.v1.TransferEvent
-	27, // 12: macuahuitl.v1.TransferEvent.progress:type_name -> macuahuitl.v1.TransferProgress
-	28, // 13: macuahuitl.v1.TransferEvent.file:type_name -> macuahuitl.v1.FileResult
-	29, // 14: macuahuitl.v1.TransferEvent.done:type_name -> macuahuitl.v1.BatchSummary
-	10, // 15: macuahuitl.v1.FileResult.result:type_name -> macuahuitl.v1.TransferResult
-	33, // 16: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
-	32, // 17: macuahuitl.v1.ListTransferSessionsResponse.rejections:type_name -> macuahuitl.v1.TransferRejection
-	0,  // 18: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
-	5,  // 19: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
-	7,  // 20: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
-	11, // 21: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
-	13, // 22: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
-	15, // 23: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
-	17, // 24: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
-	21, // 25: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
-	22, // 26: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
-	20, // 27: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
-	30, // 28: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
-	3,  // 29: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
-	6,  // 30: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
-	9,  // 31: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
-	12, // 32: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
-	14, // 33: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
-	16, // 34: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
-	19, // 35: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
-	23, // 36: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
-	24, // 37: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
-	25, // 38: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
-	31, // 39: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
-	29, // [29:40] is the sub-list for method output_type
-	18, // [18:29] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	34, // 4: macuahuitl.v1.GetRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	10, // 5: macuahuitl.v1.GetResponse.result:type_name -> macuahuitl.v1.TransferResult
+	34, // 6: macuahuitl.v1.PutRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	10, // 7: macuahuitl.v1.PutResponse.result:type_name -> macuahuitl.v1.TransferResult
+	34, // 8: macuahuitl.v1.BrowseRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	18, // 9: macuahuitl.v1.BrowseResponse.entries:type_name -> macuahuitl.v1.RemoteEntry
+	34, // 10: macuahuitl.v1.GetManyRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	11, // 11: macuahuitl.v1.GetStreamRequest.request:type_name -> macuahuitl.v1.GetRequest
+	13, // 12: macuahuitl.v1.PutStreamRequest.request:type_name -> macuahuitl.v1.PutRequest
+	26, // 13: macuahuitl.v1.GetStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	26, // 14: macuahuitl.v1.PutStreamResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	26, // 15: macuahuitl.v1.GetManyResponse.event:type_name -> macuahuitl.v1.TransferEvent
+	27, // 16: macuahuitl.v1.TransferEvent.progress:type_name -> macuahuitl.v1.TransferProgress
+	28, // 17: macuahuitl.v1.TransferEvent.file:type_name -> macuahuitl.v1.FileResult
+	29, // 18: macuahuitl.v1.TransferEvent.done:type_name -> macuahuitl.v1.BatchSummary
+	10, // 19: macuahuitl.v1.FileResult.result:type_name -> macuahuitl.v1.TransferResult
+	33, // 20: macuahuitl.v1.ListTransferSessionsResponse.sessions:type_name -> macuahuitl.v1.TransferSession
+	32, // 21: macuahuitl.v1.ListTransferSessionsResponse.rejections:type_name -> macuahuitl.v1.TransferRejection
+	0,  // 22: macuahuitl.v1.TransferService.StartServer:input_type -> macuahuitl.v1.StartServerRequest
+	5,  // 23: macuahuitl.v1.TransferService.StopServer:input_type -> macuahuitl.v1.StopServerRequest
+	7,  // 24: macuahuitl.v1.TransferService.ListServers:input_type -> macuahuitl.v1.ListServersRequest
+	11, // 25: macuahuitl.v1.TransferService.Get:input_type -> macuahuitl.v1.GetRequest
+	13, // 26: macuahuitl.v1.TransferService.Put:input_type -> macuahuitl.v1.PutRequest
+	15, // 27: macuahuitl.v1.TransferService.RedirectHint:input_type -> macuahuitl.v1.RedirectHintRequest
+	17, // 28: macuahuitl.v1.TransferService.Browse:input_type -> macuahuitl.v1.BrowseRequest
+	21, // 29: macuahuitl.v1.TransferService.GetStream:input_type -> macuahuitl.v1.GetStreamRequest
+	22, // 30: macuahuitl.v1.TransferService.PutStream:input_type -> macuahuitl.v1.PutStreamRequest
+	20, // 31: macuahuitl.v1.TransferService.GetMany:input_type -> macuahuitl.v1.GetManyRequest
+	30, // 32: macuahuitl.v1.TransferService.ListTransferSessions:input_type -> macuahuitl.v1.ListTransferSessionsRequest
+	3,  // 33: macuahuitl.v1.TransferService.StartServer:output_type -> macuahuitl.v1.StartServerResponse
+	6,  // 34: macuahuitl.v1.TransferService.StopServer:output_type -> macuahuitl.v1.StopServerResponse
+	9,  // 35: macuahuitl.v1.TransferService.ListServers:output_type -> macuahuitl.v1.ListServersResponse
+	12, // 36: macuahuitl.v1.TransferService.Get:output_type -> macuahuitl.v1.GetResponse
+	14, // 37: macuahuitl.v1.TransferService.Put:output_type -> macuahuitl.v1.PutResponse
+	16, // 38: macuahuitl.v1.TransferService.RedirectHint:output_type -> macuahuitl.v1.RedirectHintResponse
+	19, // 39: macuahuitl.v1.TransferService.Browse:output_type -> macuahuitl.v1.BrowseResponse
+	23, // 40: macuahuitl.v1.TransferService.GetStream:output_type -> macuahuitl.v1.GetStreamResponse
+	24, // 41: macuahuitl.v1.TransferService.PutStream:output_type -> macuahuitl.v1.PutStreamResponse
+	25, // 42: macuahuitl.v1.TransferService.GetMany:output_type -> macuahuitl.v1.GetManyResponse
+	31, // 43: macuahuitl.v1.TransferService.ListTransferSessions:output_type -> macuahuitl.v1.ListTransferSessionsResponse
+	33, // [33:44] is the sub-list for method output_type
+	22, // [22:33] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_transfer_proto_init() }
@@ -2929,6 +2975,7 @@ func file_macuahuitl_v1_transfer_proto_init() {
 	if File_macuahuitl_v1_transfer_proto != nil {
 		return
 	}
+	file_macuahuitl_v1_common_proto_init()
 	file_macuahuitl_v1_transfer_proto_msgTypes[3].OneofWrappers = []any{
 		(*StartServerResponse_Ready)(nil),
 		(*StartServerResponse_TransferJson)(nil),

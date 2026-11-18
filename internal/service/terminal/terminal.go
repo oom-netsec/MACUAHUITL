@@ -256,9 +256,13 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		return service.VaultErr(ctx, err)
 	}
 	user := cred.Username
-	accepted := map[string]bool{}
-	for _, fp := range o.AcceptedHostKeyFingerprints {
-		accepted[fp] = true
+	accepted, err := service.HostKeyAccepts(st.Context(), []string{transport.HostKeyID(address, port)}, o.AcceptedHostKeyFingerprints, o.AcceptedHostKeys)
+	if err != nil {
+		cred.Enable.Destroy()
+		cred.Password.Destroy()
+		cred.SSHKey.Destroy()
+		reason, reasonEN = i18n.English(err), i18n.English(err)
+		return err
 	}
 	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
 	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, transport.SSHOptions{GenericHost: generic})

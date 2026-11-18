@@ -66,7 +66,7 @@ func connErr(ctx context.Context, err error) error {
 }
 
 // open prepara el trabajo. A partir de aquí todo camino de salida debe llamar j.done().
-func (s *svc) open(ctx context.Context, rawURL, credID string, accepted []string, legacy bool) (*job, error) {
+func (s *svc) open(ctx context.Context, rawURL, credID string, accepted []string, keys []*v1.AcceptedHostKey, legacy bool) (*job, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Hostname() == "" {
 		return nil, bad(ctx, "transfer.svc.bad_url", "url", redacted(rawURL))
@@ -131,12 +131,13 @@ func (s *svc) open(ctx context.Context, rawURL, credID string, accepted []string
 		// Límite declarado: x/net/textproto manda el texto; la copia se pierde al terminar la orden.
 		j.req.User, j.req.Pass = cred.Username, string(cred.Password.Bytes())
 	case "scp", "sftp":
-		acc := map[string]bool{}
-		for _, fp := range accepted {
-			acc[fp] = true
+		port, _ := xfer.Port(u)
+		acc, err := service.HostKeyAccepts(ctx, []string{transport.HostKeyID(u.Hostname(), port)}, accepted, keys)
+		if err != nil {
+			j.done()
+			return nil, err
 		}
 		hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: acc}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
-		port, _ := xfer.Port(u)
 		opts := transport.SSHOptions{AllowLegacy: legacy, OnLegacy: func(n string) { s.d.Audit("transfer.ssh.legacy", j.label, n) }}
 		// OpenSSH destruye la contraseña y la llave al volver; se llama una sola vez, desde el cliente.
 		j.req.SSH = func(ctx context.Context) (xfer.SSHSession, error) {
@@ -179,7 +180,7 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 	if _, err := fileserve.ValidateDir(dest, s.d.DenyDirs()...); err != nil { // errores de uso antes de tocar la red
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
+	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, r.LegacySsh)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +228,7 @@ func (s *svc) put(ctx context.Context, r *v1.PutRequest, onProgress func(xfer.Pr
 	} else {
 		f.Close()
 	}
-	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
+	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, r.LegacySsh)
 	if err != nil {
 		return nil, err
 	}

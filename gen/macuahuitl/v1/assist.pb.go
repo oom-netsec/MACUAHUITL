@@ -99,8 +99,10 @@ type PlanPortsRequest struct {
 	Shutdown                    *bool                  `protobuf:"varint,6,opt,name=shutdown,proto3,oneof" json:"shutdown,omitempty"`                    // true = shutdown, false = no shutdown
 	WriteMemory                 bool                   `protobuf:"varint,7,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"` // agrega el paso final write memory (apagado por defecto)
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,8,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,9,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PlanPortsRequest) Reset() {
@@ -185,6 +187,13 @@ func (x *PlanPortsRequest) GetWriteMemory() bool {
 func (x *PlanPortsRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *PlanPortsRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -1670,8 +1679,10 @@ type PlanSnippetRequest struct {
 	Snippet                     isPlanSnippetRequest_Snippet `protobuf_oneof:"snippet"`
 	WriteMemory                 bool                         `protobuf:"varint,5,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`
 	AcceptedHostKeyFingerprints []string                     `protobuf:"bytes,6,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,8,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PlanSnippetRequest) Reset() {
@@ -1764,6 +1775,13 @@ func (x *PlanSnippetRequest) GetWriteMemory() bool {
 func (x *PlanSnippetRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *PlanSnippetRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -2193,8 +2211,10 @@ type PlanCredRotateRequest struct {
 	UpdateCredentialId          string                 `protobuf:"bytes,4,opt,name=update_credential_id,json=updateCredentialId,proto3" json:"update_credential_id,omitempty"` // credencial de la bóveda de ese usuario que recibe el secreto nuevo cuando entre con una sesión nueva
 	WriteMemory                 bool                   `protobuf:"varint,5,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,6,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,7,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PlanCredRotateRequest) Reset() {
@@ -2269,6 +2289,13 @@ func (x *PlanCredRotateRequest) GetAcceptedHostKeyFingerprints() []string {
 	return nil
 }
 
+func (x *PlanCredRotateRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
+	}
+	return nil
+}
+
 type PlanCredRotateResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PlanId        string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
@@ -2336,8 +2363,10 @@ type PlanRestoreRequest struct {
 	AllowPartial                bool                   `protobuf:"varint,5,opt,name=allow_partial,json=allowPartial,proto3" json:"allow_partial,omitempty"`
 	WriteMemory                 bool                   `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,7,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys []*AcceptedHostKey `protobuf:"bytes,8,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *PlanRestoreRequest) Reset() {
@@ -2415,6 +2444,13 @@ func (x *PlanRestoreRequest) GetWriteMemory() bool {
 func (x *PlanRestoreRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *PlanRestoreRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -2991,12 +3027,12 @@ var File_macuahuitl_v1_assist_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\n" +
-	"\x1amacuahuitl/v1/assist.proto\x12\rmacuahuitl.v1\"u\n" +
+	"\x1amacuahuitl/v1/assist.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"u\n" +
 	"\fAssistTarget\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\rR\x04port\x12#\n" +
-	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\"\xde\x02\n" +
+	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\"\xac\x03\n" +
 	"\x10PlanPortsRequest\x123\n" +
 	"\x06target\x18\x01 \x01(\v2\x1b.macuahuitl.v1.AssistTargetR\x06target\x12\x1e\n" +
 	"\n" +
@@ -3007,7 +3043,8 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\vdescription\x18\x05 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x1f\n" +
 	"\bshutdown\x18\x06 \x01(\bH\x01R\bshutdown\x88\x01\x01\x12!\n" +
 	"\fwrite_memory\x18\a \x01(\bR\vwriteMemory\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\b \x03(\tR\x1bacceptedHostKeyFingerprintsB\x0e\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\b \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\t \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeysB\x0e\n" +
 	"\f_descriptionB\v\n" +
 	"\t_shutdown\"\x86\x01\n" +
 	"\fAssistExpect\x12\x18\n" +
@@ -3118,7 +3155,7 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tH\x00R\vdescription\x88\x01\x01\x12\x18\n" +
 	"\aaddress\x18\x03 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04mask\x18\x04 \x01(\tR\x04maskB\x0e\n" +
-	"\f_description\"\x90\x03\n" +
+	"\f_description\"\xde\x03\n" +
 	"\x12PlanSnippetRequest\x123\n" +
 	"\x06target\x18\x01 \x01(\v2\x1b.macuahuitl.v1.AssistTargetR\x06target\x120\n" +
 	"\x04vlan\x18\x02 \x01(\v2\x1a.macuahuitl.v1.VlanSnippetH\x00R\x04vlan\x123\n" +
@@ -3126,7 +3163,8 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\x03svi\x18\x04 \x01(\v2\x19.macuahuitl.v1.SviSnippetH\x00R\x03svi\x12<\n" +
 	"\btemplate\x18\a \x01(\v2\x1e.macuahuitl.v1.TemplateSnippetH\x00R\btemplate\x12!\n" +
 	"\fwrite_memory\x18\x05 \x01(\bR\vwriteMemory\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprintsB\t\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\b \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeysB\t\n" +
 	"\asnippet\"\xa0\x01\n" +
 	"\x0fTemplateSnippet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12B\n" +
@@ -3158,7 +3196,7 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	" \x01(\tR\x04help\"]\n" +
 	"\x13PlanSnippetResponse\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\x12-\n" +
-	"\x04plan\x18\x02 \x01(\v2\x19.macuahuitl.v1.AssistPlanR\x04plan\"\x99\x02\n" +
+	"\x04plan\x18\x02 \x01(\v2\x19.macuahuitl.v1.AssistPlanR\x04plan\"\xe7\x02\n" +
 	"\x15PlanCredRotateRequest\x123\n" +
 	"\x06target\x18\x01 \x01(\v2\x1b.macuahuitl.v1.AssistTargetR\x06target\x12\x12\n" +
 	"\x04user\x18\x02 \x01(\tR\x04user\x12\x1d\n" +
@@ -3166,10 +3204,11 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"new_secret\x18\x03 \x01(\tR\tnewSecret\x120\n" +
 	"\x14update_credential_id\x18\x04 \x01(\tR\x12updateCredentialId\x12!\n" +
 	"\fwrite_memory\x18\x05 \x01(\bR\vwriteMemory\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprints\"`\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x06 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\a \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\"`\n" +
 	"\x16PlanCredRotateResponse\x12\x17\n" +
 	"\aplan_id\x18\x01 \x01(\tR\x06planId\x12-\n" +
-	"\x04plan\x18\x02 \x01(\v2\x19.macuahuitl.v1.AssistPlanR\x04plan\"\xc3\x02\n" +
+	"\x04plan\x18\x02 \x01(\v2\x19.macuahuitl.v1.AssistPlanR\x04plan\"\x91\x03\n" +
 	"\x12PlanRestoreRequest\x123\n" +
 	"\x06target\x18\x01 \x01(\v2\x1b.macuahuitl.v1.AssistTargetR\x06target\x12\x1b\n" +
 	"\tbackup_id\x18\x02 \x01(\tR\bbackupId\x121\n" +
@@ -3177,7 +3216,8 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\tmax_lines\x18\x04 \x01(\rR\bmaxLines\x12#\n" +
 	"\rallow_partial\x18\x05 \x01(\bR\fallowPartial\x12!\n" +
 	"\fwrite_memory\x18\x06 \x01(\bR\vwriteMemory\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\a \x03(\tR\x1bacceptedHostKeyFingerprints\"J\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\a \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\b \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\"J\n" +
 	"\x0eRestoreRefusal\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
 	"\x04line\x18\x02 \x01(\tR\x04line\x12\x10\n" +
@@ -3301,73 +3341,78 @@ var file_macuahuitl_v1_assist_proto_goTypes = []any{
 	(*DiscardPendingRollbackResponse)(nil), // 46: macuahuitl.v1.DiscardPendingRollbackResponse
 	nil,                                    // 47: macuahuitl.v1.AssistNote.ArgsEntry
 	nil,                                    // 48: macuahuitl.v1.TemplateSnippet.ValuesEntry
+	(*AcceptedHostKey)(nil),                // 49: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_assist_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.PlanPortsRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	2,  // 1: macuahuitl.v1.AssistDevicePlan.expect:type_name -> macuahuitl.v1.AssistExpect
-	4,  // 2: macuahuitl.v1.AssistDevicePlan.notes_structured:type_name -> macuahuitl.v1.AssistNote
-	47, // 3: macuahuitl.v1.AssistNote.args:type_name -> macuahuitl.v1.AssistNote.ArgsEntry
-	3,  // 4: macuahuitl.v1.AssistPlan.devices:type_name -> macuahuitl.v1.AssistDevicePlan
-	5,  // 5: macuahuitl.v1.PlanPortsResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	22, // 6: macuahuitl.v1.ConfirmResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	22, // 7: macuahuitl.v1.AbortResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	22, // 8: macuahuitl.v1.RollbackResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	22, // 9: macuahuitl.v1.ListRunsResponse.runs:type_name -> macuahuitl.v1.AssistRunState
-	22, // 10: macuahuitl.v1.GetAssistRunResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	23, // 11: macuahuitl.v1.WatchRunResponse.event:type_name -> macuahuitl.v1.AssistEvent
-	21, // 12: macuahuitl.v1.AssistRunState.pending:type_name -> macuahuitl.v1.AssistStep
-	21, // 13: macuahuitl.v1.AssistEvent.step:type_name -> macuahuitl.v1.AssistStep
-	0,  // 14: macuahuitl.v1.PlanSnippetRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	24, // 15: macuahuitl.v1.PlanSnippetRequest.vlan:type_name -> macuahuitl.v1.VlanSnippet
-	25, // 16: macuahuitl.v1.PlanSnippetRequest.trunk:type_name -> macuahuitl.v1.TrunkSnippet
-	26, // 17: macuahuitl.v1.PlanSnippetRequest.svi:type_name -> macuahuitl.v1.SviSnippet
-	28, // 18: macuahuitl.v1.PlanSnippetRequest.template:type_name -> macuahuitl.v1.TemplateSnippet
-	48, // 19: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
-	31, // 20: macuahuitl.v1.ListSnippetTemplatesResponse.templates:type_name -> macuahuitl.v1.SnippetTemplate
-	32, // 21: macuahuitl.v1.SnippetTemplate.fields:type_name -> macuahuitl.v1.SnippetField
-	5,  // 22: macuahuitl.v1.PlanSnippetResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	0,  // 23: macuahuitl.v1.PlanCredRotateRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	5,  // 24: macuahuitl.v1.PlanCredRotateResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	0,  // 25: macuahuitl.v1.PlanRestoreRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	5,  // 26: macuahuitl.v1.PlanRestoreResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	37, // 27: macuahuitl.v1.PlanRestoreResponse.refused:type_name -> macuahuitl.v1.RestoreRefusal
-	40, // 28: macuahuitl.v1.PendingRollback.devices:type_name -> macuahuitl.v1.PendingRollbackDevice
-	41, // 29: macuahuitl.v1.ListPendingRollbacksResponse.rollbacks:type_name -> macuahuitl.v1.PendingRollback
-	1,  // 30: macuahuitl.v1.AssistService.PlanPorts:input_type -> macuahuitl.v1.PlanPortsRequest
-	27, // 31: macuahuitl.v1.AssistService.PlanSnippet:input_type -> macuahuitl.v1.PlanSnippetRequest
-	29, // 32: macuahuitl.v1.AssistService.ListSnippetTemplates:input_type -> macuahuitl.v1.ListSnippetTemplatesRequest
-	34, // 33: macuahuitl.v1.AssistService.PlanCredRotate:input_type -> macuahuitl.v1.PlanCredRotateRequest
-	36, // 34: macuahuitl.v1.AssistService.PlanRestore:input_type -> macuahuitl.v1.PlanRestoreRequest
-	7,  // 35: macuahuitl.v1.AssistService.StartRun:input_type -> macuahuitl.v1.StartRunRequest
-	9,  // 36: macuahuitl.v1.AssistService.Confirm:input_type -> macuahuitl.v1.ConfirmRequest
-	11, // 37: macuahuitl.v1.AssistService.Abort:input_type -> macuahuitl.v1.AbortRequest
-	13, // 38: macuahuitl.v1.AssistService.Rollback:input_type -> macuahuitl.v1.RollbackRequest
-	15, // 39: macuahuitl.v1.AssistService.WatchRun:input_type -> macuahuitl.v1.WatchRunRequest
-	16, // 40: macuahuitl.v1.AssistService.ListRuns:input_type -> macuahuitl.v1.ListRunsRequest
-	18, // 41: macuahuitl.v1.AssistService.GetAssistRun:input_type -> macuahuitl.v1.GetAssistRunRequest
-	39, // 42: macuahuitl.v1.AssistService.ListPendingRollbacks:input_type -> macuahuitl.v1.ListPendingRollbacksRequest
-	43, // 43: macuahuitl.v1.AssistService.StartPendingRollback:input_type -> macuahuitl.v1.StartPendingRollbackRequest
-	45, // 44: macuahuitl.v1.AssistService.DiscardPendingRollback:input_type -> macuahuitl.v1.DiscardPendingRollbackRequest
-	6,  // 45: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
-	33, // 46: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
-	30, // 47: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
-	35, // 48: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
-	38, // 49: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
-	8,  // 50: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
-	10, // 51: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
-	12, // 52: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
-	14, // 53: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
-	20, // 54: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
-	17, // 55: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
-	19, // 56: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
-	42, // 57: macuahuitl.v1.AssistService.ListPendingRollbacks:output_type -> macuahuitl.v1.ListPendingRollbacksResponse
-	44, // 58: macuahuitl.v1.AssistService.StartPendingRollback:output_type -> macuahuitl.v1.StartPendingRollbackResponse
-	46, // 59: macuahuitl.v1.AssistService.DiscardPendingRollback:output_type -> macuahuitl.v1.DiscardPendingRollbackResponse
-	45, // [45:60] is the sub-list for method output_type
-	30, // [30:45] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	49, // 1: macuahuitl.v1.PlanPortsRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	2,  // 2: macuahuitl.v1.AssistDevicePlan.expect:type_name -> macuahuitl.v1.AssistExpect
+	4,  // 3: macuahuitl.v1.AssistDevicePlan.notes_structured:type_name -> macuahuitl.v1.AssistNote
+	47, // 4: macuahuitl.v1.AssistNote.args:type_name -> macuahuitl.v1.AssistNote.ArgsEntry
+	3,  // 5: macuahuitl.v1.AssistPlan.devices:type_name -> macuahuitl.v1.AssistDevicePlan
+	5,  // 6: macuahuitl.v1.PlanPortsResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	22, // 7: macuahuitl.v1.ConfirmResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 8: macuahuitl.v1.AbortResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 9: macuahuitl.v1.RollbackResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 10: macuahuitl.v1.ListRunsResponse.runs:type_name -> macuahuitl.v1.AssistRunState
+	22, // 11: macuahuitl.v1.GetAssistRunResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	23, // 12: macuahuitl.v1.WatchRunResponse.event:type_name -> macuahuitl.v1.AssistEvent
+	21, // 13: macuahuitl.v1.AssistRunState.pending:type_name -> macuahuitl.v1.AssistStep
+	21, // 14: macuahuitl.v1.AssistEvent.step:type_name -> macuahuitl.v1.AssistStep
+	0,  // 15: macuahuitl.v1.PlanSnippetRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	24, // 16: macuahuitl.v1.PlanSnippetRequest.vlan:type_name -> macuahuitl.v1.VlanSnippet
+	25, // 17: macuahuitl.v1.PlanSnippetRequest.trunk:type_name -> macuahuitl.v1.TrunkSnippet
+	26, // 18: macuahuitl.v1.PlanSnippetRequest.svi:type_name -> macuahuitl.v1.SviSnippet
+	28, // 19: macuahuitl.v1.PlanSnippetRequest.template:type_name -> macuahuitl.v1.TemplateSnippet
+	49, // 20: macuahuitl.v1.PlanSnippetRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	48, // 21: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
+	31, // 22: macuahuitl.v1.ListSnippetTemplatesResponse.templates:type_name -> macuahuitl.v1.SnippetTemplate
+	32, // 23: macuahuitl.v1.SnippetTemplate.fields:type_name -> macuahuitl.v1.SnippetField
+	5,  // 24: macuahuitl.v1.PlanSnippetResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	0,  // 25: macuahuitl.v1.PlanCredRotateRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	49, // 26: macuahuitl.v1.PlanCredRotateRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	5,  // 27: macuahuitl.v1.PlanCredRotateResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	0,  // 28: macuahuitl.v1.PlanRestoreRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	49, // 29: macuahuitl.v1.PlanRestoreRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	5,  // 30: macuahuitl.v1.PlanRestoreResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	37, // 31: macuahuitl.v1.PlanRestoreResponse.refused:type_name -> macuahuitl.v1.RestoreRefusal
+	40, // 32: macuahuitl.v1.PendingRollback.devices:type_name -> macuahuitl.v1.PendingRollbackDevice
+	41, // 33: macuahuitl.v1.ListPendingRollbacksResponse.rollbacks:type_name -> macuahuitl.v1.PendingRollback
+	1,  // 34: macuahuitl.v1.AssistService.PlanPorts:input_type -> macuahuitl.v1.PlanPortsRequest
+	27, // 35: macuahuitl.v1.AssistService.PlanSnippet:input_type -> macuahuitl.v1.PlanSnippetRequest
+	29, // 36: macuahuitl.v1.AssistService.ListSnippetTemplates:input_type -> macuahuitl.v1.ListSnippetTemplatesRequest
+	34, // 37: macuahuitl.v1.AssistService.PlanCredRotate:input_type -> macuahuitl.v1.PlanCredRotateRequest
+	36, // 38: macuahuitl.v1.AssistService.PlanRestore:input_type -> macuahuitl.v1.PlanRestoreRequest
+	7,  // 39: macuahuitl.v1.AssistService.StartRun:input_type -> macuahuitl.v1.StartRunRequest
+	9,  // 40: macuahuitl.v1.AssistService.Confirm:input_type -> macuahuitl.v1.ConfirmRequest
+	11, // 41: macuahuitl.v1.AssistService.Abort:input_type -> macuahuitl.v1.AbortRequest
+	13, // 42: macuahuitl.v1.AssistService.Rollback:input_type -> macuahuitl.v1.RollbackRequest
+	15, // 43: macuahuitl.v1.AssistService.WatchRun:input_type -> macuahuitl.v1.WatchRunRequest
+	16, // 44: macuahuitl.v1.AssistService.ListRuns:input_type -> macuahuitl.v1.ListRunsRequest
+	18, // 45: macuahuitl.v1.AssistService.GetAssistRun:input_type -> macuahuitl.v1.GetAssistRunRequest
+	39, // 46: macuahuitl.v1.AssistService.ListPendingRollbacks:input_type -> macuahuitl.v1.ListPendingRollbacksRequest
+	43, // 47: macuahuitl.v1.AssistService.StartPendingRollback:input_type -> macuahuitl.v1.StartPendingRollbackRequest
+	45, // 48: macuahuitl.v1.AssistService.DiscardPendingRollback:input_type -> macuahuitl.v1.DiscardPendingRollbackRequest
+	6,  // 49: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
+	33, // 50: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
+	30, // 51: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
+	35, // 52: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
+	38, // 53: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
+	8,  // 54: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
+	10, // 55: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
+	12, // 56: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
+	14, // 57: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
+	20, // 58: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
+	17, // 59: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
+	19, // 60: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
+	42, // 61: macuahuitl.v1.AssistService.ListPendingRollbacks:output_type -> macuahuitl.v1.ListPendingRollbacksResponse
+	44, // 62: macuahuitl.v1.AssistService.StartPendingRollback:output_type -> macuahuitl.v1.StartPendingRollbackResponse
+	46, // 63: macuahuitl.v1.AssistService.DiscardPendingRollback:output_type -> macuahuitl.v1.DiscardPendingRollbackResponse
+	49, // [49:64] is the sub-list for method output_type
+	34, // [34:49] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_assist_proto_init() }
@@ -3375,6 +3420,7 @@ func file_macuahuitl_v1_assist_proto_init() {
 	if File_macuahuitl_v1_assist_proto != nil {
 		return
 	}
+	file_macuahuitl_v1_common_proto_init()
 	file_macuahuitl_v1_assist_proto_msgTypes[1].OneofWrappers = []any{}
 	file_macuahuitl_v1_assist_proto_msgTypes[26].OneofWrappers = []any{}
 	file_macuahuitl_v1_assist_proto_msgTypes[27].OneofWrappers = []any{

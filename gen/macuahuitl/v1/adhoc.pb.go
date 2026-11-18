@@ -29,9 +29,11 @@ type StartAdhocRequest struct {
 	// Un comando por línea.
 	Commands                    string   `protobuf:"bytes,3,opt,name=commands,proto3" json:"commands,omitempty"`
 	AcceptedHostKeyFingerprints []string `protobuf:"bytes,4,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	ExcludedDeviceIds           []string `protobuf:"bytes,5,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys  []*AcceptedHostKey `protobuf:"bytes,6,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	ExcludedDeviceIds []string           `protobuf:"bytes,5,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StartAdhocRequest) Reset() {
@@ -88,6 +90,13 @@ func (x *StartAdhocRequest) GetCommands() string {
 func (x *StartAdhocRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *StartAdhocRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -303,12 +312,13 @@ var File_macuahuitl_v1_adhoc_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_adhoc_proto_rawDesc = "" +
 	"\n" +
-	"\x19macuahuitl/v1/adhoc.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/common.proto\x1a\x19macuahuitl/v1/tools.proto\"\xfa\x01\n" +
+	"\x19macuahuitl/v1/adhoc.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/common.proto\x1a\x19macuahuitl/v1/tools.proto\"\xc8\x02\n" +
 	"\x11StartAdhocRequest\x12/\n" +
 	"\atargets\x18\x01 \x03(\v2\x15.macuahuitl.v1.TargetR\atargets\x12#\n" +
 	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12\x1a\n" +
 	"\bcommands\x18\x03 \x01(\tR\bcommands\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x04 \x03(\tR\x1bacceptedHostKeyFingerprints\x12.\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x04 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\x06 \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12.\n" +
 	"\x13excluded_device_ids\x18\x05 \x03(\tR\x11excludedDeviceIds\"\x9b\x01\n" +
 	"\x12StartAdhocResponse\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x14\n" +
@@ -348,22 +358,24 @@ var file_macuahuitl_v1_adhoc_proto_goTypes = []any{
 	(*AdhocResultRequest)(nil),    // 2: macuahuitl.v1.AdhocResultRequest
 	(*AdhocResultResponse)(nil),   // 3: macuahuitl.v1.AdhocResultResponse
 	(*Target)(nil),                // 4: macuahuitl.v1.Target
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
-	(*ToolReport)(nil),            // 6: macuahuitl.v1.ToolReport
+	(*AcceptedHostKey)(nil),       // 5: macuahuitl.v1.AcceptedHostKey
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*ToolReport)(nil),            // 7: macuahuitl.v1.ToolReport
 }
 var file_macuahuitl_v1_adhoc_proto_depIdxs = []int32{
 	4, // 0: macuahuitl.v1.StartAdhocRequest.targets:type_name -> macuahuitl.v1.Target
-	5, // 1: macuahuitl.v1.StartAdhocResponse.window_ends_at:type_name -> google.protobuf.Timestamp
-	6, // 2: macuahuitl.v1.AdhocResultResponse.report:type_name -> macuahuitl.v1.ToolReport
-	0, // 3: macuahuitl.v1.AdhocService.StartAdhoc:input_type -> macuahuitl.v1.StartAdhocRequest
-	2, // 4: macuahuitl.v1.AdhocService.AdhocResult:input_type -> macuahuitl.v1.AdhocResultRequest
-	1, // 5: macuahuitl.v1.AdhocService.StartAdhoc:output_type -> macuahuitl.v1.StartAdhocResponse
-	3, // 6: macuahuitl.v1.AdhocService.AdhocResult:output_type -> macuahuitl.v1.AdhocResultResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	5, // 1: macuahuitl.v1.StartAdhocRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	6, // 2: macuahuitl.v1.StartAdhocResponse.window_ends_at:type_name -> google.protobuf.Timestamp
+	7, // 3: macuahuitl.v1.AdhocResultResponse.report:type_name -> macuahuitl.v1.ToolReport
+	0, // 4: macuahuitl.v1.AdhocService.StartAdhoc:input_type -> macuahuitl.v1.StartAdhocRequest
+	2, // 5: macuahuitl.v1.AdhocService.AdhocResult:input_type -> macuahuitl.v1.AdhocResultRequest
+	1, // 6: macuahuitl.v1.AdhocService.StartAdhoc:output_type -> macuahuitl.v1.StartAdhocResponse
+	3, // 7: macuahuitl.v1.AdhocService.AdhocResult:output_type -> macuahuitl.v1.AdhocResultResponse
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_adhoc_proto_init() }

@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package macuahuitl.v1;
 
+import "macuahuitl/v1/common.proto";
+
 option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
 
 // Modo de cambio asistido (ADR 0007): la única parte de MACUAHUITL que cambia la configuración
@@ -51,6 +53,8 @@ message PlanPortsRequest {
   optional bool shutdown = 6;     // true = shutdown, false = no shutdown
   bool write_memory = 7;          // agrega el paso final write memory (apagado por defecto)
   repeated string accepted_host_key_fingerprints = 8;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 9;
 }
 
 message AssistExpect {
@@ -210,6 +214,8 @@ message PlanSnippetRequest {
   }
   bool write_memory = 5;
   repeated string accepted_host_key_fingerprints = 6;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 8;
 }
 
 // Una plantilla del catálogo con los valores de su formulario. El núcleo valida cada valor (tipo, rango, ASCII); los secret nunca salen en una respuesta.
@@ -263,6 +269,8 @@ message PlanCredRotateRequest {
   string update_credential_id = 4; // credencial de la bóveda de ese usuario que recibe el secreto nuevo cuando entre con una sesión nueva
   bool write_memory = 5;
   repeated string accepted_host_key_fingerprints = 6;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 7;
 }
 
 message PlanCredRotateResponse {
@@ -284,6 +292,8 @@ message PlanRestoreRequest {
   bool allow_partial = 5;
   bool write_memory = 6;
   repeated string accepted_host_key_fingerprints = 7;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 8;
 }
 
 message RestoreRefusal {

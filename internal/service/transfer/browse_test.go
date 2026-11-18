@@ -342,3 +342,27 @@ func TestGetManyTopeDeAvisosEsDelLoteNoDeCadaArchivo(t *testing.T) {
 		t.Fatalf("%d avisos de avance en %v (tope %d): el límite debe ser del lote, no de cada archivo", progress, elapsed, max)
 	}
 }
+
+// El campo nuevo ata la huella al equipo (host:puerto de la URL): con otro host no entra.
+func TestBrowseHuellaPorHost(t *testing.T) {
+	s, d := newTest(t)
+	v := d.CreateVault()
+	pub := t.TempDir()
+	run := startServer(t, s, &v1.StartServerRequest{Protocol: "sftp", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"127.0.0.1"}})
+	rd := run.ready
+	id, _ := v.Put(vault.Credential{Label: "srv", Username: rd.User, Password: secret.New([]byte(rd.Password))})
+	req := &v1.BrowseRequest{Url: "sftp://" + rd.Listening + "/", CredentialId: id}
+	for _, fp := range rd.Fingerprints {
+		req.AcceptedHostKeys = append(req.AcceptedHostKeys, &v1.AcceptedHostKey{Host: "10.9.9.9:22", Fingerprint: fp})
+	}
+	if _, err := s.Browse(context.Background(), req); code(err) != codes.FailedPrecondition {
+		t.Fatalf("la huella de otro host no debe entrar: %v", err)
+	}
+	req.AcceptedHostKeys = nil
+	for _, fp := range rd.Fingerprints {
+		req.AcceptedHostKeys = append(req.AcceptedHostKeys, &v1.AcceptedHostKey{Host: rd.Listening, Fingerprint: fp})
+	}
+	if _, err := s.Browse(context.Background(), req); err != nil {
+		t.Fatalf("campo nuevo: %v", err)
+	}
+}

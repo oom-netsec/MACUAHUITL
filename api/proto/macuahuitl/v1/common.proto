@@ -28,3 +28,10 @@ message Target {
   uint32 port = 2;
   string device_id = 3;
 }
+
+// Huella de llave de host aceptada para un equipo concreto: host es la dirección tal como se marca
+// («10.0.0.1», «sw1.lab», «sw1.lab:2222», «[2001:db8::1]:22»); sin puerto vale 22.
+message AcceptedHostKey {
+  string host = 1;
+  string fingerprint = 2;
+}
