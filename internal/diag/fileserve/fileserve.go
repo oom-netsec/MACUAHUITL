@@ -12,6 +12,7 @@ package fileserve
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -19,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -213,6 +215,12 @@ func RedirectCleanupAddr(proto, listening string) string {
 	if err != nil || perr != nil {
 		return ""
 	}
+	if isWindows() { // ahí la regla es de firewall, no una redirección, y no se pide quitarla al cerrar
+		return ""
+	}
+	if s, ok := standard[proto]; ok && p == s.port { // en el puerto estándar no se sugirió regla
+		return ""
+	}
 	return RedirectCleanup(proto, host, p)
 }
 
@@ -230,7 +238,9 @@ func HintIn(loc, proto, listen string, files []string) string {
 	b.WriteString(i18n.Msg(loc, "fileserve.hint.head", nil) + "\n")
 	for _, f := range files {
 		name := filepath.Base(f)
-		if proto == "tftp" {
+		if strings.ContainsRune(name, ' ') {
+			fmt.Fprintf(&b, "  %s\n", i18n.Msg(loc, "fileserve.hint.name_spaces", i18n.A("name", name, "proto", strings.ToUpper(proto))))
+		} else if proto == "tftp" {
 			fmt.Fprintf(&b, "  copy tftp://%s/%s flash:\n", strings.TrimSuffix(net.JoinHostPort(h, "0"), ":0"), name) // [IPv6] entre corchetes
 		} else {
 			fmt.Fprintf(&b, "  copy http://%s/%s flash:\n", net.JoinHostPort(h, p), name)
@@ -503,4 +513,19 @@ func randPass() string {
 		b[i] = alphabet[int(b[i])%len(alphabet)]
 	}
 	return string(b)
+}
+
+// BusyErr traduce «dirección en uso» en el puerto estándar del protocolo a un mensaje que lo dice y sugiere uno alto
+// (en Windows suele ser el servicio OpenSSH en el 22); nil si es otro error u otro puerto.
+func BusyErr(proto, addr string, err error) error {
+	var no syscall.Errno
+	if !errors.As(err, &no) || (no != syscall.EADDRINUSE && no != 10048) { // 10048 = WSAEADDRINUSE
+		return nil
+	}
+	_, ps, e := net.SplitHostPort(addr)
+	p, e2 := strconv.Atoi(ps)
+	if s, ok := standard[proto]; !ok || e != nil || e2 != nil || p != s.port {
+		return nil
+	}
+	return i18n.New("fileserve.err.port_busy", i18n.A("port", p))
 }

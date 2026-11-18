@@ -10,6 +10,9 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
+// hostKeyKinds es el tipo de cada huella de Ready.Fingerprints, en el orden fijo de hostSigners.
+var hostKeyKinds = []string{"ed25519", "RSA"}
+
 // ServerHint explica qué teclear en el equipo para usar el servidor y, si no escucha en el puerto
 // estándar, cómo llegar a él con una redirección (la app nunca ejecuta esos comandos). names son los
 // archivos que se pueden leer. Sintaxis de IOS 15.x sin validar en laboratorio.
@@ -40,11 +43,21 @@ func ServerHintWarnings(loc string, c Config, r Ready, names []string) (string, 
 		line("%s", w.hint) // avisos de las carpetas publicada y de recepción (escritores ajenos, volumen sin permisos)
 	}
 	b.WriteString(t("fileserve.hint.head") + "\n")
+	// IOS no decodifica %20: un nombre con espacios no tiene copy utilizable, se avisa que se renombre.
+	each := func(f func(n string)) {
+		for _, n := range names {
+			if strings.ContainsRune(n, ' ') {
+				line("%s", t("fileserve.hint.name_spaces", "name", n, "proto", strings.ToUpper(c.Proto)))
+				continue
+			}
+			f(n)
+		}
+	}
 	switch c.Proto {
 	case "tftp":
-		for _, n := range names {
+		each(func(n string) {
 			line("copy tftp://%s/%s flash:", h, n)
-		}
+		})
 		if c.Write {
 			line("copy running-config tftp://%s/r1-config.txt", h)
 			line("copy flash:crashinfo_20260101-000000 tftp://%s/crashinfo", h)
@@ -54,34 +67,36 @@ func ServerHintWarnings(loc string, c Config, r Ready, names []string) (string, 
 		line("%s", t("fileserve.hint.warn_ftp"))
 		line("conf t / ip ftp username %s / ip ftp password %s / ip ftp passive / end", r.User, r.Pass)
 		line("%s", t("fileserve.hint.ftp_passive"))
-		for _, n := range names {
+		each(func(n string) {
 			line("copy ftp://%s/%s flash:", h, n)
-		}
+		})
 		if c.Write {
 			line("copy running-config ftp://%s/r1-config.txt", h)
 		}
 		line("%s", t("fileserve.hint.ftp_cleanup"))
 	case "scp", "sftp":
-		for _, n := range names {
+		each(func(n string) {
 			line("copy %s://%s@%s/%s flash:   %s", c.Proto, r.User, h, n, t("fileserve.hint.password", "pass", r.Pass))
-		}
+		})
 		if c.Write {
 			line("copy running-config %s://%s@%s/r1-config.txt   %s", c.Proto, r.User, h, t("fileserve.hint.password", "pass", r.Pass))
 		}
 		for i, fp := range r.Fingerprints {
-			line("%s", t("fileserve.hint.fingerprint", "n", i+1, "fp", fp))
+			line("%s", t("fileserve.hint.fingerprint", "n", i+1, "fp", fp, "kind", hostKeyKinds[min(i, len(hostKeyKinds)-1)]))
 		}
 		if c.Proto == "sftp" {
 			line("%s", t("fileserve.hint.sftp_note"))
 		}
 	case "http":
-		for _, n := range names {
+		each(func(n string) {
 			line("copy http://%s:%s/%s flash:", h, port, n)
-		}
+		})
 	}
 	if s, ok := standard[c.Proto]; ok {
 		p, _ := strconv.Atoi(port)
-		if isWindows() {
+		if isWindows() && esLoopback(host) {
+			// loopback no pasa por el firewall: ni prosa ni regla
+		} else if isWindows() {
 			code := "fileserve.hint.win_std_port"
 			if p == s.port {
 				code = "fileserve.hint.win_std_port_ok"

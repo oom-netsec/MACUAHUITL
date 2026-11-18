@@ -200,6 +200,9 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	}
 	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d reason=%q", id, r.Protocol, n, rejected, reason))
 	if err != nil {
+		if be := fileserve.BusyErr(r.Protocol, addr, err); be != nil {
+			err = be
+		}
 		return service.ErrFrom(ctx, codes.Unavailable, err)
 	}
 	return nil

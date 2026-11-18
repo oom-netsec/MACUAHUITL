@@ -156,6 +156,12 @@ func remotePath(u *url.URL) (string, error) {
 		return "", i18n.New("xfer.err.name_url", nil)
 	}
 	for _, c := range p {
+		if c == ' ' && (u.Scheme == "ftp" || u.Scheme == "sftp") { // %20 decodificado; CR/LF y lo demás siguen fuera
+			continue
+		}
+		if c == ' ' && u.Scheme == "scp" {
+			return "", i18n.New("xfer.err.scp_space", nil)
+		}
 		ok := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-/:@+,=~", c)
 		if !ok {
 			return "", i18n.New("xfer.err.char", i18n.A("char", strconv.QuoteRune(c)))

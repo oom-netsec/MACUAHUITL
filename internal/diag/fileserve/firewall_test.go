@@ -40,7 +40,7 @@ func TestReglaFirewallWindows(t *testing.T) {
 	if got := RedirectCleanup("tftp", "10.0.0.5", 6969); got != `Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 6969'` {
 		t.Errorf("cleanup = %q", got)
 	}
-	if RedirectCleanupAddr("ftp", "10.0.0.5:21") != `Remove-NetFirewallRule -DisplayName 'MACUAHUITL ftp 10.0.0.5 21'` || RedirectCleanup("http", "10.0.0.5", 80) != "" || RedirectHintIn("es", "http", "10.0.0.5", 80) != "" {
+	if RedirectCleanupAddr("ftp", "10.0.0.5:21") != "" || RedirectCleanup("http", "10.0.0.5", 80) != "" || RedirectHintIn("es", "http", "10.0.0.5", 80) != "" {
 		t.Error("cleanup addr/http")
 	}
 	sh := ServerHintIn("es", Config{Proto: "tftp"}, Ready{Addr: "10.0.0.5:69"}, []string{"a.bin"})

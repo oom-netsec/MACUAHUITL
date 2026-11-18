@@ -405,7 +405,7 @@ func TestBrowseHTTP(t *testing.T) {
 	if _, err := Browse(context.Background(), req, "/json", 0); err == nil || !strings.Contains(err.Error(), "índice HTML") {
 		t.Fatalf("json: %v", err)
 	}
-	if _, err := Browse(context.Background(), req, "/nada", 0); err == nil || !strings.Contains(err.Error(), "404") {
+	if _, err := Browse(context.Background(), req, "/nada", 0); err == nil || !strings.Contains(err.Error(), "no publica un índice") {
 		t.Fatalf("404: %v", err)
 	}
 	ls, err = Browse(context.Background(), req, "/enorme", MaxEntriesCap)

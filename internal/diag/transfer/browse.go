@@ -309,6 +309,9 @@ func (r *Request) httpList(ctx context.Context, path string) (Listing, error) {
 		return Listing{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound { // nuestro servidor publica sin índice a propósito
+		return Listing{}, i18n.New("xfer.err.no_index", nil)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return Listing{}, fmt.Errorf("HTTP %s", resp.Status)
 	}

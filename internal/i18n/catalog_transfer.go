@@ -115,6 +115,8 @@ func init() {
 		"xfer.err.too_big":       e("la transferencia excede el tope de tamaño", "the transfer exceeds the size limit"),
 		"xfer.err.port":          e("transfer: puerto inválido {port:q}", "transfer: invalid port {port:q}", "port"),
 		"xfer.err.name_url":      e("transfer: la URL debe nombrar un archivo", "transfer: the URL must name a file"),
+		"xfer.err.scp_space":     e("transfer: scp no admite espacios en la ruta remota (llega a un shell remoto); usa sftp o renombra el archivo", "transfer: scp does not allow spaces in the remote path (it reaches a remote shell); use sftp or rename the file"),
+		"xfer.err.no_index":      e("este servidor HTTP no publica un índice de archivos", "this HTTP server does not publish a file index"),
 		"xfer.err.char":          e("transfer: carácter {char} no permitido en la ruta remota", "transfer: character {char} is not allowed in the remote path", "char"),
 		"xfer.err.exists":        e("transfer: {path} ya existe: no se sobrescribe", "transfer: {path} already exists: it is not overwritten", "path"),
 		"xfer.err.digest":        e("transfer: el resumen no coincide (SHA-256 {sha256}, MD5 {md5}): se descartó el archivo", "transfer: the digest does not match (SHA-256 {sha256}, MD5 {md5}): the file was discarded", "sha256", "md5"),
