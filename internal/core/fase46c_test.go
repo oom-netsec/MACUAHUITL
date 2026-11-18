@@ -1,8 +1,10 @@
 package core
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -332,19 +334,86 @@ func TestAddPinnedSeConsultaSinTomarElMutexDelNucleo(t *testing.T) {
 	id := h.creados(t, h.ready(t), 1)[0]
 	h.ponEstado(id, "completed", true)
 	h.core.addPinned(func() []service.PinnedJob {
-		if h.core.mu.TryLock() { // el conjunto «en uso» se calcula antes de c.mu
-			h.core.mu.Unlock()
-			return nil
+		// Si removeJobs tuviera c.mu mientras espera esta consulta, esta goroutine nunca lo obtendría.
+		got := make(chan struct{})
+		go func() { h.core.mu.Lock(); h.core.mu.Unlock(); close(got) }()
+		select {
+		case <-got:
+		case <-time.After(5 * time.Second):
+			t.Error("c.mu tomado al consultar el conjunto en uso")
 		}
-		t.Error("c.mu tomado al consultar el conjunto en uso")
 		return nil
 	})
-	done := make(chan struct{})
-	go func() { h.quitar(t, id); close(done) }()
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("bloqueado")
+	if r := h.quitar(t, id); r.Removed != 1 {
+		t.Fatalf("r = %+v", r)
+	}
+}
+
+// Si un servicio deja de registrarse en addPinned, su flujo se quedaría sin protección: backup, change y adhoc.
+func TestLosTresServiciosSeRegistranEnAddPinned(t *testing.T) {
+	h := newHarness(t, nil)
+	h.core.mu.Lock()
+	n := len(h.core.pinned)
+	h.core.mu.Unlock()
+	if n != 3 {
+		t.Fatalf("fuentes registradas = %d, quería 3", n)
+	}
+}
+
+func TestSubscribeAJobQuitadoCierra(t *testing.T) {
+	h := newHarness(t, nil)
+	id := h.creados(t, h.ready(t), 1)[0]
+	c, stop := context.WithTimeout(ctx(t), 10*time.Second)
+	defer stop()
+	s, err := h.events.Subscribe(c, &v1.SubscribeRequest{JobIds: []string{id}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Header(); err != nil {
+		t.Fatal(err)
+	}
+	// Un created no cierra solo: se quita y el id ausente cuenta como cerrado.
+	h.quitar(t, id)
+	for {
+		if _, err := s.Recv(); err != nil {
+			if err != io.EOF {
+				t.Fatalf("el stream no terminó limpio: %v", err)
+			}
+			return
+		}
+	}
+}
+
+// Subscribe valida el id y luego pregunta por los cerrados: un id quitado entre ambos cuenta como cerrado.
+func TestClosedJobsIdAusenteCuentaComoCerrado(t *testing.T) {
+	h := newHarness(t, nil)
+	evs := h.core.closedJobs([]string{"quitado"})["quitado"]
+	if len(evs) != 1 || evs[0].GetJobStateChanged().GetState() != "closed" {
+		t.Fatalf("evs = %v", evs)
+	}
+}
+
+// CancelJob con el puntero ya quitado: NotFound y sin auditar job.cancel.
+func TestCancelJobConElJobYaQuitadoNoAudita(t *testing.T) {
+	h := newHarness(t, nil)
+	id := h.creados(t, h.ready(t), 1)[0]
+	j, _ := h.core.getJob(id)
+	h.quitar(t, id)
+	h.core.mu.Lock()
+	h.core.jobs[id] = j
+	h.core.mu.Unlock()
+	_, err := (&patrolSvc{c: h.core}).CancelJob(ctx(t), &v1.CancelJobRequest{JobId: id})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(h.auditText(t), `"action":"job.cancel"`) {
+		t.Fatal("job.cancel auditado de un job quitado")
+	}
+	h.core.mu.Lock()
+	st := j.state
+	h.core.mu.Unlock()
+	if st != "created" {
+		t.Fatalf("estado = %s", st)
 	}
 }
 

@@ -667,6 +667,12 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
+	s.c.mu.Lock()
+	gone := j.removed
+	s.c.mu.Unlock()
+	if gone { // antes de auditar: un job quitado no se cancela
+		return nil, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", r.JobId))
+	}
 	s.c.audit("job.cancel", j.id, "")
 	s.c.mu.Lock()
 	if j.removed {
@@ -781,7 +787,11 @@ func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
 	out := map[string][]*v1.SubscribeResponse{}
 	for _, id := range ids {
 		j, ok := c.jobs[id]
-		if !ok || !j.closed {
+		if !ok { // quitado entre la validación de Subscribe y aquí: solo se quitan cerrados, así que cuenta como cerrado
+			out[id] = append(out[id], &v1.SubscribeResponse{At: timestamppb.New(c.o.Now()), JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: "closed"}}})
+			continue
+		}
+		if !j.closed {
 			continue
 		}
 		at := c.o.Now()

@@ -89,7 +89,7 @@ No se toca disco: sin `os.Remove` en el núcleo ni en el servicio. Una prueba lo
 - `all_finished`: considera los terminales cerrados (de hoy y pasados); los activos y los en uso entran a `skipped` con su motivo; un `created` no se considera (no es «terminado»).
 - Respuesta: `removed` (int32), `removed_ids` (orden estable) y `skipped` (`SkippedJob{job_id, reason}`), con `reason` ∈ `active` (armed, arming, paused o cerrándose), `change_pre`, `backup_import`, `adhoc_unread`. Si un id es activo y a la vez está fijado, sale `active`.
 - Auditoría manual: `job.removed`, target = id, detalle `name=%q dir=%q state=%s finished=%s reason=manual` (con `all_finished`, `reason=clear_finished`; `finished=` vacío en un `created`). La poda: `job.pruned`, mismo detalle con `reason=age_7d`. `dir` = `OutputDir` del historial o, si falta, el del spec. **Los saltados no se auditan.**
-- Catálogo i18n: `patrol.err.remove_args`. Glosario de acciones (`service/auditen.go`): `job.removed`, `job.pruned`, `job.remove_failed`.
+- Catálogo i18n: `patrol.err.remove_args`. Las acciones `job.removed`, `job.pruned` y `job.remove_failed` no necesitan glosario: `service/auditen.go` no tiene lista de acciones.
 - Sin política propia de permisos: pasa por los mismos interceptores; no entra en `liveUnary` ni en `liveIgnore`.
 
 ### Referencias por job id
@@ -154,7 +154,7 @@ Orden: 46a, 46b, 46c, 46d, 46e, 46f. Cada uno con sus pruebas escritas primero.
 - Riesgos: crece una fila por carpeta distinta (aceptable).
 
 ### 46c. Quitar, `RemoveJobs`, «en uso» y auditoría
-- `removeJobs`, `j.removed` en `persistJob` y `ArmJob`, `addPinned` (id + motivo) con backup, change y adhoc, RPC, i18n, glosario.
+- `removeJobs`, `j.removed` en `persistJob` y `ArmJob`, `addPinned` (id + motivo) con backup, change y adhoc, RPC, i18n.
 - Pruebas: ids (uno, varios, duplicados, inexistentes); un activo y un en uso van a `skipped` con su `reason` y los demás se quitan en la misma llamada (sin error); cada motivo (`active`, `change_pre`, `backup_import`, `adhoc_unread`); inexistentes no aparecen en ninguna lista; los saltados no se auditan; `all_finished` salta activos, en uso y `created`; `created` se quita por id; `InvalidArgument` con ambos o ninguno; auditoría exacta una por job y tras la tx (una sola conexión, sin bloqueo); evidencia en disco intacta; `persistJob` tardío no resucita la fila; **`ArmJob` vs. quita con `-race`**; DELETE que falla vuelve el job a memoria; un job en `finish` (`!closed`) es activo (B1); el adhoc sin leer se fija y se libera al leerlo.
 - Review Focus: **B1** (`!closed`, no `closing`); orden de locks `persistMu` → `c.mu` y el conjunto «en uso» calculado antes; **M2**; sin tx ni rows abiertas al auditar; que nada llama a `os.Remove`.
 - Riesgos: carrera con `ArmJob`; un servicio que olvide registrarse en `addPinned`.

@@ -177,11 +177,19 @@ func TestStartAdhocAuditaLosComandosEnmascarados(t *testing.T) {
 
 // Un lote sin leer está «en uso»; AdhocResult lo libera al entregarlo (46c).
 func TestPinnedAdhocSinLeer(t *testing.T) {
-	s := &adhocSvc{cmds: map[string][]string{"j1": {"show clock"}}}
+	s := &adhocSvc{d: jobDeps{servicetest.New(t), service.JobInfo{State: "completed"}}, cmds: map[string][]string{"j1": {"show clock"}}}
 	if p := s.pinned(); len(p) != 1 || p[0] != (service.PinnedJob{ID: "j1", Reason: "adhoc_unread"}) {
 		t.Fatalf("pinned = %v", p)
 	}
 	s.forget("j1")
+	if p := s.pinned(); len(p) != 0 {
+		t.Fatalf("pinned = %v", p)
+	}
+}
+
+// Un lote que nunca se armó (ArmJob falló en StartAdhoc) no tiene nada que leer: no queda fijado (46c).
+func TestPinnedAdhocNuncaArmadoNoSeFija(t *testing.T) {
+	s := &adhocSvc{d: jobDeps{servicetest.New(t), service.JobInfo{State: "created"}}, cmds: map[string][]string{"j1": {"show clock"}}}
 	if p := s.pinned(); len(p) != 0 {
 		t.Fatalf("pinned = %v", p)
 	}

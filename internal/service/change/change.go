@@ -243,14 +243,14 @@ func (s *changeSvc) CheckCompliance(ctx context.Context, r *v1.CheckComplianceRe
 // pinned son los PRE de un cambio que aún no tiene POST: el reporte los necesita por id.
 func (s *changeSvc) pinned() []service.PinnedJob {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	var out []service.PinnedJob
 	for _, rec := range s.changes {
 		if pre := rec.jobs[v1.ChangePhase_CHANGE_PHASE_PRE]; pre != "" && rec.jobs[v1.ChangePhase_CHANGE_PHASE_POST] == "" {
 			out = append(out, service.PinnedJob{ID: pre, Reason: "change_pre"})
 		}
 	}
-	return out
+	s.mu.Unlock()
+	return service.ArmedOnly(context.Background(), s.d, out)
 }
 
 // Module registra el servicio Change. Pinned, si no es nil, recibe de dónde leer los trabajos que no se deben quitar.

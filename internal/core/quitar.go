@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -118,6 +119,7 @@ func (c *Core) removeJobs(ids []string, reason string) (removed []string, skippe
 			continue
 		}
 		removed = append(removed, q.j.id)
+		c.bus.Publish(engine.Event{JobID: q.j.id, Kind: engine.JobState, State: "closed"}) // un Subscribe a un id quitado (p. ej. un created) termina
 		c.audit(action, q.j.id, fmt.Sprintf("name=%q dir=%q state=%s finished=%s reason=%s", q.name, q.dir, q.state, q.finished, reason))
 	}
 	if err != nil {

@@ -143,12 +143,12 @@ func (s *adhocSvc) forget(job string) {
 // pinned son los lotes cuyo resultado nadie ha leído: AdhocResult los saca de s.cmds al entregarlos.
 func (s *adhocSvc) pinned() []service.PinnedJob {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	var out []service.PinnedJob
 	for id := range s.cmds {
 		out = append(out, service.PinnedJob{ID: id, Reason: "adhoc_unread"})
 	}
-	return out
+	s.mu.Unlock()
+	return service.ArmedOnly(context.Background(), s.d, out)
 }
 
 // Module registra el servicio Adhoc. Pinned, si no es nil, recibe de dónde leer los trabajos que no se deben quitar.
