@@ -524,6 +524,7 @@ type ListJobsOpts struct {
 }
 
 func (b *Bridge) ListJobs(o ListJobsOpts) ([]JobDTO, error) {
+	loc := b.locale() // fuera de call: language() puede hacer su propio RPC
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]JobDTO, error) {
 		r, err := v1.NewPatrolServiceClient(c).ListJobs(ctx, &v1.ListJobsRequest{IncludePast: o.IncludePast})
 		if err != nil {
@@ -536,7 +537,11 @@ func (b *Bridge) ListJobs(o ListJobsOpts) ([]JobDTO, error) {
 				DevicesFailed: j.DevicesFailed, DevicesPartial: j.DevicesPartial, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{},
 				FinishedAt: rfc3339(j.FinishedAt), Past: j.Past}
 			for _, p := range j.Phases {
-				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
+				detail := p.Detail
+				if p.Reason != "" && i18n.Has(p.Reason) { // reasons del catálogo del núcleo (p. ej. el de ARM_FAILED): la UI no los tiene
+					detail = i18n.Msg(loc, p.Reason, i18n.Args(p.Args))
+				}
+				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: detail, Reason: p.Reason, Args: p.Args})
 			}
 			out = append(out, d)
 		}

@@ -6,7 +6,7 @@ import type { Key } from "../../lib/i18n/es";
 import { Segmented } from "../../components/Segmented";
 import { Check } from "../../components/Field";
 import { RemoveDialog } from "./RemoveDialog";
-import { isRemovable } from "./states";
+import { armFailed, isRemovable } from "./states";
 import { devicesText, elapsed } from "./format";
 
 export const tones: Record<string, Tone> = { armed: "ok", arming: "ok", completed: "", cancelled: "", failed: "bad", created: "warn" };
@@ -48,7 +48,7 @@ export function JobsPanel({ jobs, selected, onSelect, onNew, onClearFinished, on
       <button className="job-item" aria-current={selected === j.id ? "true" : undefined} onClick={() => onSelect(j.id)}>
         <span className="job-top">
           <span className="job-name">{j.name}</span>
-          <Badge tone={tones[j.state]}>{stateLabel(j.state)}</Badge>
+          {armFailed(j, j.phases) ? <Badge tone="bad">{t("patrol.state.armFailed")}</Badge> : <Badge tone={tones[j.state]}>{stateLabel(j.state)}</Badge>}
         </span>
         {j.state === "armed" && j.armedAt && <span className="meta">{t("patrol.activeFor", { t: elapsed(Date.now() - Date.parse(j.armedAt)) })}</span>}
         {!!j.round && (

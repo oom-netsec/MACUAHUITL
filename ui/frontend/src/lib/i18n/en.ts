@@ -3032,4 +3032,7 @@ export const en: Record<Key, string> = {
   "patrol.history.skip.backup_import": "a backup of this job is being imported",
   "patrol.history.skip.adhoc_unread": "its ad hoc result has not been read yet",
   "patrol.history.skip.unknown": "the core could not remove it ({reason})",
+  "patrol.state.armFailed": "Failed to start",
+  "patrol.armFailed": "Could not start: {reason}. Fix the device and arm again, or run the Login Test to review and accept a new host key.",
+  "patrol.phase.ARM_FAILED": "Failed to start (before arming)",
 };

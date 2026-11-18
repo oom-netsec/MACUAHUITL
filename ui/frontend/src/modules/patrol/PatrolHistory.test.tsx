@@ -151,3 +151,36 @@ test("skipped: el diálogo sigue abierto y dice por nombre y motivo; un id desco
   expect(d).toHaveTextContent("zz: el núcleo no lo pudo quitar (raro)");
   expect(d).not.toHaveTextContent("j3");
 });
+
+// 46c2: un trabajo created cuyo arranque falló muestra el motivo y deja Login Test, Armar (directo) y Quitar.
+test("arranque fallido: estado «No arrancó», motivo de la última fase y Armar sin Login Test previo", async () => {
+  const failed: Job = { id: "jf", name: "Adhoc caído", state: "created", kind: "adhoc", phases: [
+    { at: now, kind: "JOB_PHASE_KIND_CREATED" },
+    { at: now, kind: "JOB_PHASE_KIND_ARM_FAILED", reason: "patrol.svc.no_devices_left", detail: "no quedan equipos" },
+  ] };
+  const armJob = vi.fn(async () => ({ windowEndsAt: now, missingInhibitors: [] }));
+  setup([failed, jobs[3]], { armJob });
+  await userEvent.click(await list().findByText("Adhoc caído"));
+  expect(list().getByText("No arrancó")).toBeInTheDocument();
+  expect(list().getByText("Creado")).toBeInTheDocument(); // un created normal no cambia
+  const detail = within(screen.getByRole("region", { name: "Adhoc caído" }));
+  expect(detail.getByText("No arrancó")).toBeInTheDocument();
+  expect(detail.getByRole("alert")).toHaveTextContent("No se pudo arrancar: no quedan equipos");
+  expect(detail.getAllByText("No arrancó (antes de armar)").length).toBe(1); // la fase en la línea de tiempo
+  expect(detail.getByRole("button", { name: "Ejecutar Login Test" })).toBeInTheDocument();
+  expect(detail.getByRole("button", { name: "Quitar del historial" })).toBeInTheDocument();
+  await userEvent.click(detail.getByRole("button", { name: "Armar trabajo" }));
+  await waitFor(() => expect(armJob).toHaveBeenCalledWith("jf", [], []));
+});
+
+test("un created que falló antes y luego tiene otra fase ya no se marca como fallido", async () => {
+  const j: Job = { id: "jg", name: "Reintentado", state: "created", kind: "adhoc", phases: [
+    { at: now, kind: "JOB_PHASE_KIND_ARM_FAILED", detail: "dial tcp: timeout" },
+    { at: now, kind: "JOB_PHASE_KIND_LOGIN_TEST_DONE" },
+  ] };
+  setup([j]);
+  await userEvent.click(await list().findByText("Reintentado"));
+  expect(list().getByText("Creado")).toBeInTheDocument();
+  expect(screen.queryByText(/No se pudo arrancar/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Armar trabajo" })).toBeNull();
+});

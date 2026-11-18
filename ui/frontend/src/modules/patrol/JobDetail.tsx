@@ -10,7 +10,7 @@ import { MetricsPanel, useMetrics } from "./MetricsPanel";
 import { perRound } from "./metrics";
 import { tones, useStateLabel } from "./JobsPanel";
 import { RemoveDialog } from "./RemoveDialog";
-import { isRemovable } from "./states";
+import { armFailed, isRemovable } from "./states";
 import { devicesText, activeMs, clock, elapsed, when } from "./format";
 
 // Detalle de un trabajo: cifras, línea de fases, Login Test y armado, y la grilla en vivo.
@@ -73,6 +73,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
       onChanged();
     } catch (e) {
       setErr(errorText(e));
+      onChanged(); // el núcleo anotó ARM_FAILED: la lista trae la fase con su motivo traducido
     } finally {
       setBusy("");
     }
@@ -96,6 +97,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   };
   const live = ["created", "arming", "armed"].includes(job.state);
   const showLogin = job.state === "created" && !armed;
+  const failedStart = !armed && armFailed(job, phases) ? phases[phases.length - 1] : undefined;
 
   return (
     <section aria-labelledby="job-h" className="job-detail">
@@ -109,7 +111,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
         onConfirm={async () => { const r = await core.removeJobs({ jobIds: [job.id] }); if (r.skipped?.length) onChanged(); return r; }} onDone={onRemoved} onClose={() => setRemoving(false)} />}
 
       <dl className="stats">
-        <div><dt>{t("patrol.stat.state")}</dt><dd><Badge tone={tones[job.state]}>{stateLabel(job.state)}</Badge></dd></div>
+        <div><dt>{t("patrol.stat.state")}</dt><dd>{failedStart ? <Badge tone="bad">{t("patrol.state.armFailed")}</Badge> : <Badge tone={tones[job.state]}>{stateLabel(job.state)}</Badge>}</dd></div>
         {job.armedAt && <div><dt>{t("patrol.stat.elapsed")}</dt><dd>{elapsed(activeMs(job.armedAt, job.state, phases))}</dd></div>}
         {!!job.round && <div><dt>{t("patrol.stat.round")}</dt><dd>{job.rounds ? t("patrol.round", { n: job.round, total: job.rounds }) : job.round}</dd></div>}
         {job.rounds !== undefined && <div><dt>{t("patrol.stat.rounds")}</dt><dd>{job.rounds || t("patrol.untilWindow")}</dd></div>}
@@ -119,6 +121,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
       </dl>
 
       {err && <Notice kind="error">{err}</Notice>}
+      {failedStart && !err && <Notice kind="error">{t("patrol.armFailed", { reason: phaseDetail(t, failedStart) ?? "" })}</Notice>}
       {showLogin && (
         <Section title={t("patrol.login.title")} description={t("patrol.login.intro")}>
           {login.length > 0 && (
@@ -144,8 +147,8 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
             </>
           )}
           <div className="actions">
-            {login.length > 0 && <button className="primary" onClick={arm} disabled={!!busy} aria-busy={busy === "arm"}>{t("patrol.arm")}</button>}
-            <button className={login.length ? "" : "primary"} onClick={runLogin} disabled={!!busy} aria-busy={busy === "login"}>{t("patrol.login.run")}</button>
+            {(login.length > 0 || failedStart) && <button className="primary" onClick={arm} disabled={!!busy} aria-busy={busy === "arm"}>{t("patrol.arm")}</button>}
+            <button className={login.length || failedStart ? "" : "primary"} onClick={runLogin} disabled={!!busy} aria-busy={busy === "login"}>{t("patrol.login.run")}</button>
           </div>
         </Section>
       )}
@@ -182,13 +185,7 @@ function Phases({ phases }: { phases: JobPhase[] }) {
     const key = `patrol.phase.${k}` as Key;
     return key in phaseKeys ? t(key, { round: p.round ?? 0 }) : k;
   };
-  // Con reason conocido el detalle sale de i18n; las fases viejas o un reason nuevo muestran el texto del núcleo.
-  const detail = (p: JobPhase) => {
-    const key = `patrol.phaseReason.${p.reason}` as Key;
-    if (!p.reason || !(key in phaseReasonKeys)) return p.detail;
-    const a = p.args ?? {};
-    return t(key, { ...a, n: Number(a.n), ok: t("patrol.phaseReason.ok", { n: Number(a.ok) }), excl: t("patrol.phaseReason.excluded", { n: Number(a.excluded) }), partial: t("patrol.partialCount", { n: Number(a.partial) }) });
-  };
+  const detail = (p: JobPhase) => phaseDetail(t, p);
   return (
     <Section title={t("patrol.phases")}>
       {phases.length ? (
@@ -206,9 +203,18 @@ function Phases({ phases }: { phases: JobPhase[] }) {
   );
 }
 
+// Con reason conocido el detalle sale de i18n; las fases viejas o un reason nuevo muestran el texto del núcleo
+// (para los reasons del catálogo del núcleo, el puente ya lo trae traducido).
+function phaseDetail(t: ReturnType<typeof useT>, p: JobPhase) {
+  const key = `patrol.phaseReason.${p.reason}` as Key;
+  if (!p.reason || !(key in phaseReasonKeys)) return p.detail;
+  const a = p.args ?? {};
+  return t(key, { ...a, n: Number(a.n), ok: t("patrol.phaseReason.ok", { n: Number(a.ok) }), excl: t("patrol.phaseReason.excluded", { n: Number(a.excluded) }), partial: t("patrol.partialCount", { n: Number(a.partial) }) });
+}
+
 const phaseReasonKeys = Object.fromEntries(
   ["devices", "devices_excluded", "ok_failed", "ok_partial_failed", "rounds", "packaged", "round_zip_failed", "close_failed", "before_arming", "core_stopped"].map((r) => [`patrol.phaseReason.phase.${r}`, true]),
 );
 const phaseKeys = Object.fromEntries(
-  ["CREATED", "LOGIN_TEST_DONE", "ARMED", "ROUND_STARTED", "ROUND_FINISHED", "ROUND_SKIPPED", "PACKAGED", "COMPLETED", "CANCELLED", "FAILED", "ARM_CHECK_DONE"].map((k) => [`patrol.phase.${k}`, true]),
+  ["CREATED", "LOGIN_TEST_DONE", "ARMED", "ROUND_STARTED", "ROUND_FINISHED", "ROUND_SKIPPED", "PACKAGED", "COMPLETED", "CANCELLED", "FAILED", "ARM_CHECK_DONE", "ARM_FAILED"].map((k) => [`patrol.phase.${k}`, true]),
 );

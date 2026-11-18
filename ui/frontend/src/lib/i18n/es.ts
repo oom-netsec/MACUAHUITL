@@ -3031,6 +3031,9 @@ export const es = {
   "patrol.history.skip.backup_import": "se está importando un respaldo de este trabajo",
   "patrol.history.skip.adhoc_unread": "su resultado ad hoc aún no se ha leído",
   "patrol.history.skip.unknown": "el núcleo no lo pudo quitar ({reason})",
+  "patrol.state.armFailed": "No arrancó",
+  "patrol.armFailed": "No se pudo arrancar: {reason}. Corrige el equipo y vuelve a armar, o ejecuta el Login Test para revisar y aceptar una huella nueva.",
+  "patrol.phase.ARM_FAILED": "No arrancó (antes de armar)",
 };
 
 export type Key = keyof typeof es;

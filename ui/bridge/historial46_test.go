@@ -2,10 +2,12 @@ package bridge
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -20,7 +22,12 @@ type fakeHistorial struct {
 func (f fakeHistorial) ListJobs(_ context.Context, r *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
 	f.list <- r
 	return &v1.ListJobsResponse{Jobs: []*v1.JobSummary{{JobId: "j1", State: "completed", Past: true,
-		FinishedAt: timestamppb.New(time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC))}}}, nil
+		FinishedAt: timestamppb.New(time.Date(2026, 11, 16, 10, 0, 0, 0, time.UTC)),
+		Phases: []*v1.JobPhase{
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Reason: "patrol.svc.login_failed", Args: map[string]string{"failed": "10.0.0.1:22: AUTH"}, Detail: "raw"},
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Reason: "x.reason_nuevo", Detail: "core text"},
+			{Kind: v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, Detail: "dial tcp: timeout"},
+		}}}}, nil
 }
 
 func (f fakeHistorial) RemoveJobs(_ context.Context, r *v1.RemoveJobsRequest) (*v1.RemoveJobsResponse, error) {
@@ -41,6 +48,15 @@ func TestHistorial46(t *testing.T) {
 	}
 	if len(jobs) != 1 || !jobs[0].Past || jobs[0].FinishedAt != "2026-11-16T10:00:00Z" {
 		t.Fatalf("JobDTO sin past/finishedAt: %+v", jobs)
+	}
+	// Un reason del catálogo del núcleo llega traducido en detail (la UI no tiene ese catálogo); sin reason o con uno
+	// desconocido queda el texto del núcleo.
+	ph := jobs[0].Phases
+	if want := i18n.Msg(b.locale(), "patrol.svc.login_failed", i18n.Args{"failed": "10.0.0.1:22: AUTH"}); len(ph) != 3 || ph[0].Detail != want || !strings.Contains(want, "10.0.0.1:22: AUTH") {
+		t.Fatalf("fase con reason del catálogo: %+v", ph)
+	}
+	if ph[0].Reason != "patrol.svc.login_failed" || ph[0].Kind != "JOB_PHASE_KIND_FAILED" || ph[1].Detail != "core text" || ph[2].Detail != "dial tcp: timeout" {
+		t.Fatalf("fases: %+v", ph)
 	}
 
 	// La UI solo elige ids: «todos los terminados» no se puede pedir desde la UI (quita exactamente lo confirmado).
