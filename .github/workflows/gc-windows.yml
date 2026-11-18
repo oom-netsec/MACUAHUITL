@@ -26,7 +26,9 @@ jobs:
     env:
       CGO_ENABLED: "0"
       GODEBUG: gccheckmark=1,clobberfree=1
-      GOGC: "10" # GC más seguido: más oportunidades de ver el puntero colgante
+      GOGC: "5" # GC más seguido: más oportunidades de ver el puntero colgante
+      GOMAXPROCS: "4"
+      GOTRACEBACK: crash # volcado completo: el elemsize del objeto apunta al culpable (48 B = ioOperation de go-winio)
     defaults:
       run:
         shell: bash
@@ -39,11 +41,19 @@ jobs:
         run: |
           echo "TMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
           echo "TEMP=$LOCALAPPDATA\\Temp" >> "$GITHUB_ENV"
-      - name: pruebas con el GC estricto
+      # Por separado, para saber de qué lado está: winio solo (ipc), sqlite/modernc solo (store), y juntos (core, mctl).
+      - name: ipc (go-winio, IOCP, Close con ConnectNamedPipe pendiente)
+        if: always()
+        run: go test -p 1 -count=200 -timeout 30m -run 'Pipe|Dial|Listen|CloseWait|CoreRunning|ServerPID' ./internal/ipc
+      - name: store (modernc sqlite sola)
+        if: always()
+        run: go test -p 1 -tags=storewatch -count=30 -timeout 30m ./internal/store
+      - name: paquetes pedidos
+        if: always()
         env:
           COUNT: ${{ inputs.count || '20' }}
           PKGS: ${{ inputs.pkgs || './cmd/mctl/... ./internal/ipc/... ./internal/diag/... ./internal/sys/...' }}
-        run: go test -tags=storewatch -count="$COUNT" -timeout 110m $PKGS
+        run: go test -p 1 -tags=storewatch -count="$COUNT" -timeout 110m $PKGS
 
   race:
     runs-on: windows-latest
