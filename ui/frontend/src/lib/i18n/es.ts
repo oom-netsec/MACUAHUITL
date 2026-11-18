@@ -3111,6 +3111,7 @@ export const es = {
   "patrol.missing.cron": "expresión cron",
   "patrol.interval.invalid": "Escribe un entero de 1 a 10080 minutos (una semana).",
   "patrol.sched.cron": "Con expresión cron",
+  "transfer.mode.httpRo": "HTTP solo envía: para recibir archivos usa TFTP, FTP, SCP o SFTP.",
 };
 
 export type Key = keyof typeof es;

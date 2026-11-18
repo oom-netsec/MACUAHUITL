@@ -600,3 +600,33 @@ test("tarjeta en modo recibir: la orden de IOS solo sube (sin descarga ni marcad
   expect(log).toHaveTextContent("copy running-config tftp://192.0.2.10/r1-config.txt");
   expect(log.textContent).not.toMatch(/flash:/);
 });
+
+test("servidor: con HTTP «Recibir» está deshabilitado y explicado; si estaba en recibir, vuelve a enviar", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "http");
+  expect(screen.getByRole("radio", { name: "Enviar archivos al equipo" })).toBeChecked();
+  expect(screen.getByRole("radio", { name: "Recibir archivos del equipo" })).toBeDisabled();
+  expect(screen.getByRole("radio", { name: "Enviar archivos al equipo" })).toBeEnabled();
+  expect(screen.getAllByRole("group").find((g) => g.classList.contains("segmented"))).toHaveAccessibleDescription(/HTTP solo envía/);
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ protocol: "http", write: false, recvDir: "" }));
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "scp");
+  expect(screen.getByRole("radio", { name: "Recibir archivos del equipo" })).toBeEnabled();
+});
+
+test("servidor: pasar de recibir+TFTP a enviar mueve «IP permitidas» a Avanzado y lo cuenta", async () => {
+  setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.click(screen.getByRole("radio", { name: "Recibir archivos del equipo" }));
+  await userEvent.type(screen.getByLabelText(/IP permitidas/), "192.0.2.1");
+  const adv = () => document.querySelector("details")!;
+  expect(adv()).not.toContainElement(screen.getByLabelText(/IP permitidas/)); // a la vista, sin contar
+  expect(adv().querySelector("summary")).toHaveTextContent(/^Opciones avanzadas$/);
+  await userEvent.click(screen.getByRole("radio", { name: "Enviar archivos al equipo" }));
+  expect(adv()).toContainElement(screen.getByLabelText(/IP permitidas/));
+  expect(adv().querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
+});

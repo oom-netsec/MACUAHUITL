@@ -201,12 +201,12 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     <>
       <Section title={t("transfer.form.server")}>
         <div className="field-row">
-          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); }} options={protos} w="sm" />
+          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); if (p === "http") setMode("send"); /* el núcleo no recibe por HTTP */ }} options={protos} w="sm" />
           {!any && <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} w="md"
             options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />}
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
-        <Segmented legend={t("transfer.mode")} value={mode} onChange={setMode} options={[["send", t("transfer.mode.send")], ["recv", t("transfer.mode.recv")]]} />
+        <Segmented legend={t("transfer.mode")} value={mode} onChange={setMode} disabledValues={proto === "http" ? ["recv"] : undefined} hint={proto === "http" ? t("transfer.mode.httpRo") : undefined} options={[["send", t("transfer.mode.send")], ["recv", t("transfer.mode.recv")]]} />
         {!write && <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />}
         {!write && <TextArea label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} rows={2} mono />}
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}

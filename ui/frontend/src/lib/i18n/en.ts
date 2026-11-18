@@ -3112,4 +3112,5 @@ export const en: Record<Key, string> = {
   "patrol.missing.cron": "cron expression",
   "patrol.interval.invalid": "Enter a whole number from 1 to 10080 minutes (one week).",
   "patrol.sched.cron": "With a cron expression",
+  "transfer.mode.httpRo": "HTTP can only send: to receive files use TFTP, FTP, SCP or SFTP.",
 };
