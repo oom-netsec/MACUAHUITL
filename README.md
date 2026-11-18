@@ -158,6 +158,8 @@ mctl pack show oom/ios-xe                   # manifest and the pack's own README
 mctl pack remove oom/ios-xe
 ```
 
+On Windows, `cmd.exe` does not expand `*`: give the full file name, or see the [Windows guide](docs/install-windows.md#content-packs) for the PowerShell form.
+
 - **Official packs** (`oom/*`) are signed with Ed25519 and published as assets of every release, each with its README and checksum. The public key is compiled into the core. Pack updates that need no core change ship on their own, in **Content packs** releases tagged `packs-YYYY-MM-DD`, and install on the latest core.
 - **An official pack always wins.** If a third-party pack collides with an official one, installing the official pack shows which third-party packs it would remove and asks you to confirm.
 - **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their publisher prefix in every ID, so they can never take over an official playbook.
