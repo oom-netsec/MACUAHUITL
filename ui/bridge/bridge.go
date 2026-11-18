@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/netip"
+	"os"
 	"sync"
 	"time"
 
@@ -245,7 +247,8 @@ type CredentialDTO struct {
 	Username  string `json:"username"`
 	HasEnable bool   `json:"hasEnable"`
 	HasSSHKey bool   `json:"hasSshKey"`
-	Kind      string `json:"kind"` // password | key: lo calcula el núcleo al listar
+	Kind      string `json:"kind"`   // password | key: lo calcula el núcleo al listar
+	Origin    string `json:"origin"` // generated | imported; vacío en las de contraseña
 }
 
 // KeyCredentialDTO es la llave recién generada: solo la pública sale del núcleo (ADR 0013).
@@ -262,12 +265,106 @@ func (b *Bridge) CreateKeyCredential(label, username string) (KeyCredentialDTO, 
 	})
 }
 
+// ImportKeyDTO es la llave a importar: o PrivateKey (el contenido pegado) o Path (el puente lee el archivo); nunca los dos.
+type ImportKeyDTO struct {
+	Label      string `json:"label"`
+	Username   string `json:"username"`
+	PrivateKey string `json:"privateKey"`
+	Path       string `json:"path"`
+	Passphrase string `json:"passphrase"`
+}
+
+type ImportKeyResultDTO struct {
+	ID          string `json:"id"`
+	PublicKey   string `json:"publicKey"`
+	Fingerprint string `json:"fingerprint"`
+	Algorithm   string `json:"algorithm"`
+	Bits        uint32 `json:"bits"`
+	Weak        bool   `json:"weak"`
+}
+
+const maxKeyBytes = 64 << 10
+
+// ImportKeyCredential importa una privada existente. El núcleo solo recibe el contenido, nunca la ruta. Un archivo de
+// más de 64 KiB se manda recortado a 64 KiB + 1 para que el núcleo lo rechace con su propio error (field_too_long).
+func (b *Bridge) ImportKeyCredential(d ImportKeyDTO) (ImportKeyResultDTO, error) {
+	if (d.Path == "") == (d.PrivateKey == "") {
+		err := b.bridgeErr(i18n.New("bridge.err.import_source", nil))
+		err.(*Error).Code = "InvalidArgument"
+		return ImportKeyResultDTO{}, err
+	}
+	pass := []byte(d.Passphrase)
+	defer clear(pass)
+	key := []byte(d.PrivateKey)
+	if d.Path != "" {
+		var err error
+		if key, err = b.readKeyFile(d.Path); err != nil {
+			return ImportKeyResultDTO{}, b.bridgeErr(err)
+		}
+	}
+	defer clear(key) // best effort: el string pegado no se puede borrar
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ImportKeyResultDTO, error) {
+		r, err := v1.NewVaultServiceClient(c).ImportKeyCredential(ctx, &v1.ImportKeyCredentialRequest{Label: d.Label, Username: d.Username, PrivateKey: key, Passphrase: pass})
+		return ImportKeyResultDTO{ID: r.GetId(), PublicKey: r.GetPublicKey(), Fingerprint: r.GetFingerprint(), Algorithm: r.GetAlgorithm(), Bits: r.GetBits(), Weak: r.GetWeak()}, err
+	})
+}
+
+// readKeyFile lee hasta 64 KiB + 1 de un archivo regular (se revisa antes y después de abrir). Los errores salen con
+// código del catálogo y nunca con el texto de *PathError: trae la ruta y Wails lo registra.
+func (b *Bridge) readKeyFile(path string) ([]byte, error) {
+	notRegular := b.bridgeErr(i18n.New("bridge.err.import_not_regular", nil))
+	readErr := func(err error) error {
+		kind := "other"
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			kind = "not_found"
+		case errors.Is(err, fs.ErrPermission):
+			kind = "permission"
+		}
+		return b.bridgeErr(i18n.New("bridge.err.import_read", i18n.A("kind", kind)))
+	}
+	if fi, err := os.Stat(path); err != nil {
+		return nil, readErr(err)
+	} else if !fi.Mode().IsRegular() {
+		return nil, notRegular
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, readErr(err)
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil {
+		return nil, readErr(err)
+	} else if !fi.Mode().IsRegular() {
+		return nil, notRegular
+	}
+	buf := make([]byte, 0, maxKeyBytes+1)
+	for len(buf) < cap(buf) {
+		n, err := f.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+n]
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			clear(buf)
+			return nil, readErr(err)
+		}
+	}
+	return buf, nil
+}
+
+// RegenerateKeyDTO es la pública nueva y de dónde venía la llave que se destruyó (generated | imported).
+type RegenerateKeyDTO struct {
+	PublicKey      string `json:"publicKey"`
+	PreviousOrigin string `json:"previousOrigin"`
+}
+
 // RegenerateKeyCredential genera otra llave para la misma credencial (conserva el id) y devuelve la pública nueva.
 // confirm es obligatorio: la pública vieja deja de servir en cada authorized_keys. Solo credenciales de tipo llave.
-func (b *Bridge) RegenerateKeyCredential(id string, confirm bool) (string, error) {
-	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
+func (b *Bridge) RegenerateKeyCredential(id string, confirm bool) (RegenerateKeyDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (RegenerateKeyDTO, error) {
 		r, err := v1.NewVaultServiceClient(c).RegenerateKeyCredential(ctx, &v1.RegenerateKeyCredentialRequest{Id: id, Confirm: confirm})
-		return r.GetPublicKey(), err
+		return RegenerateKeyDTO{PublicKey: r.GetPublicKey(), PreviousOrigin: r.GetPreviousOrigin()}, err
 	})
 }
 
@@ -287,7 +384,7 @@ func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
 		}
 		out := []CredentialDTO{}
 		for _, i := range r.Credentials {
-			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind})
+			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind, Origin: i.Origin})
 		}
 		return out, nil
 	})

@@ -8,6 +8,7 @@ import { DataTable, type Column } from "../../components/DataTable";
 import { useT } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { useCoreLoad } from "../../lib/useCoreLoad";
+import { ImportKeyForm } from "./ImportKeyForm";
 import { BackupSection } from "./BackupSection";
 import "./vault.css";
 
@@ -22,6 +23,7 @@ export function VaultView({ core }: { core: CoreAPI }) {
   const [creds, setCreds] = useState<Credential[]>([]);
   const [msg, setMsg] = useState<Msg>(null);
   const [keyShown, setKeyShown] = useState<ShownKey | null>(null); // llave pública a la vista (recién creada o consultada), con la credencial a la que pertenece
+  const [importing, setImporting] = useState(false);
   const lastView = useRef(""); // último «Ver» pedido: una respuesta tardía de otra credencial se descarta
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   const previewOpen = useRef(false); // hay una vista previa de un respaldo con credenciales descifradas en el núcleo
@@ -79,9 +81,10 @@ export function VaultView({ core }: { core: CoreAPI }) {
           }} onRegenerate={async (c) => {
             lastView.current = c.id;
             try {
-              const publicKey = await core.regenerateKeyCredential(c.id, true); // la confirmación la dio la persona en el botón
-              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") }); return; } // la persona ya miró otra credencial: no se la pisa
-              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true });
+              const { publicKey, previousOrigin } = await core.regenerateKeyCredential(c.id, true);
+              changed(); // el origen pasa a «generated» // la confirmación la dio la persona en el botón
+              if (lastView.current !== c.id) { setMsg({ kind: "ok", text: t("vault.key.regenerated") + (previousOrigin === "imported" ? " " + t("vault.key.regenImported") : "") }); return; } // la persona ya miró otra credencial: no se la pisa
+              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true, wasImported: previousOrigin === "imported" });
               setMsg(null);
             } catch (e) { fail(e); }
           }} onDelete={async (id) => {
@@ -90,6 +93,7 @@ export function VaultView({ core }: { core: CoreAPI }) {
           {keyShown && <PublicKey key={keyShown.id + keyShown.publicKey} k={keyShown} onClose={() => setKeyShown(null)} />}
           <CredentialForm core={core} onDone={changed} setMsg={setMsg} />
           <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />
+          {importing ? <ImportKeyForm core={core} onDone={changed} onClose={() => setImporting(false)} /> : <div className="actions"><button type="button" onClick={() => setImporting(true)}>{t("vault.import.open")}</button></div>}
           <BackupSection core={core} sshKeys={creds.filter((c) => c.hasSshKey).length} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
         </>
       )}
@@ -161,11 +165,11 @@ function CredentialList({ creds, onDelete, onViewKey, onRegenerate }: { creds: C
   const cols: Column<Credential>[] = [
     { id: "label", header: t("vault.col.label"), value: (c) => c.label },
     { id: "user", header: t("vault.col.user"), value: (c) => c.username, mono: true },
-    { id: "details", header: t("vault.col.details"), value: (c) => [c.kind === "key" && t("vault.kind.key"), c.hasEnable && t("vault.hasEnable"), c.hasSshKey && c.kind !== "key" && t("vault.hasSshKey")].filter(Boolean).join(" "),
-      render: (c) => <>{c.kind === "key" && <Badge>{t("vault.kind.key")}</Badge>}{c.hasEnable && <Badge>{t("vault.hasEnable")}</Badge>}{c.hasSshKey && c.kind !== "key" && <Badge>{t("vault.hasSshKey")}</Badge>}</> },
+    { id: "details", header: t("vault.col.details"), value: (c) => [c.kind === "key" && t("vault.kind.key"), c.hasEnable && t("vault.hasEnable"), c.hasSshKey && c.kind !== "key" && t("vault.hasSshKey"), c.origin && t(c.origin === "imported" ? "vault.origin.imported" : "vault.origin.generated")].filter(Boolean).join(" "),
+      render: (c) => <>{c.kind === "key" && <Badge>{t("vault.kind.key")}</Badge>}{c.hasEnable && <Badge>{t("vault.hasEnable")}</Badge>}{c.hasSshKey && c.kind !== "key" && <Badge>{t("vault.hasSshKey")}</Badge>}{c.origin && <Badge>{t(c.origin === "imported" ? "vault.origin.imported" : "vault.origin.generated")}</Badge>}</> },
     // 480: caben «Ver llave pública», «Confirmar regenerar» y «Confirmar eliminación» armados a la vez (medido en WebKitGTK, ~472 px en español).
     { id: "actions", header: t("vault.col.actions"), value: () => "", width: 480,
-      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t("vault.key.regen.confirm", { label: c.label })} confirmText={t("vault.key.regen.confirmShort")} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} confirmText={t("common.confirmDelete")} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
+      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t(c.origin === "imported" ? "vault.key.regen.confirmImported" : "vault.key.regen.confirm", { label: c.label })} confirmText={t(c.origin === "imported" ? "vault.key.regen.confirmImportedShort" : "vault.key.regen.confirmShort")} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} confirmText={t("common.confirmDelete")} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
   ];
   return (
     <Section title={t("vault.creds")}>
@@ -216,7 +220,7 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
   );
 }
 
-type ShownKey = { id: string; label: string; username: string; publicKey: string; regenerated?: boolean };
+type ShownKey = { id: string; label: string; username: string; publicKey: string; regenerated?: boolean; wasImported?: boolean };
 
 // Llave pública: texto de solo lectura, monoespaciado y seleccionable, con Copiar y dónde pegarla en el equipo.
 // Al aparecer toma el foco (el lector de pantalla anuncia el título y quien la abrió la ve sin buscarla).
@@ -228,7 +232,7 @@ function PublicKey({ k, onClose }: { k: ShownKey; onClose: () => void }) {
   return (
     <section ref={ref} tabIndex={-1} className="section vault-pubbox" aria-labelledby={h} aria-describedby={`${h}-d`}>
       <h3 id={h}>{t("vault.key.titleOf", { label: k.label })}</h3>
-      {k.regenerated && <Notice kind="warn">{t("vault.key.regenerated")}</Notice>}
+      {k.regenerated && <Notice kind="warn">{t("vault.key.regenerated")}{k.wasImported && " " + t("vault.key.regenImported")}</Notice>}
       <p id={`${h}-d`} className="meta">{t("vault.key.hint")}</p>
       <p><code className="mono vault-pub">{k.publicKey}</code> <CopyButton value={k.publicKey} label={t("vault.key.copyLabel")} /></p>
       <h4>{t("vault.key.where")}</h4>

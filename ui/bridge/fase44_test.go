@@ -40,7 +40,7 @@ func (f *fake44) ListCredentials(context.Context, *v1.ListCredentialsRequest) (*
 }
 func (f *fake44) RegenerateKeyCredential(_ context.Context, r *v1.RegenerateKeyCredentialRequest) (*v1.RegenerateKeyCredentialResponse, error) {
 	f.reg = r
-	return &v1.RegenerateKeyCredentialResponse{PublicKey: "ssh-ed25519 NEW"}, nil
+	return &v1.RegenerateKeyCredentialResponse{PublicKey: "ssh-ed25519 NEW", PreviousOrigin: "imported"}, nil
 }
 func (f *fake44) PutCredential(_ context.Context, r *v1.PutCredentialRequest) (*v1.PutCredentialResponse, error) {
 	f.put = r
@@ -129,8 +129,8 @@ func TestVault44(t *testing.T) {
 	if e.Count != 2 || e.SSHKeysIncluded != 1 {
 		t.Fatalf("%+v", e)
 	}
-	if pk, err := b.RegenerateKeyCredential("k1", true); err != nil || pk != "ssh-ed25519 NEW" || f.reg.Id != "k1" || !f.reg.Confirm {
-		t.Fatalf("regen %q %v %+v", pk, err, f.reg)
+	if pk, err := b.RegenerateKeyCredential("k1", true); err != nil || pk.PublicKey != "ssh-ed25519 NEW" || pk.PreviousOrigin != "imported" || f.reg.Id != "k1" || !f.reg.Confirm {
+		t.Fatalf("regen %+v %v %+v", pk, err, f.reg)
 	}
 	if _, err := b.RegenerateKeyCredential("k1", false); err != nil || f.reg.Confirm {
 		t.Fatal("confirm debe viajar tal cual")
