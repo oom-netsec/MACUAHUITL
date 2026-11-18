@@ -522,9 +522,15 @@ func TestSubscribeDisconnectReleases(t *testing.T) {
 }
 
 func TestIdleLock(t *testing.T) {
-	h := newHarness(t, func(o *Options) { o.IdleLock = 150 * time.Millisecond })
-	time.Sleep(300 * time.Millisecond) // preparación lenta: no debe contar como inactividad de la bóveda
+	// Reloj manual: la inactividad la mide c.o.Now, así que una preparación lenta del runner no cierra la bóveda a mitad
+	// de ready; solo cuenta lo que la prueba adelanta.
+	h := newHarnessReloj(t, func(o *Options) { o.IdleLock = 150 * time.Millisecond })
+	h.reloj.Avanza(time.Hour) // preparación «lenta» antes de abrir la bóveda: no debe contar como inactividad
 	h.ready(t)
+	if st := h.core.vaultState(); st == v1.VaultState_VAULT_STATE_LOCKED {
+		t.Fatal("la bóveda se cerró sin pasar el tiempo de inactividad")
+	}
+	h.reloj.Avanza(200 * time.Millisecond) // más que IdleLock sin actividad
 	deadline := time.Now().Add(10 * time.Second)
 	for h.core.vaultState() != v1.VaultState_VAULT_STATE_LOCKED && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
