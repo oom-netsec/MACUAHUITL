@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -34,7 +35,7 @@ func init() { winAdapters = realAdapters }
 func realAdapters() []winAdapter {
 	size := uint32(15000)
 	for range 3 {
-		buf := make([]byte, size)
+		buf := selfPtrBuf(int(size)) // IP_ADAPTER_ADDRESSES enlaza nodos dentro del mismo búfer: tiene que estar en el heap
 		aa := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
 		err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, windows.GAA_FLAG_SKIP_ANYCAST|windows.GAA_FLAG_SKIP_MULTICAST|windows.GAA_FLAG_SKIP_DNS_SERVER, 0, aa, &size)
 		if err == windows.ERROR_BUFFER_OVERFLOW {
@@ -83,11 +84,14 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	info := windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION{}
+	// LazyProc.Call lleva //go:uintptrescapes: info escapa al heap y no se mueve con el stack mientras dura la llamada.
+	// El wrapper SetInformationJobObject de x/sys recibe un uintptr sin esa marca, y el kernel leería una copia vieja del stack.
+	var info windows.JOBOBJECT_EXTENDED_LIMIT_INFORMATION
 	info.BasicLimitInformation.LimitFlags = windows.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-	if _, err := windows.SetInformationJobObject(job, windows.JobObjectExtendedLimitInformation, uintptr(unsafe.Pointer(&info)), uint32(unsafe.Sizeof(info))); err != nil {
+	if r, _, e := procSetInformationJobObject.Call(uintptr(job), uintptr(windows.JobObjectExtendedLimitInformation),
+		uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info)); r == 0 {
 		windows.CloseHandle(job)
-		return nil, nil, err
+		return nil, nil, e
 	}
 	cmd.SysProcAttr = &windows.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED | windows.CREATE_NO_WINDOW}
 	cmd.WaitDelay = 3 * time.Second
@@ -95,9 +99,17 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 	if i := lastSep(cmd.Path); i > 0 {
 		cmd.Dir = cmd.Path[:i]
 	}
+	// jobMu y jobClosed: la goroutine de diag puede llamar a Cancel justo cuando done cierra el job; con el número de handle
+	// ya reutilizado, TerminateJobObject mataría un objeto ajeno.
+	var jobMu sync.Mutex
+	jobClosed := false
 	cmd.Cancel = func() error {
 		// El proceso aún puede no estar en el job (cancelación durante el arranque): Kill cubre ese caso.
-		windows.TerminateJobObject(job, 143) // como el 143 de Linux
+		jobMu.Lock()
+		if !jobClosed {
+			terminateJob(job, 143) // como el 143 de Linux
+		}
+		jobMu.Unlock()
 		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			return err
 		}
@@ -117,8 +129,20 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 		}
 		return err
 	}
-	return started, func() { windows.CloseHandle(job) }, nil
+	return started, func() {
+		jobMu.Lock()
+		defer jobMu.Unlock()
+		if !jobClosed {
+			jobClosed = true
+			windows.CloseHandle(job)
+		}
+	}, nil
 }
+
+var procSetInformationJobObject = windows.NewLazySystemDLL("kernel32.dll").NewProc("SetInformationJobObject")
+
+// terminateJob es la costura de las pruebas: comprueban que no se termina un job ya cerrado.
+var terminateJob = windows.TerminateJobObject
 
 // resume reanuda los hilos del proceso recién creado (solo tiene el principal).
 func resume(pid uint32) error {

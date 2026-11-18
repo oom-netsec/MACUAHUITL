@@ -81,3 +81,31 @@ func confineProbe(t *testing.T, kill func(cancel func(), done func())) {
 		t.Fatal("el nieto sigue vivo tras cancelar")
 	}
 }
+
+// Cancel después de done (la goroutine de diag puede llegar tarde) no debe tocar el job: su handle ya está cerrado y el
+// número puede ser de otro objeto.
+func TestCancelTrasDoneNoTerminaElJob(t *testing.T) {
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^$") // como en producción: Cancel solo vale con CommandContext
+	_, done, err := confine(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	old := terminateJob
+	terminateJob = func(h windows.Handle, code uint32) error { calls++; return old(h, code) }
+	defer func() { terminateJob = old }()
+	if err := cmd.Start(); err != nil { // Cancel también hace Kill: hace falta un proceso (queda suspendido)
+		t.Fatal(err)
+	}
+	defer cmd.Wait()
+	cmd.Cancel() // con el job abierto sí lo termina, una vez
+	if calls != 1 {
+		t.Fatalf("Cancel antes de done: %d llamadas, quiero 1", calls)
+	}
+	done()
+	done() // idempotente: no cierra dos veces
+	cmd.Cancel()
+	if calls != 1 {
+		t.Fatalf("Cancel tras done terminó un job cerrado (%d llamadas)", calls)
+	}
+}

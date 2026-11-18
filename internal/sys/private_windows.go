@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,11 +90,13 @@ func protect(path string, inherit bool) error {
 		inh = windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT
 	}
 	var entries []windows.EXPLICIT_ACCESS
+	var sids []*windows.SID // TrusteeValueFromSID guarda un uintptr: los SID tienen que vivir hasta después de ACLFromEntries
 	for _, s := range []string{user.String(), sidSystem, sidAdmins} {
 		sid, err := windows.StringToSid(s)
 		if err != nil {
 			return err
 		}
+		sids = append(sids, sid)
 		entries = append(entries, windows.EXPLICIT_ACCESS{
 			AccessPermissions: fileAllAccess,
 			AccessMode:        windows.GRANT_ACCESS,
@@ -102,6 +105,8 @@ func protect(path string, inherit bool) error {
 		})
 	}
 	acl, err := windows.ACLFromEntries(entries, nil)
+	runtime.KeepAlive(sids)
+	runtime.KeepAlive(user)
 	if err != nil {
 		return err
 	}
@@ -259,6 +264,7 @@ func ReadOnlyDir(path string) (restore func(), err error) {
 		AccessPermissions: fileReadExec, AccessMode: windows.GRANT_ACCESS, Inheritance: windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
 		Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(user)},
 	}}, nil)
+	runtime.KeepAlive(user) // el uintptr del Trustee no mantiene vivo el SID
 	if err != nil {
 		return nil, err
 	}

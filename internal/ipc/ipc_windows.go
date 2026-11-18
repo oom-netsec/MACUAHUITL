@@ -171,12 +171,11 @@ func pipeLabel(c net.Conn) (uint32, error) {
 		if a.Header.AceType != aceMandatoryLabel {
 			continue
 		}
-		sid := (*windows.SID)(unsafe.Pointer(&a.SidStart))
-		n := sid.SubAuthorityCount()
-		if n == 0 {
+		rid, ok := lastRID((*windows.SID)(unsafe.Pointer(&a.SidStart)))
+		if !ok {
 			return 0, errors.New("etiqueta de integridad sin RID")
 		}
-		if rid := sid.SubAuthority(uint32(n) - 1); menor == 0 || rid < menor {
+		if menor == 0 || rid < menor {
 			menor = rid
 		}
 	}
@@ -185,29 +184,54 @@ func pipeLabel(c net.Conn) (uint32, error) {
 
 const aceMandatoryLabel = 0x11 // SYSTEM_MANDATORY_LABEL_ACE_TYPE; x/sys no la define
 
+// lastRID es el último RID de un SID que vive en memoria de Go, leído directamente (Revision, SubAuthorityCount,
+// IdentifierAuthority[6] y SubAuthority[n] uint32). SID.SubAuthority y SubAuthorityCount de x/sys pasan por
+// GetSidSubAuthority, que devuelve el puntero como uintptr: convertirlo en puntero a memoria de Go viola las reglas de
+// unsafe (checkptr lo rechaza con -race) aunque el SID esté bien. ok=false sin SID o sin RID.
+func lastRID(sid *windows.SID) (uint32, bool) {
+	if sid == nil {
+		return 0, false
+	}
+	n := *(*uint8)(unsafe.Add(unsafe.Pointer(sid), 1))
+	if n == 0 || n > 15 { // SID_MAX_SUB_AUTHORITIES
+		return 0, false
+	}
+	return *(*uint32)(unsafe.Add(unsafe.Pointer(sid), 8+4*(int(n)-1))), true
+}
+
+// selfPtrBuf da un búfer para estructuras que Windows llena con punteros a sí mismas (TOKEN_MANDATORY_LABEL.Label.Sid).
+// Tiene que vivir en el heap: en el stack, al crecer, Go movería el búfer sin corregir esos punteros (están dentro de un
+// []byte), que quedarían apuntando al stack viejo ya liberado («found pointer to free object»; checkptr lo detecta con
+// -race). Que el búfer salga de una función que no se expande en línea lo hace escapar por diseño, sin depender del
+// tamaño a partir del cual el compilador deja de ponerlo en el stack.
+//
+//go:noinline
+func selfPtrBuf(n int) []byte { return make([]byte, n) }
+
 const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; x/sys no la define
 
 // factsOf lee integridad, AppContainer y restricción de un token abierto con TOKEN_QUERY. Cualquier fallo va en Err.
 func factsOf(tok windows.Token) tokenFacts {
 	var f tokenFacts
 	var n uint32
-	// Búfer en el heap (patrón de Token.getInfo de x/sys): Label.Sid apunta dentro del propio búfer.
+	// Label.Sid apunta dentro del propio búfer: el búfer tiene que estar en el heap (ver selfPtrBuf).
 	err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, nil, 0, &n)
 	if err != windows.ERROR_INSUFFICIENT_BUFFER {
 		f.Err = err
 		return f
 	}
-	buf := make([]byte, n)
-	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], n, &n); err != nil {
+	buf := selfPtrBuf(int(n))
+	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], uint32(len(buf)), &n); err != nil {
 		f.Err = err
 		return f
 	}
 	sid := (*windows.Tokenmandatorylabel)(unsafe.Pointer(&buf[0])).Label.Sid
-	if sid == nil || sid.SubAuthorityCount() == 0 {
+	rid, ok := lastRID(sid)
+	if !ok {
 		f.Err = errors.New("sin SID de integridad")
 		return f
 	}
-	f.IL = sid.SubAuthority(uint32(sid.SubAuthorityCount()) - 1)
+	f.IL = rid
 	var ac uint32
 	if err := windows.GetTokenInformation(tok, tokenIsAppContainer, (*byte)(unsafe.Pointer(&ac)), 4, &n); err != nil {
 		f.Err = err
