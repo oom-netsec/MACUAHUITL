@@ -65,9 +65,9 @@ func phaseLines(ps []*v1.JobPhase) []string {
 }
 
 func TestJobSummaryAndPhases(t *testing.T) {
-	h := newHarness(t, nil)
+	h := newHarnessReloj(t, nil) // la ronda 2 sale al terminar la 1, no por el tiempo que ésta tarde
 	cred := h.ready(t)
-	before := time.Now()
+	before := h.reloj.Now()
 	job, _ := h.arm(t, cred)
 	evs := h.waitJob(t, job, "closed")
 	s := h.summary(t, job)

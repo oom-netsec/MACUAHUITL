@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -69,6 +70,52 @@ type harness struct {
 	o      Options
 	served <-chan struct{}                            // se cierra cuando Serve termina solo (apagado ordenado)
 	subs   map[string]v1.EventService_SubscribeClient // suscripciones tomadas por arm antes de armar, que waitJob consume
+	reloj  *relojPrueba                               // reloj manual del núcleo (newHarnessReloj); nil con el reloj real
+}
+
+// relojPrueba es el reloj del núcleo en las pruebas que no pueden depender del tiempo real: no avanza solo, así
+// una ronda lenta no se solapa con la siguiente ni la ventana se acaba por la carga del runner.
+type relojPrueba struct{ ns atomic.Int64 }
+
+func (r *relojPrueba) Now() time.Time         { return time.Unix(0, r.ns.Load()).UTC() }
+func (r *relojPrueba) Avanza(d time.Duration) { r.ns.Add(int64(d)) }
+
+// newHarnessReloj es newHarness con un reloj manual que parte de la hora actual.
+func newHarnessReloj(t *testing.T, mut func(*Options)) *harness {
+	t.Helper()
+	r := &relojPrueba{}
+	r.ns.Store(time.Now().UnixNano())
+	h := newHarness(t, func(o *Options) {
+		o.Now = r.Now
+		if mut != nil {
+			mut(o)
+		}
+	})
+	h.reloj = r
+	return h
+}
+
+// siguienteRonda adelanta el reloj manual un intervalo (1 s en h.spec) al terminar una ronda, cuando el
+// planificador ya liberó la ronda: la siguiente sale por el evento y no por el tiempo que tardó la anterior.
+func (h *harness) siguienteRonda(e *v1.SubscribeResponse) {
+	if p := e.GetPhaseAdded(); h.reloj != nil && p != nil && p.Kind == v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED {
+		h.reloj.Avanza(time.Second)
+	}
+}
+
+// esperaEvento lee la suscripción de arm hasta que ok acepte un evento, sin cerrarla: waitJob sigue después.
+func (h *harness) esperaEvento(t *testing.T, job string, ok func(*v1.SubscribeResponse) bool) {
+	t.Helper()
+	for {
+		e, err := h.subs[job].Recv()
+		if err != nil {
+			t.Fatalf("esperaba un evento del trabajo %s y el stream terminó: %v", job, err)
+		}
+		h.siguienteRonda(e)
+		if ok(e) {
+			return
+		}
+	}
 }
 
 func transcripts() string {
@@ -265,6 +312,7 @@ func (h *harness) waitJob(t *testing.T, job string, states ...string) []*v1.Subs
 			t.Fatalf("stream ended: %v (events %d)", err, len(evs))
 		}
 		evs = append(evs, e)
+		h.siguienteRonda(e)
 		if js := e.GetJobStateChanged(); js != nil {
 			for _, st := range states {
 				if js.State == st {

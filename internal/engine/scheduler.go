@@ -101,6 +101,9 @@ func (s *Scheduler) heartbeat(ctx context.Context, jobID string) {
 func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, targets []string, f RunFunc) {
 	until := a.until
 	var wg sync.WaitGroup
+	// roundMu une «ver si hay ronda en curso y tomarla» con «soltarla y anunciar su fin»: la siguiente ronda no puede
+	// arrancar entre que una suelta running y publica round.end (eventos fuera de orden, conteos mezclados).
+	var roundMu sync.Mutex
 	state := "completed"
 	next := s.now().Round(0)
 	if cs != nil {
@@ -135,17 +138,26 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		// salir todas de golpe; la última de la ventana sí corre.
 		late := s.now().Round(0).Sub(wake.Round(0))
 		missed := more && sc.Interval > 0 && roundLost(late, sc.Interval, s.tick())
-		if a.paused.Load() || a.running.Load() || missed {
+		roundMu.Lock()
+		busy := a.paused.Load() || a.running.Load() || missed
+		if busy {
 			s.bus.Publish(Event{JobID: jobID, Kind: Warning, Detail: "round.skipped", Index: round})
 		} else {
 			a.running.Store(true)
+			s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.start", Index: round})
+		}
+		roundMu.Unlock()
+		if !busy {
 			wg.Add(1)
 			go func(round int) {
 				defer wg.Done()
-				defer a.running.Store(false)
-				s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.start", Index: round})
 				s.r.RunRound(ctx, jobID, round, targets, f)
+				// Suelta la ronda y anuncia su fin juntos: quien reacciona a round.end ya la ve libre, y la siguiente no
+				// arranca entre medio.
+				roundMu.Lock()
+				a.running.Store(false)
 				s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.end", Index: round})
+				roundMu.Unlock()
 			}(round)
 		}
 	}
