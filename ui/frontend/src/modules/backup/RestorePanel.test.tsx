@@ -91,16 +91,13 @@ test("el foco va al título del panel al abrirlo y vuelve al botón «Restaurar�
   expect(screen.getByRole("button", { name: `Restaurar ${clear.id}` })).toHaveFocus();
 });
 
-test("interfaz de gestión, tope y plan parcial van plegados; cuentan los cambios y el rechazo sin interfaz abre el panel", async () => {
-  await open({ assistPlanRestore: vi.fn(async () => ({ reason: "no se pudo identificar la interfaz de gestión", refused: [] })) });
+test("tope y plan parcial van plegados y cuentan los cambios; la interfaz de gestión queda a la vista", async () => {
+  await open();
   const det = screen.getByLabelText("Tope de líneas de cambio").closest("details")!;
   expect(det.open).toBe(false);
-  for (const l of [/Interfaz de gestión/, "Tope de líneas de cambio", /Plan parcial/]) expect(det).toContainElement(screen.getByLabelText(l));
-  expect(det).not.toContainElement(screen.getByLabelText(/write memory/));
+  for (const l of ["Tope de líneas de cambio", /Plan parcial/]) expect(det).toContainElement(screen.getByLabelText(l));
+  for (const l of [/Interfaz de gestión/, /write memory/]) expect(det).not.toContainElement(screen.getByLabelText(l));
   await userEvent.click(screen.getByLabelText(/Plan parcial/));
   expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
   expect(det.open).toBe(false);
-  await userEvent.click(planBtn());
-  await screen.findByText(/Plan rechazado/);
-  expect(det.open).toBe(true);
 });

@@ -216,7 +216,6 @@ export const es = {
   "patrol.step.targets": "Equipos y credencial",
   "patrol.step.commands": "Comandos y salida",
   "patrol.step.schedule": "Programación",
-  "patrol.step.safety": "Seguridad",
   "patrol.name": "Nombre del trabajo",
   "patrol.targets": "Equipos",
   "patrol.targets.hint": "Direcciones IP, nombres o bloques CIDR, separados por comas, espacios o saltos de línea.",

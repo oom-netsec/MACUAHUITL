@@ -85,11 +85,10 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
       </div>
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
-      <Advanced changed={[mgmt.trim() !== "", maxLines !== "200", partial].filter(Boolean).length} forceOpen={(!!reason || refused.length > 0) && !mgmt.trim()}>
-        <div className="field-row">
-          <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />
-          <Field label={t("backup.restore.maxLines")} type="number" value={maxLines} onChange={setMaxLines} w="sm" mono />
-        </div>
+      {/* La interfaz de gestión queda a la vista: el núcleo la exige cuando no la deduce y su rechazo llega como texto, sin código para abrir un panel. */}
+      <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />
+      <Advanced changed={[maxLines !== "200", partial].filter(Boolean).length}>
+        <Field label={t("backup.restore.maxLines")} type="number" value={maxLines} onChange={setMaxLines} w="sm" mono />
         <Check label={t("backup.restore.partial")} checked={partial} onChange={setPartial} />
       </Advanced>
       <div className="actions">

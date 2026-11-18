@@ -218,7 +218,6 @@ export const en: Record<Key, string> = {
   "patrol.step.targets": "Devices and credential",
   "patrol.step.commands": "Commands and output",
   "patrol.step.schedule": "Schedule",
-  "patrol.step.safety": "Safety",
   "patrol.name": "Job name",
   "patrol.targets": "Devices",
   "patrol.targets.hint": "IP addresses, hostnames or CIDR blocks, separated by commas, spaces or new lines.",
