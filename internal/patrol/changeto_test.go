@@ -148,13 +148,13 @@ func TestChangetoValidaElDestino(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	for _, c := range []string{"ctx 1", "ctx1; reload", "-x", strings.Repeat("a", 33), "a/b"} {
 		e.spec.Targets[0].Context = c
-		if err := ValidateWith(e.spec, e.d.Playbooks, nil, nil); err == nil {
+		if err := ValidateWith(e.spec, e.d.Playbooks, nil, nil, time.Now()); err == nil {
 			t.Errorf("%q aceptado", c)
 		}
 	}
 	for _, c := range []string{"", "system", "ctx1"} {
 		e.spec.Targets[0].Context = c
-		if err := ValidateWith(e.spec, e.d.Playbooks, nil, nil); err != nil {
+		if err := ValidateWith(e.spec, e.d.Playbooks, nil, nil, time.Now()); err != nil {
 			t.Errorf("%q: %v", c, err)
 		}
 	}

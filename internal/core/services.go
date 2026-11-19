@@ -302,7 +302,7 @@ func (s *patrolSvc) validate(ctx context.Context, p *v1.JobSpec) (patrol.Spec, e
 	} else {
 		spec.OutputDir = dir
 	}
-	if err := patrol.ValidateWith(spec, s.c.catalog(), v, s.c.missingPack); err != nil {
+	if err := patrol.ValidateWith(spec, s.c.catalog(), v, s.c.missingPack, s.c.o.Now()); err != nil {
 		var fe *patrol.FieldError
 		if errors.As(err, &fe) {
 			return spec, service.ErrFrom(ctx, codes.InvalidArgument, err)

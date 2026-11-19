@@ -50,11 +50,11 @@ func TestIDFaltanteUsaGemelo(t *testing.T) {
 	}
 	e := newEnv(t, simulator.Config{})
 	e.spec.PlaybookIDs = []string{"ios-xe/solo"}
-	if err := ValidateWith(e.spec, pbs, e.d.Vault, nil); err != nil {
+	if err := ValidateWith(e.spec, pbs, e.d.Vault, nil, time.Now()); err != nil {
 		t.Errorf("ValidateWith con gemelo: %v", err)
 	}
 	e.spec.PlaybookIDs = []string{"ios-xe/nada"}
-	if err := ValidateWith(e.spec, pbs, e.d.Vault, nil); err == nil {
+	if err := ValidateWith(e.spec, pbs, e.d.Vault, nil, time.Now()); err == nil {
 		t.Error("ValidateWith sin gemelo debía fallar")
 	}
 }
