@@ -137,13 +137,13 @@ func TestTerminalAuthBridge(t *testing.T) {
 	}
 }
 
-// El usuario solo viaja en modo tecleado: con credencial o host guardado no se manda.
+// El usuario viaja en modo tecleado (con dirección o con host guardado); con credencial explícita no. Con hostId decide el núcleo.
 func TestTerminalUsernameSoloTecleado(t *testing.T) {
 	if u := (TerminalDTO{Address: "a", CredentialID: "c", Username: "x"}).open().Username; u != "" {
 		t.Fatalf("con credencial: %q", u)
 	}
-	if u := (TerminalDTO{HostID: "h", Username: "x"}).open().Username; u != "" {
-		t.Fatalf("con host: %q", u)
+	if u := (TerminalDTO{HostID: "h", Username: "x"}).open().Username; u != "x" {
+		t.Fatalf("con host guardado debe viajar: %q", u)
 	}
 	if u := (TerminalDTO{Address: "a", Username: "x"}).open().Username; u != "x" {
 		t.Fatalf("tecleado: %q", u)

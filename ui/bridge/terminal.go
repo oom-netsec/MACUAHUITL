@@ -19,18 +19,18 @@ type TerminalDTO struct {
 	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
 	Rows         uint32               `json:"rows"`
 	Cols         uint32               `json:"cols"`
-	// HostID abre un host guardado y es exclusivo: con él no viajan dirección, puerto ni credencial.
+	// HostID abre un host guardado: con él no viajan dirección, puerto ni credencial (solo, opcional, Username).
 	HostID string `json:"hostId"`
 	// ExpectedStartupCommand es la orden de inicio que la UI mostró; si no coincide con la guardada el núcleo no conecta.
 	ExpectedStartupCommand string `json:"expectedStartupCommand"`
-	// Username solo viaja en modo tecleado (sin credencial ni host guardado); vacío = el núcleo pregunta «login as:».
+	// Username es del modo tecleado: viaja con dirección sin credencial o con hostId (el núcleo rechaza si el host tiene credencial); vacío = «login as:».
 	Username string `json:"username"`
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
 	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
 	if d.HostID != "" {
-		o.HostId = d.HostID
+		o.HostId, o.Username = d.HostID, d.Username // el núcleo decide: con credencial en el host responde username_with_credential
 	} else {
 		o.Address, o.Port, o.CredentialId = d.Address, d.Port, d.CredentialID
 		if d.CredentialID == "" {
