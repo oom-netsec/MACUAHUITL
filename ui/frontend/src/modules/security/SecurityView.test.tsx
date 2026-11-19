@@ -339,9 +339,9 @@ test("tacacs: autenticación, comando y accounting van plegados y cuentan los ca
   await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
   const det = screen.getByLabelText("Autenticación").closest("details")!;
   expect(det.open).toBe(false);
-  for (const l of ["Autenticación", /Comando a autorizar/, /Accounting/]) expect(det).toContainElement(screen.getByLabelText(l));
-  expect(det).not.toContainElement(screen.getByLabelText("Servidor"));
-  await userEvent.click(screen.getByLabelText(/Accounting/)); // por omisión está activo
+  for (const l of ["Autenticación", /Comando a autorizar/, /Accounting/]) expect(det).toContainElement(within(det).getByLabelText(l));
+  expect(det).not.toContainElement(screen.getByRole("textbox", { name: "Servidor" })); // RADIUS sigue montado y oculto: el visible
+  await userEvent.click(within(det).getByLabelText(/Accounting/)); // por omisión está activo (RADIUS sigue montado y oculto)
   expect(det.querySelector("summary")).toHaveTextContent("Autorización y accounting · cambiadas: 1");
 });
 
