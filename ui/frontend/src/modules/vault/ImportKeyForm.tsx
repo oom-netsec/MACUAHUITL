@@ -3,17 +3,19 @@ import type { CoreAPI, VaultImportKeyResult } from "../../lib/core";
 import { Field, Notice, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { Section } from "../../components/Page";
+import { Segmented } from "../../components/Segmented";
 import { errInfo } from "../../lib/coreError";
 import { useT } from "../../lib/i18n";
 
 export const MAX_KEY_BYTES = 64 * 1024;
 
 // Importar una privada existente: por archivo (solo viaja la ruta) o pegada. La privada pegada y la frase viven solo en este estado
-// y se vacían en cuanto el núcleo responde, bien o mal, y al desmontar. Nada va a localStorage ni a logs.
+// y se vacían en cuanto el núcleo responde, bien o mal, al elegir un archivo y al cerrar la bóveda. Nada va a localStorage ni a logs.
 export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone: () => void; onClose: () => void }) {
   const t = useT();
   const [label, setLabel] = useState("");
   const [user, setUser] = useState("");
+  const [mode, setMode] = useState<"file" | "paste">("file");
   const [path, setPath] = useState("");
   const [text, setText] = useState("");
   const [pass, setPass] = useState("");
@@ -39,26 +41,28 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
       default: return errorText(e);
     }
   };
-  const tooBig = new Blob([text]).size > MAX_KEY_BYTES;
+  // Solo cuenta la fuente elegida: lo que quedó escrito en la otra no se envía.
+  const file = mode === "file";
+  const tooBig = !file && new Blob([text]).size > MAX_KEY_BYTES;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return setErr(t("vault.err.userRequired"));
-    if (!path && !text.trim()) return setErr(t("vault.import.needSource"));
-    if (!path && tooBig) return setErr(t("vault.import.tooBig"));
+    if (file ? !path : !text.trim()) return setErr(t("vault.import.needSource"));
+    if (tooBig) return setErr(t("vault.import.tooBig"));
     setErr(""); setNeedPass(false); setBadPass(false); setBusy(true);
     try {
-      const r = await core.vaultImportKey({ label, username: user, ...(path ? { path } : { privateKey: text }), ...(pass ? { passphrase: pass } : {}) });
+      const r = await core.vaultImportKey({ label, username: user, ...(file ? { path } : { privateKey: text }), ...(pass ? { passphrase: pass } : {}) });
       setRes({ ...r, label: label || user }); setLabel(""); setUser(""); setPath("");
       onDone();
     } catch (x) {
       const reason = errInfo(x)?.reason;
-      if (reason === "vault.err.key_passphrase_required") { setNeedPass(true); setErr(t(path ? "vault.import.err.passRequiredFile" : "vault.import.err.passRequired")); }
+      if (reason === "vault.err.key_passphrase_required") { setNeedPass(true); setErr(t(file ? "vault.import.err.passRequiredFile" : "vault.import.err.passRequired")); }
       else { setBadPass(reason === "vault.err.key_passphrase_wrong"); setErr(reasonText(x)); }
     } finally {
       setText(""); setPass(""); setBusy(false);
     }
   };
-  const pick = async () => { const p = await core.pickPath({ title: t("vault.import.file") }).catch(() => ""); if (p) { setPath(p); setText(""); } };
+  const pick = async () => { const p = await core.pickPath({ title: t("vault.import.file") }).catch(() => ""); if (p) { setPath(p); setText(""); } }; // elegido un archivo, la privada pegada no se guarda «por si acaso»
 
   if (res) {
     return (
@@ -74,23 +78,27 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
   }
   return (
     <form onSubmit={submit}>
-      <Section title={t("vault.import.title")}>
+      <>
         <p className="meta">{t("vault.import.hint")}</p>
         <p className="meta">{t("vault.import.stored")} {t("vault.import.kept")}</p>
         <div className="field-row">
           <Field label={t("vault.import.label")} value={label} onChange={setLabel} w="md" />
           <Field label={t("vault.import.user")} value={user} onChange={setUser} w="md" />
         </div>
+        <Segmented legend={t("vault.import.source")} value={mode} onChange={(m) => { setMode(m); setErr(""); }} options={[["file", t("vault.import.srcFile")], ["paste", t("vault.import.srcPaste")]]} />
+        {file ? (
         <div className="actions">
           <button type="button" onClick={pick}>{t("vault.import.pick")}</button>
           {path && <><span className="meta">{t("vault.import.fileChosen", { path })}</span><button type="button" onClick={() => setPath("")}>{t("vault.import.unpick")}</button></>}
         </div>
+        ) : (
         <div className="field">
           <label htmlFor="vault-import-text">{t("vault.import.pasteLabel")}</label>
-          <textarea id="vault-import-text" className="mono" rows={6} value={text} disabled={!!path} autoComplete="off" autoCorrect="off" spellCheck={false}
+          <textarea id="vault-import-text" className="mono" rows={6} value={text} autoComplete="off" autoCorrect="off" spellCheck={false}
             aria-invalid={tooBig || undefined} onChange={(e) => setText(e.target.value)} />
           {tooBig && <div className="field-error">{t("vault.import.tooBig")}</div>}
         </div>
+        )}
         <div className="field" data-w="md">
           <label htmlFor="vault-import-pass">{t("vault.import.pass")}</label>
           <input id="vault-import-pass" ref={passRef} type="password" value={pass} autoComplete="off" spellCheck={false} aria-invalid={needPass || badPass || undefined}
@@ -102,7 +110,7 @@ export function ImportKeyForm({ core, onDone, onClose }: { core: CoreAPI; onDone
           <button type="submit" aria-busy={busy} disabled={busy}>{t("vault.import.submit")}</button>
           <button type="button" onClick={onClose}>{t("common.cancel")}</button>
         </div>
-      </Section>
+      </>
     </form>
   );
 }

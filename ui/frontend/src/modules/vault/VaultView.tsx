@@ -2,12 +2,13 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { CoreAPI, Credential, VaultState } from "../../lib/core";
 import { ConfirmButton, Field, Notice, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
-import { Badge, EmptyState, Page, Section } from "../../components/Page";
+import { Badge, EmptyState, Page, Section, TabPanels } from "../../components/Page";
 import { Glyph } from "../../components/Glyph";
 import { DataTable, type Column } from "../../components/DataTable";
 import { useT } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { useCoreLoad } from "../../lib/useCoreLoad";
+import { Segmented } from "../../components/Segmented";
 import { ImportKeyForm } from "./ImportKeyForm";
 import { BackupSection } from "./BackupSection";
 import "./vault.css";
@@ -15,6 +16,7 @@ import "./vault.css";
 // Al pegar una contraseña suele venir el salto de línea final; los espacios internos son parte de ella.
 export const trimTrailingNewline = (s: string) => s.replace(/\r?\n$/, "");
 
+type AddKind = "password" | "key" | "import";
 export type Msg = { kind: "error" | "ok"; text: string } | null;
 
 export function VaultView({ core }: { core: CoreAPI }) {
@@ -23,7 +25,8 @@ export function VaultView({ core }: { core: CoreAPI }) {
   const [creds, setCreds] = useState<Credential[]>([]);
   const [msg, setMsg] = useState<Msg>(null);
   const [keyShown, setKeyShown] = useState<ShownKey | null>(null); // llave pública a la vista (recién creada o consultada), con la credencial a la que pertenece
-  const [importing, setImporting] = useState(false);
+  const [add, setAdd] = useState<AddKind>("password");
+  const [importGen, setImportGen] = useState(0); // al cerrar el formulario de importar se monta uno limpio
   const lastView = useRef(""); // último «Ver» pedido: una respuesta tardía de otra credencial se descarta
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   const previewOpen = useRef(false); // hay una vista previa de un respaldo con credenciales descifradas en el núcleo
@@ -91,9 +94,15 @@ export function VaultView({ core }: { core: CoreAPI }) {
             try { await core.deleteCredential(id); setKeyShown((k) => (k?.id === id ? null : k)); setMsg({ kind: "ok", text: t("vault.deleted") }); changed(); } catch (e) { fail(e); }
           }} />
           {keyShown && <PublicKey key={keyShown.id + keyShown.publicKey} k={keyShown} onClose={() => setKeyShown(null)} />}
-          <CredentialForm core={core} onDone={changed} setMsg={setMsg} />
-          <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />
-          {importing ? <ImportKeyForm core={core} onDone={changed} onClose={() => setImporting(false)} /> : <div className="actions"><button type="button" onClick={() => setImporting(true)}>{t("vault.import.open")}</button></div>}
+          <Section title={t("vault.add")}>
+            <Segmented legend={t("vault.add.kind")} value={add} onChange={setAdd}
+              options={[["password", t("vault.add.password")], ["key", t("vault.add.key")], ["import", t("vault.add.import")]]} />
+            <TabPanels value={add} render={(which) => ({
+              password: <CredentialForm core={core} onDone={changed} setMsg={setMsg} />,
+              key: <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />,
+              import: <ImportKeyForm key={importGen} core={core} onDone={changed} onClose={() => { setImportGen((g) => g + 1); setAdd("password"); }} />,
+            })[which]} />
+          </Section>
           <BackupSection core={core} sshKeys={creds.filter((c) => c.hasSshKey).length} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
         </>
       )}
@@ -203,7 +212,7 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
   };
   return (
     <form onSubmit={submit}>
-      <Section title={t("vault.newCred")}>
+      <>
         <div className="field-row">
           <Field label={t("vault.label")} value={label} onChange={setLabel} w="md" />
           <Field label={t("vault.user")} value={user} onChange={setUser} w="md" />
@@ -215,7 +224,7 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
         <div className="actions">
           <button type="submit" aria-busy={busy} disabled={busy}>{t("vault.save")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
         </div>
-      </Section>
+      </>
     </form>
   );
 }
@@ -271,14 +280,14 @@ function KeyForm({ core, onDone, setMsg, onCreated }: FormProps & { onCreated: (
   };
   return (
     <form onSubmit={submit}>
-      <Section title={t("vault.key.new")}>
+      <>
         <p className="meta">{t("vault.key.newHint")}</p>
         <div className="field-row">
           <Field label={t("vault.key.label")} value={label} onChange={setLabel} w="md" />
           <Field label={t("vault.key.user")} value={user} onChange={setUser} w="md" />
         </div>
         <div className="actions"><button type="submit" aria-busy={busy} disabled={busy}>{t("vault.key.create")}</button></div>
-      </Section>
+      </>
     </form>
   );
 }

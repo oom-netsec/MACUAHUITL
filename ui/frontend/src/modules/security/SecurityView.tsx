@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Page, TabPanels, Tabs } from "../../components/Page";
+import { Segmented } from "../../components/Segmented";
 import { useT } from "../../lib/i18n";
 import { CaCard } from "./CaCard";
 import { CsrCard } from "./CsrCard";
@@ -13,6 +14,19 @@ import "./security.css";
 
 type Sub = "RADIUS" | "TACACS+" | "PKI" | "IKE/IPsec";
 const subs: Sub[] = ["RADIUS", "TACACS+", "PKI", "IKE/IPsec"];
+type Pki = "csr" | "ca" | "export" | "decode";
+
+function PkiPanel({ core }: { core: CoreAPI }) {
+  const t = useT();
+  const [what, setWhat] = useState<Pki>("csr");
+  return (
+    <>
+      <Segmented legend={t("security.pki.what")} value={what} onChange={setWhat}
+        options={[["csr", t("security.pki.csr")], ["ca", t("security.pki.ca")], ["export", t("security.pki.export")], ["decode", t("security.pki.decode")]]} />
+      <TabPanels value={what} render={(k) => ({ csr: <CsrCard core={core} />, ca: <CaCard core={core} />, export: <ExportCard core={core} />, decode: <DecodeCard core={core} /> })[k]} />
+    </>
+  );
+}
 
 export function SecurityView({ core }: { core: CoreAPI }) {
   const t = useT();
@@ -20,14 +34,7 @@ export function SecurityView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("security.title")} description={t("security.desc")}
       tabs={<Tabs label={t("security.tool")} value={sub} onChange={setSub} tabs={subs.map((s) => [s, s] as [Sub, string])} />}>
-      <TabPanels value={sub} render={(s) => s === "RADIUS" ? <RadiusPanel core={core} /> : s === "TACACS+" ? <TacacsPanel core={core} /> : s === "IKE/IPsec" ? <IkePanel core={core} /> : (
-        <>
-          <CsrCard core={core} />
-          <CaCard core={core} />
-          <ExportCard core={core} />
-          <DecodeCard core={core} />
-        </>
-      )} />
+      <TabPanels value={sub} render={(s) => s === "RADIUS" ? <RadiusPanel core={core} /> : s === "TACACS+" ? <TacacsPanel core={core} /> : s === "IKE/IPsec" ? <IkePanel core={core} /> : <PkiPanel core={core} />} />
     </Page>
   );
 }

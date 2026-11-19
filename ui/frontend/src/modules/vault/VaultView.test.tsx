@@ -118,6 +118,8 @@ test("las credenciales van en una tabla con búsqueda por etiqueta, usuario o de
   expect(within(table).queryByRole("cell", { name: "Laboratorio" })).not.toBeInTheDocument();
 });
 
+const impMode = async () => { await userEvent.click(await screen.findByRole("radio", { name: "Importar respaldo" })); };
+
 describe("respaldo cifrado", () => {
   const frase = "frase-del-respaldo-1";
 
@@ -192,18 +194,20 @@ describe("respaldo cifrado", () => {
   test("Exportar e Importar respaldo nombran lo que falta y dejan de hacerlo al completarlo", async () => {
     render(<VaultView core={fakeCore()} />);
     const exp = await screen.findByRole("button", { name: "Exportar respaldo…" });
-    const imp = screen.getByRole("button", { name: "Importar respaldo…" });
     expect(exp).toHaveAccessibleDescription("Falta: marcar que entiendes el aviso.");
-    expect(imp).toHaveAccessibleDescription("Falta: escribir la frase del respaldo.");
     await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
-    await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "x");
     expect(exp).toBeEnabled();
     expect(exp).not.toHaveAccessibleDescription();
+    await impMode();
+    const imp = screen.getByRole("button", { name: "Importar respaldo…" });
+    expect(imp).toHaveAccessibleDescription("Falta: escribir la frase del respaldo.");
+    await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "x");
     expect(imp).not.toHaveAccessibleDescription();
   });
 
   test("Importar respaldo… sigue deshabilitado hasta que hay frase", async () => {
     render(<VaultView core={fakeCore()} />);
+    await impMode();
     const b = await screen.findByRole("button", { name: "Importar respaldo…" });
     expect(b).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "x");
@@ -212,6 +216,7 @@ describe("respaldo cifrado", () => {
 
   async function abrirVistaPrevia(core: ReturnType<typeof fakeCore>) {
     render(<VaultView core={core} />);
+    await impMode();
     const f = await screen.findByLabelText("Frase del respaldo a importar");
     await userEvent.type(f, frase);
     await userEvent.click(screen.getByRole("button", { name: "Importar respaldo…" }));
@@ -244,6 +249,7 @@ describe("respaldo cifrado", () => {
       previewVaultBackupImport: vi.fn(async () => { throw new Error("rpc error: code = PermissionDenied desc = la frase del respaldo es incorrecta (o el archivo está alterado)"); }),
     });
     render(<VaultView core={core} />);
+    await impMode();
     await userEvent.type(await screen.findByLabelText("Frase del respaldo a importar"), frase);
     await userEvent.click(screen.getByRole("button", { name: "Importar respaldo…" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("la frase del respaldo es incorrecta");
@@ -327,6 +333,7 @@ test("crear credencial con llave pide solo etiqueta y usuario, y muestra la púb
   const user = userEvent.setup();
   const core = fakeCore({ createKeyCredential: vi.fn(async () => ({ id: "k1", publicKey: PUB })) });
   render(<VaultView core={core} />);
+  await user.click(await screen.findByRole("radio", { name: "Llave SSH nueva" }));
   const form = (await screen.findByRole("button", { name: "Crear credencial con llave SSH" })).closest("form")!;
   expect(within(form).queryByLabelText(/Contraseña/)).not.toBeInTheDocument();
   await user.type(within(form).getByLabelText("Etiqueta de la llave"), "llave lab");
@@ -493,19 +500,20 @@ test("regenerar una llave importada: armado el texto visible sigue corto (cabe e
 });
 
 // Fase 47: importar llave existente.
-async function openImport(over = {}) {
+async function openImport(over = {}, mode: "paste" | "file" = "paste") {
   const core = fakeCore(over);
   render(<VaultView core={core} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Importar llave existente" }));
+  await userEvent.click(await screen.findByRole("radio", { name: "Importar llave SSH" }));
   await userEvent.type(screen.getByLabelText("Etiqueta de la llave importada"), "pi");
   await userEvent.type(screen.getByLabelText("Usuario de la llave importada"), "root");
+  if (mode === "paste") await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
   return core;
 }
 const keyBox = () => screen.getByLabelText("O pega la llave privada") as HTMLTextAreaElement;
 const send = () => userEvent.click(screen.getByRole("button", { name: "Importar llave" }));
 
 test("importar con archivo manda path y no privateKey", async () => {
-  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/id_ed25519") });
+  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/id_ed25519") }, "file");
   await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
   expect(await screen.findByText(/id_ed25519/)).toBeInTheDocument();
   await send();
@@ -636,7 +644,7 @@ test("tipos no soportados se traducen y PKCS#8 cifrada no muestra «other»", as
 });
 
 test("frase requerida con archivo: texto aparte, conserva la ruta y reenvía con ella; frase mala enfoca y marca", async () => {
-  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/enc") });
+  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/enc") }, "file");
   vi.mocked(core.vaultImportKey).mockRejectedValueOnce(Object.assign(new Error("x"), { cause: { code: "FailedPrecondition", reason: "vault.err.key_passphrase_required", metadata: {} } }));
   await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
   await send();
@@ -660,13 +668,19 @@ test("frase incorrecta enfoca el campo y lo marca inválido", async () => {
   expect(pass).toBeInvalid();
 });
 
-test("Quitar archivo permite volver a pegar", async () => {
-  await openImport({ pickPath: vi.fn(async () => "/x/id") });
+test("importar: solo se ve la fuente elegida, lo escrito se conserva al cambiar y lo que no se ve no se envía", async () => {
+  const core = await openImport({ pickPath: vi.fn(async () => "/x/id") }, "file");
+  expect(screen.getByRole("button", { name: "Elegir archivo…" })).toBeVisible();
+  expect(screen.queryByLabelText("O pega la llave privada")).toBeNull();
   await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
-  expect(keyBox()).toBeDisabled();
-  await userEvent.click(screen.getByRole("button", { name: "Quitar archivo" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  expect(screen.queryByRole("button", { name: "Elegir archivo…" })).toBeNull();
   expect(keyBox()).toBeEnabled();
-  expect(screen.queryByRole("button", { name: "Quitar archivo" })).toBeNull();
+  await userEvent.type(keyBox(), "PEGADA");
+  await userEvent.click(screen.getByRole("radio", { name: "Archivo" }));
+  expect(screen.getByText(/Archivo: \/x\/id/)).toBeInTheDocument(); // la ruta se conserva
+  await send();
+  await waitFor(() => expect(core.vaultImportKey).toHaveBeenCalledWith({ label: "pi", username: "root", path: "/x/id" })); // sin privateKey
 });
 
 test("Cancelar con la petición en curso cierra el formulario sin romper nada", async () => {
@@ -677,7 +691,7 @@ test("Cancelar con la petición en curso cierra el formulario sin romper nada", 
   await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(screen.queryByLabelText("O pega la llave privada")).toBeNull();
   await act(async () => { done({ id: "i1", publicKey: "k", fingerprint: "f", algorithm: "a", bits: 256, weak: false } as never); });
-  expect(screen.getByRole("button", { name: "Importar llave existente" })).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "Contraseña" })).toBeChecked();
   expect(core.vaultImportKey).toHaveBeenCalledTimes(1);
 });
 
@@ -688,4 +702,72 @@ test("la lista marca Importada o Generada según origin y nada sin origin", asyn
   await screen.findByText("uno");
   expect(screen.getAllByText("Importada")).toHaveLength(1);
   expect(screen.getAllByText("Generada")).toHaveLength(1);
+});
+
+test("Agregar credencial: solo se ve el formulario elegido, lo escrito se conserva y no hay botón aparte de importar", async () => {
+  const core = fakeCore();
+  render(<VaultView core={core} />);
+  await userEvent.type(await screen.findByLabelText("Etiqueta"), "core");
+  expect(screen.getByLabelText("Contraseña del equipo")).toBeVisible();
+  expect(screen.queryByLabelText("Etiqueta de la llave")).toBeNull(); // ni se montó
+  expect(screen.queryByRole("button", { name: "Importar llave existente" })).toBeNull();
+  await userEvent.click(screen.getByRole("radio", { name: "Llave SSH nueva" }));
+  expect(screen.getByLabelText("Etiqueta")).not.toBeVisible();
+  await userEvent.type(screen.getByLabelText("Etiqueta de la llave"), "k1");
+  await userEvent.type(screen.getByLabelText("Usuario de la llave"), "u");
+  await userEvent.click(screen.getByRole("button", { name: "Crear credencial con llave SSH" }));
+  await waitFor(() => expect(core.createKeyCredential).toHaveBeenCalledWith("k1", "u")); // lo escrito en Contraseña no se mezcla
+  expect(core.putCredential).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("radio", { name: "Contraseña" }));
+  expect(screen.getByLabelText("Etiqueta")).toHaveValue("core");
+});
+
+test("Respaldo: exportar e importar se eligen; lo que no se ve no se muestra (las frases se vacían al cambiar: ver la prueba de abajo)", async () => {
+  render(<VaultView core={fakeCore()} />);
+  await userEvent.type(await screen.findByLabelText("Frase del respaldo"), "una-frase-larga-1");
+  expect(screen.queryByLabelText("Frase del respaldo a importar")).toBeNull();
+  await userEvent.click(screen.getByRole("radio", { name: "Importar respaldo" }));
+  expect(screen.queryByLabelText("Frase del respaldo")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Exportar respaldo…" })).toBeNull();
+  expect(screen.getByLabelText("Frase del respaldo a importar")).toBeVisible();
+});
+
+test("importar: con un archivo elegido y la pestaña Pegar activa solo viaja lo pegado", async () => {
+  const core = await openImport({ pickPath: vi.fn(async () => "/x/id") }, "file");
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  await userEvent.type(keyBox(), "PEGADA");
+  await send();
+  await waitFor(() => expect(core.vaultImportKey).toHaveBeenCalledWith({ label: "pi", username: "root", privateKey: "PEGADA" }));
+});
+
+test("tras Cancelar, volver a Importar llave SSH muestra un formulario vacío", async () => {
+  await openImport({ vaultImportKey: vi.fn(() => new Promise(() => {})) });
+  await userEvent.type(keyBox(), "PRIVADA");
+  await send();
+  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Importar llave SSH" }));
+  expect(screen.getByLabelText("Etiqueta de la llave importada")).toHaveValue("");
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  expect(keyBox()).toHaveValue("");
+});
+
+test("al elegir un archivo, la privada pegada se descarta (no queda en un panel oculto)", async () => {
+  await openImport({ pickPath: vi.fn(async () => "/x/id") });
+  await userEvent.type(keyBox(), "PEGADA");
+  await userEvent.click(screen.getByRole("radio", { name: "Archivo" }));
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  await userEvent.click(screen.getByRole("radio", { name: "Pegar" }));
+  expect(keyBox()).toHaveValue("");
+});
+
+test("cambiar entre Exportar e Importar respaldo vacía las frases del modo que se deja", async () => {
+  render(<VaultView core={fakeCore()} />);
+  await userEvent.type(await screen.findByLabelText("Frase del respaldo"), "frase-del-respaldo-1");
+  await impMode();
+  await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "otra-frase-larga");
+  await userEvent.click(screen.getByRole("radio", { name: "Exportar respaldo" }));
+  expect(screen.getByLabelText("Frase del respaldo")).toHaveValue("");
+  await impMode();
+  expect(screen.getByLabelText("Frase del respaldo a importar")).toHaveValue("");
 });
