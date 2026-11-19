@@ -1,7 +1,7 @@
 import { findPb } from "./pbTestUtil";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PatrolView, parseTargets } from "./PatrolView";
+import { PatrolView } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
 import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
@@ -9,11 +9,7 @@ import type { RunDevice } from "../../lib/core";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { NavContext } from "../../app/activity";
-
-test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
-  expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
-  expect(parseTargets("  \n , ")).toEqual([]);
-});
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 test("elapsed resume duraciones de forma legible", () => {
   const t = (s: number) => elapsed(s * 1000);
@@ -29,7 +25,7 @@ const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 async function fillForm(core: ReturnType<typeof fakeCore>) {
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-1");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1 10.0.0.2");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1 10.0.0.2");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.type(screen.getByLabelText("Comandos"), "show version");
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
@@ -267,7 +263,7 @@ test("se eligen playbooks del catálogo y van en playbookIds; sin comandos pegad
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-2");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.click(await findPb("STP"));
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
@@ -793,4 +789,22 @@ test("programación: 1 y 10080 minutos son válidos; la pista de Rondas nombra l
     await crear(core);
     expect(sched(core)).toMatchObject({ intervalSeconds: Number(m) * 60 });
   }
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y el trabajo lleva lo mismo que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<PatrolView core={core} />);
+  await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-2");
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.type(screen.getByLabelText("Comandos"), "show version");
+  await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+  const spec = vi.mocked(core.createJob).mock.calls[0][0];
+  expect(spec.targets).toEqual([{ address: "10.9.0.1", deviceId: "10.9.0.1" }, { address: "ap1.lab", port: 2222, deviceId: "ap1.lab:2222" }]); // el puerto va aparte, no dentro de address
+  expect(spec.defaultCredentialId).toBe(BOOK_CRED);
 });

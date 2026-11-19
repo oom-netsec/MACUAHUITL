@@ -14,7 +14,7 @@ async function setup(playbooks: unknown[], extra: Record<string, unknown> = {}) 
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => playbooks as never), ...extra });
   render(<PatrolView core={core} />);
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-3");
-  await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "10.0.0.1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
   return core;

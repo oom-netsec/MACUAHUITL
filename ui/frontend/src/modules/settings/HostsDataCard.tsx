@@ -12,7 +12,7 @@ import { useCoreLoad } from "../../lib/useCoreLoad";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostFileFormat, HostImportAction, HostImportItem, HostsFormat, HostsImportPreview, HostsImportResult } from "../inventory/api";
 import { hostsChanged, useHostsVersion } from "../inventory/signal";
-import { addrPort } from "../inventory/HostPicker";
+import { addrPort } from "../../lib/targets";
 import "../inventory/hosts.css";
 
 // Tipos de la tabla de campos: el núcleo manda text/integer/list (en español, texto/entero/lista); se muestran con el nombre de la UI.

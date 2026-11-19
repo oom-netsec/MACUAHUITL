@@ -6,6 +6,7 @@ import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
 import { samplePortSecurityPlan, sampleTemplates } from "./fake";
 import type { SnippetTemplate } from "./api";
 import { I18nProvider } from "../../lib/i18n";
+import { BOOK_CRED, LABEL_ONE, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 const target = { name: "10.0.0.5", address: "10.0.0.5", credentialId: "c1" };
@@ -13,7 +14,7 @@ const target = { name: "10.0.0.5", address: "10.0.0.5", credentialId: "c1" };
 async function open(over: Partial<ReturnType<typeof fakeCore>> = {}) {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), ...over });
   render(<SnippetsView core={core} />);
-  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
+  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5");
   return core;
 }
 const choose = async (name: string) => userEvent.click(await screen.findByRole("radio", { name }));
@@ -399,7 +400,7 @@ test("cambiar write memory, equipo, credencial, huellas o plataforma después de
   await userEvent.type(screen.getByLabelText(/Huellas SHA256/), "x");
   gone();
   await plan();
-  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "1");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "1");
   gone();
   await plan();
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c2");
@@ -524,4 +525,21 @@ test("Planear nombra lo que falta y deja de hacerlo al completarlo", async () =>
   await userEvent.type(screen.getByLabelText(/^Puertos/), "Gi1/0/1");
   expect(planBtn()).toBeEnabled();
   expect(planBtn()).not.toHaveAccessibleDescription();
+});
+
+test("equipo de la libreta: etiqueta común, rellena campo y credencial, y el plan lleva lo mismo que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds), ...withDemo } as never);
+  render(<SnippetsView core={core} />);
+  await screen.findAllByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_ONE)).toHaveValue("ap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue("");
+  await pickHost("LAB-CORE");
+  expect(screen.getByLabelText(LABEL_ONE)).toHaveValue("10.9.0.1");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await choose("Demo de tipos");
+  await userEvent.type(screen.getByLabelText("Texto *"), "abc");
+  await userEvent.selectOptions(screen.getByLabelText("Opción obligatoria *"), "add");
+  await userEvent.click(planBtn());
+  expect(core.planTemplateSnippet).toHaveBeenCalledWith(expect.objectContaining({ target: { name: "10.9.0.1", address: "10.9.0.1", credentialId: BOOK_CRED }, id: "demo" }));
 });

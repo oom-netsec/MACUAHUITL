@@ -1,23 +1,15 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AdhocView, parseTarget } from "./AdhocView";
+import { AdhocView } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const cred = { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false };
 const report = { commands: ["show clock"], devices: 2, rows: [
   { device: "SW1", address: "192.0.2.1", command: "show clock", ok: true, output: "10:00:00" },
   { device: "SW2", address: "192.0.2.2", command: "show clock", ok: false, output: "", note: "tiempo agotado" },
 ] };
-
-test("el destino acepta host y host:puerto", () => {
-  expect(parseTarget("192.0.2.1")).toEqual({ address: "192.0.2.1", port: 0 });
-  expect(parseTarget("sw1:2222")).toEqual({ address: "sw1", port: 2222 });
-  expect(parseTarget("2001:db8::1")).toEqual({ address: "2001:db8::1", port: 0 });
-  // IPv6 con puerto: la forma entre corchetes.
-  expect(parseTarget("[2001:db8::1]:2222")).toEqual({ address: "2001:db8::1", port: 2222 });
-  expect(parseTarget("[2001:db8::1]")).toEqual({ address: "2001:db8::1", port: 0 });
-});
 
 test("ejecuta el lote, espera el resultado y muestra por equipo, tabla, CSV y Markdown", async () => {
   const adhocResult = vi.fn().mockResolvedValueOnce({ state: "armed", done: false, report: null, text: "", csv: "", markdown: "" })
@@ -220,4 +212,26 @@ test("Ejecutar lote nombra lo que falta y deja de hacerlo al completarlo", async
   await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
   expect(run()).toBeEnabled();
   expect(run()).not.toHaveAccessibleDescription();
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se envía igual que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "10.9.0.1", port: 0 }, { address: "ap1.lab", port: 2222 }], BOOK_CRED, expect.stringContaining("show version"), [], []);
+});
+
+test("equipos de la libreta: una credencial ya elegida a mano no se pisa", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "otra (x)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c2");
+  await pickHost("LAB-CORE");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1");
+  expect(screen.getByLabelText("Credencial")).toHaveValue("c2");
 });

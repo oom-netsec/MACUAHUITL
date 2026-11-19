@@ -4,6 +4,7 @@ import { BackupView } from "./BackupView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext, ModuleIdContext, NavContext } from "../../app/activity";
 import { sampleEntry } from "./fake";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const a = sampleEntry();
 const b = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });
@@ -267,4 +268,16 @@ test("Respaldar ahora nombra lo que falta y deja de hacerlo al completarlo", asy
   await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
   expect(go()).toBeEnabled();
   expect(go()).not.toHaveAccessibleDescription();
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se envía igual que a mano", async () => {
+  const core = withCreds({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<BackupView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.click(screen.getByRole("button", { name: "Respaldar ahora" }));
+  expect(core.backupStart).toHaveBeenCalledWith(expect.objectContaining({ targets: [{ address: "10.9.0.1", port: 0 }, { address: "ap1.lab", port: 2222 }], credentialId: BOOK_CRED }));
 });

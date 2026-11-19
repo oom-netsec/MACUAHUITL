@@ -15,15 +15,12 @@ import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
 import { NoPacks } from "../../components/NoPacks";
 import { useNav } from "../../app/activity";
+import { parseTargets, targetSpec } from "../../lib/targets";
+import { TargetsField } from "../inventory/TargetField";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
 const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"].includes(k);
-
-// Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
-export function parseTargets(text: string): string[] {
-  return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
-}
 
 // Crea el trabajo; el Login Test y el armado se hacen después, desde el detalle del trabajo.
 export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; creds: Credential[]; vault: VaultGate; onCreated: (id: string) => void }) {
@@ -33,6 +30,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
   const [cred, setCred] = useState("");
+  const pickCred = (id: string) => { if (!cred && creds.some((c) => c.id === id)) setCred(id); }; // de la libreta; no pisa la que ya se eligió
   const [cmds, setCmds] = useState("");
   const [catalog, setCatalog] = useState<PlaybookInfo[] | null>(null);
   const go = useNav();
@@ -90,7 +88,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
     if (repeat && !/^\d+$/.test(rounds.trim())) return setRoundsErr(t("patrol.rounds.invalid")); // vacío no es 0: 0 es hasta el fin de la ventana
     setRoundsErr("");
     const spec: JobSpec = {
-      name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
+      name, targets: devices.map((a) => ({ ...targetSpec(a), deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: zip !== "ZIP_POLICY_NONE" && delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
       windowHours: winHours,
       schedule: schedule(),
@@ -119,7 +117,7 @@ export function NewJobForm({ core, creds, vault, onCreated }: { core: CoreAPI; c
           <Field label={t("patrol.name")} value={name} onChange={setName} w="md" />
           <CredentialSelect creds={creds} vault={vault} notice={false} value={cred} onChange={setCred} w="lg" />
         </div>
-        <TextArea label={t("patrol.targets")} hint={t("patrol.targets.hint")} value={targets} onChange={setTargets} rows={4} mono />
+        <TargetsField core={core} hint={t("patrol.targets.hint")} value={targets} onChange={setTargets} rows={4} onPickCredential={pickCred} />
         <p className="hint count">{t("patrol.deviceCount", { n: devices.length })}</p>
       </Section>
       <Section title={`2 · ${t("patrol.step.commands")}`}>

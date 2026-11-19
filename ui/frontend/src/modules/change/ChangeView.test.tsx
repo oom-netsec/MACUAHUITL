@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { ChangeView } from "./ChangeView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext, ModuleIdContext } from "../../app/activity";
+import { BOOK_CRED, LABEL_MANY, bookCreds, pickHost } from "../inventory/testkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 
@@ -311,4 +312,17 @@ test("Reporte nombra qué fase falta y lo calla cuando PRE y POST terminan", asy
   await show("completed");
   expect(await screen.findByRole("button", { name: /Reporte/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: /Reporte/ })).not.toHaveAccessibleDescription();
+});
+
+test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se envía igual que a mano", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => bookCreds) });
+  render(<ChangeView core={core} />);
+  await screen.findByRole("option", { name: "admin lab (root)" });
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-2");
+  await pickHost("LAB-CORE");
+  await pickHost("LAB-AP");
+  expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
+  expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
+  await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
+  await waitFor(() => expect(core.changeCreate).toHaveBeenCalledWith({ name: "CRQ-2", targets: [{ address: "10.9.0.1" }, { address: "ap1.lab", port: 2222 }], defaultCredentialId: BOOK_CRED, outputDir: "" }));
 });

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -21,6 +23,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [equipo, setEquipo] = useState("");
   const [ifaces, setIfaces] = useState("");
   const [vlan, setVlan] = useState("");
@@ -45,7 +48,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const readPorts = (extra: AcceptedKey[] = []) => {
     setHk(null);
     return front.run(async () => {
-      const d = targetOf(equipo, credId);
+      const d = planTarget(equipo, credId);
       const keys = [...(pairs(d).acceptedKeys ?? []), ...extra];
       try {
         return await core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...(keys.length ? { acceptedKeys: keys } : {}) });
@@ -60,7 +63,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
     const req: PortsRequest = {
-      target: targetOf(equipo, credId),
+      target: planTarget(equipo, credId),
       interfaces: ifaces.split(/[\s,]+/).filter(Boolean),
     };
     if (vlan) req.vlan = Number(vlan);
@@ -85,8 +88,8 @@ export function PortsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("ports.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
+          <TargetField core={core} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
         </div>
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>

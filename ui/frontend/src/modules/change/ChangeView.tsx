@@ -8,9 +8,10 @@ import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResu
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
-import { parseTargets } from "../patrol/PatrolView";
+import { parseTargets, targetSpec } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
-import { hostKeysFromLogin, type AcceptedKey } from "../../lib/hostkeys";
+import { type AcceptedKey, hostKeysFromLogin } from "../../lib/hostkeys";
+import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 import { outputsErrorText } from "../../lib/outputsError";
 import { jobState } from "../../lib/vocab";
@@ -66,7 +67,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
     }
   };
   const create = () => guard(async () => {
-    const id = await core.changeCreate({ name, targets: parseTargets(targets).map((address) => ({ address })), defaultCredentialId: cred, outputDir: out });
+    const id = await core.changeCreate({ name, targets: parseTargets(targets).map(targetSpec), defaultCredentialId: cred, outputDir: out });
     setCurrent(id); setLogin([]); setDevices(null);
     setMsg({ kind: "info", text: t("change.created", { id }) });
     await refresh();
@@ -103,7 +104,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
       <Section title={t("change.sec.new")} description={t("change.prepost.hint")}>
         <div className="field-row">
           <Field label={t("change.name")} value={name} onChange={setName} w="md" />
-          <Field label={t("change.targets")} value={targets} onChange={setTargets} w="lg" mono />
+          <TargetsField core={core} value={targets} onChange={setTargets} rows={2} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) setCred(id); }} />
         </div>
         <div className="field-row">
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />

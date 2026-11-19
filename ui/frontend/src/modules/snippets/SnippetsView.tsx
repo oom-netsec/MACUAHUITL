@@ -3,7 +3,9 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -59,6 +61,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
   // Todo lo que entra en la petición (campos, equipo, credencial, huellas, write memory, plataforma) deja obsoleto el plan y cualquier respuesta pendiente.
   const stale = () => { seq.current++; setPlan(null); };
   const edit = <T,>(set: (v: T) => void) => (v: T) => { stale(); set(v); };
+  const bookCred = useBookCredential(creds, credId, edit(setCredId));
   const pick = (x: SnippetTemplate) => { stale(); setSel(x); setValues(initialValues(x)); setPlanned(false); clearMsgs(); };
   // Cambiar un dato también quita el rechazo que el núcleo dio a ese campo.
   const setVal = (name: string, v: string) => {
@@ -78,8 +81,8 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     const accepted = fps.split(/[\s,]+/).filter(Boolean);
     try {
       const res = await core.planTemplateSnippet({
-        target: targetOf(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
-        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted, acceptedHostKeys: resolveAccepted(fps, [targetOf(equipo, credId)]).keys } : {}),
+        target: planTarget(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
+        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted, acceptedHostKeys: resolveAccepted(fps, [planTarget(equipo, credId)]).keys } : {}),
       });
       if (mine === seq.current) setPlan(res);
     } catch (e) {
@@ -104,8 +107,8 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("snippets.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={edit(setEquipo)} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={edit(setCredId)} />
+          <TargetField core={core} value={equipo} onChange={edit(setEquipo)} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
           <Select<Platform> label={t("snippets.platform")} value={platform} onChange={edit(setPlatform)} w="sm" options={[["", t("snippets.platform.all")], ["ios", "IOS"], ["ios-xe", "IOS-XE"]]} />
         </div>
       </Section>

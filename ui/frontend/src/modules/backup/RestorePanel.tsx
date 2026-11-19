@@ -3,7 +3,9 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
 import { Advanced } from "../../components/Advanced";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
@@ -36,6 +38,7 @@ function Refused({ items, title }: { items: RestoreRefusal[]; title: string }) {
 export function RestorePanel({ core, entry, creds, vault, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; vault: VaultGate; onClose: () => void }) {
   const t = useT();
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [equipo, setEquipo] = useState(guessAddress(entry.device));
   const [mgmt, setMgmt] = useState("");
   const [maxLines, setMaxLines] = useState("200");
@@ -56,7 +59,7 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setRefused([]); setReason("");
-    const req: RestoreRequest = { target: targetOf(equipo, credId), backupId: entry.id, allowPartial: partial, writeMemory: writeMem };
+    const req: RestoreRequest = { target: planTarget(equipo, credId), backupId: entry.id, allowPartial: partial, writeMemory: writeMem };
     if (mgmt.trim()) req.managementInterface = mgmt.trim();
     const n = Number(maxLines);
     if (n > 0) req.maxLines = n;
@@ -81,8 +84,8 @@ export function RestorePanel({ core, entry, creds, vault, onClose }: { core: Cor
       <AssistBanner active={active} />
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">
-        <Field label={t("backup.restore.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
+        <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={bookCred.onPickCredential} />
+        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={bookCred.onChange} />
       </div>
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />

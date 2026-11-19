@@ -8,11 +8,12 @@ import { ExportMenu } from "../../components/Files";
 import { AdhocMatrix } from "./AdhocMatrix";
 import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
-import { parseTargets } from "../patrol/PatrolView";
+import { parseTarget, parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { hostKeysFromLogin, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 // Lotes: comandos de solo lectura en varios equipos, como un trabajo de Patrol de una ronda.
@@ -20,15 +21,6 @@ import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 const views = ["matrix", "host", "table", "csv", "markdown"] as const;
 type ViewName = (typeof views)[number];
-
-// "host", "host:puerto" (un solo ':') o "[ipv6]:puerto" / "[ipv6]"; una IPv6 sin corchetes va sin puerto.
-export function parseTarget(s: string): { address: string; port: number } {
-  const b = /^\[([^\]]+)\](?::(\d+))?$/.exec(s);
-  if (b) return { address: b[1], port: b[2] ? Number(b[2]) : 0 };
-  const i = s.lastIndexOf(":");
-  if (i > 0 && s.indexOf(":") === i && /^\d+$/.test(s.slice(i + 1))) return { address: s.slice(0, i), port: Number(s.slice(i + 1)) };
-  return { address: s, port: 0 };
-}
 
 // maxWaitMs: tope de la espera del resultado; pasado, se deja de preguntar (el trabajo sigue en Patrol).
 export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {
@@ -98,7 +90,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
       <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); setUnarmed(""); }} w="lg" />
-      <TextArea label={t("adhoc.devices")} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} rows={3} />
+      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); setUnarmed(""); } }} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); setHks([]); setUnarmed(""); }} rows={5} />
       <div className="actions">
         <RunButton primary kbd busy={r.busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>

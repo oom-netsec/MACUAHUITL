@@ -56,18 +56,6 @@ function fromInfo(i: AssistRunInfo): RunState {
     stopped: i.state === "failed" && !!i.waiting, changed: i.changed ?? [], log: [] };
 }
 
-// splitTarget separa "host[:puerto]"; las direcciones IPv6 quedan sin puerto.
-export function splitTarget(s: string): { address: string; port?: number } {
-  const m = /^([^:]+):(\d{1,5})$/.exec(s);
-  return m ? { address: m[1], port: Number(m[2]) } : { address: s };
-}
-
-// target arma el destino de una petición de plan desde lo que escribió el ingeniero.
-export function targetOf(equipo: string, credentialId: string) {
-  const t = splitTarget(equipo.trim());
-  return { name: equipo.trim(), address: t.address, ...(t.port ? { port: t.port } : {}), credentialId };
-}
-
 // Líneas de configuración con su marca (+ aplicar, ↺ reversa) y resaltado de palabras clave.
 export function CodeLines({ lines, mark }: { lines: string[]; mark?: string }) {
   return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={showHidden(l)} /></div>)}</pre>;

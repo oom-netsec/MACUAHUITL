@@ -3,7 +3,9 @@ import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
-import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
+import { TargetField, useBookCredential } from "../inventory/TargetField";
+import { planTarget } from "../../lib/targets";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import type { PortsPlanResult } from "../ports/api";
@@ -15,6 +17,7 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
+  const bookCred = useBookCredential(creds, credId, setCredId);
   const [update, setUpdate] = useState("");
   const [equipo, setEquipo] = useState("");
   const [user, setUser] = useState("");
@@ -29,7 +32,7 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
-    const req: CredRotateRequest = { target: targetOf(equipo, credId), user: user.trim(), writeMemory: true }; // obligatorio en la rotación
+    const req: CredRotateRequest = { target: planTarget(equipo, credId), user: user.trim(), writeMemory: true }; // obligatorio en la rotación
     if (!generate) req.newSecret = secret;
     if (update) req.updateCredentialId = update;
     const accepted = fps.split(/[\s,]+/).filter(Boolean);
@@ -50,8 +53,8 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("credrotate.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
+          <TargetField core={core} value={equipo} onChange={setEquipo} onPickCredential={bookCred.onPickCredential} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={bookCred.onChange} />
         </div>
       </Section>
       <Section title={t("credrotate.section.secret")}>
