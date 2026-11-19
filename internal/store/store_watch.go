@@ -13,16 +13,21 @@ import (
 
 // Con -tags storewatch (CI y ./dev.sh test), cada base abierta lleva el vigía de esperas colgadas.
 func init() {
-	startWatch = func(db *sql.DB) { go watch(db, watchLimit, watchEvery, onStuck) }
+	startWatch = func(db *sql.DB) { go watch(db, watchLimit, watchSlow, watchEvery, driverFrame, onStuck) }
 }
 
 // Vigía solo de pruebas: con una sola conexión, un interbloqueo (usar db con una tx abierta en la misma goroutine) se cuelga mudo; aquí se vuelve un panic con todos los stacks.
 // Variables para que las pruebas usen valores chicos.
+// Si alguna goroutine está dentro del driver (driverFrame en su stack), la dueña de la conexión trabaja: un fsync o
+// FlushFileBuffers lento del runner de Windows retiene la única conexión segundos. Eso no es un interbloqueo; se espera
+// hasta watchSlow y, si no vuelve, se avisa con su propio motivo.
 var (
-	watchLimit = 2 * time.Second
-	watchEvery = 100 * time.Millisecond
-	onStuck    = func(stacks []byte) {
-		panic("store: espera de conexión colgada, posible interbloqueo\n\n" + string(stacks))
+	watchLimit  = 2 * time.Second
+	watchSlow   = 30 * time.Second
+	watchEvery  = 100 * time.Millisecond
+	driverFrame = "modernc.org/sqlite."
+	onStuck     = func(motivo string, stacks []byte) {
+		panic("store: " + motivo + "\n\n" + string(stacks))
 	}
 )
 
@@ -39,11 +44,14 @@ func allStacks() []byte {
 // conexión, luego nadie espera). Las estadísticas no distinguen al dueño que trabaja del que espera y pueden contar de
 // más (esperas que empiezan y terminan en un muestreo, o que miden 0 con el reloj grueso de Windows): antes de disparar
 // se confirma en los stacks que alguien espera en este DB.
-func watch(db *sql.DB, limit, every time.Duration, stuck func([]byte)) {
+//
+// Otra goroutine dentro del driver con otra base también cuenta como trabajo: un interbloqueo real en ese momento se
+// avisa a los watchSlow en vez de a los limit.
+func watch(db *sql.DB, limit, slow, every time.Duration, frame string, stuck func(string, []byte)) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	var lastWC, lastWD, pending int64
-	var since time.Time
+	var since, recheck time.Time
 	tk := time.NewTicker(every)
 	defer tk.Stop()
 	for range tk.C {
@@ -66,11 +74,19 @@ func watch(db *sql.DB, limit, every time.Duration, stuck func([]byte)) {
 			since = time.Now()
 		}
 		lastWC, lastWD = wc, wd
-		if pending > 0 && time.Since(since) > limit {
-			if s := allStacks(); bytes.Contains(s, fmt.Appendf(nil, "database/sql.(*DB).conn(%p,", db)) {
-				stuck(s)
+		if pending > 0 && time.Since(since) > limit && time.Now().After(recheck) {
+			s := allStacks()
+			switch waited := time.Since(since); {
+			case !bytes.Contains(s, fmt.Appendf(nil, "database/sql.(*DB).conn(%p,", db)):
+			case !bytes.Contains(s, []byte(frame)):
+				stuck("espera de conexión colgada, posible interbloqueo", s)
+			case waited <= slow:
+				recheck = time.Now().Add(limit) // I/O en curso: se vuelve a mirar sin reiniciar since
+				continue
+			default:
+				stuck(fmt.Sprintf("la conexión lleva %s dentro del driver con otra goroutine esperándola (disco lento o colgado)", waited.Round(time.Second)), s)
 			}
-			pending, since = 0, time.Time{}
+			pending, since, recheck = 0, time.Time{}, time.Time{}
 		}
 	}
 }

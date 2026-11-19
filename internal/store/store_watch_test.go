@@ -13,12 +13,82 @@ import (
 // vigilar baja el umbral del vigía y cambia su acción por un aviso por canal.
 func vigilar(t *testing.T) <-chan []byte {
 	t.Helper()
-	l, e, s := watchLimit, watchEvery, onStuck
+	l, sl, e, f, s := watchLimit, watchSlow, watchEvery, driverFrame, onStuck
 	ch := make(chan []byte, 4)
-	watchLimit, watchEvery = 300*time.Millisecond, 20*time.Millisecond
-	onStuck = func(b []byte) { ch <- b }
-	t.Cleanup(func() { watchLimit, watchEvery, onStuck = l, e, s })
+	watchLimit, watchSlow, watchEvery = 300*time.Millisecond, 1500*time.Millisecond, 20*time.Millisecond
+	driverFrame = "store.ioLenta(" // un marco que la prueba controla, en lugar del de modernc.org/sqlite
+	onStuck = func(motivo string, b []byte) { ch <- append([]byte(motivo+"\n\n"), b...) }
+	t.Cleanup(func() { watchLimit, watchSlow, watchEvery, driverFrame, onStuck = l, sl, e, f, s })
 	return ch
+}
+
+// ioLenta retiene la conexión de tx como un fsync lento de Windows (FlushFileBuffers): con su marco en el stack,
+// la dueña de la conexión está trabajando dentro del driver.
+//
+//go:noinline
+func ioLenta(tx *sql.Tx, hasta <-chan struct{}) {
+	<-hasta
+	tx.Rollback()
+}
+
+// retenerEnDriver abre una tx, la deja dentro de ioLenta y pone a otra goroutine a esperar la conexión.
+func retenerEnDriver(t *testing.T, db *sql.DB) (soltar func()) {
+	t.Helper()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasta, fin := make(chan struct{}), make(chan struct{})
+	go ioLenta(tx, hasta)
+	go func() {
+		defer close(fin)
+		db.Exec(`CREATE TABLE IF NOT EXISTS x(a)`) // espera legítima: la conexión vuelve al terminar la I/O
+	}()
+	var once sync.Once
+	soltar = func() { once.Do(func() { close(hasta); <-fin }) }
+	t.Cleanup(soltar)
+	return soltar
+}
+
+// Hallazgo del CI de Windows (#287): la dueña de la conexión estaba en FlushFileBuffers dentro de Commit y otra
+// goroutine esperaba la conexión; no es un interbloqueo y no debe disparar con el umbral corto.
+func TestVigiaIOLentaNoEsInterbloqueo(t *testing.T) {
+	ch := vigilar(t)
+	db := abrirVigia(t)
+	soltar := retenerEnDriver(t, db)
+	select {
+	case b := <-ch:
+		t.Fatalf("disparó con la dueña trabajando en el driver:\n%s", b)
+	case <-time.After(1 * time.Second): // más de tres veces watchLimit, menos que watchSlow
+	}
+	soltar()
+	select {
+	case b := <-ch:
+		t.Fatalf("disparó tras terminar la I/O:\n%s", b)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+// Si la I/O no vuelve nunca, el vigía avisa igual pasado watchSlow, con un motivo que no dice interbloqueo.
+func TestVigiaIOColgadaDisparaConSuMotivo(t *testing.T) {
+	ch := vigilar(t)
+	db := abrirVigia(t)
+	inicio := time.Now()
+	retenerEnDriver(t, db)
+	select {
+	case b := <-ch:
+		if d := time.Since(inicio); d < watchSlow {
+			t.Fatalf("disparó a los %s, antes de watchSlow", d)
+		}
+		if !strings.Contains(string(b), "dentro del driver") || strings.Contains(string(b), "interbloqueo") {
+			t.Fatalf("motivo equivocado:\n%.200s", b)
+		}
+		if !strings.Contains(string(b), "store.ioLenta(") {
+			t.Fatalf("los stacks no incluyen a la dueña:\n%s", b)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("el vigía no disparó")
+	}
 }
 
 func TestVigiaInterbloqueo(t *testing.T) {
@@ -35,6 +105,9 @@ func TestVigiaInterbloqueo(t *testing.T) {
 	}()
 	select {
 	case b := <-ch:
+		if !strings.HasPrefix(string(b), "espera de conexión colgada, posible interbloqueo") {
+			t.Fatalf("motivo equivocado:\n%.200s", b)
+		}
 		if !strings.Contains(string(b), "TestVigiaInterbloqueo.func1") {
 			t.Fatalf("los stacks no incluyen a la culpable:\n%s", b)
 		}
