@@ -360,10 +360,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       )}
     </div>
   );
+  // Sin credencial de contraseña a la vista (llave, sin credencial o bóveda cerrada) se abre por hostId y el núcleo decide; el usuario solo viaja si su campo se ve.
+  const shownUser = typed || !credOk ? user : "";
   const form = (
     <>
-      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : user); }} />
-      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { void open("", h.name, "", h.id, h.startCommand, ""); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setTyped(!ok); }} />
+      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); }} />
+      <HostPicker core={core} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />
       <div className="field-row">
         <Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
         {(typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}

@@ -172,3 +172,14 @@ test.each([
   expect(open.mock.calls[1][0]).toEqual({ name: "LAB-CORE", hostId: sampleHosts[0].id, expectedStartupCommand: "", accept: [`SHA256:${fp}`], rows: expect.any(Number), cols: expect.any(Number) });
   await waitFor(() => expect(screen.queryByText(`SHA256:${fp}`)).toBeNull()); // el aviso se va al reintentar
 });
+
+test("un host guardado sin credencial no manda un usuario cuyo campo ya no se ve", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id); // el campo se oculta
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-AP" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty("username");
+});
