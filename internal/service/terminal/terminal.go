@@ -17,6 +17,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,25 +31,63 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
+	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
 const (
 	maxSessions = 8
 	closeWait   = 15 * time.Second
+	maxUser     = 128  // bytes del usuario tecleado
+	maxAnswer   = 1024 // bytes de cada respuesta tecleada: el mismo tope del transport
 )
+
+// wipeMsg pone en ceros lo que un mensaje ignorado pudiera traer: respuestas de autenticación y data.
+func wipeMsg(m *v1.OpenTerminalRequest) {
+	for _, b := range m.GetAuthAnswer().GetAnswers() {
+		clear(b)
+	}
+	clear(m.GetData())
+}
+
+// Motivos propios de la autenticación tecleada (fase 47t). Ninguno lleva respuestas ni textos de preguntas.
+var (
+	errAuthTimeout = i18n.New("terminal.err.auth_timeout", nil)
+	errAuthAnswer  = i18n.New("terminal.err.auth_answer", nil)
+	errAuthNoMeth  = i18n.New("terminal.err.auth_no_method", nil)
+	errAuthTries   = i18n.New("terminal.err.auth_attempts", nil)
+	errUsername    = i18n.New("terminal.err.username", nil)
+	errClientGone  = i18n.New("terminal.err.client_gone", nil)
+	errCoreClosing = i18n.New("terminal.err.core_closing", nil)
+)
+
+// cleanUser recorta espacios y valida el usuario (el de la petición y el de «login as:» pasan por aquí): UTF-8
+// imprimible, sin controles, C1 ni Unicode de formato, de 1 a maxUser bytes.
+func cleanUser(u string) (string, bool) {
+	u = strings.TrimSpace(u)
+	if u == "" || len(u) > maxUser || !utf8.ValidString(u) {
+		return "", false
+	}
+	for _, r := range u {
+		if !unicode.IsPrint(r) {
+			return "", false
+		}
+	}
+	return u, true
+}
 
 type termSvc struct {
 	v1.UnimplementedTerminalServiceServer
-	d      service.Deps
-	ctx    context.Context // vive mientras el núcleo: cancelarlo cierra todas las sesiones
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	live   atomic.Int32
+	d        service.Deps
+	ctx      context.Context // vive mientras el núcleo: cancelarlo cierra todas las sesiones
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
+	live     atomic.Int32
+	authWait time.Duration // espera máxima de la respuesta a cada pregunta tecleada
 }
 
 func newSvc(d service.Deps) *termSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &termSvc{d: d, ctx: ctx, cancel: cancel}
+	return &termSvc{d: d, ctx: ctx, cancel: cancel, authWait: 2 * time.Minute}
 }
 
 // close cierra las sesiones vivas y espera a que cada una cierre SSH, revoque el guard y audite.
@@ -135,7 +175,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		address, credID, startup string
 		port                     uint16
 		label                    = o.Name
-		generic                  bool // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
+		username                 string // modo tecleado: el de la petición, ya recortado y validado
+		typed                    bool   // fase 47t: credencial tecleada
+		generic                  bool   // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
 	)
 	if o.HostId != "" {
 		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
@@ -144,6 +186,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		}
 		if o.Address != "" || o.Port != 0 || o.CredentialId != "" {
 			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.host_and_address", nil), "host and address")
+		}
+		if o.Username != "" { // hoy todo host guardado trae su credencial
+			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username_with_credential", nil), "username with a credential")
 		}
 		h, err := service.SavedHost(s.d.DB(), o.HostId)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -164,12 +209,22 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		}
 		address, port, credID, startup, generic = h.Address, uint16(h.Port), h.CredentialID, h.StartupCommand, devices.IsGeneric(h.Platform)
 	} else {
-		if o.Address == "" || o.CredentialId == "" {
+		if o.Address == "" {
 			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.no_address", nil)
 		}
 		if o.Port > 65535 {
 			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.port", nil)
 		}
+		if o.CredentialId != "" && o.Username != "" {
+			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username_with_credential", nil)
+		}
+		if o.Username != "" {
+			var ok bool
+			if username, ok = cleanUser(o.Username); !ok && strings.TrimSpace(o.Username) != "" {
+				return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username", nil)
+			}
+		}
+		typed = o.CredentialId == "" // sin credencial: las respuestas se piden por el stream y no se usa la bóveda
 		address, credID, port = o.Address, o.CredentialId, uint16(o.Port)
 	}
 	if port == 0 {
@@ -178,16 +233,21 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if label == "" {
 		label = address + ":" + strconv.Itoa(int(port))
 	}
+	// Las huellas aceptadas solo dependen del pedido: se validan antes de la bóveda, del guard y de preguntar «login as:».
+	accepted, err := service.HostKeyAccepts(st.Context(), []string{transport.HostKeyID(address, port)}, o.AcceptedHostKeyFingerprints, o.AcceptedHostKeys)
+	if err != nil {
+		return s.refuse(label, err, i18n.English(err))
+	}
 	v := s.d.Vault()
-	if v == nil || !v.Unlocked() {
-		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
-	}
-	// Una credencial de solo llave solo se usa por host_id de un host linux o windows; se rechaza antes de Guard.Allow (sin DNS) y de conectar.
-	infos, err := v.List()
-	if err != nil { // la bóveda se cerró entre medio: sin saber el tipo no se sigue
-		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
-	}
-	{
+	if !typed {
+		if v == nil || !v.Unlocked() {
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
+		}
+		// Una credencial de solo llave solo se usa por host_id de un host linux o windows; se rechaza antes de Guard.Allow (sin DNS) y de conectar.
+		infos, err := v.List()
+		if err != nil { // la bóveda se cerró entre medio: sin saber el tipo no se sigue
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
+		}
 		for _, i := range infos {
 			if i.ID == credID && i.IsKey() && !generic {
 				return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.key_credential", nil), "key credential")
@@ -230,6 +290,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		reasonEN   = "could not open" // lo mismo que reason, en inglés, para la auditoría
 		rx, tx     atomic.Int64
 		recordPath string
+		user       = username // en modo tecleado, el de la petición o el de «login as:»
 	)
 	defer func() {
 		if sess != nil {
@@ -247,31 +308,186 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if !opened {
 			action = "terminal.failed"
 		}
-		s.d.Audit(action, label, fmt.Sprintf("session=%s reason=%q received=%d sent=%d guard=revoked recording=%s", id, reasonEN, rx.Load(), tx.Load(), recordPath))
+		who := ""
+		if typed {
+			who = fmt.Sprintf(" credential=typed user=%q", user)
+		}
+		s.d.Audit(action, label, fmt.Sprintf("session=%s%s reason=%q received=%d sent=%d guard=revoked recording=%s", id, who, reasonEN, rx.Load(), tx.Load(), recordPath))
 	}()
 
-	cred, err := v.Get(credID)
-	if err != nil {
-		reason, reasonEN = err.Error(), i18n.English(err)
-		return service.VaultErr(ctx, err)
+	// Un solo Recv desde aquí: el handshake tecleado y, después, el teclado leen de este canal.
+	msgs := make(chan *v1.OpenTerminalRequest)
+	go func() {
+		defer close(msgs)
+		for {
+			m, err := st.Recv()
+			if err != nil {
+				return
+			}
+			select {
+			case msgs <- m:
+			case <-ctx.Done():
+				wipeMsg(m) // nadie la va a leer
+				return
+			}
+		}
+	}()
+	szRows, szCols := o.Rows, o.Cols // un resize durante la autenticación se guarda para el PTY
+	var (
+		seq, lastAttempt = uint32(0), 1
+		askErr           error
+		askMu            sync.Mutex
+		askClosed        bool
+		askWG            sync.WaitGroup
+	)
+	// ask lo llama el handshake (otra goroutine, una a la vez) o este manejador: nunca hay dos emisores a la vez.
+	ask := func(actx context.Context, p transport.Prompt) (ans [][]byte, err error) {
+		askMu.Lock()
+		if askClosed {
+			askMu.Unlock()
+			return nil, errClientGone
+		}
+		askWG.Add(1)
+		askMu.Unlock()
+		defer askWG.Done()
+		defer func() {
+			if err != nil && askErr == nil {
+				askErr = err
+			}
+		}()
+		for drained := false; !drained; { // una respuesta que llegó antes de esta pregunta no es de ella: se vacía y se borra
+			select {
+			case m, ok := <-msgs:
+				if !ok {
+					return nil, errClientGone
+				}
+				if rz := m.GetResize(); rz != nil {
+					szRows, szCols = rz.Rows, rz.Cols
+				}
+				wipeMsg(m)
+			default:
+				drained = true
+			}
+		}
+		if p.Attempt > lastAttempt {
+			lastAttempt = p.Attempt
+			if st.Send(&v1.OpenTerminalResponse{Data: []byte(i18n.T(st.Context(), "terminal.auth.denied", nil) + "\r\n")}) != nil {
+				return nil, errClientGone
+			}
+		}
+		seq++
+		ap := &v1.AuthPrompt{Seq: seq, Name: p.Name, Instruction: p.Instruction}
+		for _, q := range p.Questions {
+			ap.Prompts = append(ap.Prompts, &v1.AuthQuestion{Text: q.Text, Echo: q.Echo})
+		}
+		if st.Send(&v1.OpenTerminalResponse{AuthPrompt: ap}) != nil {
+			return nil, errClientGone
+		}
+		timer := time.NewTimer(s.authWait)
+		defer timer.Stop()
+		for {
+			select {
+			case m, ok := <-msgs:
+				if !ok {
+					return nil, errClientGone
+				}
+				switch {
+				case m.GetResize() != nil:
+					szRows, szCols = m.GetResize().Rows, m.GetResize().Cols
+				case m.GetAuthAnswer() != nil:
+					a := m.GetAuthAnswer()
+					big := false
+					for _, b := range a.Answers {
+						big = big || len(b) > maxAnswer
+					}
+					if a.Seq != seq || len(a.Answers) != len(p.Questions) || big {
+						wipeMsg(m)
+						return nil, errAuthAnswer
+					}
+					return a.Answers, nil
+				default: // data durante la autenticación: se descarta
+					clear(m.GetData())
+				}
+			case <-actx.Done():
+				return nil, actx.Err()
+			case <-timer.C:
+				return nil, errAuthTimeout
+			}
+		}
 	}
-	user := cred.Username
-	accepted, err := service.HostKeyAccepts(st.Context(), []string{transport.HostKeyID(address, port)}, o.AcceptedHostKeyFingerprints, o.AcceptedHostKeys)
-	if err != nil {
-		cred.Enable.Destroy()
-		cred.Password.Destroy()
-		cred.SSHKey.Destroy()
-		reason, reasonEN = i18n.English(err), i18n.English(err)
-		return err
+	// failTyped traduce el fallo de la autenticación tecleada a un motivo propio; ok=false deja el error al connErr de siempre.
+	failTyped := func(err error) (error, bool) {
+		if askErr != nil {
+			err = askErr
+		}
+		var he *transport.HostKeyError
+		var te error
+		code := codes.Unavailable
+		switch {
+		case errors.As(err, &he):
+			return nil, false
+		case s.ctx.Err() != nil:
+			te = errCoreClosing
+		case errors.Is(err, errClientGone) || ctx.Err() != nil:
+			te = errClientGone
+		case errors.Is(err, errAuthTimeout):
+			te, code = errAuthTimeout, codes.DeadlineExceeded
+		case errors.Is(err, errAuthAnswer), errors.Is(err, errUsername):
+			te, code = err, codes.InvalidArgument
+		case errors.Is(err, transport.ErrAuthAttempts), errors.Is(err, transport.ErrAuthRounds): // los dos topes dan el mismo motivo
+			te, code = errAuthTries, codes.PermissionDenied
+		case errors.Is(err, transport.ErrTypedNoMethod):
+			te, code = errAuthNoMeth, codes.FailedPrecondition
+		default:
+			return nil, false
+		}
+		reason, reasonEN = te.Error(), i18n.English(te)
+		return service.ErrFrom(st.Context(), code, te), true
+	}
+
+	var cred vault.Credential
+	opts := transport.SSHOptions{GenericHost: generic}
+	if typed {
+		if user == "" { // «login as:» antes de marcar: x/crypto no cambia el usuario a mitad del handshake
+			ans, err := ask(ctx, transport.Prompt{Attempt: 1, Questions: []transport.Question{{Text: i18n.T(st.Context(), "terminal.auth.login", nil), Echo: true}}})
+			if err != nil {
+				te, _ := failTyped(err)
+				return te
+			}
+			u, ok := cleanUser(string(ans[0]))
+			clear(ans[0])
+			if user = u; !ok {
+				askErr = errUsername
+				te, _ := failTyped(errUsername)
+				return te
+			}
+		}
+		cred.Username, opts.Ask = user, ask
+	} else {
+		var err error
+		if cred, err = v.Get(credID); err != nil {
+			reason, reasonEN = err.Error(), i18n.English(err)
+			return service.VaultErr(ctx, err)
+		}
+		user = cred.Username
 	}
 	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
-	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, transport.SSHOptions{GenericHost: generic})
+	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, opts)
 	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
+	askMu.Lock()
+	askClosed = true
+	askMu.Unlock()
+	askWG.Wait() // ninguna ask sigue enviando por el stream ni tocando szRows
 	if err != nil {
+		if typed {
+			if te, ok := failTyped(err); ok {
+				return te
+			}
+		}
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return connErr(st.Context(), err)
 	}
-	term, rows, cols := "vt100", clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500)
+	term, rows, cols := "vt100", clamp(szRows, 24, 1, 200), clamp(szCols, 200, 20, 500)
 	if generic {
 		term = "xterm-256color"
 	}
@@ -295,6 +511,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	summary := fmt.Sprintf("%s@%s:%d", user, address, port)
 	rec.Mark("abierto " + summary)
 	detail := fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath)
+	if typed {
+		detail = fmt.Sprintf("session=%s credential=typed user=%q recording=%s manual=true", id, user, recordPath)
+	}
 	if o.HostId != "" {
 		start := "none"
 		if startup != "" {
@@ -335,14 +554,16 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	go func() { // teclado → equipo
 		defer close(clientDone)
 		for {
-			m, err := st.Recv()
-			if err != nil {
+			m, ok := <-msgs
+			if !ok {
 				return
 			}
 			switch {
 			case m.GetResize() != nil:
 				sz := m.GetResize()
 				sess.Resize(clamp(sz.Rows, 24, 1, 200), clamp(sz.Cols, 200, 20, 500))
+			case m.GetAuthAnswer() != nil: // llegó tarde: no es de nadie
+				wipeMsg(m)
 			case len(m.GetData()) > 0:
 				rec.Input(m.GetData())
 				if n, err := w.Write(m.GetData()); err != nil {

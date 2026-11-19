@@ -43,8 +43,12 @@ type TerminalOpen struct {
 	// La orden de inicio que la UI le mostró al usuario antes de conectar. Si no es igual a la guardada, el núcleo no
 	// conecta (FailedPrecondition): lo que corre es lo que se vio. Vacío = el host no debe tener orden de inicio.
 	ExpectedStartupCommand string `protobuf:"bytes,9,opt,name=expected_startup_command,json=expectedStartupCommand,proto3" json:"expected_startup_command,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Fase 47t: sin credential_id (y sin host_id) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
+	// por el stream (AuthPrompt/AuthAnswer) lo que el equipo pregunte. username es opcional y solo va en ese modo; vacío =
+	// el núcleo pregunta «login as:» antes de marcar. Con credential_id se rechaza (terminal.err.username_with_credential).
+	Username      string `protobuf:"bytes,11,opt,name=username,proto3" json:"username,omitempty"` // 10 es accepted_host_keys (huellas por host)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TerminalOpen) Reset() {
@@ -147,6 +151,13 @@ func (x *TerminalOpen) GetExpectedStartupCommand() string {
 	return ""
 }
 
+func (x *TerminalOpen) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
 type TerminalSize struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Rows          uint32                 `protobuf:"varint,1,opt,name=rows,proto3" json:"rows,omitempty"`
@@ -206,6 +217,7 @@ type OpenTerminalRequest struct {
 	//	*OpenTerminalRequest_Open
 	//	*OpenTerminalRequest_Data
 	//	*OpenTerminalRequest_Resize
+	//	*OpenTerminalRequest_AuthAnswer
 	Msg           isOpenTerminalRequest_Msg `protobuf_oneof:"msg"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -275,6 +287,15 @@ func (x *OpenTerminalRequest) GetResize() *TerminalSize {
 	return nil
 }
 
+func (x *OpenTerminalRequest) GetAuthAnswer() *AuthAnswer {
+	if x != nil {
+		if x, ok := x.Msg.(*OpenTerminalRequest_AuthAnswer); ok {
+			return x.AuthAnswer
+		}
+	}
+	return nil
+}
+
 type isOpenTerminalRequest_Msg interface {
 	isOpenTerminalRequest_Msg()
 }
@@ -291,17 +312,24 @@ type OpenTerminalRequest_Resize struct {
 	Resize *TerminalSize `protobuf:"bytes,3,opt,name=resize,proto3,oneof"`
 }
 
+type OpenTerminalRequest_AuthAnswer struct {
+	AuthAnswer *AuthAnswer `protobuf:"bytes,4,opt,name=auth_answer,json=authAnswer,proto3,oneof"` // respuesta a un AuthPrompt; mismo seq y una respuesta por pregunta
+}
+
 func (*OpenTerminalRequest_Open) isOpenTerminalRequest_Msg() {}
 
 func (*OpenTerminalRequest_Data) isOpenTerminalRequest_Msg() {}
 
 func (*OpenTerminalRequest_Resize) isOpenTerminalRequest_Msg() {}
 
+func (*OpenTerminalRequest_AuthAnswer) isOpenTerminalRequest_Msg() {}
+
 type OpenTerminalResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Opened        string                 `protobuf:"bytes,1,opt,name=opened,proto3" json:"opened,omitempty"`       // primer evento: "usuario@host:puerto"
-	Recording     string                 `protobuf:"bytes,2,opt,name=recording,proto3" json:"recording,omitempty"` // archivo de la grabación
-	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`           // lo que devuelve el equipo
+	Opened        string                 `protobuf:"bytes,1,opt,name=opened,proto3" json:"opened,omitempty"`                           // primer evento: "usuario@host:puerto"
+	Recording     string                 `protobuf:"bytes,2,opt,name=recording,proto3" json:"recording,omitempty"`                     // archivo de la grabación
+	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`                               // lo que devuelve el equipo
+	AuthPrompt    *AuthPrompt            `protobuf:"bytes,4,opt,name=auth_prompt,json=authPrompt,proto3" json:"auth_prompt,omitempty"` // fase 47t: ronda de preguntas de la autenticación tecleada
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -357,11 +385,192 @@ func (x *OpenTerminalResponse) GetData() []byte {
 	return nil
 }
 
+func (x *OpenTerminalResponse) GetAuthPrompt() *AuthPrompt {
+	if x != nil {
+		return x.AuthPrompt
+	}
+	return nil
+}
+
+// Una ronda de preguntas del equipo (keyboard-interactive) o la contraseña como una sola pregunta, o «login as:».
+// Las respuestas nunca se guardan, graban ni auditan.
+type AuthPrompt struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Seq           uint32                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Instruction   string                 `protobuf:"bytes,3,opt,name=instruction,proto3" json:"instruction,omitempty"`
+	Prompts       []*AuthQuestion        `protobuf:"bytes,4,rep,name=prompts,proto3" json:"prompts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthPrompt) Reset() {
+	*x = AuthPrompt{}
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthPrompt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthPrompt) ProtoMessage() {}
+
+func (x *AuthPrompt) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthPrompt.ProtoReflect.Descriptor instead.
+func (*AuthPrompt) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_terminal_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AuthPrompt) GetSeq() uint32 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *AuthPrompt) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AuthPrompt) GetInstruction() string {
+	if x != nil {
+		return x.Instruction
+	}
+	return ""
+}
+
+func (x *AuthPrompt) GetPrompts() []*AuthQuestion {
+	if x != nil {
+		return x.Prompts
+	}
+	return nil
+}
+
+type AuthQuestion struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Echo          bool                   `protobuf:"varint,2,opt,name=echo,proto3" json:"echo,omitempty"` // false = respuesta secreta: no se pinta lo tecleado
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthQuestion) Reset() {
+	*x = AuthQuestion{}
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthQuestion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthQuestion) ProtoMessage() {}
+
+func (x *AuthQuestion) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthQuestion.ProtoReflect.Descriptor instead.
+func (*AuthQuestion) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_terminal_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AuthQuestion) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *AuthQuestion) GetEcho() bool {
+	if x != nil {
+		return x.Echo
+	}
+	return false
+}
+
+type AuthAnswer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Seq           uint32                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	Answers       [][]byte               `protobuf:"bytes,2,rep,name=answers,proto3" json:"answers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthAnswer) Reset() {
+	*x = AuthAnswer{}
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthAnswer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthAnswer) ProtoMessage() {}
+
+func (x *AuthAnswer) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_terminal_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthAnswer.ProtoReflect.Descriptor instead.
+func (*AuthAnswer) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_terminal_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AuthAnswer) GetSeq() uint32 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *AuthAnswer) GetAnswers() [][]byte {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
 var File_macuahuitl_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\x83\x03\n" +
+	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\x9f\x03\n" +
 	"\fTerminalOpen\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x12\n" +
@@ -373,19 +582,37 @@ const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\x04rows\x18\x06 \x01(\rR\x04rows\x12\x12\n" +
 	"\x04cols\x18\a \x01(\rR\x04cols\x12\x17\n" +
 	"\ahost_id\x18\b \x01(\tR\x06hostId\x128\n" +
-	"\x18expected_startup_command\x18\t \x01(\tR\x16expectedStartupCommand\"6\n" +
+	"\x18expected_startup_command\x18\t \x01(\tR\x16expectedStartupCommand\x12\x1a\n" +
+	"\busername\x18\v \x01(\tR\busername\"6\n" +
 	"\fTerminalSize\x12\x12\n" +
 	"\x04rows\x18\x01 \x01(\rR\x04rows\x12\x12\n" +
-	"\x04cols\x18\x02 \x01(\rR\x04cols\"\x9c\x01\n" +
+	"\x04cols\x18\x02 \x01(\rR\x04cols\"\xda\x01\n" +
 	"\x13OpenTerminalRequest\x121\n" +
 	"\x04open\x18\x01 \x01(\v2\x1b.macuahuitl.v1.TerminalOpenH\x00R\x04open\x12\x14\n" +
 	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x125\n" +
-	"\x06resize\x18\x03 \x01(\v2\x1b.macuahuitl.v1.TerminalSizeH\x00R\x06resizeB\x05\n" +
-	"\x03msg\"`\n" +
+	"\x06resize\x18\x03 \x01(\v2\x1b.macuahuitl.v1.TerminalSizeH\x00R\x06resize\x12<\n" +
+	"\vauth_answer\x18\x04 \x01(\v2\x19.macuahuitl.v1.AuthAnswerH\x00R\n" +
+	"authAnswerB\x05\n" +
+	"\x03msg\"\x9c\x01\n" +
 	"\x14OpenTerminalResponse\x12\x16\n" +
 	"\x06opened\x18\x01 \x01(\tR\x06opened\x12\x1c\n" +
 	"\trecording\x18\x02 \x01(\tR\trecording\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data2n\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\x12:\n" +
+	"\vauth_prompt\x18\x04 \x01(\v2\x19.macuahuitl.v1.AuthPromptR\n" +
+	"authPrompt\"\x8b\x01\n" +
+	"\n" +
+	"AuthPrompt\x12\x10\n" +
+	"\x03seq\x18\x01 \x01(\rR\x03seq\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vinstruction\x18\x03 \x01(\tR\vinstruction\x125\n" +
+	"\aprompts\x18\x04 \x03(\v2\x1b.macuahuitl.v1.AuthQuestionR\aprompts\"6\n" +
+	"\fAuthQuestion\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x12\n" +
+	"\x04echo\x18\x02 \x01(\bR\x04echo\"8\n" +
+	"\n" +
+	"AuthAnswer\x12\x10\n" +
+	"\x03seq\x18\x01 \x01(\rR\x03seq\x12\x18\n" +
+	"\aanswers\x18\x02 \x03(\fR\aanswers2n\n" +
 	"\x0fTerminalService\x12[\n" +
 	"\fOpenTerminal\x12\".macuahuitl.v1.OpenTerminalRequest\x1a#.macuahuitl.v1.OpenTerminalResponse(\x010\x01BAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
@@ -401,25 +628,31 @@ func file_macuahuitl_v1_terminal_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_terminal_proto_rawDescData
 }
 
-var file_macuahuitl_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_macuahuitl_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_macuahuitl_v1_terminal_proto_goTypes = []any{
 	(*TerminalOpen)(nil),         // 0: macuahuitl.v1.TerminalOpen
 	(*TerminalSize)(nil),         // 1: macuahuitl.v1.TerminalSize
 	(*OpenTerminalRequest)(nil),  // 2: macuahuitl.v1.OpenTerminalRequest
 	(*OpenTerminalResponse)(nil), // 3: macuahuitl.v1.OpenTerminalResponse
-	(*AcceptedHostKey)(nil),      // 4: macuahuitl.v1.AcceptedHostKey
+	(*AuthPrompt)(nil),           // 4: macuahuitl.v1.AuthPrompt
+	(*AuthQuestion)(nil),         // 5: macuahuitl.v1.AuthQuestion
+	(*AuthAnswer)(nil),           // 6: macuahuitl.v1.AuthAnswer
+	(*AcceptedHostKey)(nil),      // 7: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_terminal_proto_depIdxs = []int32{
-	4, // 0: macuahuitl.v1.TerminalOpen.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	7, // 0: macuahuitl.v1.TerminalOpen.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
 	0, // 1: macuahuitl.v1.OpenTerminalRequest.open:type_name -> macuahuitl.v1.TerminalOpen
 	1, // 2: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
-	2, // 3: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
-	3, // 4: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 3: macuahuitl.v1.OpenTerminalRequest.auth_answer:type_name -> macuahuitl.v1.AuthAnswer
+	4, // 4: macuahuitl.v1.OpenTerminalResponse.auth_prompt:type_name -> macuahuitl.v1.AuthPrompt
+	5, // 5: macuahuitl.v1.AuthPrompt.prompts:type_name -> macuahuitl.v1.AuthQuestion
+	2, // 6: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
+	3, // 7: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
+	7, // [7:8] is the sub-list for method output_type
+	6, // [6:7] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_terminal_proto_init() }
@@ -432,6 +665,7 @@ func file_macuahuitl_v1_terminal_proto_init() {
 		(*OpenTerminalRequest_Open)(nil),
 		(*OpenTerminalRequest_Data)(nil),
 		(*OpenTerminalRequest_Resize)(nil),
+		(*OpenTerminalRequest_AuthAnswer)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -439,7 +673,7 @@ func file_macuahuitl_v1_terminal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_terminal_proto_rawDesc), len(file_macuahuitl_v1_terminal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
