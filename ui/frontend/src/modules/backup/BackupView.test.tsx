@@ -37,6 +37,34 @@ test("sin armar explica por qué y no espera", async () => {
   expect(core.backupCollect).not.toHaveBeenCalled();
 });
 
+test("sin armar por llave de host muestra la huella y solo con «Confiar y reintentar» respalda con ella", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "Login Test falló" }).mockResolvedValueOnce({ jobId: "j10", armed: true, detail: "" });
+  const loginTest = vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.changed", args: { key_type: "ssh-rsa" } }]);
+  const core = withCreds({ backupStart, loginTest, backupCollect: vi.fn(async () => ({ state: "completed", done: true, saved: [a.id], skipped: 0, pruned: 0, warnings: [] })) });
+  render(<BackupView core={core} pollMs={1} />);
+  expect(screen.queryByLabelText(/Huellas aceptadas|Huellas SHA256 aceptadas/)).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
+  expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
+  expect(loginTest).toHaveBeenCalledWith("j9");
+  expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("CAMBIÓ");
+  expect(backupStart).toHaveBeenCalledTimes(1); // sin clic no se acepta nada
+  await userEvent.click(screen.getByRole("checkbox", { name: /Entiendo que la llave de este equipo cambió/ })); // llave cambiada
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(backupStart).toHaveBeenCalledTimes(2));
+  expect(backupStart).toHaveBeenLastCalledWith(expect.objectContaining({ accept: [], acceptedKeys: [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }] }));
+  expect(await screen.findByText(/1 respaldo guardado/)).toBeInTheDocument();
+});
+
+test("si el Login Test no se puede obtener, se avisa que no hay huella", async () => {
+  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "x" })), loginTest: vi.fn(async () => { throw new Error("sin ruta"); }) });
+  render(<BackupView core={core} />);
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
+  expect(await screen.findByText(/No se pudo obtener la huella/)).toBeInTheDocument();
+});
+
 test("programar convierte minutos en segundos y no espera el resultado", async () => {
   const core = withCreds();
   render(<BackupView core={core} />);
@@ -186,21 +214,29 @@ test("una restauración viva retomada muestra el aviso rojo del modo asistido", 
   } finally { localStorage.removeItem("macuahuitl.assist.r7"); }
 });
 
-// Seguridad: con varios equipos una huella sin equipo valdría para cualquiera; no se manda y se pide EQUIPO=HUELLA.
-test("con varios equipos una huella sola no se manda; con EQUIPO=HUELLA sí", async () => {
-  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "Login Test falló" })) });
+// Seguridad: con varios equipos cada huella viaja atada a su equipo (nunca una lista suelta) y solo la de los marcados.
+test("con varios equipos el reintento manda pares (equipo, huella) de los marcados y accept vacío", async () => {
+  const row = (target: string, fingerprint: string) => ({ target, passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint, reason: "transport.hostkey.unknown" });
+  const backupStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "x" }).mockResolvedValue({ jobId: "j10", armed: false, detail: "x" });
+  const core = withCreds({ backupStart, loginTest: vi.fn(async () => [row("192.0.2.1:22", "SHA256:abc"), row("sw2:2222", "SHA256:def")]) });
   render(<BackupView core={core} pollMs={1} />);
   await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1 sw2:2222");
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
   await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
-  expect(await screen.findByText(/EQUIPO=HUELLA/)).toBeInTheDocument();
-  expect(core.backupStart).not.toHaveBeenCalled();
-  await userEvent.clear(screen.getByLabelText(/Huellas SHA256 aceptadas/));
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "192.0.2.1=SHA256:abc sw2:2222=SHA256:def");
-  await userEvent.click(screen.getByRole("button", { name: "Respaldar ahora" }));
-  await waitFor(() => expect(core.backupStart).toHaveBeenCalledWith(expect.objectContaining({
-    accept: [], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }, { host: "sw2:2222", fingerprint: "SHA256:def" }],
-  })));
+  await userEvent.click(await screen.findByRole("checkbox", { name: /sw2:2222/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(backupStart).toHaveBeenCalledTimes(2));
+  expect(backupStart).toHaveBeenLastCalledWith(expect.objectContaining({ accept: [], acceptedKeys: [{ host: "sw2:2222", fingerprint: "SHA256:def" }] }));
+});
+
+test("si cambian los equipos tras el rechazo, el panel de confianza desaparece", async () => {
+  const loginTest = vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown" }]);
+  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "x" })), loginTest });
+  render(<BackupView core={core} pollMs={1} />);
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
+  await screen.findByRole("button", { name: "Confiar y reintentar" });
+  await userEvent.type(screen.getByLabelText(/Equipos/), " 192.0.2.9");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
 });
 
 test("las opciones avanzadas del respaldo van plegadas, cuentan los cambios y el aviso de secretos queda fuera", async () => {
