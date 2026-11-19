@@ -60,6 +60,18 @@ const fileBase = (label: string) => label.replace(/[^\w.-]+/g, "_");
 // Tamaño con el que se abre la sesión: el último medido o una estimación por la ventana; el ajuste real llega con terminalResize.
 const estimate = () => ({ cols: Math.max(80, Math.min(300, Math.floor((window.innerWidth - 320) / 8.4))), rows: Math.max(24, Math.min(80, Math.floor(window.innerHeight * 0.6 / 16.8))) });
 
+// Llave nueva: un clic. Llave CAMBIADA: antes hay que marcar que se entiende el riesgo.
+function TrustButton({ changed, busy, retry }: { changed: boolean; busy: boolean; retry: () => void }) {
+  const t = useT();
+  const [ack, setAck] = useState(false);
+  return (
+    <>
+      {changed && <Check label={t("ssh.hostKey.ack")} checked={ack} onChange={setAck} />}
+      <button type="button" disabled={busy || (changed && !ack)} onClick={retry}>{t("transfer.hostKey.accept")}</button>
+    </>
+  );
+}
+
 export function TerminalView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [creds, setCreds] = useState<Credential[]>([]);
@@ -111,7 +123,9 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     core.listPinnedScripts().then((l) => { if (live) setPins(l.filter((x) => scriptText(x.commands))); }, () => { if (live) setPins([]); });
     return () => { live = false; };
   }, [core, sv]);
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); const pw = passwordCreds(l); setCred((c) => (pw.some((x) => x.id === c) ? c : pw[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
+  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); const pw = passwordCreds(l); setCred((c) => (pw.some((x) => x.id === c) ? c : pw[0]?.id ?? "")); }).catch(() => { setCreds([]); setCred(""); }); }, [core, vv]); // bóveda cerrada: sin lista ni credencial elegida
+  // Lo que ve la persona manda: una credencial que ya no está en la lista (bóveda cerrada) cuenta como «Escribir…».
+  const credOk = passwordCreds(creds).some((c) => c.id === cred) ? cred : "";
 
   const patch = (runId: string, f: (t: Tab) => Tab) => setTabs((ts) => ts.map((t) => (t.runId === runId ? f(t) : t)));
   const apply = (e: TerminalEvent) => {
@@ -228,7 +242,8 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   // la pregunta en el mismo handler (el panel se desmonta) y las respuestas no se guardan en ninguna parte.
   const answer = (runId: string, seq: number, answers: string[]) => {
     patch(runId, (t) => ({ ...t, ask: undefined }));
-    core.terminalAnswer(runId, seq, answers).catch((e) => patch(runId, (t) => ({ ...t, err: errorText(e) })));
+    // El error del puente no se pinta: un núcleo descuidado podría reflejar lo recibido. La razón real llega por el evento done.
+    core.terminalAnswer(runId, seq, answers).catch(() => patch(runId, (x) => ({ ...x, err: x.err || t("ssh.auth.sendFail") })));
   };
   const closeTab = (i: number) => {
     const t = tabs[i];
@@ -318,7 +333,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
             <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
           </>
         )}
-        <button type="button" disabled={busy} onClick={retry}>{t("transfer.hostKey.accept")}</button>
+        <TrustButton changed={hk.changed} busy={busy} retry={retry} />
       </Notice>
     );
   };
@@ -350,8 +365,8 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand); }} />
       <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); if (ok) setCred(h.credentialId); setTyped(false); setNoCred(!ok); }} />
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={noCred ? "" : typed || !cred ? TYPED : cred} placeholder={noCred ? t("ssh.credPick") : undefined} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); setNoCred(false); }} w="md" hint={noCred ? t("hosts.pick.noCred") : undefined} options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
-        {(typed || !cred) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
+        <Select label={t("ssh.cred")} value={noCred ? "" : typed || !credOk ? TYPED : credOk} placeholder={noCred ? t("ssh.credPick") : undefined} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); setNoCred(false); }} w="md" hint={noCred ? t("hosts.pick.noCred") : undefined} options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
+        {(typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
         <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
       </div>
@@ -365,7 +380,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         <p id={`${logId}-h`} className="hint">{t("ssh.logHelp")}</p>
       </div>
       <div className="actions">
-        <button className="primary" disabled={busy || noCred || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : cred, undefined, "", typed || !cred ? user : "")}>
+        <button className="primary" disabled={busy || noCred || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : credOk, undefined, "", typed || !credOk ? user : "")}>
           {busy ? t("ssh.connectingBtn") : <>{t("ssh.openTab")}<kbd aria-hidden="true">Ctrl ↵</kbd></>}
         </button>
       </div>
@@ -428,9 +443,9 @@ export function TerminalView({ core }: { core: CoreAPI }) {
                     return (
                       <div key={tab.key} hidden={!shown} data-key={tab.key} className={`ssh-pane ${side}`} onFocus={() => setFocusKey(tab.key)} onMouseDown={() => setFocusKey(tab.key)}>
                         {second && shown && <div className="ssh-pane-head"><strong>{tab.label}</strong>{head(tab)}</div>}
-                        {tab.ask && <AuthPanel key={`${tab.runId}:${tab.ask.seq}`} prompt={tab.ask} onAnswer={(seq, a) => answer(tab.runId, seq, a)} />}
+                        {tab.ask && <AuthPanel key={`${tab.runId}:${tab.ask.seq}`} prompt={tab.ask} label={tab.label} active={second ? tab.key === tool.key : i === active} onAnswer={(seq, a) => answer(tab.runId, seq, a)} />}
                         <div className="ssh-term" style={second ? { background: theme.background } : undefined}>
-                          <XTermPane runId={tab.runId} screenReader={srm} onCopy={(x) => { void core.copyText(x).catch(() => {}); }} onPaste={async (given) => { const txt = given ?? await core.pasteText(); return pasteNeedsConfirm(txt) && !(await core.confirmPaste(txt, tab.label)) ? "" : txt; }} active={i === active} shown={shown} done={tab.done} theme={theme} search={tab.key === tool.key ? find : undefined}
+                          <XTermPane runId={tab.runId} screenReader={srm} onCopy={(x) => { void core.copyText(x).catch(() => {}); }} onPaste={async (given) => { const txt = given ?? await core.pasteText(); return pasteNeedsConfirm(txt) && !(await core.confirmPaste(txt, tab.label)) ? "" : txt; }} active={i === active} asking={!!tab.ask} shown={shown} done={tab.done} theme={theme} search={tab.key === tool.key ? find : undefined}
                             label={second && shown ? t(side === "left" ? "ssh.pane.left" : "ssh.pane.right", { label: tab.label }) : undefined}
                             bind={bind} onInput={(d) => send(tab.runId, d)} onResults={(index, count) => { if (tab.key === tool.key) setHits({ index, count }); }}
                             onSize={(rows, cols) => { size.current = { rows, cols }; core.terminalResize(tab.runId, rows, cols).catch(() => {}); }}

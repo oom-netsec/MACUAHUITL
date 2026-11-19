@@ -3119,4 +3119,7 @@ export const en: Record<Key, string> = {
   "ssh.userHint": "Empty: the terminal asks «login as:». Not used with a saved credential.",
   "ssh.auth.title": "The device asks for sign-in details",
   "ssh.auth.answer": "Answer",
+  "ssh.auth.said": "The device says:",
+  "ssh.auth.sendFail": "The answer could not be sent. If the session is still open, the device will ask again.",
+  "ssh.hostKey.ack": "I understand this device's host key changed",
 };

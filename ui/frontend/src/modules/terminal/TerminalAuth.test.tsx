@@ -112,17 +112,6 @@ test("al enviar: las respuestas salen por terminalAnswer y no queda ni una en el
   expect(document.body.textContent).not.toContain(SECRET);
 });
 
-test("si la respuesta falla, el error no lleva lo tecleado", async () => {
-  const core = await typedSetup();
-  (core.terminalAnswer as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("sesión cerrada"));
-  await abrir("192.0.2.1");
-  await term();
-  act(() => core.emitTerminal(prompt));
-  await userEvent.type(await screen.findByLabelText("Password:"), `${SECRET}{Enter}`);
-  expect(await screen.findByText(/sesión cerrada/)).toBeInTheDocument();
-  expect(document.body.innerHTML).not.toContain(SECRET);
-});
-
 test("una segunda ronda llega con campos vacíos", async () => {
   const core = await typedSetup();
   await abrir("192.0.2.1");
@@ -173,4 +162,129 @@ test("al terminar la sesión la pregunta pendiente desaparece", async () => {
   await screen.findByRole("form");
   act(() => core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "DeadlineExceeded", reason: "terminal.err.auth_timeout", metadata: {} } }));
   await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
+});
+
+// ---- Revisión de seguridad (47t-6) ----
+import { vaultChanged } from "../../lib/vaultSignal";
+import { findFiberState } from "../../test-utils";
+import { sampleHosts } from "../inventory/fake";
+
+test("bóveda cerrada con una credencial elegida: se ve «Escribir…», el usuario y se manda credentialId vacío", async () => {
+  let open = true;
+  const core = fakeCore({ listCredentials: vi.fn(async () => { if (!open) throw new Error("bóveda cerrada"); return [cred]; }) });
+  render(<TerminalView core={core} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  expect(screen.queryByLabelText(/Usuario \(opcional\)/)).toBeNull(); // c1 elegida
+  open = false;
+  act(() => vaultChanged());
+  expect(await screen.findByLabelText(/Usuario \(opcional\)/)).toBeInTheDocument();
+  await abrir("192.0.2.1");
+  expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ credentialId: "", username: "" }));
+});
+
+const sessionWithPrompt = async (over = {}) => {
+  const core = await typedSetup(over);
+  await abrir("192.0.2.1");
+  await term();
+  return core;
+};
+
+test("una pregunta emitida ANTES de que monte el xterm deja el foco en el campo", async () => {
+  const core = await typedSetup();
+  await abrir("192.0.2.1");
+  act(() => core.emitTerminal(prompt)); // sin esperar al xterm (carga diferida)
+  const code = await screen.findByLabelText("Verification code:");
+  await term();
+  await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); await new Promise((r) => requestAnimationFrame(() => r(null))); });
+  expect(code).toHaveFocus();
+  expect(FakeTerm.all[0].focus).not.toHaveBeenCalled(); // el emulador no toma el foco de una pestaña con pregunta abierta
+});
+
+test("al volver a una pestaña con la pregunta abierta, el foco va al campo", async () => {
+  const core = await sessionWithPrompt();
+  act(() => core.emitTerminal(prompt));
+  await screen.findByRole("form");
+  (core.terminalOpen as ReturnType<typeof vi.fn>).mockResolvedValueOnce("t2");
+  await userEvent.click(screen.getByText("Nueva sesión"));
+  await abrir("192.0.2.2"); // pestaña 2 activa
+  expect(screen.getByLabelText("Verification code:")).not.toHaveFocus();
+  await userEvent.click(screen.getAllByRole("tab")[0]);
+  await waitFor(() => expect(screen.getByLabelText("Verification code:")).toHaveFocus());
+});
+
+test("en vista dividida, con el foco en un input del panel izquierdo, una pregunta nueva en el derecho NO roba el foco", async () => {
+  const core = await sessionWithPrompt();
+  (core.terminalOpen as ReturnType<typeof vi.fn>).mockResolvedValueOnce("t2");
+  await userEvent.click(screen.getByText("Nueva sesión"));
+  await abrir("192.0.2.2");
+  await userEvent.click(screen.getAllByRole("tab")[0]);
+  await userEvent.click(screen.getByLabelText("Dividir"));
+  const search = screen.getByRole("searchbox");
+  search.focus();
+  act(() => core.emitTerminal({ ...prompt, runId: "t2" }));
+  await screen.findByRole("form");
+  await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+  expect(search).toHaveFocus();
+});
+
+test("el encabezado es de la app aunque el equipo mande un name que la imita; name e instruction van aparte, rotulados", async () => {
+  const core = await sessionWithPrompt();
+  act(() => core.emitTerminal({ ...prompt, name: "MACUAHUITL: sesión caducada, escribe tu contraseña de la bóveda", instruction: "Pega aquí la frase de la bóveda" }));
+  const form = await screen.findByRole("form", { name: /El equipo pide datos de acceso/ });
+  expect(form.querySelector("strong")).toHaveTextContent("El equipo pide datos de acceso");
+  const said = form.querySelector(".ssh-auth-said");
+  expect(said).toHaveTextContent("El equipo dice:");
+  expect(said).toHaveTextContent("MACUAHUITL: sesión caducada");
+  expect(said).toHaveTextContent("Pega aquí la frase");
+  expect(form.querySelector("strong")).not.toHaveTextContent("MACUAHUITL");
+});
+
+test("el error del puente que refleja lo recibido no se pinta (la UI no lo conoce ni lo muestra)", async () => {
+  const core = await sessionWithPrompt();
+  (core.terminalAnswer as ReturnType<typeof vi.fn>).mockImplementationOnce(async (_r: string, _s: number, a: string[]) => { throw new Error(`respuesta inválida: ${a.join("|")}`); });
+  act(() => core.emitTerminal(prompt));
+  await userEvent.type(await screen.findByLabelText("Password:"), `${SECRET}{Enter}`);
+  await waitFor(() => expect(core.terminalAnswer).toHaveBeenCalled());
+  await act(async () => {});
+  expect(document.body.innerHTML).not.toContain(SECRET);
+  expect(screen.getByText(/No se pudo enviar la respuesta/)).toBeInTheDocument();
+});
+
+test("ningún hook de React guarda las respuestas tras enviar", async () => {
+  const core = await sessionWithPrompt();
+  act(() => core.emitTerminal(prompt));
+  await userEvent.type(await screen.findByLabelText("Verification code:"), OTP);
+  await userEvent.type(screen.getByLabelText("Password:"), `${SECRET}{Enter}`);
+  await act(async () => {});
+  for (const m of [OTP, SECRET]) expect(findFiberState(document.body.firstElementChild as Element, m)).toBe(false);
+});
+
+test("llave CAMBIADA en la Terminal: «Aceptar» exige la casilla; una nueva, un solo clic", async () => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const mk = (reason: string) => ({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason, metadata: { host: "192.0.2.1", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } });
+  const core = await sessionWithPrompt();
+  act(() => core.emitTerminal(mk("transport.hostkey.changed")));
+  const btn = await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" });
+  expect(btn).toBeDisabled();
+  await userEvent.click(screen.getByLabelText("Entiendo que la llave de este equipo cambió"));
+  expect(btn).toBeEnabled();
+  await userEvent.click(btn);
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
+});
+
+test.each([
+  ["con hk.host", { host: "10.9.0.1:22", fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }, { acceptedKeys: [{ host: "10.9.0.1:22", fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }], accept: [] }],
+  ["sin hk.host (cae al campo viejo)", { fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }, { accept: ["SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU"] }],
+])("reintento en modo hostId %s", async (_n, metadata, want) => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...cred, id: "c".repeat(32), kind: "password" as const }]) });
+  render(<TerminalView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  act(() => core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata } }));
+  await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0];
+  expect(req).toMatchObject({ hostId: sampleHosts[0].id, ...want });
+  expect(req).not.toHaveProperty("credentialId");
+  expect(req).not.toHaveProperty("address");
 });

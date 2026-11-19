@@ -9,7 +9,7 @@ import { useT } from "../../lib/i18n";
 
 export interface FindReq { q: string; dir: 1 | -1; n: number }
 interface Props {
-  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: (given?: string) => Promise<string>; active: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
+  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: (given?: string) => Promise<string>; active: boolean; asking?: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
   bind: (runId: string, write: ((d: string) => void) | null) => void; // la vista manda aquí lo que llega del equipo
   onInput: (d: string) => void; // teclas en crudo hacia el equipo
   onSize: (rows: number, cols: number) => void;
@@ -106,9 +106,9 @@ export default function XTermPane(p: Props) {
   }, [shown]);
   useEffect(() => {
     if (!shown) return;
-    const id = requestAnimationFrame(() => { fit.current(); if (props.current.active) term.current?.focus(); }); // visible de nuevo: medir y, si es la activa, tomar el foco
+    const id = requestAnimationFrame(() => { fit.current(); if (props.current.active && !props.current.asking) term.current?.focus(); }); // visible de nuevo: medir y, si es la activa y no hay pregunta abierta, tomar el foco
     return () => cancelAnimationFrame(id);
-  }, [shown, p.active]);
+  }, [shown, p.active, p.asking]);
   useEffect(() => {
     const s = p.search;
     if (!shown || !s || !find.current) return;

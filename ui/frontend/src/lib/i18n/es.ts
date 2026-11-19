@@ -3118,6 +3118,9 @@ export const es = {
   "ssh.userHint": "Vacío: la terminal pregunta «login as:». Con una credencial guardada no se usa.",
   "ssh.auth.title": "El equipo pide datos de acceso",
   "ssh.auth.answer": "Responder",
+  "ssh.auth.said": "El equipo dice:",
+  "ssh.auth.sendFail": "No se pudo enviar la respuesta. Si la sesión sigue abierta, el equipo volverá a preguntar.",
+  "ssh.hostKey.ack": "Entiendo que la llave de este equipo cambió",
 };
 
 export type Key = keyof typeof es;
