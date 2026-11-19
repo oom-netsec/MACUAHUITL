@@ -2,6 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DnsPanel, PcapPanel, SyslogPanel, TlsPanel } from "./ToolsView";
 import { fakeCore } from "../../lib/fake";
+import { CoreContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 
 test("pcap analiza la ruta indicada y muestra el resumen", async () => {
   const core = fakeCore({ toolsPcap: vi.fn(async () => "26 paquetes\nRST: 1") });
@@ -116,4 +118,15 @@ test("Consultar DNS nombra el nombre que falta y deja de hacerlo al escribirlo",
   await userEvent.type(screen.getByLabelText("Nombre"), "example.com");
   expect(go()).toBeEnabled();
   expect(go()).not.toHaveAccessibleDescription();
+});
+
+test("TextResult: sin texto no hay Copiar; con salida copia el texto completo y anuncia Copiado", async () => {
+  const core = fakeCore({ toolsPcap: vi.fn(async () => "26 paquetes\nRST: 1") });
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><PcapPanel core={core} /></CoreContext.Provider>);
+  expect(screen.queryByRole("button", { name: /^Copiar/ })).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Archivo de captura"), "/home/x/cap.pcapng");
+  await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
+  await userEvent.click(await screen.findByRole("button", { name: /^Copiar (Salida|Informe completo)/ }));
+  expect(core.copyText).toHaveBeenCalledWith("26 paquetes\nRST: 1");
+  expect(await screen.findByText("Copiado")).toBeInTheDocument();
 });

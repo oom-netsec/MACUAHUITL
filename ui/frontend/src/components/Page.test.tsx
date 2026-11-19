@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult } from "./Page";
+import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, Warnings, useResult } from "./Page";
 
 test("Page tiene un encabezado con título y descripción y lo usa como nombre de la región", () => {
   render(<Page title="Ping" description="Alcance y latencia." actions={<button>Historial</button>}><p>cuerpo</p></Page>);
@@ -85,4 +85,11 @@ test("TabPanels: monta al visitar, conserva el estado oculto y no monta lo no vi
   expect(document.querySelectorAll("input")).toHaveLength(2);
   await user.click(screen.getByRole("tab", { name: "A" }));
   expect(screen.getByRole("textbox", { name: "a" })).toHaveValue("hola");
+});
+
+test("Warnings lista cada aviso con su prefijo y no pinta nada si no hay", () => {
+  const { container, rerender } = render(<Warnings list={["uno", "dos"]} />);
+  expect(screen.getAllByRole("listitem").map((e) => e.textContent)).toEqual(["Aviso: uno", "Aviso: dos"]);
+  rerender(<Warnings list={[]} />);
+  expect(container).toBeEmptyDOMElement();
 });

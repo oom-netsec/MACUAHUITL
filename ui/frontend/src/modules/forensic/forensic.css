@@ -1,7 +1,6 @@
 /* Forense: avisos, fichas y carriles de flapping. Solo tokens. */
 
 .forensic-intro { color: var(--text-2); max-width: 72ch; margin: 0 0 var(--s-4); }
-.forensic-warnings { list-style: none; margin: 0; padding: 0; }
 .forensic-kv { border: 0; border-radius: 0; margin: 0; }
 .forensic-kv th[scope="row"] { width: 240px; background: none; color: var(--text-2); font-weight: 500; }
 .forensic-anomalies { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }

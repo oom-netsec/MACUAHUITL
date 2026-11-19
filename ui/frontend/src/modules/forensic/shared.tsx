@@ -1,4 +1,4 @@
-import { Field, Notice, Select, TextArea } from "../../components/Field";
+import { Field, Select, TextArea } from "../../components/Field";
 import { EmptyState, ResultPanel } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
@@ -21,12 +21,6 @@ export const runKbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
 export function FirstRun({ what }: { what: Key }) {
   const t = useT();
   return <EmptyState icon="search" title={t("forensic.empty.title")}>{t(what)}</EmptyState>;
-}
-
-export function Warnings({ list }: { list?: string[] }) {
-  const t = useT();
-  if (!list?.length) return null;
-  return <Notice kind="warn"><ul className="forensic-warnings">{list.map((w) => <li key={w}>{t("forensic.warning", { w })}</li>)}</ul></Notice>;
 }
 
 const SEV: Key[] = ["forensic.sev.0", "forensic.sev.1", "forensic.sev.2", "forensic.sev.3", "forensic.sev.4", "forensic.sev.5", "forensic.sev.6", "forensic.sev.7"];

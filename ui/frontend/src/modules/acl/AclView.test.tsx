@@ -1,3 +1,5 @@
+import { CoreContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AclView } from "./AclView";
@@ -11,7 +13,7 @@ test("importar, analizar y generar", async () => {
     aclAnalyze: vi.fn(async () => [{ index: 0, kind: "shadowed", detail: "la regla 1 ya cubre" }]),
     aclGenerate: vi.fn(async () => "ip access-list NEW\n  10 permit tcp 10.0.0.0/24 any eq 22\n"),
   });
-  render(<AclView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><AclView core={core} /></CoreContext.Provider>);
   await userEvent.selectOptions(screen.getByLabelText("Plataforma de origen"), "asa");
   await userEvent.type(screen.getByLabelText("ACL a importar"), "access-list EDGE extended permit tcp any any");
   await userEvent.click(screen.getByRole("button", { name: "Importar y analizar" }));
@@ -25,8 +27,9 @@ test("importar, analizar y generar", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Generar" }));
   expect(await screen.findByRole("log", { name: "Resultado" })).toHaveTextContent("ip access-list NEW");
   expect(core.aclGenerate).toHaveBeenCalledWith("nx-os", acl);
-  await userEvent.click(screen.getByRole("button", { name: "Copiar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Copiar Resultado" }));
   await waitFor(() => expect(core.copyText).toHaveBeenCalledWith(expect.stringContaining("ip access-list NEW")));
+  await waitFor(() => expect(screen.getAllByRole("status").some((e) => e.textContent === "Copiado")).toBe(true));
 });
 
 test("antes de importar explica qué hacer y no ofrece generar", () => {
@@ -37,7 +40,7 @@ test("antes de importar explica qué hacer y no ofrece generar", () => {
 
 test("un error de importación muestra la línea", async () => {
   const core = fakeCore({ aclImport: vi.fn(async () => { throw new Error("rpc error: code = InvalidArgument desc = acl: línea 2: wildcard no contigua"); }) });
-  render(<AclView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><AclView core={core} /></CoreContext.Provider>);
   await userEvent.type(screen.getByLabelText("ACL a importar"), "x");
   await userEvent.click(screen.getByRole("button", { name: "Importar y analizar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("línea 2");

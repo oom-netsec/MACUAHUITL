@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { CleanResult, CoreAPI } from "../../lib/core";
 import { Check, Notice, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, useResult } from "../../components/Page";
-import { Icon } from "../../components/Icon";
+import { CopyButton } from "../../components/Data";
 import { Terminal } from "../../components/Terminal";
 import { DiffView } from "../../components/DiffView";
 import { useT } from "../../lib/i18n";
@@ -14,11 +14,9 @@ export function CleanerView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [text, setText] = useState("");
   const [sort, setSort] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [ran, setRan] = useState(""); // lo que se limpió: el diff no cambia si se sigue editando la entrada
   const q = useResult<CleanResult>();
   const res = q.data;
-  const copy = async () => { try { await core.copyText(res?.output ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
 
   return (
     <Page title={t("cleaner.title")} description={t("cleaner.intro")}>
@@ -48,7 +46,7 @@ export function CleanerView({ core }: { core: CoreAPI }) {
             </ResultPanel>
           )}
           <ResultPanel title={t("cleaner.result")}
-            actions={<button className="quiet sm" onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>}>
+            actions={<CopyButton value={res.output} label={t("cleaner.result")} />}>
             <Terminal text={res.output} role="log" aria-label={t("cleaner.result")} />
           </ResultPanel>
         </>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { showHidden } from "../../lib/safeText";
 import type { CoreAPI, DriftReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, Warnings, useResult } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
@@ -67,11 +67,7 @@ export function DriftView({ core }: { core: CoreAPI }) {
               )}
             </ResultPanel>
           ))}
-          {rep.warnings.length > 0 && (
-            <Notice kind="warn">
-              <ul className="drift-warnings">{rep.warnings.map((w, i) => <li key={i}>{t("drift.warning", { w })}</li>)}</ul>
-            </Notice>
-          )}
+          <Warnings list={rep.warnings} />
         </>
       )}
     </Page>

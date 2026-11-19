@@ -4,11 +4,11 @@ import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Field, Notice, TextArea } from "../../components/Field";
-import { ResultPanel, Section, useResult } from "../../components/Page";
+import { ResultPanel, Section, Warnings, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import type { DebugGroup, DebugReport } from "./api";
-import { FirstRun, Intro, Warnings } from "./shared";
+import { FirstRun, Intro } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 
 // Filtro de debugs: agrupa las líneas repetidas, oculta el ruido y marca las anomalías. Solo texto o archivo: sin conexión en vivo.

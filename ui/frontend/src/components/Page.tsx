@@ -3,6 +3,7 @@
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./Icon";
 import { Notice, errorText } from "./Field";
+import { useT } from "../lib/i18n";
 
 export function Page({ title, description, actions, tabs, children }: { title: string; description?: ReactNode; actions?: ReactNode; tabs?: ReactNode; children?: ReactNode }) {
   const h = useId();
@@ -127,4 +128,11 @@ export function ErrorState({ title, children, action }: { title: string; childre
       {action}
     </div>
   );
+}
+
+// Lista de avisos de un resultado; no pinta nada si no hay.
+export function Warnings({ list }: { list: string[] | null | undefined }) {
+  const t = useT();
+  if (!list?.length) return null;
+  return <Notice kind="warn"><ul className="warnings">{list.map((w, i) => <li key={i}>{t("common.warning", { w })}</li>)}</ul></Notice>;
 }

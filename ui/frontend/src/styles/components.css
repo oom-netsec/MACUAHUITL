@@ -327,3 +327,4 @@ code.nowrap { white-space: nowrap; } /* un comando corto no se parte entre líne
 /* Subvistas que siguen montadas: contents conserva el espaciado; hidden las oculta. */
 .tab-panel { display: contents; }
 .tab-panel[hidden] { display: none; }
+.warnings { list-style: none; margin: 0; padding: 0; }

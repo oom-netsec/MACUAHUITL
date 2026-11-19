@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Check, Field, Notice, errorText } from "../../components/Field";
-import { Badge, ResultPanel, Section } from "../../components/Page";
+import { Badge, ResultPanel, Section, Warnings } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import type { PatternsReport } from "./api";
-import { FirstRun, Intro, SourcePicker, Warnings, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
+import { FirstRun, Intro, SourcePicker, emptySource, sourceMissing, toSource, type SourceState } from "./shared";
 
 // Con el modo en vivo se relee a lo más esto del final de la captura.
 const LIVE_KIB = 4096;
