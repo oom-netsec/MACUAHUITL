@@ -591,3 +591,62 @@ func TestTecleadaCancelarEnLoginAs(t *testing.T) {
 		t.Fatalf("goroutines %d > base %d", runtime.NumGoroutine(), base)
 	}
 }
+
+// Revisión de 47t-4 sobre #280: una huella por host ilegible se rechaza antes de preguntar «login as:», sin marcar.
+func TestTecleadaHuellaInvalidaAntesDeLoginAs(t *testing.T) {
+	var conns atomic.Int32
+	r := newRig(t, simulator.Config{OTP: otp, Conns: &conns})
+	o := r.typed("")
+	fp := o.AcceptedHostKeyFingerprints[0]
+	o.AcceptedHostKeyFingerprints = nil
+	o.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: "sw1:0", Fingerprint: fp}} // puerto 0: hostkey.err.accept_invalid
+	st, done, cancel := r.session(o)
+	defer cancel()
+	if err := wait(t, done); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("err = %v", err)
+	}
+	for len(st.out) > 0 {
+		if m := <-st.out; m.AuthPrompt != nil {
+			t.Fatal("preguntó «login as:» con una huella ilegible")
+		}
+	}
+	if conns.Load() != 0 {
+		t.Errorf("marcó al equipo %d veces", conns.Load())
+	}
+}
+
+// Las huellas por host (accepted_host_keys) valen en modo tecleado: la del equipo abre, la de otro equipo no.
+func TestTecleadaHuellasPorHost(t *testing.T) {
+	for _, ajena := range []bool{false, true} {
+		r := newRig(t, simulator.Config{OTP: otp}) // uno por caso: la llave aceptada queda en known_hosts
+		fp := r.open.AcceptedHostKeyFingerprints[0]
+		c := struct {
+			host string
+			abre bool
+		}{transport.HostKeyID(r.host, r.port), true}
+		if ajena {
+			c.host, c.abre = "192.0.2.9", false
+		}
+		o := r.typed("admin")
+		o.AcceptedHostKeyFingerprints = nil
+		o.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: c.host, Fingerprint: fp}}
+		st, done, cancel := r.session(o)
+		if !c.abre {
+			if err := wait(t, done); status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "SHA256:") {
+				t.Fatalf("%s: err = %v", c.host, err)
+			}
+			cancel()
+			continue
+		}
+		m, _ := st.prompt(t)
+		st.answer(m.Seq, "pw", otp)
+		if first := <-st.out; first.Opened == "" {
+			t.Fatalf("%s: primer evento = %+v", c.host, first)
+		}
+		close(st.in)
+		if err := wait(t, done); err != nil {
+			t.Fatalf("%s: %v", c.host, err)
+		}
+		cancel()
+	}
+}
