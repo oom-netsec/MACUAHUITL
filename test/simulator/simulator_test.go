@@ -190,3 +190,49 @@ func TestExecYSoloPublickey(t *testing.T) {
 		t.Fatal("AuthLog vacío")
 	}
 }
+
+// shellAbierto abre un shell con contraseña y espera el prompt.
+func shellAbierto(t *testing.T, addr string, hostKey ssh.PublicKey) *bufio.Reader {
+	t.Helper()
+	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "admin", Auth: []ssh.AuthMethod{ssh.Password("pw")}, HostKeyCallback: ssh.FixedHostKey(hostKey)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+	s, err := client.NewSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sin StdinPipe el cliente manda EOF por stdin al abrir y el shell termina solo: la sesión
+	// ya no estaría abierta cuando la prueba corte.
+	if _, err := s.StdinPipe(); err != nil {
+		t.Fatal(err)
+	}
+	outPipe, _ := s.StdoutPipe()
+	out := bufio.NewReader(outPipe)
+	if err := s.Shell(); err != nil {
+		t.Fatal(err)
+	}
+	readUntil(t, out, "SW1>")
+	return out
+}
+
+func TestHangupCortaSoloLasSesionesAbiertas(t *testing.T) {
+	h := &Hangup{}
+	addr, hostKey := Start(t, Config{Hostname: "SW1", Username: "admin", Password: "pw", Hangup: h})
+	out := shellAbierto(t, addr, hostKey)
+	if n := h.Now(); n != 1 {
+		t.Fatalf("cortó %d sesiones, se esperaba 1", n)
+	}
+	if _, err := out.ReadByte(); err != io.EOF {
+		t.Fatalf("la sesión cortada sigue viva: %v", err)
+	}
+	// La que se abre después no la toca el corte anterior: sigue abierta hasta el siguiente.
+	shellAbierto(t, addr, hostKey)
+	if n := h.Now(); n != 1 {
+		t.Fatalf("segundo corte: %d sesiones", n)
+	}
+	if n := h.Now(); n != 0 {
+		t.Fatalf("sin sesiones abiertas cortó %d", n)
+	}
+}
