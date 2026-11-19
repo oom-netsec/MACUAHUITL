@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Page, TabPanels, Tabs } from "../../components/Page";
-import { Panels } from "../../components/Panels";
 import { Segmented } from "../../components/Segmented";
 import { useT } from "../../lib/i18n";
 import { CaCard } from "./CaCard";
@@ -24,7 +23,7 @@ function PkiPanel({ core }: { core: CoreAPI }) {
     <>
       <Segmented legend={t("security.pki.what")} value={what} onChange={setWhat}
         options={[["csr", t("security.pki.csr")], ["ca", t("security.pki.ca")], ["export", t("security.pki.export")], ["decode", t("security.pki.decode")]]} />
-      <Panels value={what} panels={{ csr: <CsrCard core={core} />, ca: <CaCard core={core} />, export: <ExportCard core={core} />, decode: <DecodeCard core={core} /> }} />
+      <TabPanels value={what} render={(k) => ({ csr: <CsrCard core={core} />, ca: <CaCard core={core} />, export: <ExportCard core={core} />, decode: <DecodeCard core={core} /> })[k]} />
     </>
   );
 }

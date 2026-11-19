@@ -2,13 +2,12 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { CoreAPI, Credential, VaultState } from "../../lib/core";
 import { ConfirmButton, Field, Notice, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
-import { Badge, EmptyState, Page, Section } from "../../components/Page";
+import { Badge, EmptyState, Page, Section, TabPanels } from "../../components/Page";
 import { Glyph } from "../../components/Glyph";
 import { DataTable, type Column } from "../../components/DataTable";
 import { useT } from "../../lib/i18n";
 import { vaultChanged } from "../../lib/vaultSignal";
 import { useCoreLoad } from "../../lib/useCoreLoad";
-import { Panels } from "../../components/Panels";
 import { Segmented } from "../../components/Segmented";
 import { ImportKeyForm } from "./ImportKeyForm";
 import { BackupSection } from "./BackupSection";
@@ -98,11 +97,11 @@ export function VaultView({ core }: { core: CoreAPI }) {
           <Section title={t("vault.add")}>
             <Segmented legend={t("vault.add.kind")} value={add} onChange={setAdd}
               options={[["password", t("vault.add.password")], ["key", t("vault.add.key")], ["import", t("vault.add.import")]]} />
-            <Panels value={add} panels={{
+            <TabPanels value={add} render={(which) => ({
               password: <CredentialForm core={core} onDone={changed} setMsg={setMsg} />,
               key: <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />,
               import: <ImportKeyForm key={importGen} core={core} onDone={changed} onClose={() => { setImportGen((g) => g + 1); setAdd("password"); }} />,
-            }} />
+            })[which]} />
           </Section>
           <BackupSection core={core} sshKeys={creds.filter((c) => c.hasSshKey).length} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
         </>
