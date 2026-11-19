@@ -81,3 +81,20 @@ func TestWindowFinCortaRondaEnCurso(t *testing.T) {
 		t.Fatalf("el fin de la ventana debía cortar la ronda 2: estado %v motivo %q", st, reason)
 	}
 }
+
+// Regresión (CI de Windows, #292): Schedule.Until se valida contra el reloj del núcleo, no contra la hora real. Con
+// el reloj manual una hora atrás, un Until a 3 s del reloj ya «pasó» en tiempo real y aun así es válido.
+func TestUntilSeValidaConElRelojDelNucleo(t *testing.T) {
+	h := newHarnessReloj(t, nil)
+	cred := h.ready(t)
+	h.reloj.Avanza(-time.Hour)
+	spec := h.spec(cred)
+	spec.Schedule = &v1.Schedule{Rounds: 1, Until: timestamppb.New(h.reloj.Now().Add(3 * time.Second))}
+	if _, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: spec}); err != nil {
+		t.Fatalf("Until futuro en el reloj del núcleo rechazado: %v", err)
+	}
+	spec.Schedule.Until = timestamppb.New(h.reloj.Now().Add(-time.Second))
+	if _, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: spec}); err == nil {
+		t.Fatal("Until pasado en el reloj del núcleo aceptado")
+	}
+}

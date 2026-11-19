@@ -180,8 +180,9 @@ func noPlaybook(id string, missing func(string) string) error {
 	return fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
 }
 
-// missing dice qué paquete trae un playbook que ya no está (pack.missing, ADR 0010); nil = ninguno.
-func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(string) string) error {
+// missing dice qué paquete trae un playbook que ya no está (pack.missing, ADR 0010); nil = ninguno. now es la hora
+// del núcleo (su reloj, que las pruebas controlan) contra la que se valida Schedule.Until.
+func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(string) string, now time.Time) error {
 	if len(s.Targets) == 0 {
 		return fieldErr("targets", "patrol.field.no_targets")
 	}
@@ -246,7 +247,7 @@ func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(
 			return fieldErr("schedule", "patrol.field.cron", "error", err.Error())
 		}
 	}
-	if !sc.Until.IsZero() && !sc.Until.After(time.Now()) {
+	if !sc.Until.IsZero() && !sc.Until.After(now) {
 		return fieldErr("schedule", "patrol.field.until_past")
 	}
 	return nil

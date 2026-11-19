@@ -1,6 +1,8 @@
 package patrol
 
 import (
+	"time"
+
 	"encoding/json"
 	"strings"
 	"testing"
@@ -23,7 +25,7 @@ func specParams(t *testing.T, ids []string, p map[string]string) Spec {
 func TestValidateWithParams(t *testing.T) {
 	pbs := pbConMAC()
 	ok := specParams(t, []string{"ios-xe/cli", "ios-xe/plano"}, map[string]string{"mac": "AA:BB:CC:DD:EE:FF"})
-	if err := ValidateWith(ok, pbs, nil, nil); err != nil {
+	if err := ValidateWith(ok, pbs, nil, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	for name, s := range map[string]Spec{
@@ -32,7 +34,7 @@ func TestValidateWithParams(t *testing.T) {
 		"sin playbook con datos": specParams(t, []string{"ios-xe/plano"}, map[string]string{"mac": "aabb.ccdd.eeff"}),
 		"inyección":              specParams(t, []string{"ios-xe/cli"}, map[string]string{"mac": "aabb.ccdd.eeff\nconf t"}),
 	} {
-		err := ValidateWith(s, pbs, nil, nil)
+		err := ValidateWith(s, pbs, nil, nil, time.Now())
 		if err == nil || !strings.Contains(err.Error(), "params") {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -75,15 +77,15 @@ func TestSpecParamsJSON(t *testing.T) {
 func TestValidateWithParamsGemelo(t *testing.T) {
 	pbs := pbConMAC()
 	s := specParams(t, []string{"ios/cli"}, map[string]string{"mac": "AA:BB:CC:DD:EE:FF"})
-	if err := ValidateWith(s, pbs, nil, nil); err != nil {
+	if err := ValidateWith(s, pbs, nil, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	s = specParams(t, []string{"ios/cli"}, nil)
-	if err := ValidateWith(s, pbs, nil, nil); err == nil {
+	if err := ValidateWith(s, pbs, nil, nil, time.Now()); err == nil {
 		t.Fatal("falta el dato del gemelo y pasó")
 	}
 	s = specParams(t, []string{"ios/cli"}, map[string]string{"mac": "mal"})
-	if err := ValidateWith(s, pbs, nil, nil); err == nil {
+	if err := ValidateWith(s, pbs, nil, nil, time.Now()); err == nil {
 		t.Fatal("dato inválido pasó")
 	}
 }
