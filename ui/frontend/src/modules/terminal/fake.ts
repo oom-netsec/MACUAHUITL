@@ -9,6 +9,7 @@ export function fakeTerminal() {
     terminalOpen: vi.fn(async () => `t${++seq}`),
     terminalSend: vi.fn(async () => {}),
     terminalResize: vi.fn(async () => {}),
+    terminalAnswer: vi.fn(async () => {}),
     terminalClose: vi.fn(async () => {}),
     onTerminal: (cb: (e: TerminalEvent) => void) => (evs.add(cb), () => { evs.delete(cb); }),
     emitTerminal: (e: TerminalEvent) => evs.forEach((cb) => cb(e)),

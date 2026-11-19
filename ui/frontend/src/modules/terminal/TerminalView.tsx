@@ -16,7 +16,8 @@ import type { Key } from "../../lib/i18n/es";
 import { PALETTES } from "../../lib/termHighlight";
 import { setTermPrefs, useTermPrefs } from "../../lib/termPrefs";
 import { createLiveWriter } from "../../lib/termAnsi";
-import type { TerminalEvent } from "./api";
+import type { AuthPrompt, TerminalEvent } from "./api";
+import { AuthPanel } from "./AuthPanel";
 import type { FindReq } from "./XTermPane";
 import { xtermTheme } from "./termTheme";
 import "./terminal.css";
@@ -25,7 +26,7 @@ import { hostsChanged } from "../inventory/signal";
 import { passwordCreds } from "../vault/api";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
 import { SavedHosts } from "./SavedHosts";
-import { hostKeyFromError, keygenCommands, parseFingerprints, type HostKeyInfo } from "../../lib/hostkeys";
+import { hostKeyFromError, hostOfTarget, keygenCommands, parseFingerprints, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
 import { useScriptsVersion } from "../scripts/signal";
@@ -40,7 +41,7 @@ const XTermPane = lazy(() => import("./XTermPane"));
 // La salida viva se resalta con las reglas de la app (lib/termAnsi): solo líneas completas y sin ESC; el texto limpio (búsqueda, descarga y registro) no lleva códigos.
 
 interface Tab {
-  key: number; label: string; device: string; cred: string; hostId?: string; startup?: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
+  key: number; label: string; device: string; cred: string; user: string; ask?: AuthPrompt; hostId?: string; startup?: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
   logPath: string; logAt: Date | null; logErr: string; // registro opcional en el archivo que eligió la persona
 }
 interface LogState { path: string; last: string; chain: Promise<void> }
@@ -48,6 +49,7 @@ interface LogState { path: string; last: string; chain: Promise<void> }
 // Punto de estado de la pestaña y de la línea de estado: conectando, viva, cerrada o con error.
 const stateOf = (tab: Tab) => (tab.done ? (tab.err ? "error" : "closed") : tab.status.k === "ssh.connecting" ? "connecting" : "live");
 
+const TYPED = "\u0000typed"; // valor de la opción «Escribir usuario y contraseña al conectar» del selector
 const QUICK = ["show running-config", "show version", "show ip interface brief", "show interfaces status"];
 // Nombre de archivo seguro: la dirección puede traer ":" del puerto.
 const LOG_EVERY = 30_000;
@@ -62,12 +64,14 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [creds, setCreds] = useState<Credential[]>([]);
   const [cred, setCred] = useState("");
+  const [typed, setTyped] = useState(false); // sin credencial: el equipo pregunta usuario y contraseña en la propia terminal
+  const [user, setUser] = useState(""); // usuario opcional en modo tecleado; vacío = «login as:»
   const [noCred, setNoCred] = useState(false); // el host elegido de la libreta no tiene credencial utilizable: se elige una
   const [device, setDevice] = useState("");
   const [accept, setAccept] = useState("");
   const [err, setErr] = useState("");
   // Llave de host rechazada en la apertura misma (sin pestaña): el aviso va arriba. Hoy el núcleo lo manda por el stream de la pestaña.
-  const [openHk, setOpenHk] = useState<{ hk: HostKeyInfo; dev: string; cred: string; hostId?: string; startup: string } | null>(null);
+  const [openHk, setOpenHk] = useState<{ hk: HostKeyInfo; dev: string; cred: string; user: string; hostId?: string; startup: string } | null>(null);
   const [note, setNote] = useState<"" | "nosession" | "noconfig">(""); // aviso de un script que no se pudo insertar
   const [pins, setPins] = useState<ScriptItem[]>([]); // scripts fijados (hasta 5, en su orden), junto a los comandos rápidos
   const sv = useScriptsVersion(); // los scripts cambiaron: volver a listar los fijados
@@ -115,9 +119,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       writers.current.get(e.runId)?.flush();
       saveLog(e.runId);
       if (e.errorInfo?.reason === "terminal.err.startup_changed") hostsChanged(); // volver a leer los hosts: reintentar usa la orden nueva
-      patch(e.runId, (t) => ({ ...t, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err, errInfo: e.error ? errInfo({ cause: e.errorInfo }) : t.errInfo }));
+      patch(e.runId, (t) => ({ ...t, ask: undefined, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err, errInfo: e.error ? errInfo({ cause: e.errorInfo }) : t.errInfo }));
+    } else if (e.prompts) {
+      const ask = { seq: e.seq ?? 0, name: e.name ?? "", instruction: e.instruction ?? "", prompts: e.prompts };
+      patch(e.runId, (t) => ({ ...t, ask }));
     } else if (e.opened) {
-      patch(e.runId, (t) => ({ ...t, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
+      patch(e.runId, (t) => ({ ...t, ask: undefined, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
     } else if (e.data) {
       const d = e.data;
       texts.current.set(e.runId, cleanTerminal(texts.current.get(e.runId) ?? "", d, logs.current.has(e.runId) ? LOG_MAX : undefined));
@@ -176,17 +183,17 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
-  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "") => {
+  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "", usr = user, keys: AcceptedKey[] = []) => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setOpenHk(null); setErr(t("ssh.logInUse")); return; }
     setErr(""); setOpenHk(null); setBusy(true);
     try {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
-      const base = { name: label, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols };
-      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup } : { ...base, address: tg.address, port: tg.port, credentialId: credId });
+      const base = { name: label, accept: parseFingerprints(accepted), ...(keys.length ? { acceptedKeys: keys } : {}), rows: size.current.rows, cols: size.current.cols };
+      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
-      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, hostId, startup, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
+      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
       // La pestaña se registra ya (no al renderizar) para que ningún evento se quede sin dueño.
       tabsRef.current = [...tabsRef.current, tab];
@@ -199,7 +206,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       if (newRef.current) newRef.current.open = false;
     } catch (e) {
       const hk = hostKeyFromError(errorText(e), errInfo(e));
-      if (hk) setOpenHk({ hk, dev, cred: credId, hostId, startup });
+      if (hk) setOpenHk({ hk, dev, cred: credId, user: usr, hostId, startup });
       else setErr(errorText(e));
     } finally { setBusy(false); }
   };
@@ -216,6 +223,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       if (q.buf) { const n = q.buf; q.buf = ""; go(n); } else q.busy = false;
     });
     go(data);
+  };
+  // Respuesta a una pregunta del equipo: el panel entrega las respuestas y aquí solo se mandan; el estado de la pestaña pierde
+  // la pregunta en el mismo handler (el panel se desmonta) y las respuestas no se guardan en ninguna parte.
+  const answer = (runId: string, seq: number, answers: string[]) => {
+    patch(runId, (t) => ({ ...t, ask: undefined }));
+    core.terminalAnswer(runId, seq, answers).catch((e) => patch(runId, (t) => ({ ...t, err: errorText(e) })));
   };
   const closeTab = (i: number) => {
     const t = tabs[i];
@@ -285,7 +298,13 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   useInbox("terminal-insert", (data) => { const ins = decodeInsert(data); if (ins) void insert(tool, ins); }); // «Enviar a la terminal» de Scripts
 
   // Huella nueva o cambiada: se muestra con la orden para compararla y se acepta explícitamente (agrega la huella al campo y reintenta).
-  const hostKeyNotice = (hk: HostKeyInfo, device: string, retry: (accepted: string) => void) => {
+  // «Confiar y reintentar» manda el par {host, huella} del destino, nunca lo del campo de huellas ni respuestas. Con un host guardado la
+  // UI no conoce la dirección: sirve la que informó el núcleo, y sin ella el campo viejo (un solo destino).
+  const trust = (hk: HostKeyInfo, dev: string, hostId: string | undefined): { accepted: string; keys: AcceptedKey[] } => {
+    const host = hostId ? hk.host : hostOfTarget(parseTarget(parseTargets(dev)[0] ?? ""));
+    return host ? { accepted: accept, keys: [{ host, fingerprint: hk.fp }] } : { accepted: `${accept} ${hk.fp}`.trim(), keys: [] };
+  };
+  const hostKeyNotice = (hk: HostKeyInfo, device: string, retry: () => void) => {
     const kg = hk.keyType ? keygenCommands(hk.keyType) : null;
     return (
       <Notice kind="warn">
@@ -299,7 +318,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
             <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
           </>
         )}
-        <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); retry(next); }}>{t("transfer.hostKey.accept")}</button>
+        <button type="button" disabled={busy} onClick={retry}>{t("transfer.hostKey.accept")}</button>
       </Notice>
     );
   };
@@ -312,7 +331,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
         {tab.err && <Notice kind="error">{tab.err}</Notice>}
         {changedStartup && <Notice kind="warn">{t("ssh.startupChanged")}</Notice>}
-        {hk && hostKeyNotice(hk, tab.device, (next) => void open(next, tab.device, tab.cred, tab.hostId, tab.startup))}
+        {hk && hostKeyNotice(hk, tab.device, () => { const k = trust(hk, tab.device, tab.hostId); void open(k.accepted, tab.device, tab.cred, tab.hostId, tab.startup, tab.user, k.keys); })}
       </>
     );
   };
@@ -329,9 +348,10 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const form = (
     <>
       <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand); }} />
-      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
+      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); if (ok) setCred(h.credentialId); setTyped(false); setNoCred(!ok); }} />
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
+        <Select label={t("ssh.cred")} value={noCred ? "" : typed || !cred ? TYPED : cred} placeholder={noCred ? t("ssh.credPick") : undefined} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); setNoCred(false); }} w="md" hint={noCred ? t("hosts.pick.noCred") : undefined} options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
+        {(typed || !cred) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
         <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
       </div>
@@ -345,7 +365,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         <p id={`${logId}-h`} className="hint">{t("ssh.logHelp")}</p>
       </div>
       <div className="actions">
-        <button className="primary" disabled={busy || !cred || !device.trim()} aria-busy={busy} onClick={() => open()}>
+        <button className="primary" disabled={busy || noCred || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : cred, undefined, "", typed || !cred ? user : "")}>
           {busy ? t("ssh.connectingBtn") : <>{t("ssh.openTab")}<kbd aria-hidden="true">Ctrl ↵</kbd></>}
         </button>
       </div>
@@ -357,7 +377,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {/* Sin sesiones, el formulario a la vista; con sesiones se pliega en una línea y la terminal se queda con la pantalla. */}
       {!hasTabs ? <Section title={t("ssh.new")}>{form}</Section> : <details ref={newRef} className="ssh-new"><summary>{t("ssh.new")}</summary>{form}</details>}
       {err && <Notice kind="error">{err}</Notice>}
-      {openHk && hostKeyNotice(openHk.hk, openHk.dev, (next) => void open(next, openHk.dev, openHk.cred, openHk.hostId, openHk.startup))}
+      {openHk && hostKeyNotice(openHk.hk, openHk.dev, () => { const k = trust(openHk.hk, openHk.dev, openHk.hostId); void open(k.accepted, openHk.dev, openHk.cred, openHk.hostId, openHk.startup, openHk.user, k.keys); })}
       {note && <Notice kind="warn">{t(note === "nosession" ? "ssh.scriptNoSession" : "scripts.noSend")}</Notice>}
       {tabs.length === 0 && <EmptyState icon="terminal" title={t("ssh.empty.title")}>{t("ssh.empty")}</EmptyState>}
       {cur && !second && head(cur)}
@@ -408,6 +428,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
                     return (
                       <div key={tab.key} hidden={!shown} data-key={tab.key} className={`ssh-pane ${side}`} onFocus={() => setFocusKey(tab.key)} onMouseDown={() => setFocusKey(tab.key)}>
                         {second && shown && <div className="ssh-pane-head"><strong>{tab.label}</strong>{head(tab)}</div>}
+                        {tab.ask && <AuthPanel key={`${tab.runId}:${tab.ask.seq}`} prompt={tab.ask} onAnswer={(seq, a) => answer(tab.runId, seq, a)} />}
                         <div className="ssh-term" style={second ? { background: theme.background } : undefined}>
                           <XTermPane runId={tab.runId} screenReader={srm} onCopy={(x) => { void core.copyText(x).catch(() => {}); }} onPaste={async (given) => { const txt = given ?? await core.pasteText(); return pasteNeedsConfirm(txt) && !(await core.confirmPaste(txt, tab.label)) ? "" : txt; }} active={i === active} shown={shown} done={tab.done} theme={theme} search={tab.key === tool.key ? find : undefined}
                             label={second && shown ? t(side === "left" ? "ssh.pane.left" : "ssh.pane.right", { label: tab.label }) : undefined}

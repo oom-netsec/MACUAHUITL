@@ -244,7 +244,7 @@ test("una llave de host nueva ofrece aceptar la huella y reintenta con ella; la 
   await userEvent.type(screen.getByLabelText(/Equipo/), "10.9.9.9"); // otro equipo en el campo: la huella no se le manda
   await userEvent.click(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
-  expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ address: "192.168.3.2", accept: ["SHA256:AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK", `SHA256:${fp}`] }));
+  expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ address: "192.168.3.2", accept: ["SHA256:AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK"], acceptedKeys: [{ host: "192.168.3.2", fingerprint: `SHA256:${fp}` }] }));
 });
 
 test("la pestaña y la línea de estado muestran el punto de la conexión: conectando, viva y cerrada con error", async () => {

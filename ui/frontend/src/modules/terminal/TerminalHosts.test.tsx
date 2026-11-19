@@ -65,7 +65,7 @@ test("junto al botón se ve la orden de inicio y viaja como expectedStartupComma
   act(() => { core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "10.9.0.1:22", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }); });
   await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
-  expect(calls()[1][0]).toMatchObject({ expectedStartupCommand: "tmux attach -t main", accept: [`SHA256:${fp}`] }); // la misma orden que se mostró
+  expect(calls()[1][0]).toMatchObject({ expectedStartupCommand: "tmux attach -t main", acceptedKeys: [{ host: "10.9.0.1:22", fingerprint: `SHA256:${fp}` }] }); // la misma orden que se mostró
 });
 
 test("si el núcleo no conecta porque la orden cambió, lo dice claro y recarga los hosts guardados", async () => {
