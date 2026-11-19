@@ -6,7 +6,6 @@ import { resolveAccepted } from "../../lib/hostkeys";
 import { TargetField, useBookCredential } from "../inventory/TargetField";
 import { planTarget } from "../../lib/targets";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
-import { planTarget } from "../../lib/targets";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";

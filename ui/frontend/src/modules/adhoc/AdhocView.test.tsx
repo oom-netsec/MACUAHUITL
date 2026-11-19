@@ -223,7 +223,7 @@ test("equipos de la libreta: etiqueta común, rellena campo y credencial, y se e
   expect(screen.getByLabelText(LABEL_MANY)).toHaveValue("10.9.0.1\nap1.lab:2222");
   expect(screen.getByLabelText("Credencial")).toHaveValue(BOOK_CRED);
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
-  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "10.9.0.1", port: 0 }, { address: "ap1.lab", port: 2222 }], BOOK_CRED, expect.stringContaining("show version"), []);
+  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "10.9.0.1", port: 0 }, { address: "ap1.lab", port: 2222 }], BOOK_CRED, expect.stringContaining("show version"), [], []);
 });
 
 test("equipos de la libreta: una credencial ya elegida a mano no se pisa", async () => {

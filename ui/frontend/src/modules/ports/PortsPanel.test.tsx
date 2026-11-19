@@ -96,7 +96,7 @@ test("con la respuesta del núcleo: miembros de un port-channel fijos y avisos v
 test("la huella aceptada viaja atada al equipo y su puerto", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), portStatus: vi.fn(async () => live) });
   render(<PortsView core={core} />);
-  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5:2222");
+  await userEvent.type(await screen.findByLabelText("Equipo (IP o nombre, con :puerto opcional)"), "10.0.0.5:2222");
   await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
   await userEvent.click(screen.getByRole("button", { name: "Leer puertos (solo lectura)" }));
   expect(core.portStatus).toHaveBeenCalledWith({ device: "10.0.0.5", port: 2222, credentialId: "c1", acceptedHostKeys: ["SHA256:abc"], acceptedKeys: [{ host: "10.0.0.5:2222", fingerprint: "SHA256:abc" }] });
