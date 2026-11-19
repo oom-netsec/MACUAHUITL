@@ -7,24 +7,22 @@ import type { CoreAPI } from "../../lib/core";
 import { I18nProvider, useSetLang } from "../../lib/i18n";
 import { setOSForTests } from "../../lib/platform";
 
-test("ejecuta ping, muestra la salida en vivo y la ruta al terminar", async () => {
+test("ejecuta nmap, muestra la salida en vivo y la ruta al terminar", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<DiagView core={core} tool="ping" />);
-  expect(screen.getByRole("heading", { name: "Ping" })).toBeInTheDocument();
+  render(<DiagView core={core} tool="nmap" />);
+  expect(screen.getByRole("heading", { name: "nmap" })).toBeInTheDocument();
   expect(screen.getByLabelText("Destino")).toHaveAccessibleDescription("Nombre de host o dirección IP.");
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
-  await userEvent.clear(screen.getByLabelText("Paquetes"));
-  await userEvent.type(screen.getByLabelText("Paquetes"), "6");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "6" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("nmap", ["10.0.0.1"], { scan: "connect" }));
   act(() => core.emitDiag({ runId: "r1", line: "64 bytes from 10.0.0.1" }));
   act(() => core.emitDiag({ runId: "otro", line: "no es mío" }));
   await waitFor(() => expect(screen.getByRole("log", { name: "Salida" })).toHaveTextContent(/64 bytes from 10\.0\.0\.1/)); // las líneas pasan por lotes
   expect(screen.queryByText(/no es mío/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(core.diagCancel).toHaveBeenCalledWith("r1");
-  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0, outputPath: "/home/u/out/diag_ping_x.txt" }));
-  expect(await screen.findByText(/diag_ping_x\.txt/)).toBeInTheDocument();
+  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0, outputPath: "/home/u/out/diag_nmap_x.txt" }));
+  expect(await screen.findByText(/diag_nmap_x\.txt/)).toBeInTheDocument();
 });
 
 test("la captura pide interfaz y manda el filtro tal cual", async () => {
@@ -166,7 +164,7 @@ test("iperf3 servidor: sin IP local disponible lo dice y no arranca", async () =
 });
 
 test("el botón de ejecutar queda deshabilitado hasta que hay destino", async () => {
-  render(<DiagView core={fakeCore()} tool="ping" />);
+  render(<DiagView core={fakeCore()} tool="nmap" />);
   expect(screen.getByRole("button", { name: /Ejecutar/ })).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   expect(screen.getByRole("button", { name: /Ejecutar/ })).toBeEnabled();
@@ -174,7 +172,7 @@ test("el botón de ejecutar queda deshabilitado hasta que hay destino", async ()
 
 test("cancelar no es un fallo: estado neutro «Cancelado» y sin mensaje de error", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<DiagView core={core} tool="ping" />);
+  render(<DiagView core={core} tool="nmap" />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
@@ -187,7 +185,7 @@ test("cancelar no es un fallo: estado neutro «Cancelado» y sin mensaje de erro
 
 test("dos clics seguidos en Ejecutar no lanzan dos ejecuciones", async () => {
   const core = fakeCore({ diagRun: vi.fn(() => new Promise<string>(() => {})) });
-  render(<DiagView core={core} tool="ping" />);
+  render(<DiagView core={core} tool="nmap" />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   const run = screen.getByRole("button", { name: /Ejecutar/ });
   await userEvent.click(run);
@@ -198,7 +196,7 @@ test("dos clics seguidos en Ejecutar no lanzan dos ejecuciones", async () => {
 test("un evento posterior al cambio de idioma se escribe en el idioma vigente, no en el del primer render", async () => {
   const Switch = () => { const set = useSetLang(); return <button onClick={() => set("en")}>a-en</button>; };
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<I18nProvider><Switch /><DiagView core={core} tool="ping" /></I18nProvider>);
+  render(<I18nProvider><Switch /><DiagView core={core} tool="nmap" /></I18nProvider>);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
   await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
@@ -221,165 +219,9 @@ test("nmap en Windows no ofrece el escaneo SYN; en Linux sí", () => {
   expect(screen.getAllByRole("option").map((o) => o.getAttribute("value"))).toContain("syn");
 });
 
-// Ping extendido (#200, contrato en #218)
-const openExt = async () => userEvent.click(screen.getByText("Opciones extendidas"));
-const pingView = async (over = {}) => {
-  const core = fakeCore({ diagRun: vi.fn(async () => "r1"), ...over });
-  render(<DiagView core={core} tool="ping" />);
-  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
-  return core;
-};
-
-test("ping extendido: sección cerrada con el número de opciones activas; manda solo las claves con valor", async () => {
-  const core = await pingView();
-  const sum = screen.getByText("Opciones extendidas").closest("details")!;
-  expect(sum).not.toHaveAttribute("open");
-  await openExt();
-  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "5");
-  await userEvent.click(screen.getByLabelText("No fragmentar (DF)"));
-  expect(sum).toHaveTextContent("2 activas");
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "4", ttl: "5", df: "true" }));
-});
-
-test("ping extendido: valor fuera de rango muestra el mensaje y no deja ejecutar", async () => {
-  await pingView();
-  await openExt();
-  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "300");
-  expect(screen.getByLabelText("TTL (1-255)")).toBeInvalid();
-  expect(screen.getByText("El TTL va de 1 a 255.")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Ejecutar" })).toBeDisabled();
-});
-
-test("en Windows se ocultan intervalo y DSCP", async () => {
-  setOSForTests("windows");
-  try {
-    await pingView();
-    await openExt();
-    expect(screen.queryByLabelText("Intervalo (0.2-60 s)")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("DSCP (0-63)")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("TTL (1-255)")).toBeInTheDocument();
-  } finally { setOSForTests(undefined); }
-});
-
-test("continuo: Detener usa diagStop y Cancelar sigue cortando; NotFound al detener no muestra error", async () => {
-  const diagStop = vi.fn().mockRejectedValue(Object.assign(new Error("x"), { cause: { code: "NotFound", reason: "run.notfound" } }));
-  const core = await pingView({ diagStop });
-  await openExt();
-  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { continuous: "true" }));
-  await userEvent.click(await screen.findByRole("button", { name: "Detener" }));
-  expect(diagStop).toHaveBeenCalledWith("r1");
-  await act(async () => {});
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(core.diagCancel).toHaveBeenCalledWith("r1");
-});
-
-test("sin continuo ni duración no hay Detener", async () => {
-  const core = await pingView();
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
-  await screen.findByRole("button", { name: "Cancelar" });
-  expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument();
-});
-
-test("Detener desaparece al terminar y si el arranque falla", async () => {
-  const core = await pingView();
-  await openExt();
-  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await screen.findByRole("button", { name: "Detener" });
-  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0 }));
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument());
-});
-
-test("Detener desaparece si diagRun falla", async () => {
-  await pingView({ diagRun: vi.fn().mockRejectedValue(new Error("boom")) });
-  await openExt();
-  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await screen.findByRole("alert");
-  expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument();
-});
-
-test("paquetes inválido se ve con la sección cerrada; otros errores salen en el resumen", async () => {
-  await pingView();
-  await userEvent.clear(screen.getByLabelText("Paquetes"));
-  expect(screen.getByLabelText("Paquetes")).toBeInvalid();
-  expect(screen.getByText("Los paquetes van de 1 a 100.")).toBeInTheDocument();
-  await userEvent.type(screen.getByLabelText("Paquetes"), "4");
-  await openExt();
-  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "300");
-  expect(screen.getByText("Opciones extendidas").closest("summary")).toHaveTextContent("1 con error");
-});
-
-test("con barrido, Paquetes pasa a 1 hasta que el usuario lo toca", async () => {
-  await pingView();
-  await openExt();
-  await userEvent.type(screen.getByLabelText("Inicio"), "0");
-  expect(screen.getByLabelText("Paquetes")).toHaveValue(1);
-});
-
-test("MTU: con familia Auto y un nombre de host no hay cifra, solo el aviso", async () => {
-  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<DiagView core={core} tool="ping" />);
-  await userEvent.type(screen.getByLabelText("Destino"), "router.example");
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
-  act(() => {
-    core.emitDiag({ runId: "r1", sweepPoint: { size: 1400, sent: 1, received: 1, result: "ok" } });
-    core.emitDiag({ runId: "r1", sweepPoint: { size: 1500, sent: 1, received: 0, result: "frag" } });
-  });
-  expect(await screen.findByText(/No se puede estimar la MTU/)).toBeInTheDocument();
-  expect(screen.queryByText(/MTU estimada de la ruta/)).not.toBeInTheDocument();
-});
-
-test("también se detiene con duración, y un error distinto de NotFound se muestra", async () => {
-  await pingView({ diagStop: vi.fn().mockRejectedValue(new Error("boom")) });
-  await openExt();
-  await userEvent.type(screen.getByLabelText("Duración total (1-3600 s)"), "30");
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await userEvent.click(await screen.findByRole("button", { name: "Detener" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("boom");
-});
-
-test("resumen y barrido: tarjeta, tabla ordenada y MTU estimada", async () => {
-  const core = await pingView();
-  await openExt();
-  await userEvent.type(screen.getByLabelText("Inicio"), "1400");
-  await userEvent.type(screen.getByLabelText("Fin"), "1500");
-  await userEvent.type(screen.getByLabelText("Paso"), "50");
-  expect(screen.getByText("3 puntos (máximo 100)")).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "1", sweep_start: "1400", sweep_end: "1500", sweep_step: "50" }));
-  act(() => {
-    core.emitDiag({ runId: "r1", sweepPoint: { size: 1500, sent: 4, received: 0, result: "frag" } });
-    core.emitDiag({ runId: "r1", sweepPoint: { size: 1400, sent: 4, received: 4, result: "ok" } });
-    core.emitDiag({ runId: "r1", sweepPoint: { size: 1450, sent: 4, received: 4, result: "ok" } });
-    core.emitDiag({ runId: "r1", done: true, exitCode: 0, pingSummary: { sent: 12, received: 8, lossPct: 33.33, minMs: 1, avgMs: 2, maxMs: 3.5, mdevMs: 0.7 } });
-  });
-  const table = await screen.findByRole("table", { name: "Barrido de tamaños" });
-  expect([...table.querySelectorAll("tbody th")].map((x) => x.textContent)).toEqual(["1400", "1450", "1500"]);
-  expect(screen.getByText(/MTU estimada de la ruta: 1478/)).toBeInTheDocument();
-  expect(screen.getByText(/Es una estimación/)).toBeInTheDocument();
-  const sum = screen.getByRole("region", { name: "Resumen del ping" });
-  expect(sum).toHaveTextContent("Enviados12");
-  expect(sum).toHaveTextContent("33.33 %");
-  expect(sum).toHaveTextContent("Desviación (mdev)0.7 ms");
-});
-
-test("si el núcleo rechaza una opción en Windows se muestra su texto con la clave", async () => {
-  const diagRun = vi.fn().mockRejectedValue(Object.assign(new Error("x"), { cause: { code: "InvalidArgument", reason: "diag.err.opt_windows", metadata: { key: "tos" } } }));
-  await pingView({ diagRun });
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Esta opción no está disponible en Windows: tos");
-});
-
 test("500 líneas seguidas llegan en orden y done no pierde las pendientes del lote", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<DiagView core={core} tool="ping" />);
+  render(<DiagView core={core} tool="nmap" />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
@@ -435,7 +277,7 @@ test("el aviso de la captura en Windows pide Wireshark con Npcap, no el paquete 
 });
 
 test("Ejecutar nombra el destino que falta y deja de hacerlo al escribirlo", async () => {
-  render(<DiagView core={fakeCore()} tool="ping" />);
+  render(<DiagView core={fakeCore()} tool="nmap" />);
   const go = () => screen.getByRole("button", { name: "Ejecutar" });
   expect(go()).toBeDisabled();
   expect(go()).toHaveAccessibleDescription("Falta: indicar el equipo.");
@@ -446,7 +288,7 @@ test("Ejecutar nombra el destino que falta y deja de hacerlo al escribirlo", asy
 
 test("Copiar solo aparece con salida; copia el texto completo y anuncia Copiado", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "rc") });
-  render(<CoreContext.Provider value={core as unknown as CoreAPI}><DiagView core={core} tool="ping" /></CoreContext.Provider>);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><DiagView core={core} tool="nmap" /></CoreContext.Provider>);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   expect(screen.queryByRole("button", { name: "Copiar Salida" })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));

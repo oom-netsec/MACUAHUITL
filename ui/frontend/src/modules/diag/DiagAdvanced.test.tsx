@@ -6,20 +6,6 @@ import { fakeCore } from "../../lib/fake";
 const nics = [{ name: "eth0", up: true, loopback: false, addresses: ["192.168.3.10/24"], hardwareAddr: "aa:bb" }];
 const sum = (d: HTMLElement) => d.querySelector("summary")!;
 
-test("traceroute: «Saltos máximos» va plegado, cuenta y se sigue enviando; destino queda fuera", async () => {
-  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  render(<DiagView core={core} tool="traceroute" />);
-  const d = screen.getByLabelText("Saltos máximos").closest("details")!;
-  expect(d.open).toBe(false);
-  expect(d).not.toContainElement(screen.getByLabelText("Destino"));
-  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
-  await userEvent.clear(screen.getByLabelText("Saltos máximos"));
-  await userEvent.type(screen.getByLabelText("Saltos máximos"), "12");
-  expect(sum(d)).toHaveTextContent("cambiadas: 1");
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("traceroute", ["10.0.0.1"], { max_hops: "12" }));
-});
-
 test("iperf3 servidor: el puerto va plegado, cuenta y se abre solo si es inválido; el modo queda fuera", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r3"), listInterfaces: vi.fn(async () => nics) });
   render(<DiagView core={core} tool="iperf3" />);

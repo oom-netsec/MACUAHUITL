@@ -23,42 +23,6 @@ async function start(tool: ToolName, target = "10.0.0.1") {
   return { core, emit };
 }
 
-test("ping: gráfica de RTT en vivo y cifras de mín, prom, máx, jitter y pérdida", async () => {
-  const { emit } = await start("ping");
-  emit(
-    "64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.4 ms",
-    "64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.5 ms",
-    "no answer yet for icmp_seq=3",
-    "64 bytes from 10.0.0.1: icmp_seq=4 ttl=64 time=0.3 ms",
-  );
-  const fig = await screen.findByRole("figure", { name: "RTT por paquete" });
-  expect(fig).toHaveTextContent("RTT: mín 0.3 ms, prom 0.4 ms, máx 0.5 ms, último 0.3 ms");
-  const stats = screen.getByRole("region", { name: "Estadísticas del ping" });
-  expect(within(stats).getByText("Mínimo").nextSibling).toHaveTextContent("0.3 ms");
-  expect(within(stats).getByText("Máximo").nextSibling).toHaveTextContent("0.5 ms");
-  expect(within(stats).getByText("Jitter").nextSibling).toHaveTextContent("0.15 ms");
-  expect(within(stats).getByText("Pérdida").nextSibling).toHaveTextContent("25 % (1 de 4)");
-  expect(within(stats).getByText("Paquetes perdidos").nextSibling).toHaveTextContent("3");
-});
-
-test("traceroute: tabla de saltos con barra de RTT y los saltos sin respuesta resaltados", async () => {
-  const { emit } = await start("traceroute", "8.8.8.8");
-  emit(
-    "traceroute to dns.google (8.8.8.8), 30 hops max, 60 byte packets",
-    " 1  _gateway (192.168.1.1)  0.412 ms  0.388 ms  0.401 ms",
-    " 2  * * *",
-    " 3  dns.google (8.8.8.8)  14.2 ms  13.9 ms  14.8 ms",
-  );
-  const table = await screen.findByRole("table", { name: "Saltos" });
-  const rows = within(table).getAllByRole("row");
-  expect(rows).toHaveLength(4);
-  expect(within(rows[1]).getByRole("meter", { name: "RTT del salto 1" })).toHaveAttribute("aria-valuenow", "0.4");
-  expect(within(rows[3]).getByRole("meter", { name: "RTT del salto 3" })).toHaveAttribute("aria-valuenow", "14.3");
-  expect(rows[2]).toHaveAttribute("data-state", "bad");
-  expect(within(rows[2]).getByText("Sin respuesta")).toBeInTheDocument();
-  expect(within(rows[2]).queryByRole("meter")).not.toBeInTheDocument();
-});
-
 test("iperf3: rendimiento por intervalo y promedio del enlace", async () => {
   const { emit } = await start("iperf3");
   emit(
@@ -108,12 +72,12 @@ function renderWith(id: string, tool: ToolName, inbox: Record<string, Delivery>)
   );
 }
 
-test("el menú de equipo rellena el destino de ping", async () => {
-  renderWith("ping", "ping", { ping: { data: "10.1.1.1", n: 1 } });
-  expect(screen.getByLabelText("Destino")).toHaveValue("10.1.1.1");
+test("una entrega para otro módulo no se toma", async () => {
+  renderWith("nmap", "nmap", { ping: { data: "10.1.1.1", n: 1 } });
+  expect(screen.getByLabelText("Destino")).toHaveValue("");
 });
 
-test("una entrega para otro módulo no se toma", async () => {
-  renderWith("traceroute", "traceroute", { ping: { data: "10.1.1.1", n: 1 } });
-  expect(screen.getByLabelText("Destino")).toHaveValue("");
+test("el menú de equipo rellena el destino del módulo dueño de la entrega", async () => {
+  renderWith("nmap", "nmap", { nmap: { data: "10.1.1.1", n: 1 } });
+  expect(screen.getByLabelText("Destino")).toHaveValue("10.1.1.1");
 });

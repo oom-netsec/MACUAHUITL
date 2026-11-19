@@ -9,7 +9,7 @@ import { SavedHosts } from "../modules/terminal/SavedHosts";
 import { DriftView } from "../modules/drift/DriftView";
 import { AnalysisView } from "../modules/analysis/AnalysisView";
 import { ScriptsView } from "../modules/scripts/ScriptsView";
-import { DiagView } from "../modules/diag/DiagView";
+import { PingTraceView } from "../modules/diag/PingTraceView";
 import { HostsDataCard } from "../modules/settings/HostsDataCard";
 import { fakeInventory, sampleHosts, sampleHostsImport } from "../modules/inventory/fake";
 import { sampleScripts } from "../modules/scripts/fake";
@@ -74,12 +74,12 @@ test("Scripts: el nombre del script seleccionado en el título", async () => {
 
 test("Diagnóstico: bidi y controles en la salida (después de quitar ANSI)", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
-  wrap(<DiagView core={core} tool="ping" />);
+  wrap(<PingTraceView core={core} />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
   act(() => core.emitDiag({ runId: "r1", line: `\u001b[31m${RAW}\u001b[0m\r` }));
-  const log = screen.getByRole("log", { name: "Salida" });
+  const log = screen.getByRole("log", { name: "Ping" });
   await waitFor(() => expect(log.textContent).toContain(SHOWN));
   expect(log.textContent).not.toMatch(/\u001b|\r|⟦U\+000D⟧|\[31m/);
   noRaw(log.textContent);
