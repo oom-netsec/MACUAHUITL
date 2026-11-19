@@ -2,7 +2,7 @@ import { plural } from "../../lib/plural";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { useEffect, useRef, useState } from "react";
 import type { AdhocResult, CoreAPI } from "../../lib/core";
-import { Field, Notice, TextArea } from "../../components/Field";
+import { Notice, TextArea } from "../../components/Field";
 import { RunButton } from "../../components/RunButton";
 import { ExportMenu } from "../../components/Files";
 import { AdhocMatrix } from "./AdhocMatrix";
@@ -12,7 +12,8 @@ import { parseTargets } from "../patrol/PatrolView";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { resolveAccepted } from "../../lib/hostkeys";
+import { hostKeysFromLogin, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 // Lotes: comandos de solo lectura en varios equipos, como un trabajo de Patrol de una ronda.
 // El núcleo rechaza todo comando que no sea de lectura; la app no aplica configuración.
@@ -36,7 +37,8 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   const [commands, setCommands] = useState(["show version", "show ip interface brief"].join("\n"));
-  const [accept, setAccept] = useState("");
+  const [hks, setHks] = useState<HostKeyInfo[]>([]); // llaves que rechazó el Login Test del lote sin armar
+  const [unarmed, setUnarmed] = useState(""); // trabajo creado sin armar: «Confiar y reintentar» lo arma, no crea otro
   const [note, setNote] = useState("");
   const [picked, setPicked] = useState("");
   const [view, setView] = useState<ViewName>("matrix");
@@ -44,15 +46,30 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  const run = () => {
-    setNote(""); setPicked("");
+  // accept: pares (equipo, huella) aceptados con un clic en «Confiar y reintentar», solo para este reintento.
+  const run = (accept: AcceptedKey[] = []) => {
+    setNote(""); setPicked(""); setHks([]);
+    const job = accept.length ? unarmed : "";
+    setUnarmed("");
     return r.run(async () => {
-      const targets = parseTargets(devices).map(parseTarget);
-      // Con varios equipos una huella sin equipo no se manda: valdría para cualquiera. El campo viejo ya no se usa.
-      const keys = resolveAccepted(accept, targets);
-      if (keys.ambiguous) throw new Error(t("fps.needHost"));
-      const st = await core.adhocStart(targets, cred, commands, [], keys.keys);
-      if (!st.armed) { setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail })); return null; }
+      let st = { jobId: job, armed: true, detail: "" };
+      if (job) {
+        try { await core.armJob(job, [], accept, []); } // mismo trabajo (ya tiene sus equipos y comandos)
+        catch (e) { // otro equipo sigue sin confiar: el panel vuelve con lo que el Login Test diga ahora, y el error se muestra
+          setUnarmed(job);
+          setHks(hostKeysFromLogin(await core.loginTest(job).catch(() => [])));
+          throw e;
+        }
+      }
+      else st = await core.adhocStart(parseTargets(devices).map(parseTarget), cred, commands, [], accept);
+      if (!st.armed) {
+        setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail }));
+        setUnarmed(st.jobId);
+        // El lote quedó creado sin armar: el Login Test dice qué huella presentó cada equipo. La llamada se hace siempre:
+        // detail es solo texto del núcleo, sin reason que diga si la causa fue la llave de host.
+        try { setHks(hostKeysFromLogin(await core.loginTest(st.jobId))); } catch { setNote((n) => `${n} ${t("hostkey.noLogin")}`); }
+        return null;
+      }
       const deadline = Date.now() + maxWaitMs;
       for (;;) {
         const res = await core.adhocResult(st.jobId);
@@ -80,16 +97,16 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
 
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
-      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} w="lg" />
-      <TextArea label={t("adhoc.devices")} value={devices} onChange={setDevices} rows={3} />
-      <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
-      <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
+      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); setUnarmed(""); }} w="lg" />
+      <TextArea label={t("adhoc.devices")} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} rows={3} />
+      <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); setHks([]); setUnarmed(""); }} rows={5} />
       <div className="actions">
-        <RunButton primary kbd busy={r.busy} onClick={run} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>
+        <RunButton primary kbd busy={r.busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>
           {t(r.busy ? "adhoc.running" : "adhoc.run")}
         </RunButton>
       </div>
       {note && <Notice kind="warn">{note}</Notice>}
+      {hks.length > 0 && <HostKeyTrust items={hks} busy={r.busy} onTrust={run} />}
       {!started && !note && <EmptyState icon="layers" title={t("adhoc.empty.title")}>{t("adhoc.empty.text")}</EmptyState>}
       {started && (
         <ResultPanel title={t("common.output")} status={status} error={r.error}

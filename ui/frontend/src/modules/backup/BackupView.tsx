@@ -21,7 +21,8 @@ import { BackupTimeline } from "./BackupTimeline";
 import { useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import "./backup.css";
-import { resolveAccepted } from "../../lib/hostkeys";
+import { hostKeysFromLogin, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 // Respaldos: running-config (y startup-config) de cada equipo en outputs/respaldos/, con permisos 0600.
 // Respaldar es solo lectura (un trabajo de Patrol). Restaurar (fase 16c) planea desde aquí y ejecuta con el modo asistido.
@@ -31,13 +32,13 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
-  useInbox("backup", setDevices); // desde el menú de equipo
+  useInbox("backup", (d) => { setDevices(d); setHks([]); }); // desde el menú de equipo
   const [startup, setStartup] = useState(false);
   const [secrets, setSecrets] = useState(false);
   const [keep, setKeep] = useState("30");
   const [every, setEvery] = useState("0");
   const [rounds, setRounds] = useState("2");
-  const [accept, setAccept] = useState("");
+  const [hks, setHks] = useState<HostKeyInfo[]>([]); // llaves que rechazó el Login Test del respaldo sin armar
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [liveRestore, setLiveRestore] = useState(false);
@@ -62,20 +63,22 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   useEffect(() => { void reload(); }, [reload]);
 
   const scheduled = Number(every) > 0;
-  const run = async () => {
-    setErr(""); setNote(null);
-    const targets = parseTargets(devices).map(parseTarget);
-    // Con varios equipos una huella sin equipo no se manda: valdría para cualquiera. El campo viejo ya no se usa.
-    const keys = resolveAccepted(accept, targets);
-    if (keys.ambiguous) { setErr(t("fps.needHost")); return; }
-    setBusy(true);
+  // accept: pares (equipo, huella) aceptados con un clic en «Confiar y reintentar», solo para este reintento.
+  const run = async (accept: AcceptedKey[] = []) => {
+    setErr(""); setNote(null); setHks([]); setBusy(true);
     try {
       const st = await core.backupStart({
-        targets, credentialId: cred, startup, keep: Number(keep) || 0,
+        targets: parseTargets(devices).map(parseTarget), credentialId: cred, startup, keep: Number(keep) || 0,
         intervalSeconds: Math.round(Number(every) * 60), rounds: scheduled ? Number(rounds) : 0, secrets,
-        accept: [], acceptedKeys: keys.keys,
+        accept: [], acceptedKeys: accept,
       });
-      if (!st.armed) { setNote({ kind: "warn", text: t("backup.notArmed", { job: st.jobId, detail: st.detail }) }); return; }
+      if (!st.armed) {
+        setNote({ kind: "warn", text: t("backup.notArmed", { job: st.jobId, detail: st.detail }) });
+        // El trabajo quedó creado sin armar: el Login Test dice qué huella presentó cada equipo. Se llama siempre: detail es solo
+        // texto, sin reason. No se arma con armJob: solo backupStart pone a guardar los respaldos al terminar (watch) y se programan.
+        try { setHks(hostKeysFromLogin(await core.loginTest(st.jobId))); } catch { setNote((n) => n && { ...n, text: `${n.text} ${t("hostkey.noLogin")}` }); }
+        return;
+      }
       if (scheduled) { setNote({ kind: "info", text: t("backup.scheduled", { job: st.jobId }) }); return; }
       const deadline = Date.now() + maxWaitMs;
       for (;;) {
@@ -115,12 +118,11 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   return (
     <Page title={t("backup.title")} description={<>{t("backup.intro.a")}<code>outputs/respaldos/</code>{t("backup.intro.b")}</>}>
       <Section title={t("backup.sec.run")}>
-        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
-        <TextArea label={t("backup.devices")} value={devices} onChange={setDevices} rows={3} />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); }} />
+        <TextArea label={t("backup.devices")} value={devices} onChange={(v) => { setDevices(v); setHks([]); }} rows={3} />
         <div className="field-row end">
           <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
           {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
-          <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
         </div>
         <Advanced changed={[startup, secrets, keep !== "30"].filter(Boolean).length}>
           <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
@@ -129,10 +131,11 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         </Advanced>
         {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="actions">
-          <RunButton primary kbd busy={busy} onClick={run} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets")]}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}</RunButton>
+          <RunButton primary kbd busy={busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets")]}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}</RunButton>
         </div>
         {err && <Notice kind="error">{err}</Notice>}
         {note && <Notice kind={note.kind}>{note.text}</Notice>}
+        {hks.length > 0 && <HostKeyTrust items={hks} busy={busy} onTrust={run} />}
       </Section>
 
       <Section title={t("backup.saved.title")} description={t("backup.list.hint")}>

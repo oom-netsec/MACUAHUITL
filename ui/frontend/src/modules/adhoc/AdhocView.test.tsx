@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdhocView, parseTarget } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
@@ -87,37 +87,89 @@ test("la matriz se exporta a CSV y Markdown con lo que entregó el núcleo", asy
   expect(core.saveFile).toHaveBeenLastCalledWith("lote.md", "| Equipo | Comando |", "utf8");
 });
 
-test("un lote sin armar explica por qué y manda las huellas aceptadas al reintentar", async () => {
-  const adhocStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "Login Test falló: llave de host SHA256:abc" })
-    .mockResolvedValueOnce({ jobId: "j10", armed: true, detail: "" });
-  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart });
+const login = (o: object = {}) => ({ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "llave de host", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown", args: { key_type: "ssh-ed25519" }, ...o });
+
+test("un lote sin armar por llave de host muestra la huella y solo con «Confiar y reintentar» arma con ella", async () => {
+  const adhocStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "Login Test falló: llave de host SHA256:abc" });
+  const loginTest = vi.fn(async () => [login()]);
+  const armJob = vi.fn(async () => ({ windowEndsAt: "", missingInhibitors: [] }));
+  const adhocResult = vi.fn(async () => ({ state: "completed", done: true, report: { commands: [], devices: 0, rows: [] }, text: "", csv: "", markdown: "" }));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart, loginTest, armJob, adhocResult });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  expect(screen.queryByLabelText(/Huellas SHA256 aceptadas/)).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
+  expect(loginTest).toHaveBeenCalledWith("j9");
+  expect(screen.getByText("ssh-ed25519")).toBeInTheDocument();
+  expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub")).toBeInTheDocument();
+  expect(armJob).not.toHaveBeenCalled(); // sin clic no se acepta nada
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await screen.findByRole("button", { name: "Tabla" });
+  // Se arma el mismo trabajo (ya tiene sus comandos); no se crea otro.
+  expect(armJob).toHaveBeenCalledWith("j9", [], [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }], []); // un par atado al equipo, no la lista suelta
+  expect(adhocStart).toHaveBeenCalledTimes(1);
+  expect(adhocResult).toHaveBeenCalledWith("j9");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+});
+
+test("si armar el mismo trabajo falla, el panel de confianza vuelve con lo que diga el Login Test y el error se ve", async () => {
+  const adhocStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "llave de host" });
+  const loginTest = vi.fn(async () => [login()]);
+  const armJob = vi.fn(async () => { throw new Error("login test failed: B: HOST_KEY"); });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart, loginTest, armJob });
   render(<AdhocView core={core} pollMs={1} />);
   await screen.findByRole("option", { name: "lab (admin)" });
   await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
-  expect(await screen.findByRole("status")).toHaveTextContent("Login Test falló");
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
-  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
-  await screen.findByRole("button", { name: "Tabla" });
-  expect(adhocStart).toHaveBeenLastCalledWith([{ address: "192.0.2.1", port: 0 }], "c1", expect.any(String), [], [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }]);
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  expect(await screen.findByText(/login test failed/)).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Confiar y reintentar" })).toBeInTheDocument();
+  expect(loginTest).toHaveBeenCalledTimes(2);
+  expect(adhocStart).toHaveBeenCalledTimes(1);
 });
 
-// Seguridad: con varios equipos una huella sin equipo valdría para cualquiera; no se manda y se pide EQUIPO=HUELLA.
-test("con varios equipos una huella sola no se manda; EQUIPO=HUELLA sí, con su puerto", async () => {
-  const adhocStart = vi.fn(async () => ({ jobId: "j1", armed: true, detail: "" }));
-  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart });
+test("en un lote con varios equipos con huella, solo se aceptan los marcados; una cambiada avisa peligro", async () => {
+  const adhocStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "x" });
+  const loginTest = vi.fn(async () => [login(), login({ target: "192.0.2.2:22", fingerprint: "SHA256:def", reason: "transport.hostkey.changed" }), login({ target: "192.0.2.3:22", fingerprint: "", failedStep: "LOGIN_TEST_STEP_AUTH", reason: "" })]);
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart, loginTest });
   render(<AdhocView core={core} pollMs={1} />);
   await screen.findByRole("option", { name: "lab (admin)" });
-  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1 sw2:2222");
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1\n192.0.2.2\n192.0.2.3");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("EQUIPO=HUELLA");
-  expect(adhocStart).not.toHaveBeenCalled();
-  await userEvent.clear(screen.getByLabelText(/Huellas SHA256 aceptadas/));
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "192.0.2.1=SHA256:abc sw2:2222=SHA256:def");
+  expect(await screen.findAllByRole("checkbox")).toHaveLength(2); // el de auth no ofrece huella
+  expect(screen.getByRole("alert")).toHaveTextContent("CAMBIÓ");
+  expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("checkbox", { name: /192\.0\.2\.1:22/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await screen.findByRole("button", { name: "Tabla" });
+  expect(core.armJob).toHaveBeenCalledWith("j9", [], [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }], []); // solo el marcado, con su equipo
+});
+
+test("si el Login Test no se puede obtener, se avisa que no hay huella (no queda en silencio)", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "x" })), loginTest: vi.fn(async () => { throw new Error("sin ruta"); }) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
-  await waitFor(() => expect(adhocStart).toHaveBeenCalledWith(expect.any(Array), "c1", expect.any(String), [],
-    [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }, { host: "sw2:2222", fingerprint: "SHA256:def" }]));
+  expect(await screen.findByText(/No se pudo obtener la huella/)).toBeInTheDocument();
+  expect(screen.queryByText(/compara la huella aquí abajo/)).not.toBeInTheDocument();
+});
+
+test("si cambian los comandos tras el rechazo, ya no se arma el trabajo viejo: se crea uno nuevo", async () => {
+  const adhocStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "x" }).mockResolvedValueOnce({ jobId: "j10", armed: true, detail: "" });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart, loginTest: vi.fn(async () => [login()]) });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  await screen.findByText("SHA256:abc");
+  await userEvent.type(screen.getByLabelText("Comandos (uno por línea)"), "x");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  expect(adhocStart).toHaveBeenCalledTimes(2);
+  expect(core.armJob).not.toHaveBeenCalled();
 });
 
 test("el rechazo del núcleo (comando que no es de lectura) se muestra como alerta", async () => {

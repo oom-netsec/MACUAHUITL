@@ -22,13 +22,13 @@ test("la sección Reversas pendientes lista las guardadas", async () => {
   expect(await screen.findByRole("region", { name: "Reversa de la ejecución a" })).toBeInTheDocument();
 });
 
-test("crea el cambio, confirma la huella y captura PRE", async () => {
+test("crea el cambio, muestra la huella y con «Confiar y reintentar» repite la captura PRE con ella", async () => {
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
     changeCapture: vi.fn()
       .mockResolvedValueOnce({ jobId: "j1", armed: false, detail: "Login Test falló; excluye o corrige: 192.0.2.1:22: host_key" })
       .mockResolvedValueOnce({ jobId: "j2", armed: true, detail: "" }),
-    loginTest: vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "nueva", platform: "", fingerprint: "SHA256:abc" }]),
+    loginTest: vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "nueva", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown" }]), // llave nueva: sin la casilla de «cambió»
   });
   render(<ChangeView core={core} />);
   await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-1");
@@ -39,13 +39,78 @@ test("crea el cambio, confirma la huella y captura PRE", async () => {
   await waitFor(() => expect(core.changeCreate).toHaveBeenCalledWith({ name: "CRQ-1", targets: [{ address: "192.0.2.1" }, { address: "192.0.2.2" }], defaultCredentialId: "c1", outputDir: "" }));
   await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
   expect(core.loginTest).toHaveBeenCalledWith("j1");
-  await userEvent.click(await screen.findByLabelText(/SHA256:abc/));
-  await userEvent.click(screen.getByRole("button", { name: "Capturar PRE" }));
+  expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
+  expect(core.changeCapture).toHaveBeenCalledTimes(1); // sin clic no se acepta nada
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(core.changeCapture).toHaveBeenCalledTimes(2));
   expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "pre", [], [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }], []);
   expect(await screen.findByText(/trabajo j2/)).toBeInTheDocument();
+  // Lo aceptado vale solo para ese reintento: la siguiente captura sale sin huellas.
+  await userEvent.click(screen.getByRole("button", { name: "Capturar POST" }));
+  expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "post", [], [], []);
 });
 
-test("confiar en la huella A de un equipo no deja marcada otra huella B del mismo equipo en la captura siguiente", async () => {
+test("«Confiar y reintentar» repite la fase que quedó sin armar (POST), no otra", async () => {
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    changeCapture: vi.fn().mockResolvedValueOnce({ jobId: "j1", armed: false, detail: "x" }).mockResolvedValueOnce({ jobId: "j2", armed: true, detail: "" }),
+    loginTest: vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown" }]),
+  });
+  render(<ChangeView core={core} />);
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-1");
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Capturar POST" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "post", [], [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }], []));
+});
+
+const hkRow = { target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown" };
+async function createChange(core: ReturnType<typeof fakeCore>) {
+  render(<ChangeView core={core} />);
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "CRQ-1");
+  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
+}
+
+test("una captura que falla al armar sin huella no deja el reintento apuntando a la huella de la captura anterior", async () => {
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    changeCapture: vi.fn().mockResolvedValueOnce({ jobId: "j1", armed: false, detail: "x" }).mockRejectedValueOnce(new Error("rpc error: code = Unavailable desc = sin ruta")),
+    loginTest: vi.fn(async () => [hkRow]),
+  });
+  await createChange(core);
+  await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
+  expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Capturar POST" }));
+  await screen.findByText(/sin ruta/);
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+});
+
+test("la selección de huellas sobrevive a un cambio de render y un doble clic en «Confiar y reintentar» no lanza dos capturas", async () => {
+  let release: (v: unknown) => void = () => {};
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    changeCapture: vi.fn().mockResolvedValueOnce({ jobId: "j1", armed: false, detail: "x" }).mockImplementationOnce(() => new Promise((ok) => { release = ok; })),
+    loginTest: vi.fn(async () => [hkRow, { ...hkRow, target: "192.0.2.2:22", fingerprint: "SHA256:def" }]),
+  });
+  await createChange(core);
+  await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
+  const box = await screen.findByRole("checkbox", { name: /192\.0\.2\.1:22/ });
+  await userEvent.click(box);
+  await userEvent.type(screen.getByLabelText("Nombre del cambio"), "x"); // otro render: no vacía la selección
+  expect(box).toBeChecked();
+  const btn = screen.getByRole("button", { name: "Confiar y reintentar" });
+  await userEvent.dblClick(btn);
+  expect(core.changeCapture).toHaveBeenCalledTimes(2);
+  release({ jobId: "j2", armed: true, detail: "" });
+});
+
+test("confiar en la huella A de un equipo no acepta otra huella B del mismo equipo en la captura siguiente", async () => {
   const row = (fp: string) => ({ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: fp });
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
@@ -62,11 +127,13 @@ test("confiar en la huella A de un equipo no deja marcada otra huella B del mism
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
   await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
-  await userEvent.click(await screen.findByLabelText(/SHA256:aaa/));
-  await userEvent.click(screen.getByRole("button", { name: "Capturar PRE" }));
+  await screen.findByText("SHA256:aaa");
+  await userEvent.click(screen.getByRole("checkbox", { name: /Entiendo que la llave/ })); // sin reason cuenta como cambiada
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
   await screen.findByText(/trabajo j2/);
   await userEvent.click(screen.getByRole("button", { name: "Capturar POST" }));
-  expect(await screen.findByLabelText(/SHA256:bbb/)).not.toBeChecked(); // otra llave del mismo equipo: el usuario decide de nuevo
+  expect(await screen.findByText("SHA256:bbb")).toBeInTheDocument(); // otra llave del mismo equipo: el usuario decide de nuevo
+  expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "post", [], [], []); // la anterior no se arrastra
 });
 
 test("el reporte muestra el semáforo por equipo", async () => {
@@ -163,14 +230,14 @@ test("el reporte avisa si la evidencia se recogió sin enmascarar, y no si no", 
   await waitFor(() => expect(screen.queryByText(/sin enmascarar/)).not.toBeInTheDocument());
 });
 
-// Seguridad: dos equipos con la misma huella son dos confirmaciones distintas y cada una viaja con su equipo.
-test("capturar manda un par por cada equipo confirmado aunque compartan huella", async () => {
+// Seguridad: dos equipos con la misma huella: marcar uno marca los dos a la vista y cada par viaja con su equipo.
+test("capturar manda un par por cada equipo marcado aunque compartan huella", async () => {
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
     changeCapture: vi.fn(async () => ({ jobId: "j1", armed: false, detail: "Login Test falló" })),
     loginTest: vi.fn(async () => [
-      { target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same" },
-      { target: "192.0.2.2:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same" },
+      { target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same", reason: "transport.hostkey.unknown" },
+      { target: "192.0.2.2:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:same", reason: "transport.hostkey.unknown" },
     ]),
   });
   render(<ChangeView core={core} />);
@@ -180,11 +247,13 @@ test("capturar manda un par por cada equipo confirmado aunque compartan huella",
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Crear cambio" }));
   await userEvent.click(await screen.findByRole("button", { name: "Capturar PRE" }));
-  const boxes = await screen.findAllByLabelText(/SHA256:same/);
+  const boxes = await screen.findAllByRole("checkbox", { name: /Confiar en la llave de/ });
   expect(boxes).toHaveLength(2);
   await userEvent.click(boxes[1]);
-  await userEvent.click(screen.getByRole("button", { name: "Capturar PRE" }));
-  expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "pre", [], [{ host: "192.0.2.2:22", fingerprint: "SHA256:same" }], []);
+  boxes.forEach((b) => expect(b).toBeChecked()); // la huella es la misma: ambos a la vista
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(core.changeCapture).toHaveBeenCalledTimes(2));
+  expect(core.changeCapture).toHaveBeenLastCalledWith("ch1", "pre", [], [{ host: "192.0.2.1:22", fingerprint: "SHA256:same" }, { host: "192.0.2.2:22", fingerprint: "SHA256:same" }], []);
 });
 
 test("las subpestañas conservan lo escrito y Pre/Post refresca la lista sin remontarse", async () => {

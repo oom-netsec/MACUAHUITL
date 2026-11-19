@@ -276,10 +276,58 @@ test("una llave de host nueva pide aceptar la huella y reintenta con ella", asyn
   expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
   expect(get).toHaveBeenCalledTimes(1);
   expect(get.mock.calls[0][0]).toMatchObject({ credentialId: "c1", acceptedHostKeys: [] });
-  await userEvent.click(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
   await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
-  expect(get.mock.calls[1][0]).toMatchObject({ acceptedHostKeys: ["SHA256:AbC123+/x"] });
+  expect(get.mock.calls[1][0]).toMatchObject({ acceptedHostKeys: [], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:AbC123+/x" }] }); // un par con el destino, no la lista suelta
   expect(await screen.findByText("Transferencia terminada.")).toBeInTheDocument();
+  // Lo aceptado vale solo para ese reintento: no se escribe en el campo de Avanzado ni en el siguiente envío.
+  expect(screen.getByLabelText(/Huellas SHA256 aceptadas/)).toHaveValue("");
+  // Un segundo envío sale sin huellas aceptadas.
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(3));
+  expect(get.mock.calls[2][0]).toMatchObject({ acceptedHostKeys: [] });
+  expect(get.mock.calls[2][0]).not.toHaveProperty("acceptedKeys");
+});
+
+test("el par que se acepta lleva el equipo con su puerto, también al enviar (Put)", async () => {
+  const cause = { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "otro:22", fingerprint: "SHA256:AbC123+/x" } };
+  const put = vi.fn().mockRejectedValueOnce(Object.assign(new Error("x"), { cause })).mockResolvedValueOnce({ path: "/o/x", bytes: 1, md5: "a".repeat(32), sha256: "b".repeat(64), verified: "", seconds: 0, report: "" });
+  const core = setup({ pickPath: vi.fn(async () => "/home/u/cfg/r1.txt"), transferPut: put, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  await client(core, "scp://admin@192.0.2.1:2222/cfg/r1.txt");
+  await userEvent.click(screen.getByLabelText("Enviar (put)"));
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: /Examinar.*Archivo de origen/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(put).toHaveBeenCalledTimes(2));
+  expect(put.mock.calls[0][0]).not.toHaveProperty("acceptedKeys");
+  expect(put.mock.calls[1][0]).toMatchObject({ acceptedHostKeys: [], acceptedKeys: [{ host: "192.0.2.1:2222", fingerprint: "SHA256:AbC123+/x" }] }); // el destino pedido, no el que diga el error
+});
+
+test("si se cambia el host, el puerto o la URL tras el error, la huella pendiente desaparece", async () => {
+  const cause = { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.1:22", fingerprint: "SHA256:AbC123+/x", key_type: "ssh-ed25519" } };
+  const get = vi.fn().mockRejectedValue(Object.assign(new Error("transport: llave de host desconocida"), { cause }));
+  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  await client(core, "scp://admin@192.0.2.1/ios.bin");
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText(/^Equipo/), "9");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  expect(get).toHaveBeenCalledTimes(1);
+});
+
+test("la huella nueva se muestra con equipo, tipo de llave y la orden para compararla; sin clic no se reintenta", async () => {
+  const cause = { code: "FailedPrecondition", reason: "transport.hostkey.changed", metadata: { host: "192.0.2.1:22", fingerprint: "SHA256:AbC123+/x", key_type: "ssh-ed25519" } };
+  const get = vi.fn().mockRejectedValue(Object.assign(new Error("transport: llave de host cambiada"), { cause }));
+  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  await client(core, "scp://admin@192.0.2.1/ios.bin");
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByText("ssh-ed25519")).toBeInTheDocument();
+  expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub")).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("CAMBIÓ");
+  expect(get).toHaveBeenCalledTimes(1);
 });
 
 test("el envío separa carpeta y nombre del archivo elegido con el diálogo", async () => {
@@ -395,7 +443,7 @@ test("una llave de host nueva en inglés, con reason, también pide aceptar la h
   await client(core, "scp://admin@192.0.2.1/ios.bin");
   await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
-  expect(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Confiar y reintentar" })).toBeInTheDocument();
 });
 
 test("al cerrarse el servidor, la contraseña efímera y los comandos de IOS (que la llevan en la URL) dejan de verse", async () => {

@@ -89,8 +89,9 @@ function limits(f: ClientForm): { maxBytes?: number; seconds?: number } {
 }
 
 // El destino del par: la dirección del formulario con su puerto SSH (el 22 va sin puerto).
+export const sshTarget = (f: ClientForm) => ({ address: f.host.trim().replace(/^\[|\]$/g, ""), port: Number(portOf(f)) });
 function sshKeys(f: ClientForm): { acceptedKeys?: AcceptedKey[] } {
-  const keys = usesSsh(f.proto) ? resolveAccepted(f.accepted, [{ address: f.host.trim().replace(/^\[|\]$/g, ""), port: Number(portOf(f)) }]).keys : [];
+  const keys = usesSsh(f.proto) ? resolveAccepted(f.accepted, [sshTarget(f)]).keys : [];
   return keys.length ? { acceptedKeys: keys } : {};
 }
 

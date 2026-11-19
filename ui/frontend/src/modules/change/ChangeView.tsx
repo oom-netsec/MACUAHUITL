@@ -3,13 +3,15 @@ import { RunButton } from "../../components/RunButton";
 import { useEffect, useId, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
-import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
+import { Field, Notice, TextArea, errorText } from "../../components/Field";
 import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult, type Tone } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
 import { parseTargets } from "../patrol/PatrolView";
 import { useT } from "../../lib/i18n";
+import { hostKeysFromLogin, type AcceptedKey } from "../../lib/hostkeys";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
 import { outputsErrorText } from "../../lib/outputsError";
 import { jobState } from "../../lib/vocab";
 import type { Key } from "../../lib/i18n/es";
@@ -43,9 +45,9 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
   const [out, setOut] = useState("");
   const [current, setCurrent] = useState("");
   const [login, setLogin] = useState<LoginResult[]>([]);
-  const [trusted, setTrusted] = useState<Set<string>>(new Set()); // pares «equipo\nhuella»: otra huella del mismo equipo NO queda confirmada
-  const pair = (l: { target: string; fingerprint: string }) => `${l.target}\n${l.fingerprint}`;
+  const [phase, setPhase] = useState<"pre" | "post">("pre"); // la captura que quedó sin armar: «Confiar y reintentar» la repite
   const [msg, setMsg] = useState<{ kind: "info" | "warn"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [devices, setDevices] = useState<DeviceReport[] | null>(null);
   const [note, setNote] = useState("");
@@ -65,28 +67,36 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
   };
   const create = () => guard(async () => {
     const id = await core.changeCreate({ name, targets: parseTargets(targets).map((address) => ({ address })), defaultCredentialId: cred, outputDir: out });
-    setCurrent(id); setLogin([]); setTrusted(new Set()); setDevices(null);
+    setCurrent(id); setLogin([]); setDevices(null);
     setMsg({ kind: "info", text: t("change.created", { id }) });
     await refresh();
   });
-  const capture = (phase: "pre" | "post") => guard(async () => {
-    const r = await core.changeCapture(current, phase, [], login.filter((l) => l.fingerprint && trusted.has(pair(l))).map((l) => ({ host: l.target, fingerprint: l.fingerprint })), []);
+  // accepted: pares (equipo, huella) aceptados con un clic, solo para este reintento.
+  const capture = (ph: "pre" | "post", accepted: AcceptedKey[] = []) => guard(async () => {
+    setPhase(ph); setLogin([]); // el reintento apunta siempre a la captura más reciente, no a la huella o fase de la anterior
+    setBusy(true);
+    try {
+      await runCapture(ph, accepted);
+    } finally {
+      setBusy(false);
+    }
+  });
+  const runCapture = async (ph: "pre" | "post", accepted: AcceptedKey[]) => {
+    const r = await core.changeCapture(current, ph, [], accepted, []);
     if (r.armed) {
-      setLogin([]);
-      setMsg({ kind: "info", text: t("change.capturing", { phase: phase.toUpperCase(), job: r.jobId }) });
+      setMsg({ kind: "info", text: t("change.capturing", { phase: ph.toUpperCase(), job: r.jobId }) });
     } else {
       setMsg({ kind: "warn", text: t("change.unarmed", { job: r.jobId, detail: r.detail }) });
       setLogin(await core.loginTest(r.jobId));
     }
     await refresh();
-  });
+  };
   const showReport = (id: string) => guard(async () => {
     const r = await core.changeReport(id, "", "");
     const rep = JSON.parse(r.json) as { devices?: DeviceReport[]; note?: string; unmasked?: boolean };
     setDevices(rep.devices ?? []); setNote(rep.note ?? ""); setUnmasked(!!rep.unmasked);
     setRep({ name: changes.find((c) => c.id === id)?.name ?? id, json: JSON.stringify(rep, null, 2) });
   });
-  const toggle = (key: string, on: boolean) => setTrusted((s) => { const n = new Set(s); if (on) n.add(key); else n.delete(key); return n; });
 
   return (
     <>
@@ -110,13 +120,11 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
       {current && (
         <Section title={t("change.sec.capture")}>
           <div className="actions">
-            <button onClick={() => capture("pre")}>{t("change.capture", { phase: "PRE" })}</button>
-            <button onClick={() => capture("post")}>{t("change.capture", { phase: "POST" })}</button>
+            <button disabled={busy} onClick={() => capture("pre")}>{t("change.capture", { phase: "PRE" })}</button>
+            <button disabled={busy} onClick={() => capture("post")}>{t("change.capture", { phase: "POST" })}</button>
           </div>
-          {login.filter((l) => l.fingerprint).map((l) => (
-            <Check key={l.target} label={t("change.trust", { fp: l.fingerprint, target: l.target })} checked={trusted.has(pair(l))} onChange={(v) => toggle(pair(l), v)} />
-          ))}
-          {login.filter((l) => !l.passed && !l.fingerprint).map((l) => <Notice key={l.target} kind="warn"><code>{l.target}</code> {l.failedStep} {l.detail}</Notice>)}
+          {hostKeysFromLogin(login).length > 0 && <HostKeyTrust items={hostKeysFromLogin(login)} busy={busy} onTrust={(keys) => capture(phase, keys)} />}
+          {login.filter((l) => !l.passed && !hostKeysFromLogin([l]).length).map((l) => <Notice key={l.target} kind="warn"><code>{l.target}</code> {l.failedStep} {l.detail}</Notice>)}
         </Section>
       )}
       <Section title={t("change.sec.list")}>
@@ -127,7 +135,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
               <tbody>
                 {changes.map((c) => (
                   <tr key={c.id}>
-                    <td><button className="quiet sm" onClick={() => { setCurrent(c.id); setLogin([]); setTrusted(new Set()); }} aria-current={current === c.id ? "true" : undefined}>{c.name}</button></td>
+                    <td><button className="quiet sm" onClick={() => { setCurrent(c.id); setLogin([]); }} aria-current={current === c.id ? "true" : undefined}>{c.name}</button></td>
                     <td>{c.preState ? <Badge tone={stateTone(c.preState)}>{jobState(t, c.preState)}</Badge> : "—"}</td>
                     <td>{c.postState ? <Badge tone={stateTone(c.postState)}>{jobState(t, c.postState)}</Badge> : "—"}</td>
                     <td className="row-actions"><ReportButton c={c} t={t} onClick={() => showReport(c.id)} /></td>
