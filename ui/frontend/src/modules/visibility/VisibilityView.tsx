@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
+import { Segmented } from "../../components/Segmented";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { CoreAPI, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
@@ -179,6 +180,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
   const [cred, setCred] = useState("");
   const [auth, setAuth] = useState("SHA");
   const [priv, setPriv] = useState("AES");
+  const [mode, setMode] = useState<"query" | "poll">("query");
   const [oids, setOids] = useState("");
   const [bulk, setBulk] = useState(true);
   const [prof, setProf] = useState<Record<string, boolean>>({ sistema: true, interfaces: true });
@@ -193,6 +195,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
   const charted = picked ?? busiest(hist);
   const toggleChart = (name: string) => setPicked(charted.includes(name) ? charted.filter((n) => n !== name) : [...charted, name]);
   const target = (): SnmpTarget => ({ host: host.trim(), port: Number(port) || 161, version, credentialId: cred, auth: version === "3" ? auth : "", priv: version === "3" ? priv : "" });
+  const shown = live.runId ? "poll" : mode; // mientras arranca o corre, la sección del sondeo (y su Detener) no se desmonta
   const snmpNeed = [!host && t("need.target"), !cred && t("need.cred"), !oids && t("need.oids")];
   return (
     <>
@@ -214,7 +217,9 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
         </Advanced>
       </Section>
-      <Section title={t("visibility.sec.query")}>
+      <Segmented legend={t("visibility.snmp.mode")} value={shown} onChange={setMode} disabled={!!live.runId} hint={live.runId ? t("visibility.snmp.mode.locked") : undefined}
+        options={[["query", t("visibility.snmp.mode.query")], ["poll", t("visibility.snmp.mode.poll")]]} />
+      {shown === "query" && <Section title={t("visibility.sec.query")}>
         <Field label={t("visibility.snmp.oids")} value={oids} onChange={setOids} w="full" mono />
         <Check label={t("visibility.snmp.bulk")} checked={bulk} onChange={setBulk} />
         <div className="actions">
@@ -222,8 +227,8 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           <RunButton quiet busy={r.busy} missing={snmpNeed} onClick={() => r.run(() => core.snmpWalk(target(), words(oids)[0], bulk))}>Walk</RunButton>
         </div>
         <Report r={r} />
-      </Section>
-      <Section title={t("visibility.snmp.poll")}>
+      </Section>}
+      {shown === "poll" && <Section title={t("visibility.snmp.poll")}>
         <div className="cols">
           {profiles.map(([k, l]) => <Check key={k} label={t(l)} checked={!!prof[k]} onChange={(v) => setProf({ ...prof, [k]: v })} />)}
         </div>
@@ -276,7 +281,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
             )}
           </ResultPanel>
         )}
-      </Section>
+      </Section>}
     </>
   );
 }

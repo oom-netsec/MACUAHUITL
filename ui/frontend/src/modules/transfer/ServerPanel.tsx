@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { RunButton } from "../../components/RunButton";
+import { Segmented } from "../../components/Segmented";
 import { Advanced } from "../../components/Advanced";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
@@ -124,7 +125,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [ifaces, setIfaces] = useState<NetInterface[]>([]);
   const [listen, setListen] = useState("");
   const [port, setPort] = useState(portFor("tftp"));
-  const [write, setWrite] = useState(false);
+  const [mode, setMode] = useState<"send" | "recv">("send"); // enviar sirve archivos; recibir deja escribir: cada modo manda solo lo suyo
+  const write = mode === "recv";
   const [recvDir, setRecvDir] = useState("");
   const [fromDir, setFromDir] = useState("");
   const [files, setFiles] = useState("");
@@ -165,7 +167,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   useBusy(servers.some((s) => !s.done));
 
   const ssh = proto === "scp" || proto === "sftp";
-  const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
+  // Lo del otro modo no se ve ni se valida ni se envía, aunque siga escrito.
+  const form = { proto, any, listen, port, write, recvDir: write ? recvDir : "", fromDir: write ? "" : fromDir, files: write ? "" : files, allow, minutes };
 // Los datos requeridos los nombra el botón (missing); el resto lo explica serveProblem al abrir.
   const [bad, setBad] = useState<{ k: Key | null; n: number }>({ k: null, n: 0 }); // última razón de validación y nº de intento: si cae en Avanzado, se abre (también al repetir)
   // Con TFTP + recibir la lista de IP es obligatoria: se queda a la vista, fuera de Avanzado.
@@ -183,7 +186,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     try {
       await core.transferServe({
         protocol: proto, listen: host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`, allowAny: any,
-        files: splitPaths(files), fromDir, write, recvDir: write ? recvDir : "", allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
+        files: splitPaths(form.files), fromDir: form.fromDir, write, recvDir: form.recvDir, allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
       });
     } catch (e) {
       setErr(errorText(e), errInfo(e));
@@ -198,14 +201,14 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     <>
       <Section title={t("transfer.form.server")}>
         <div className="field-row">
-          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); }} options={protos} w="sm" />
+          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); if (p === "http") setMode("send"); /* el núcleo no recibe por HTTP */ }} options={protos} w="sm" />
           {!any && <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} w="md"
             options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />}
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
-        <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />
-        <TextArea label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} rows={2} mono />
-        <Check label={t("transfer.write")} checked={write} onChange={setWrite} />
+        <Segmented legend={t("transfer.mode")} value={mode} onChange={setMode} disabledValues={proto === "http" ? ["recv"] : undefined} hint={proto === "http" ? t("transfer.mode.httpRo") : undefined} options={[["send", t("transfer.mode.send")], ["recv", t("transfer.mode.recv")]]} />
+        {!write && <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />}
+        {!write && <TextArea label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} rows={2} mono />}
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
         {allowVisible && allowField}

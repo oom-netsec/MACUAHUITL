@@ -47,6 +47,7 @@ test("snmp: get con la credencial de la bóveda y sondeo en vivo", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Get" }));
   expect(await screen.findByText(/OctetString: SW1/)).toBeInTheDocument();
   expect(core.snmpGet).toHaveBeenCalledWith({ host: "10.0.0.1", port: 161, version: "2c", credentialId: "c1", auth: "", priv: "" }, ["1.3.6.1.2.1.1.5.0"]);
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
   await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
   expect(core.snmpPollStart).toHaveBeenCalledWith(expect.objectContaining({ host: "10.0.0.1" }), ["sistema", "interfaces"], 10);
   act(() => core.emitVis("snmp", { runId: "p1", json: JSON.stringify({ Time: "2026-11-04T10:00:00Z", Interfaces: [{ Name: "Gi1/0/1", Oper: "up", InBps: 2500000, OutBps: null }] }) }));
@@ -93,6 +94,7 @@ test("snmp: el sondeo en vivo grafica entrada y salida por interfaz, con el curs
   await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
   await screen.findByRole("option", { name: "snmp-lab (snmp)" });
   await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
   await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
   act(() => core.emitVis("snmp", { runId: "p1", json: poll("2026-11-04T10:00:00Z", [2_000_000, null]) }));
   act(() => core.emitVis("snmp", { runId: "p1", json: poll("2026-11-04T10:00:10Z", [4_000_000, null]) }));
@@ -116,6 +118,7 @@ test("snmp: cada fila lleva su minigráfica de tendencia de entrada", async () =
   await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
   await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
   await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
   await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
   act(() => core.emitVis("snmp", { runId: "p1", json: poll("2026-11-04T10:00:00Z", [2_000_000]) }));
@@ -203,6 +206,7 @@ test("un sondeo SNMP en curso sigue al volver de otra pestaña y marca su pesta�
   await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
   await screen.findByRole("option", { name: "snmp-lab (snmp)" });
   await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
   await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
   expect(await screen.findByRole("tab", { name: "SNMP · en curso" })).toBeInTheDocument();
   await userEvent.click(screen.getByRole("tab", { name: "gNMI" }));
@@ -338,6 +342,7 @@ test("Construir, Get, Walk y Sondear nombran lo que falta", async () => {
   await userEvent.type(screen.getByLabelText(/OID/), "1.3.6");
   expect(b("Get")).toBeEnabled();
   expect(b("Get")).not.toHaveAccessibleDescription();
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
   for (const p of ["Sistema", "Interfaces"]) await userEvent.click(screen.getByLabelText(new RegExp(p)));
   expect(b("Sondear")).toHaveAccessibleDescription("Falta: elegir al menos un perfil.");
   await userEvent.click(screen.getByLabelText(/Sistema/));
@@ -355,4 +360,70 @@ test("gNMI: Get y Suscribir nombran lo que falta", async () => {
   await userEvent.type(screen.getByLabelText(/Rutas/), "/a");
   expect(b("Get")).toBeEnabled();
   expect(b("Suscribir")).not.toHaveAccessibleDescription();
+});
+
+// PR 6: el destino es común; debajo se elige consulta puntual o sondeo continuo.
+test("snmp: consulta puntual y sondeo continuo se alternan sin perder lo escrito ni esconder Detener", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(async () => "p1"), snmpGet: vi.fn(async () => "ok") });
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
+  await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeChecked();
+  expect(screen.queryByRole("button", { name: "Sondear" })).toBeNull();
+  await userEvent.type(screen.getByLabelText(/OID/), "1.3.6.1.2.1.1.5.0");
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
+  expect(screen.queryByLabelText(/OID/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Get" })).toBeNull();
+  expect(screen.getByLabelText("Equipo")).toHaveValue("10.0.0.1"); // el destino sigue arriba
+  await userEvent.click(screen.getByRole("radio", { name: "Consulta puntual" }));
+  expect(screen.getByLabelText(/OID/)).toHaveValue("1.3.6.1.2.1.1.5.0"); // se conserva
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
+  await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
+  expect(core.snmpGet).not.toHaveBeenCalled(); // lo que no se ve no se envía
+  // Corriendo: el selector se bloquea y Detener sigue a la vista.
+  await screen.findByRole("tab", { name: "SNMP · en curso" });
+  expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled();
+});
+
+async function snmpReady(core: ReturnType<typeof fakeCore>) {
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "SNMP" }));
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.1");
+  await screen.findByRole("option", { name: "snmp-lab (snmp)" });
+  await userEvent.selectOptions(screen.getByLabelText(/Credencial/), "c1");
+  await userEvent.click(screen.getByRole("radio", { name: "Sondeo continuo" }));
+  await userEvent.click(screen.getByRole("button", { name: "Sondear" }));
+}
+
+test("snmp: si el sondeo tarda en arrancar y se pasa a consulta puntual, Detener no se desmonta", async () => {
+  let resolve!: (id: string) => void;
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(() => new Promise<string>((r) => { resolve = r; })) });
+  await snmpReady(core);
+  await userEvent.click(screen.getByRole("radio", { name: "Consulta puntual" })); // aún sin runId
+  await act(async () => resolve("p1"));
+  expect(screen.getByRole("radio", { name: "Sondeo continuo" })).toBeChecked();
+  expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled();
+  expect(screen.queryByLabelText(/OID/)).toBeNull();
+  expect(screen.getByText(/Detén el sondeo/)).toBeInTheDocument();
+});
+
+test.each([["done", undefined], ["done con error", "boom"]])("snmp: el selector se desbloquea con %s", async (_n, error) => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(async () => "p1") });
+  await snmpReady(core);
+  await screen.findByRole("tab", { name: "SNMP · en curso" });
+  expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeDisabled();
+  act(() => core.emitVis("snmp", { runId: "p1", done: true, ...(error ? { error } : {}) }));
+  await waitFor(() => expect(screen.getByRole("radio", { name: "Consulta puntual" })).toBeEnabled());
+  await userEvent.click(screen.getByRole("radio", { name: "Consulta puntual" }));
+  expect(screen.getByLabelText(/OID/)).toBeInTheDocument();
+});
+
+test("snmp: el aviso del selector bloqueado lo describe (aria-describedby)", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), snmpPollStart: vi.fn(async () => "p1") });
+  await snmpReady(core);
+  await screen.findByRole("tab", { name: "SNMP · en curso" });
+  expect(screen.getAllByRole("group").find((g) => g.classList.contains("segmented"))).toHaveAccessibleDescription(/Detén el sondeo/);
 });

@@ -8,12 +8,13 @@ const base = { user: "mac", password: "pw", files: ["c4.bin"] };
 test("el comando de IOS cambia con el protocolo", () => {
   const cmd = (protocol: "tftp" | "ftp" | "scp" | "sftp" | "http", listening = "192.0.2.10:6969", write = false) => iosCommands({ ...base, protocol, listening }, write, ph);
   expect(cmd("tftp")).toEqual(["copy tftp://192.0.2.10/c4.bin flash:"]);
-  expect(cmd("tftp", "192.0.2.10:6969", true)).toEqual(["copy tftp://192.0.2.10/c4.bin flash:", "copy running-config tftp://192.0.2.10/r1-config.txt"]);
+  expect(iosCommands({ ...base, files: [], protocol: "tftp", listening: "192.0.2.10:6969" }, true, ph)).toEqual(["copy running-config tftp://192.0.2.10/r1-config.txt"]); // recibir: sin archivos no hay descarga
+  expect(iosCommands({ ...base, files: null, protocol: "tftp", listening: "0.0.0.0:6969" }, true, ph)).toEqual(["copy running-config tftp://IP-X/r1-config.txt"]);
   expect(cmd("ftp")).toEqual(["copy ftp://mac:pw@192.0.2.10/c4.bin flash:"]);
   expect(cmd("scp")).toEqual(["copy scp://mac@192.0.2.10/c4.bin flash:"]);
   expect(cmd("sftp")).toEqual(["copy sftp://mac@192.0.2.10/c4.bin flash:"]);
   expect(cmd("http", "192.0.2.10:8080")).toEqual(["copy http://192.0.2.10:8080/c4.bin flash:"]);
-  expect(cmd("http", "192.0.2.10:8080", true)).toHaveLength(1); // HTTP no recibe
+  expect(cmd("http", "192.0.2.10:8080", true)).toHaveLength(1); // HTTP no recibe (con archivos queda solo la descarga)
 });
 
 test("sin archivos o en 0.0.0.0 usa los marcadores, y IPv6 va entre corchetes", () => {

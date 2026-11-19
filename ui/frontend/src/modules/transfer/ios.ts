@@ -13,7 +13,7 @@ export const unsafeName = (n: string): boolean => /[\p{Cc}\p{Cf}\u2028\u2029]/u.
 export function iosCommands(r: Pick<TransferReady, "protocol" | "listening" | "user" | "password" | "files">, write: boolean, ph: { ip: string; file: string }): string[] {
   const { host: h, port } = splitListen(r.listening);
   const ip = /^(0\.0\.0\.0|::)$/.test(h) ? ph.ip : h.includes(":") ? `[${h}]` : h;
-  const names = (r.files?.length ? r.files : [ph.file]).filter((n) => !unsafeName(n));
+  const names = (r.files?.length ? r.files : write ? [] : [ph.file]).filter((n) => !unsafeName(n));
   const out: string[] = [];
   const url = (path: string) => {
     switch (r.protocol) {
