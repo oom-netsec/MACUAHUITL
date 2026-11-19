@@ -8,25 +8,18 @@ import { Terminal } from "../../components/Terminal";
 import { CopyButton } from "../../components/Data";
 import { ModuleIdContext, useInbox, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
-import { useDiagRun, type DiagSpec } from "./useDiagRun";
-import { PingOptions, PingSummaryCard, SweepTable } from "./PingExt";
-import { PING_FORM0, ipFamily, patchForm, pingOptions, type PingForm } from "./pingOpts";
+import { useDiagRun } from "./useDiagRun";
 import { DiagViz } from "./DiagViz";
 import { isWindows } from "../../lib/platform"; // ADR 0012 (i): en Windows el SYN necesita Npcap, fuera del producto
 import "./diag.css";
 
-export type ToolName = "ping" | "traceroute" | "nmap" | "iperf3" | "pcap";
+export type ToolName = "nmap" | "iperf3" | "pcap";
 
 // Cada herramienta tiene opciones cerradas (spec §9): no hay línea de comandos libre.
 export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const t = useT();
   const go = useNav();
   const [target, setTarget] = useState("");
-  const [pf, setPf] = useState<PingForm>(PING_FORM0);
-  const setP = (p: Partial<PingForm>) => setPf((f) => patchForm(f, p));
-  const count = pf.count;
-  const ping = pingOptions(pf, isWindows());
-  const [hops, setHops] = useState("30");
   const [ports, setPorts] = useState("");
   const [scan, setScan] = useState<"connect" | "syn" | "udp" | "ping">("connect");
   const [skipDisc, setSkipDisc] = useState(false);
@@ -39,15 +32,15 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [ifaces, setIfaces] = useState<NetInterface[]>([]);
   const [ifState, setIfState] = useState<"loading" | "ok" | "error">("loading");
   const [filter, setFilter] = useState("");
-  const { runId, lines, setLines, result, summary, sweep, stoppable, fam, interval, t0, err, launching, started, start, stop, cancel } = useDiagRun(core);
-  // El menú de equipo manda la dirección al módulo con su id (ping, traceroute…); cada instancia toma solo la suya.
+  const { runId, lines, setLines, result, t0, err, launching, started, start, cancel } = useDiagRun(core);
+  // El menú de equipo manda la dirección al módulo con su id (nmap, iperf3…); cada instancia toma solo la suya.
   const moduleId = useContext(ModuleIdContext);
   const needsTarget = tool !== "pcap" && !(tool === "iperf3" && mode === "server");
   useInbox(moduleId, (addr) => { if (needsTarget) setTarget(addr); });
   // La vista queda montada toda la sesión: las interfaces se vuelven a leer al pasar a servidor y antes de arrancarlo (DHCP, VPN).
   const loadIfaces = () => core.listInterfaces().then((l) => { setIfaces(l ?? []); setIfState("ok"); return l ?? []; }, () => { setIfaces([]); setIfState("error"); return [] as NetInterface[]; });
   useEffect(() => {
-    if (tool === "pcap" || tool === "iperf3" || tool === "ping") void loadIfaces();
+    if (tool === "pcap" || tool === "iperf3") void loadIfaces();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadIfaces solo usa core
   }, [core, tool, mode]);
 
@@ -60,15 +53,12 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     if (server && !localIPs(await loadIfaces()).includes(bindIP)) return t("diag.bind.gone", { ip: bindIP }); // la IP ya no está (DHCP, VPN)
     const options: Record<string, string> = {};
     let targets: string[] = [];
-    let extra: Partial<DiagSpec> = {};
     switch (tool) {
-      case "ping": Object.assign(options, ping.options); targets = [target]; extra = { stoppable: !!(ping.options.continuous || ping.options.duration), fam: (ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?"), interval: Number(ping.options.interval) || 1 }; break;
-      case "traceroute": options.max_hops = hops; targets = [target]; break;
       case "nmap": options.scan = scan; if (ports && scan !== "ping") options.ports = ports; if (skipDisc && scan !== "ping") options.skip_discovery = "true"; targets = [target]; break; // -Pn con scan=ping: diag.err.skip_with_ping
       case "iperf3": options.mode = mode; if (mode === "client") { options.seconds = seconds; targets = [target]; } else { options.bind = bindIP; options.port = port; } break;
       case "pcap": options.interface = iface; options.seconds = seconds; if (filter) options.filter = filter; break;
     }
-    return { tool, targets, options, ...extra };
+    return { tool, targets, options };
   });
 
   const status = runId ? { tone: "info" as const, label: t("diag.status.running") }
@@ -79,24 +69,17 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     <Page title={t(`diag.title.${tool}`)} description={t(`diag.desc.${tool}`)}>
       <div className="field-row">
         {needsTarget && <Field label={t("diag.target")} hint={t("diag.target.hint")} value={target} onChange={setTarget} w="lg" mono />}
-        {tool === "ping" && <Field label={t("diag.count")} type="number" value={count} onChange={(count) => setP({ count })} w="sm" disabled={pf.continuous} error={ping.errors.count ? t(ping.errors.count) : undefined} />}
         {tool === "nmap" && scan !== "ping" && <Field label={t("diag.ports")} hint={t("diag.ports.hint")} value={ports} onChange={setPorts} w="md" mono />}
         {tool === "iperf3" && <Select label={t("diag.mode")} value={mode} onChange={setMode} options={[["client", t("diag.mode.client")], ["server", t("diag.mode.server")]]} w="md" />}
         {((tool === "iperf3" && !server) || tool === "pcap") && <Field label={t("diag.seconds")} type="number" value={seconds} onChange={setSeconds} w="sm" />}
         {server && binds.length > 0 && <Select label={t("diag.bind")} value={bindIP} onChange={setBind} options={binds.map((a) => [a, a] as [string, string])} w="md" />}
       </div>
-      {tool === "traceroute" && (
-        <Advanced changed={hops !== "30" ? 1 : 0}>
-          <Field label={t("diag.hops")} type="number" value={hops} onChange={setHops} w="sm" />
-        </Advanced>
-      )}
       {server && (
         <Advanced forceOpen={!portOk} changed={port !== "5201" ? 1 : 0}>
           <Field label={t("diag.port")} hint={t("diag.port.hint")} value={port} onChange={setPort} error={portOk ? undefined : t("diag.port.invalid")} inputMode="numeric" w="sm" mono />
         </Advanced>
       )}
       {server && ifState !== "loading" && binds.length === 0 && <Notice kind="warn">{t(ifState === "error" ? "diag.bind.error" : "diag.bind.none")}</Notice>}
-      {tool === "ping" && <PingOptions form={pf} set={setP} errors={ping.errors} active={ping.active} ifaces={ifaces} disabled={!!runId} />}
       {tool === "nmap" && (
         <Select label={t("diag.scan")} value={scan} onChange={setScan} w="lg"
           options={([["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]] as [typeof scan, string][])
@@ -120,14 +103,11 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       )}
       <div className="actions">
         <RunButton primary kbd onClick={run} busy={!!runId} disabled={launching}
-          missing={[tool === "ping" && Object.keys(ping.errors).length > 0 && t("need.fixFields"), needsTarget && !target.trim() && t("need.target"), server && !bindIP && t("need.bindIP"), server && !portOk && t("need.portValid")]}>{t("common.run")}</RunButton>
-        {stoppable && <button onClick={stop} disabled={!runId}>{t("diag.stop")}</button>}
+          missing={[needsTarget && !target.trim() && t("need.target"), server && !bindIP && t("need.bindIP"), server && !portOk && t("need.portValid")]}>{t("common.run")}</RunButton>
         <button onClick={cancel} disabled={!runId}>{t("common.cancel")}</button>
       </div>
       {!started && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}
-      {tool === "ping" && summary && <PingSummaryCard s={summary} />}
-      {tool === "ping" && sweep.length > 0 && <SweepTable points={sweep} fam={fam} />}
-      {started && <DiagViz tool={tool} lines={lines} t0={t0} interval={interval} path={result?.ok ? result.path : undefined} />}
+      {started && <DiagViz tool={tool} lines={lines} t0={t0} path={result?.ok ? result.path : undefined} />}
       {started && (
         <ResultPanel title={t("common.output")} status={status} error={err || (result && !result.ok && !result.canceled ? result.text : "")}
           meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : result?.canceled ? result.text : undefined}

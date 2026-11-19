@@ -1058,8 +1058,6 @@ export const es = {
   "term.palette.classic": "Clásica",
   "term.palette.consolaOscura": "Consola oscura",
   "term.palette.consolaClara": "Consola clara",
-  "diag.desc.ping": "Alcance y latencia hacia un equipo. La salida se guarda en la carpeta del caso.",
-  "diag.desc.traceroute": "Ruta salto por salto hasta un destino.",
   "diag.desc.nmap": "Puertos y servicios abiertos en un equipo o una red, con opciones cerradas.",
   "diag.desc.iperf3": "Ancho de banda entre este equipo y un servidor iperf3.",
   "diag.desc.pcap": "Captura con dumpcap en una interfaz local; el archivo se puede analizar después en PCAP.",

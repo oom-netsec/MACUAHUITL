@@ -1060,8 +1060,6 @@ export const en: Record<Key, string> = {
   "term.palette.classic": "Classic",
   "term.palette.consolaOscura": "Dark console",
   "term.palette.consolaClara": "Light console",
-  "diag.desc.ping": "Reachability and latency to a device. The output is saved in the case folder.",
-  "diag.desc.traceroute": "Hop-by-hop path to a destination.",
   "diag.desc.nmap": "Open ports and services on a device or network, with fixed options.",
   "diag.desc.iperf3": "Bandwidth between this computer and an iperf3 server.",
   "diag.desc.pcap": "Capture with dumpcap on a local interface; the file can then be analyzed in PCAP.",
