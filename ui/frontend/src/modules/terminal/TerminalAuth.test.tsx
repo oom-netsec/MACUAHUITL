@@ -340,3 +340,22 @@ test("llave CAMBIADA: otra huella sobre el mismo botón llega con la casilla sin
   expect(screen.getByLabelText("Entiendo que la llave de este equipo cambió")).not.toBeChecked();
   expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeDisabled();
 });
+
+import { App } from "../../app/App";
+test("Ctrl+Enter con el foco fuera del panel de preguntas no lo envía; con el foco dentro, sí", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<App core={core} initial="terminal" />);
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  await abrir("192.0.2.1");
+  await term();
+  act(() => core.emitTerminal(prompt));
+  const code = await screen.findByLabelText("Verification code:");
+  await userEvent.type(code, OTP);
+  await userEvent.type(screen.getByLabelText("Password:"), SECRET);
+  (document.activeElement as HTMLElement).blur();
+  await userEvent.keyboard("{Control>}{Enter}{/Control}");
+  expect(core.terminalAnswer).not.toHaveBeenCalled();
+  screen.getByLabelText("Password:").focus();
+  await userEvent.keyboard("{Control>}{Enter}{/Control}");
+  await waitFor(() => expect(core.terminalAnswer).toHaveBeenCalled());
+});
