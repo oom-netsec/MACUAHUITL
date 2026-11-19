@@ -156,7 +156,6 @@ export const es = {
   "syslog.title": "Syslog",
   "syslog.addr": "Dirección de escucha",
   "syslog.proto": "Protocolo",
-  "syslog.any": "Escuchar en todas las interfaces (0.0.0.0)",
   "syslog.save": "Guardar en archivo",
   "syslog.hint": "Se recomienda un puerto alto (5514). Configuración en el equipo: logging host <IP> transport udp port 5514",
   "syslog.listen": "Escuchar",
@@ -499,7 +498,6 @@ export const es = {
   "visibility.every": "Segundos entre muestras",
   "visibility.listen": "Escuchar",
   "visibility.listenAddr": "Dirección de escucha",
-  "visibility.anyIf": "Escuchar en todas las interfaces (0.0.0.0)",
   "visibility.topo.src": "Trabajo o carpeta de salida de Patrol (ID o ruta absoluta)",
   "visibility.topo.pcap": "Captura con CDP/LLDP (opcional, ruta absoluta)",
   "visibility.topo.note": "Usa el playbook «L2 · Topología (CDP, LLDP, STP, port-channels)» en Patrol: show cdp|lldp neighbors detail, show spanning-tree y show etherchannel summary.",
@@ -1576,7 +1574,6 @@ export const es = {
   "transfer.proto": "Protocolo",
   "transfer.listen": "IP de escucha",
   "transfer.listen.hint": "La de la interfaz que ve al equipo; la IP queda explícita en la regla del servidor.",
-  "transfer.any": "Escuchar en todas las interfaces (avanzado)",
   "transfer.port": "Puerto",
   "transfer.port.hint": "De 1 a 65535. Por omisión, el puerto estándar del protocolo; si el sistema no deja abrirlo, se explica cómo permitirlo.",
   "transfer.minutes": "Duración (minutos)",
@@ -3055,7 +3052,7 @@ export const es = {
   "need.fixFields": "corregir los campos marcados",
   "need.bindIP": "elegir la dirección de escucha",
   "need.portValid": "poner un puerto válido",
-  "need.listen": "indicar la dirección de escucha (o elegir cualquiera)",
+  "need.listen": "indicar la dirección de escucha (o elegir «Todas las interfaces»)",
   "need.serveFiles": "elegir los archivos o la carpeta a servir",
   "need.aclText": "pegar la ACL a importar",
   "need.backupSure": "marcar que entiendes el aviso",
@@ -3119,6 +3116,10 @@ export const es = {
   "ssh.auth.said": "El equipo dice:",
   "ssh.auth.sendFail": "No se pudo enviar la respuesta. Si la sesión sigue abierta, el equipo volverá a preguntar.",
   "ssh.hostKey.ack": "Entiendo que la llave de este equipo cambió",
+  "listen.all": "Todas las interfaces (0.0.0.0)",
+  "job.other": "Otra carpeta…",
+  "job.other.label": "ID o ruta del trabajo",
+  "listen.any.warn": "Cualquier equipo de la red podrá inyectar datos falsos (syslog, traps o flujos) en la evidencia mientras esté abierto.",
 };
 
 export type Key = keyof typeof es;

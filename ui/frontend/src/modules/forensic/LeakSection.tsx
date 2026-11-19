@@ -3,6 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
+import { JobField } from "../../components/JobField";
 import { ResultPanel, Warnings, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { LeakRow, LeaksReport } from "./api";
@@ -35,7 +36,7 @@ export function LeakSection({ core }: { core: CoreAPI }) {
     <>
       <Intro text={t("forensic.leak.intro")} />
       <div className="field-row">
-        <Field label={t("forensic.leak.job")} value={job} onChange={setJob} w="lg" mono />
+        <JobField core={core} label={t("forensic.leak.job")} value={job} onChange={setJob} />
         <Field label={t("forensic.leak.device")} value={device} onChange={setDevice} w="md" mono />
       </div>
       <Advanced label={t("forensic.section.thresholds")} changed={Number(rounds !== "3") + Number(growth !== "1024")}>

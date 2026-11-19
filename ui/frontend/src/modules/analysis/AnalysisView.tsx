@@ -10,6 +10,7 @@ import { tableCsv, tableMarkdown } from "../../lib/tableExport";
 import type { AnalysisReport, AnalysisWarning, CoreAPI, DiffReport, Severity, TimelineEvent, TimelineReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, Warnings, useResult } from "../../components/Page";
+import { JobField } from "../../components/JobField";
 import { useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { vocab } from "../../lib/vocab";
@@ -200,7 +201,7 @@ export function AnalysisView({ core }: { core: CoreAPI }) {
   const [device, setDevice] = useState("");
   const head = (
     <div className="field-row">
-      <Field label={t("analysis.job")} value={job} onChange={setJob} w="lg" mono />
+      <JobField core={core} label={t("analysis.job")} value={job} onChange={setJob} />
       <Field label={t("analysis.device")} value={device} onChange={setDevice} w="md" mono />
     </div>
   );

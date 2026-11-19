@@ -164,7 +164,7 @@ test("un done{error} de dirección marca la dirección y uno sin campo va en un 
   const core = await setup("Flujos");
   await listen();
   act(() => core.emitVis("flows", { runId: "f1", done: true, error: "rpc error: code = InvalidArgument desc = flows: dirección de escucha inválida \"x\": address x: missing port in address" }));
-  expect(screen.getByLabelText("Dirección de escucha")).toHaveAccessibleDescription(/dirección de escucha inválida/);
+  expect(screen.getByLabelText("Puerto")).toHaveAccessibleDescription(/dirección de escucha inválida/);
   expect(screen.getByText("Opciones").closest("details")).not.toHaveAttribute("open");
   await listen();
   act(() => core.emitVis("flows", { runId: "f1", done: true, error: "rpc error: code = Internal desc = no se pudo crear la carpeta de salida: permiso denegado" }));

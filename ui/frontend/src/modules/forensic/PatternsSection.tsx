@@ -52,7 +52,7 @@ export function PatternsSection({ core, active = true, refreshMs = 10_000 }: { c
     <>
       <Intro text={t("forensic.pat.intro")} />
       <Section title={t("forensic.section.source")}>
-        <SourcePicker value={src} onChange={setSrc} />
+        <SourcePicker core={core} value={src} onChange={setSrc} />
         {src.kind === "capture" && <Check label={t("forensic.pat.live", { n: Math.round(refreshMs / 1000) })} checked={live} onChange={setLive} />}
       </Section>
       <Advanced label={t("forensic.section.thresholds")} changed={Number(burst !== "5") + Number(win !== "60")}>

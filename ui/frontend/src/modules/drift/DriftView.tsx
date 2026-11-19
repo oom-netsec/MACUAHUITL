@@ -4,6 +4,7 @@ import { useState } from "react";
 import { showHidden } from "../../lib/safeText";
 import type { CoreAPI, DriftReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
+import { JobField } from "../../components/JobField";
 import { EmptyState, Page, ResultPanel, Warnings, useResult } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { useNav } from "../../app/activity";
@@ -23,7 +24,7 @@ export function DriftView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("drift.title")} description={t("drift.intro")}>
       <div className="field-row">
-        <Field label={t("drift.job")} value={job} onChange={setJob} w="lg" mono />
+        <JobField core={core} label={t("drift.job")} value={job} onChange={setJob} />
       </div>
       <Advanced changed={Number(round !== "0") + Number(device !== "")}>
         <div className="field-row">
