@@ -203,6 +203,11 @@ func shellAbierto(t *testing.T, addr string, hostKey ssh.PublicKey) *bufio.Reade
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Sin StdinPipe el cliente manda EOF por stdin al abrir y el shell termina solo: la sesión
+	// ya no estaría abierta cuando la prueba corte.
+	if _, err := s.StdinPipe(); err != nil {
+		t.Fatal(err)
+	}
 	outPipe, _ := s.StdoutPipe()
 	out := bufio.NewReader(outPipe)
 	if err := s.Shell(); err != nil {
