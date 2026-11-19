@@ -30,11 +30,44 @@ test("conectar con un clic manda hostId y no dirección ni credencial", async ()
   expect(req).not.toHaveProperty("credentialId");
 });
 
-test("un host sin credencial queda deshabilitado y dice por qué", async () => {
-  render(<TerminalView core={fakeCore({ listCredentials: vi.fn(async () => [cred]) })} />);
+test("un host sin credencial abre en modo tecleado: hostId y nada más, sin pedir nada antes", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
   const b = await screen.findByRole("button", { name: "Conectar a LAB-AP" });
-  expect(b).toBeDisabled();
-  expect(b).toHaveAccessibleDescription(/no tiene credencial/);
+  expect(b).toBeEnabled();
+  await userEvent.click(b);
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).toEqual({ name: "LAB-AP", hostId: sampleHosts[1].id, expectedStartupCommand: "", accept: [], rows: expect.any(Number), cols: expect.any(Number) });
+});
+
+test("un host sin credencial manda el usuario escrito; uno con credencial nunca lo manda", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  await userEvent.type(screen.getByLabelText("Usuario (opcional)"), " admin ");
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-AP" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const calls = () => (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls;
+  expect(calls()[0][0]).toEqual({ name: "LAB-AP", hostId: sampleHosts[1].id, expectedStartupCommand: "", username: "admin", accept: [], rows: expect.any(Number), cols: expect.any(Number) });
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
+  expect(calls()[1][0]).not.toHaveProperty("username");
+  expect(calls()[1][0]).not.toHaveProperty("credentialId");
+});
+
+test("el reintento con la huella de un host tecleado reenvía hostId y el usuario", async () => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin");
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-AP" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  act(() => { core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "ap1.lab:2222", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }); });
+  await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
+  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toMatchObject({ hostId: sampleHosts[1].id, username: "admin", acceptedKeys: [{ host: "ap1.lab:2222", fingerprint: `SHA256:${fp}` }] });
 });
 
 test("la huella de la primera vez se confirma igual y el reintento sigue usando hostId", async () => {

@@ -333,7 +333,7 @@ test("solo el panel a la vista tiene contexto WebGL: al ocultarse lo suelta y al
   expect(FakeWebgl.all[1].dispose).toHaveBeenCalled();
 });
 
-test("elegir un host de la libreta rellena equipo, puerto y credencial; sin credencial limpia la anterior y obliga a elegir", async () => {
+test("elegir un host de la libreta rellena equipo, puerto y credencial; sin credencial pasa a modo tecleado sin credencial oculta", async () => {
   const lab = { id: "c".repeat(32), label: "admin lab", username: "root", hasEnable: false, hasSshKey: false };
   const core = setup({ listCredentials: vi.fn(async () => [cred, lab]) });
   const pick = await screen.findByLabelText("Host de la libreta");
@@ -343,22 +343,32 @@ test("elegir un host de la libreta rellena equipo, puerto y credencial; sin cred
   expect(screen.getByLabelText(/Equipo/)).toHaveValue("10.9.0.1");
   expect(screen.getByLabelText("Credencial")).toHaveValue(lab.id);
   expect(pick).toHaveValue("a".repeat(32)); // el selector muestra el host elegido
-  await userEvent.selectOptions(pick, "b".repeat(32)); // LAB-AP, puerto 2222, sin credencial: no deja la anterior
+  await userEvent.selectOptions(pick, "b".repeat(32)); // LAB-AP, puerto 2222, sin credencial: modo tecleado, no deja la anterior
   expect(screen.getByLabelText(/Equipo/)).toHaveValue("ap1.lab:2222");
-  expect(screen.getByLabelText("Credencial")).toHaveValue("");
-  expect(screen.getByText("Este host no tiene credencial en la bóveda: elige una")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Abrir pestaña" })).toBeDisabled();
-  await userEvent.selectOptions(screen.getByLabelText("Credencial"), lab.id);
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Escribir usuario y contraseña al conectar");
   expect(screen.queryByText("Este host no tiene credencial en la bóveda: elige una")).toBeNull();
+  await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin");
   await userEvent.click(screen.getByRole("button", { name: "Abrir pestaña" }));
-  expect(core.terminalOpen).toHaveBeenCalledWith(expect.objectContaining({ address: "ap1.lab", port: 2222, credentialId: lab.id }));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).toMatchObject({ address: "ap1.lab", port: 2222, credentialId: "", username: "admin" });
 });
 
-test("un host con credencial borrada de la bóveda tampoco hereda la anterior", async () => {
-  setup({ listHosts: vi.fn(async () => [{ id: "e".repeat(32), name: "HUERFANO", address: "10.1.1.1", port: 22, platform: "", folder: "", tags: [], credentialId: "f".repeat(32), credentialLabel: "", notes: "" }]) });
+test("un host con credencial borrada de la bóveda tampoco hereda la anterior: modo tecleado", async () => {
+  const core = setup({ listHosts: vi.fn(async () => [{ id: "e".repeat(32), name: "HUERFANO", address: "10.1.1.1", port: 22, platform: "", folder: "", tags: [], credentialId: "f".repeat(32), credentialLabel: "", notes: "" }]) });
   await userEvent.selectOptions(await screen.findByLabelText("Host de la libreta"), "e".repeat(32));
-  expect(screen.getByLabelText("Credencial")).toHaveValue("");
-  expect(screen.getByText("Este host no tiene credencial en la bóveda: elige una")).toBeVisible();
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Escribir usuario y contraseña al conectar");
+  expect(screen.getByLabelText("Usuario (opcional)")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Abrir pestaña" }));
+  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ credentialId: "" });
+});
+
+test("elegir un host sin credencial tras uno con credencial no manda la credencial que ya no se ve", async () => {
+  const core = setup({ listCredentials: vi.fn(async () => [{ ...cred, id: "c".repeat(32) }]) });
+  const pick = await screen.findByLabelText("Host de la libreta");
+  await userEvent.selectOptions(pick, "a".repeat(32)); // con credencial
+  await userEvent.selectOptions(pick, "b".repeat(32)); // sin credencial
+  await userEvent.click(screen.getByRole("button", { name: "Abrir pestaña" }));
+  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ address: "ap1.lab", credentialId: "" });
 });
 
 test("un host IPv6 con puerto distinto de 22 abre la sesión en ese puerto", async () => {

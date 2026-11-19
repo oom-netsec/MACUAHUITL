@@ -6,7 +6,7 @@ import type { Host } from "../inventory/api";
 import { useHostsVersion } from "../inventory/signal";
 
 // Conexión de un clic: un botón por host guardado. Manda solo el id; el núcleo pone dirección, puerto, credencial y orden de inicio.
-// Sin credencial utilizable el botón queda deshabilitado y la razón se lee junto a él.
+// Sin credencial el host abre en modo tecleado. Queda deshabilitado solo si su credencial no está disponible (bóveda cerrada o borrada).
 export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; creds: Credential[]; busy: boolean; onConnect: (h: Host) => void }) {
   const t = useT();
   const hv = useHostsVersion();
@@ -23,7 +23,7 @@ export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; cr
       <h3 id={`${id}-t`}>{t("ssh.saved")}</h3>
       <ul>
         {hosts.map((h) => {
-          const ok = creds.some((c) => c.id === h.credentialId);
+          const ok = !h.credentialId || creds.some((c) => c.id === h.credentialId);
           return (
             <li key={h.id}>
               <button type="button" disabled={busy || !ok} aria-describedby={[h.startCommand ? `${id}-${h.id}-run` : "", ok ? "" : `${id}-${h.id}`].filter(Boolean).join(" ") || undefined} aria-label={t("ssh.connectHost", { name: showHidden(h.name) })} onClick={() => onConnect(h)}>{showHidden(h.name)}</button>
