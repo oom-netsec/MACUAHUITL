@@ -109,14 +109,26 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 		cfg.HostKeyAlgorithms = append(def.HostKeys, legacyHostKey...)
 	}
 
+	if err := ctx.Err(); err != nil { // ya cancelado: ni se conecta ni se marca al equipo
+		return nil, err
+	}
 	conn, err := g.Dial(ctx, jobID, host, port)
 	if err != nil {
 		return nil, err
 	}
 	conn.SetDeadline(time.Now().Add(o.HandshakeTimeout))
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
+	// Cancelar el ctx corta el handshake; stop() lo desarma al terminar para que cancelarlo después no cierre la sesión abierta.
+	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
-	if err != nil {
+	if !stop() { // la cancelación ya cerró (o está cerrando) la conexión: no se entrega una sesión muerta
+		if err == nil {
+			c.Close()
+		}
+		conn.Close()
+		return nil, ctx.Err()
+	}
+	if err != nil { // stop() en true: el AfterFunc no tocó la conexión, el error es del handshake (huella, autenticación…)
 		conn.Close()
 		var he *HostKeyError
 		if errors.As(err, &he) {
