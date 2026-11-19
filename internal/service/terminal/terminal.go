@@ -187,9 +187,6 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if o.Address != "" || o.Port != 0 || o.CredentialId != "" {
 			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.host_and_address", nil), "host and address")
 		}
-		if o.Username != "" { // hoy todo host guardado trae su credencial
-			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username_with_credential", nil), "username with a credential")
-		}
 		h, err := service.SavedHost(s.d.DB(), o.HostId)
 		if errors.Is(err, sql.ErrNoRows) {
 			return s.refuse(label, service.Err(st.Context(), codes.NotFound, "terminal.err.host_not_found", nil), "saved host not found")
@@ -201,13 +198,19 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if h.StartupCommand != "" && !devices.IsGeneric(h.Platform) { // Clean no lo permite: datos alterados o viejos
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup on a non-generic host")
 		}
-		if h.CredentialID == "" {
-			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.host_no_credential", nil), "saved host has no credential")
+		if o.Username != "" && h.CredentialID != "" {
+			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username_with_credential", nil), "username with a credential")
 		}
 		if o.ExpectedStartupCommand != h.StartupCommand { // lo que corre es lo que el usuario vio
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup changed")
 		}
 		address, port, credID, startup, generic = h.Address, uint16(h.Port), h.CredentialID, h.StartupCommand, devices.IsGeneric(h.Platform)
+		if typed = h.CredentialID == ""; typed && o.Username != "" { // host sin credencial: modo tecleado
+			var ok bool
+			if username, ok = cleanUser(o.Username); !ok && strings.TrimSpace(o.Username) != "" {
+				return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.username", nil), "invalid username")
+			}
+		}
 	} else {
 		if o.Address == "" {
 			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.no_address", nil)

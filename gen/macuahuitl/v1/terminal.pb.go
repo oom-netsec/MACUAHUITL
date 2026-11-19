@@ -43,9 +43,9 @@ type TerminalOpen struct {
 	// La orden de inicio que la UI le mostró al usuario antes de conectar. Si no es igual a la guardada, el núcleo no
 	// conecta (FailedPrecondition): lo que corre es lo que se vio. Vacío = el host no debe tener orden de inicio.
 	ExpectedStartupCommand string `protobuf:"bytes,9,opt,name=expected_startup_command,json=expectedStartupCommand,proto3" json:"expected_startup_command,omitempty"`
-	// Fase 47t: sin credential_id (y sin host_id) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
+	// Fase 47t: sin credential_id (o con un host_id cuyo host no tiene credencial) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
 	// por el stream (AuthPrompt/AuthAnswer) lo que el equipo pregunte. username es opcional y solo va en ese modo; vacío =
-	// el núcleo pregunta «login as:» antes de marcar. Con credential_id se rechaza (terminal.err.username_with_credential).
+	// el núcleo pregunta «login as:» antes de marcar. Con credential_id, o con el host_id de un host con credencial, se rechaza (terminal.err.username_with_credential).
 	Username      string `protobuf:"bytes,11,opt,name=username,proto3" json:"username,omitempty"` // 10 es accepted_host_keys (huellas por host)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
