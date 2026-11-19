@@ -212,6 +212,7 @@ test("cancelar no es un fallo: estado «Cancelado» y sin mensaje de error", asy
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await userEvent.click(await screen.findByRole("button", { name: "Detener ping" }));
+  expect(core.diagCancel).toHaveBeenCalledWith("r1");
   act(() => core.emitDiag({ runId: "r1", done: true, exitCode: -1, canceled: true }));
   expect(await screen.findByText("Cancelado")).toBeInTheDocument();
   expect(screen.getByText("Cancelado por el usuario.")).toBeInTheDocument();

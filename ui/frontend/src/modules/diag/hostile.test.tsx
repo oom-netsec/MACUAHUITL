@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PingTraceView } from "./PingTraceView";
+import { DiagView } from "./DiagView";
 import { fakeCore } from "../../lib/fake";
 
 async function run() {
@@ -27,4 +28,18 @@ test("los colores ANSI de la herramienta no se ven como basura; el texto queda",
   const log = screen.getByRole("log", { name: "Ping" });
   await waitFor(() => expect(log.textContent).toContain("64 bytes from 10.0.0.1 ok"));
   expect(log.textContent).not.toMatch(/\u001b|\[31m|titulo/);
+});
+
+test("nmap, iperf3 y pcap (DiagView): la salida con HTML se ve literal y sin ANSI", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="nmap" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  const evil = '<img src=x onerror="window.__pwn=1"> \u001b[31m<b>x</b>\u001b[0m';
+  act(() => core.emitDiag({ runId: "r1", line: evil }));
+  const log = screen.getByRole("log", { name: "Salida" });
+  await waitFor(() => expect(log.textContent).toContain('<img src=x onerror="window.__pwn=1"> <b>x</b>'));
+  expect(log.querySelector("img, b")).toBeNull();
+  expect(log.textContent).not.toMatch(/\u001b|\[31m/);
 });
