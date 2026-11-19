@@ -134,7 +134,7 @@ test("Analizar, Comparar y Ver línea de tiempo nombran el trabajo que falta", a
   expect(btn("Comparar")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
   await userEvent.click(screen.getByRole("tab", { name: "Línea de tiempo" }));
   expect(btn("Ver línea de tiempo")).toHaveAccessibleDescription("Falta: indicar el trabajo.");
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   expect(btn("Ver línea de tiempo")).toBeEnabled();
   expect(btn("Ver línea de tiempo")).not.toHaveAccessibleDescription();
 });
