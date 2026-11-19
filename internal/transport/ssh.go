@@ -33,6 +33,10 @@ type SSHOptions struct {
 	OnLegacy func(negotiated string)
 	// GenericHost: la conexión es del terminal a un host linux o windows. Solo así se acepta una credencial de solo llave (fase 44, regla 7b).
 	GenericHost bool
+	// Ask pide las respuestas al usuario cuando no hay credencial guardada (modo tecleado, fase 47t). Recibe el ctx del
+	// handshake y debe volver al cancelarse; las respuestas se ponen en ceros al usarlas. Con Ask la credencial no puede
+	// traer contraseña ni llave.
+	Ask func(context.Context, Prompt) ([][]byte, error)
 }
 
 // Algoritmos que solo negocian equipos viejos; se activan por perfil (spec §3).
@@ -63,6 +67,12 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 	}
 	if o.HandshakeTimeout == 0 {
 		o.HandshakeTimeout = 15 * time.Second
+	}
+	if o.Ask != nil && (!cred.Password.Empty() || !cred.SSHKey.Empty()) { // no se mezclan: ni se marca
+		return nil, ErrTypedMixed
+	}
+	if o.Ask == nil && cred.Password.Empty() && cred.SSHKey.Empty() { // antes marcaba y gastaba un intento «none»
+		return nil, ErrNoCredential
 	}
 	cfg := &ssh.ClientConfig{User: cred.Username, HostKeyCallback: hk, Timeout: o.HandshakeTimeout}
 	if !cred.SSHKey.Empty() {
@@ -117,6 +127,9 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 		return nil, err
 	}
 	conn.SetDeadline(time.Now().Add(o.HandshakeTimeout))
+	if o.Ask != nil {
+		cfg.AuthCallback = askAuth(ctx, conn, host, cred.Username, o)
+	}
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
 	// Cancelar el ctx corta el handshake; stop() lo desarma al terminar para que cancelarlo después no cierre la sesión abierta.
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
