@@ -15,7 +15,7 @@ func vigilar(t *testing.T) <-chan []byte {
 	t.Helper()
 	l, sl, e, f, s := watchLimit, watchSlow, watchEvery, driverFrame, onStuck
 	ch := make(chan []byte, 4)
-	watchLimit, watchSlow, watchEvery = 300*time.Millisecond, 1500*time.Millisecond, 20*time.Millisecond
+	watchLimit, watchSlow, watchEvery = 300*time.Millisecond, 2500*time.Millisecond, 20*time.Millisecond
 	driverFrame = "store.ioLenta(" // un marco que la prueba controla, en lugar del de modernc.org/sqlite
 	onStuck = func(motivo string, b []byte) { ch <- append([]byte(motivo+"\n\n"), b...) }
 	t.Cleanup(func() { watchLimit, watchSlow, watchEvery, driverFrame, onStuck = l, sl, e, f, s })
@@ -59,7 +59,7 @@ func TestVigiaIOLentaNoEsInterbloqueo(t *testing.T) {
 	select {
 	case b := <-ch:
 		t.Fatalf("disparó con la dueña trabajando en el driver:\n%s", b)
-	case <-time.After(1 * time.Second): // más de tres veces watchLimit, menos que watchSlow
+	case <-time.After(1 * time.Second): // más de tres veces watchLimit y lejos de watchSlow (margen para un runner cargado)
 	}
 	soltar()
 	select {
@@ -80,7 +80,7 @@ func TestVigiaIOColgadaDisparaConSuMotivo(t *testing.T) {
 		if d := time.Since(inicio); d < watchSlow {
 			t.Fatalf("disparó a los %s, antes de watchSlow", d)
 		}
-		if !strings.Contains(string(b), "dentro del driver") || strings.Contains(string(b), "interbloqueo") {
+		if !strings.HasPrefix(string(b), "una espera de conexión lleva ") || !strings.Contains(string(b), "dentro del driver") {
 			t.Fatalf("motivo equivocado:\n%.200s", b)
 		}
 		if !strings.Contains(string(b), "store.ioLenta(") {

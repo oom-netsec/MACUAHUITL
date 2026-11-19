@@ -84,7 +84,7 @@ func watch(db *sql.DB, limit, slow, every time.Duration, frame string, stuck fun
 				recheck = time.Now().Add(limit) // I/O en curso: se vuelve a mirar sin reiniciar since
 				continue
 			default:
-				stuck(fmt.Sprintf("la conexión lleva %s dentro del driver con otra goroutine esperándola (disco lento o colgado)", waited.Round(time.Second)), s)
+				stuck(fmt.Sprintf("una espera de conexión lleva %s mientras alguna goroutine sigue dentro del driver: disco lento o colgado, o un interbloqueo en esta base mientras otra trabaja", waited.Round(time.Second)), s)
 			}
 			pending, since, recheck = 0, time.Time{}, time.Time{}
 		}
