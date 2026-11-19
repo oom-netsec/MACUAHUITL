@@ -58,10 +58,11 @@ export function hostKeyFromError(msg: string, info?: ErrInfo): HostKeyInfo | nul
 interface LoginRow { target: string; passed: boolean; failedStep: string; fingerprint: string; reason?: string; args?: Record<string, string> }
 const HK_REASON = /^transport\.hostkey\.(unknown|changed)$/;
 // Paso HOST_KEY sin reason reconocible: se trata como llave cambiada (pide la casilla «Entiendo que cambió»).
+// El par va con el destino del Login Test (target), como pide el contrato; args.host es metadata que un envoltorio podría pisar.
 export function hostKeysFromLogin(rows: LoginRow[]): HostKeyInfo[] {
   // El reason puede venir directo o como causa de otro (args.cause_reason), igual que en hostKeyFromError.
   const hk = (l: LoginRow) => [l.reason, l.args?.cause_reason].find((r) => r && HK_REASON.test(r));
   return rows
     .filter((l) => !l.passed && l.fingerprint && (hk(l) || l.failedStep.endsWith("HOST_KEY")))
-    .map((l) => ({ fp: l.fingerprint, changed: hk(l) ? hk(l)!.endsWith("changed") : true, host: l.args?.host || l.target, keyType: l.args?.key_type || undefined }));
+    .map((l) => ({ fp: l.fingerprint, changed: hk(l) ? hk(l)!.endsWith("changed") : true, host: l.target, keyType: l.args?.key_type || undefined }));
 }

@@ -128,3 +128,13 @@ test("una fila sin equipo no se puede atar: no genera par y el botón no acepta"
   render(<HostKeyTrust items={[{ fp: "SHA256:aaa", changed: false }]} onTrust={() => {}} />);
   expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeDisabled();
 });
+
+test("si cambian los equipos con las mismas huellas, la selección se borra (no se arrastran pares a otro equipo)", async () => {
+  const onTrust = vi.fn();
+  const a = [{ fp: "SHA256:a", changed: false, host: "10.0.0.1:22" }, { fp: "SHA256:b", changed: false, host: "10.0.0.2:22" }];
+  const b = [{ fp: "SHA256:a", changed: false, host: "10.0.0.9:22" }, { fp: "SHA256:b", changed: false, host: "10.0.0.2:22" }];
+  const { rerender } = render(<HostKeyTrust items={a} onTrust={onTrust} />);
+  await userEvent.click(screen.getAllByRole("checkbox")[0]);
+  rerender(<HostKeyTrust items={b} onTrust={onTrust} />);
+  expect(screen.getAllByRole("checkbox").every((c) => !(c as HTMLInputElement).checked)).toBe(true);
+});

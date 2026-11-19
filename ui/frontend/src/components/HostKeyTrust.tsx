@@ -22,7 +22,7 @@ export function HostKeyTrust({ items, busy, onTrust }: { items: HostKeyInfo[]; b
     opener.current = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
     root.current?.focus();
   }, []);
-  const key = items.map((i) => i.fp + (i.changed ? "!" : "")).join("\n"); // un arreglo nuevo con las mismas huellas no borra la selección
+  const key = items.map((i) => `${i.host ?? ""}|${i.fp}${i.changed ? "!" : ""}`).join("\n"); // un arreglo nuevo con las mismas huellas no borra la selección
   useEffect(() => { setPicked(new Set()); setAck(false); }, [key]);
   const many = items.length > 1;
   const chosen = [...new Set(items.filter((i) => !many || picked.has(i.fp)).map((i) => i.fp))];

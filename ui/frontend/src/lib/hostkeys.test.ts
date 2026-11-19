@@ -78,3 +78,8 @@ test("hostKeysFromLogin lee el reason envuelto (args.cause_reason) igual que hos
   const row = { target: "10.0.0.2:22", passed: false, failedStep: "LOGIN_TEST_STEP_AUTH", detail: "", platform: "", fingerprint: "SHA256:bbb", reason: "login.failed", args: { cause_reason: "transport.hostkey.changed" } };
   expect(hostKeysFromLogin([row])).toEqual([{ fp: "SHA256:bbb", changed: true, host: "10.0.0.2:22" }]);
 });
+
+test("hostKeysFromLogin ata el par al destino del Login Test (target), no al host de la metadata", () => {
+  const row = { target: "10.0.0.7:2222", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:x", reason: "transport.hostkey.unknown", args: { host: "10.0.0.7" } };
+  expect(hostKeysFromLogin([row])[0].host).toBe("10.0.0.7:2222");
+});
