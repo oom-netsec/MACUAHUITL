@@ -23,6 +23,8 @@ type TerminalDTO struct {
 	HostID string `json:"hostId"`
 	// ExpectedStartupCommand es la orden de inicio que la UI mostró; si no coincide con la guardada el núcleo no conecta.
 	ExpectedStartupCommand string `json:"expectedStartupCommand"`
+	// Username solo viaja en modo tecleado (sin credencial ni host guardado); vacío = el núcleo pregunta «login as:».
+	Username string `json:"username"`
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
@@ -31,6 +33,9 @@ func (d TerminalDTO) open() *v1.TerminalOpen {
 		o.HostId = d.HostID
 	} else {
 		o.Address, o.Port, o.CredentialId = d.Address, d.Port, d.CredentialID
+		if d.CredentialID == "" {
+			o.Username = d.Username
+		}
 	}
 	return o
 }
@@ -80,6 +85,14 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 				b.emit("terminal:done", ev)
 				return
 			}
+			if p := r.GetAuthPrompt(); p != nil {
+				qs := make([]map[string]any, 0, len(p.Prompts))
+				for _, q := range p.Prompts {
+					qs = append(qs, map[string]any{"text": q.Text, "echo": q.Echo})
+				}
+				b.emit("terminal:auth", map[string]any{"runId": id, "seq": p.Seq, "name": p.Name, "instruction": p.Instruction, "prompts": qs})
+				continue
+			}
 			if r.Opened != "" {
 				b.emit("terminal:opened", map[string]any{"runId": id, "opened": r.Opened, "recording": r.Recording})
 				continue
@@ -105,6 +118,31 @@ func (b *Bridge) terminal(id string, f func(st v1.TerminalService_OpenTerminalCl
 func (b *Bridge) TerminalSend(id, data string) error {
 	return b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error {
 		return st.Send(&v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Data{Data: []byte(data)}})
+	})
+}
+
+// TerminalAnswer manda las respuestas de una ronda de preguntas (una por pregunta, mismo seq) por el mismo stream.
+// Las respuestas son secretos: no se guardan, no se registran y los bytes enviados se ponen en ceros al volver.
+func (b *Bridge) TerminalAnswer(id string, seq uint32, answers []string) error {
+	return wrapErr(b.terminalAnswer(id, seq, answers, nil))
+}
+
+// afterClear (solo pruebas) recibe los bytes ya puestos en ceros: así se ve que el clear() ocurre.
+func (b *Bridge) terminalAnswer(id string, seq uint32, answers []string, afterClear func([][]byte)) error {
+	bs := make([][]byte, len(answers))
+	for i, a := range answers {
+		bs[i] = []byte(a)
+	}
+	if afterClear != nil {
+		defer afterClear(bs)
+	}
+	defer func() {
+		for _, x := range bs {
+			clear(x)
+		}
+	}()
+	return b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error {
+		return st.Send(&v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_AuthAnswer{AuthAnswer: &v1.AuthAnswer{Seq: seq, Answers: bs}}})
 	})
 }
 

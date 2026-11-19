@@ -65,7 +65,7 @@ test("junto al botón se ve la orden de inicio y viaja como expectedStartupComma
   act(() => { core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "10.9.0.1:22", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }); });
   await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
-  expect(calls()[1][0]).toMatchObject({ expectedStartupCommand: "tmux attach -t main", accept: [`SHA256:${fp}`] }); // la misma orden que se mostró
+  expect(calls()[1][0]).toMatchObject({ expectedStartupCommand: "tmux attach -t main", acceptedKeys: [{ host: "10.9.0.1:22", fingerprint: `SHA256:${fp}` }] }); // la misma orden que se mostró
 });
 
 test("si el núcleo no conecta porque la orden cambió, lo dice claro y recarga los hosts guardados", async () => {
@@ -132,7 +132,8 @@ test.each([
   render(<TerminalView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
-  if (kind === "changed") expect(screen.getByText(/cambi/i)).toBeInTheDocument();
+  if (kind === "changed") expect(screen.getByText(/CAMBIÓ/)).toBeInTheDocument();
+  if (kind === "changed") await userEvent.click(screen.getByLabelText(/Entiendo que la llave/));
   await userEvent.click(screen.getByRole("button", { name: accept }));
   await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
   expect(open.mock.calls[1][0]).toEqual({ name: "LAB-CORE", hostId: sampleHosts[0].id, expectedStartupCommand: "", accept: [`SHA256:${fp}`], rows: expect.any(Number), cols: expect.any(Number) });

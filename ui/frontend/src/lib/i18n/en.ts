@@ -3114,4 +3114,12 @@ export const en: Record<Key, string> = {
   "hostkey.new": "The device presented a host key you did not know. Compare this fingerprint with the device's and trust it only if it matches.",
   "hostkey.ack": "I understand this device's host key changed",
   "hostkey.noLogin": "Could not get the devices' fingerprints (the Login Test failed): there is nothing to compare or trust from here.",
+  "ssh.credTyped": "Type username and password when connecting",
+  "ssh.user": "Username (optional)",
+  "ssh.userHint": "Empty: the terminal asks «login as:». Not used with a saved credential.",
+  "ssh.auth.title": "The device asks for sign-in details",
+  "ssh.auth.answer": "Answer",
+  "ssh.auth.said": "The device says:",
+  "ssh.auth.sendFail": "The answer could not be sent. If the session is still open, the device will ask again.",
+  "ssh.hostKey.ack": "I understand this device's host key changed",
 };

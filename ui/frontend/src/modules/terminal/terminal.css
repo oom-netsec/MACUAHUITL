@@ -129,3 +129,4 @@
 .scripts-none { padding: var(--s-2); }
 .saved-hosts ul { list-style: none; margin: 0 0 var(--s-3); padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
 .saved-hosts h3 { margin: 0 0 var(--s-2); font-size: var(--fs-2, 1rem); }
+.ssh-auth { display: grid; gap: 8px; padding: 12px; margin: 8px 0; border: 1px solid var(--border, currentColor); border-radius: 6px; max-width: 480px; }

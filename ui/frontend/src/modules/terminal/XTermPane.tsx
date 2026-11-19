@@ -9,7 +9,7 @@ import { useT } from "../../lib/i18n";
 
 export interface FindReq { q: string; dir: 1 | -1; n: number }
 interface Props {
-  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: (given?: string) => Promise<string>; active: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
+  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: (given?: string) => Promise<string>; active: boolean; focus?: boolean; asking?: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
   bind: (runId: string, write: ((d: string) => void) | null) => void; // la vista manda aquí lo que llega del equipo
   onInput: (d: string) => void; // teclas en crudo hacia el equipo
   onSize: (rows: number, cols: number) => void;
@@ -104,11 +104,18 @@ export default function XTermPane(p: Props) {
     } catch { gl?.dispose(); gl = null; setNoGL(true); }
     return () => gl?.dispose();
   }, [shown]);
+  const wasAsking = useRef(p.asking);
   useEffect(() => {
     if (!shown) return;
-    const id = requestAnimationFrame(() => { fit.current(); if (props.current.active) term.current?.focus(); }); // visible de nuevo: medir y, si es la activa, tomar el foco
+    const fromAsk = wasAsking.current !== p.asking; // el cambio viene de la pregunta (done o respuesta): no se roba el foco si se teclea en otra parte
+    wasAsking.current = p.asking;
+    const id = requestAnimationFrame(() => {
+      fit.current();
+      const a = document.activeElement;
+      if ((props.current.focus ?? props.current.active) && !props.current.asking && (!fromAsk || !a || a === document.body)) term.current?.focus(); // visible de nuevo: medir y, si es la de foco y no hay pregunta abierta, tomar el foco
+    });
     return () => cancelAnimationFrame(id);
-  }, [shown, p.active]);
+  }, [shown, p.active, p.focus, p.asking]);
   useEffect(() => {
     const s = p.search;
     if (!shown || !s || !find.current) return;
