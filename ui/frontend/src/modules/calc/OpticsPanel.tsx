@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -32,13 +33,16 @@ export function OpticsPanel({ core }: { core: CoreAPI }) {
         <div className="field-row end">
           <Field label={t("calc.optics.tx")} type="number" value={tx} onChange={set("tx")} w="md" mono />
           <Field label={t("calc.optics.rx")} type="number" value={rx} onChange={set("rx")} w="md" mono />
-          <Field label={t("calc.optics.overload")} type="number" value={ov} onChange={set("ov")} w="md" mono />
         </div>
       </Section>
       <Section title={t("calc.optics.secLink")}>
         <div className="field-row end">
           <Field label={t("calc.optics.km")} type="number" value={km} onChange={set("km")} w="sm" mono />
           <Select label={t("calc.optics.fiber")} value={fiber} onChange={set("fiber")} options={fibers(t)} w="lg" />
+        </div>
+        <Advanced changed={(["ov", "lpk", "conn", "connLoss", "splices", "spliceLoss", "margin"] as const).filter((k) => f[k] !== initial[k]).length}>
+        <div className="field-row end">
+          <Field label={t("calc.optics.overload")} type="number" value={ov} onChange={set("ov")} w="md" mono />
           <Field label={t("calc.optics.lossKm")} type="number" value={lpk} onChange={set("lpk")} w="md" mono />
         </div>
         <div className="field-row end">
@@ -48,6 +52,7 @@ export function OpticsPanel({ core }: { core: CoreAPI }) {
           <Field label={t("calc.optics.spliceLoss")} type="number" value={spliceLoss} onChange={set("spliceLoss")} w="md" mono />
           <Field label={t("calc.optics.margin")} type="number" value={margin} onChange={set("margin")} w="md" mono />
         </div>
+        </Advanced>
         <div className="actions"><button className="primary" disabled={!tx || !rx || !km || c.busy} aria-busy={c.busy} onClick={budget}>{t("calc.optics.btn")}{kbd}</button></div>
       </Section>
       <Section title={t("calc.optics.convHead")}>

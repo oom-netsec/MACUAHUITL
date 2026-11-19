@@ -18,7 +18,8 @@ export function Advanced({ children, label, forceOpen, changed = 0 }: { children
   const base = label ?? t("common.advanced");
   return (
     <details ref={ref} className="adv" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>{changed > 0 ? t("common.advanced.changed", { label: base, n: changed }) : base}</summary>
+      {/* forceOpen booleano = hay un error ahora mismo dentro: el summary lo dice, por si el usuario lo cierra (el botón sigue bloqueado). */}
+      <summary>{changed > 0 ? t("common.advanced.changed", { label: base, n: changed }) : base}{forceOpen === true && <span className="adv-error"> · {t("common.advanced.error")}</span>}</summary>
       {children}
     </details>
   );

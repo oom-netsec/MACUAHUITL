@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Advanced } from "../../components/Advanced";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Select } from "../../components/Field";
 import { useT } from "../../lib/i18n";
@@ -18,8 +19,10 @@ export function DscpPanel({ core }: { core: CoreAPI }) {
     <>
       <div className="field-row end">
         <Field label={t("calc.dscp.query")} value={query} onChange={setQuery} w="lg" mono />
-        <Select label={t("calc.dscp.field")} value={field} onChange={setField} options={dscpFields(t)} w="md" />
       </div>
+      <Advanced changed={field !== "" ? 1 : 0}>
+        <Select label={t("calc.dscp.field")} value={field} onChange={setField} options={dscpFields(t)} w="md" />
+      </Advanced>
       <div className="actions"><button className="primary" disabled={c.busy} aria-busy={c.busy} onClick={() => c.run("dscp", { query, field })}>{t("calc.dscp.btn")}{kbd}</button></div>
       {c.view}
     </>

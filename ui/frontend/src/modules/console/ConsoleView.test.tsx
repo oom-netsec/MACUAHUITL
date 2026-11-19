@@ -84,3 +84,20 @@ test("un comando con un control oculto (Ctrl+Z pegado) pide confirmación; si se
   await waitFor(() => expect(core.confirmPaste).toHaveBeenCalledWith("end\x1a", "/dev/ttyUSB0"));
   expect(core.consoleSend).not.toHaveBeenCalled();
 });
+
+test("los parámetros serie van plegados en Avanzado, cuentan y se siguen enviando; puerto y Abrir quedan fuera", async () => {
+  const core = fakeCore({ fieldPorts: vi.fn(async () => ["/dev/ttyUSB0"]) });
+  render(<ConsoleView core={core} />);
+  await waitFor(() => expect(screen.getByLabelText("Puerto")).toHaveValue("/dev/ttyUSB0"));
+  const det = screen.getByLabelText("Velocidad").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Bits de datos", "Paridad", "Bits de parada", "Control de flujo"]) expect(det).toContainElement(screen.getByLabelText(l));
+  expect(det).not.toContainElement(screen.getByText(/^Cisco: 9600 8N1/)); // a la vista: trae el remedio de permisos
+  expect(det).not.toContainElement(screen.getByLabelText("Puerto"));
+  expect(det).not.toContainElement(screen.getByRole("button", { name: "Abrir" }));
+  await userEvent.selectOptions(screen.getByLabelText("Velocidad"), "115200");
+  await userEvent.selectOptions(screen.getByLabelText("Paridad"), "even");
+  expect(det.querySelector("summary")).toHaveTextContent("cambiadas: 2");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+  expect(core.consoleOpen).toHaveBeenCalledWith({ port: "/dev/ttyUSB0", baud: 115200, dataBits: 8, parity: "even", stopBits: 1, flow: "none" });
+});

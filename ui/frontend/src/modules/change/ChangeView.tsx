@@ -1,3 +1,4 @@
+import { Advanced } from "../../components/Advanced";
 import { useEffect, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
@@ -95,8 +96,10 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
         </div>
         <div className="field-row">
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
-          <Field label={t("change.outDir")} value={out} onChange={setOut} w="lg" mono />
         </div>
+        <Advanced changed={out !== "" ? 1 : 0}>
+          <Field label={t("change.outDir")} value={out} onChange={setOut} w="lg" mono />
+        </Advanced>
         <div className="actions">
           <button className="primary" disabled={!name || !targets || !cred} onClick={create}>{t("change.create")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
         </div>
@@ -188,10 +191,14 @@ function Upgrade({ core }: { core: CoreAPI }) {
         <TextArea label={t("change.upgrade.outputs")} value={outputs} onChange={setOutputs} rows={8} />
         <div className="field-row">
           <Field label={t("change.upgrade.image")} value={image} onChange={setImage} w="lg" mono />
-          <Field label={t("change.upgrade.size")} type="number" value={size} onChange={setSize} w="sm" mono />
-          <Field label={t("change.upgrade.md5")} value={md5} onChange={setMd5} w="lg" mono />
         </div>
-        <TextArea label={t("change.upgrade.verify")} value={verify} onChange={setVerify} rows={3} />
+        <Advanced label={t("change.upgrade.integrity")} changed={[size, md5, verify].filter(Boolean).length}>
+          <div className="field-row">
+            <Field label={t("change.upgrade.size")} type="number" value={size} onChange={setSize} w="sm" mono />
+            <Field label={t("change.upgrade.md5")} value={md5} onChange={setMd5} w="lg" mono />
+          </div>
+          <TextArea label={t("change.upgrade.verify")} value={verify} onChange={setVerify} rows={3} />
+        </Advanced>
         <div className="actions">
           <button className="primary" disabled={!outputs || !image || r.busy} aria-busy={r.busy} onClick={check}>{t("change.upgrade.check")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
         </div>

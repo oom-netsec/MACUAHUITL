@@ -3,6 +3,7 @@ import { useCoreLoad } from "../../lib/useCoreLoad";
 import { Terminal } from "../../components/Terminal";
 import type { ConsoleEvent, CoreAPI } from "../../lib/core";
 import { Field, Notice, Select, errorText } from "../../components/Field";
+import { Advanced } from "../../components/Advanced";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
@@ -75,6 +76,7 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
           {ports.length ? t("console.detected", { ports: ports.join(", ") }) : t("console.none")}
           <button className="quiet sm" onClick={scan}>{t("console.scan")}</button>
         </p>
+        <Advanced changed={[baud !== "9600", dataBits !== "8", parity !== "none", stopBits !== "1", flow !== "none"].filter(Boolean).length}>
         <div className="field-row">
           <Select label={t("console.baud")} value={baud} onChange={setBaud} w="sm" options={["9600", "19200", "38400", "57600", "115200"].map((v) => [v, v])} />
           <Select label={t("console.dataBits")} value={dataBits} onChange={setDataBits} w="sm" options={[["8", "8"], ["7", "7"]]} />
@@ -82,7 +84,8 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
           <Select label={t("console.stopBits")} value={stopBits} onChange={setStopBits} w="sm" options={[["1", "1"], ["2", "2"]]} />
           <Select label={t("console.flow")} value={flow} onChange={setFlow} w="md" options={[["none", t("console.flow.none")], ["rtscts", "RTS/CTS"], ["xonxoff", "XON/XOFF"]]} />
         </div>
-        <p className="hint defaults">{t("console.defaults")}</p>
+        </Advanced>
+        <p className="hint defaults">{t("console.defaults")}</p>{/* a la vista: trae el remedio de permisos (dialout) para cuando abrir falla */}
         <div className="actions">
           <button className="primary" disabled={!!runId || starting || !port} onClick={open}>{t("console.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
           <button disabled={!runId} onClick={() => send("\x03")}>Ctrl-C</button>

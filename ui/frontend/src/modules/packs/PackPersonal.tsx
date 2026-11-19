@@ -5,6 +5,7 @@ import type { CoreAPI } from "../../lib/core";
 import { cleanOnFail } from "../../lib/cleanOnFail";
 import { errInfo } from "../../lib/coreError";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
+import { Advanced } from "../../components/Advanced";
 import { Dialog } from "../../components/Dialog";
 import { useT } from "../../lib/i18n";
 import type { PackExportResult, PackImportDecision, PackImportResult } from "./api";
@@ -46,10 +47,12 @@ export function ExportDialog({ core, onClose }: { core: CoreAPI; onClose: () => 
       {scripts.length === 0 && <p className="hint">{t("packs.export.noScripts")}</p>}
       {scripts.map((s) => <Check key={s.id} label={s.name} checked={picked.includes(s.id)} onChange={(v) => setPicked((p) => (v ? [...p, s.id] : p.filter((x) => x !== s.id)))} />)}
       <Check label={t("packs.export.playbooks")} checked={playbooks} onChange={setPlaybooks} />
-      <Field label={t("packs.export.name")} value={name} onChange={setName} />
-      <Field label={t("packs.export.description")} value={description} onChange={setDescription} />
-      <Field label={t("packs.export.author")} value={author} onChange={setAuthor} />
-      <Field label={t("packs.export.license")} hint={t("packs.export.licenseHint")} value={license} onChange={setLicense} />
+      <Advanced label={t("packs.export.meta")} changed={[name, description, author, license].filter(Boolean).length}>
+        <Field label={t("packs.export.name")} value={name} onChange={setName} />
+        <Field label={t("packs.export.description")} value={description} onChange={setDescription} />
+        <Field label={t("packs.export.author")} value={author} onChange={setAuthor} />
+        <Field label={t("packs.export.license")} hint={t("packs.export.licenseHint")} value={license} onChange={setLicense} />
+      </Advanced>
       {!picked.length && !playbooks && <p className="hint">{t("packs.export.nothing")}</p>}
       {(err || loadErr) && <Notice kind="error">{err || loadErr}</Notice>}
       {res && <Notice kind="ok">{t("packs.export.done", { id: res.id, version: res.version, sha: res.sha256, scripts: res.scripts, playbooks: res.playbooks })}</Notice>}

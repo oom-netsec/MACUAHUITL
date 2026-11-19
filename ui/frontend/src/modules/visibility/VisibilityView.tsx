@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { CoreAPI, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
@@ -119,8 +120,10 @@ function TopoPanel({ core }: { core: CoreAPI }) {
       <Section title={t("visibility.sec.source")} description={t("visibility.topo.note")}>
         <div className="field-row">
           <Field label={t("visibility.topo.src")} value={src} onChange={setSrc} w="lg" mono />
-          <Field label={t("visibility.topo.pcap")} value={pcap} onChange={setPcap} w="lg" mono />
         </div>
+        <Advanced changed={pcap !== "" ? 1 : 0}>
+          <Field label={t("visibility.topo.pcap")} value={pcap} onChange={setPcap} w="lg" mono />
+        </Advanced>
         <div className="actions">
           <button className="primary" disabled={(!src && !pcap) || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.topoBuild(src.trim(), pcap.trim()))}>{t("visibility.topo.build")}{kbd}</button>
         </div>
@@ -194,7 +197,6 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
       <Section title={t("visibility.sec.target")}>
         <div className="field-row">
           <Field label={t("visibility.host")} value={host} onChange={setHost} w="lg" mono />
-          <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
           <Select label={t("visibility.version")} value={version} onChange={setVersion} options={[["2c", "v2c"], ["3", "v3 authPriv"]]} w="md" />
         </div>
         <div className="field-row">
@@ -206,6 +208,9 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
             </>
           )}
         </div>
+        <Advanced changed={port !== "161" ? 1 : 0}>
+          <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
+        </Advanced>
       </Section>
       <Section title={t("visibility.sec.query")}>
         <Field label={t("visibility.snmp.oids")} value={oids} onChange={setOids} w="full" mono />
@@ -384,8 +389,10 @@ function FlowsPanel({ core, active, onRun }: PanelProps) {
       <Section title={t("visibility.sec.listen")} description={t("visibility.flows.note")}>
         <div className="field-row">
           <Field label={t("visibility.listenAddr")} value={addr} onChange={(v) => { setAddr(v); o.touch("addr"); }} w="lg" mono error={o.errors.addr} />
-          <Field label={t("visibility.flows.top")} type="number" value={top} onChange={setTop} w="sm" mono />
         </div>
+        <Advanced changed={top !== "10" ? 1 : 0}>
+          <Field label={t("visibility.flows.top")} type="number" value={top} onChange={setTop} w="sm" mono />
+        </Advanced>
         <Check label={t("visibility.anyIf")} checked={any} onChange={setAny} />
         <Check label={t("visibility.flows.save")} checked={save} onChange={setSave} disabled={!!live.runId} />
         {live.runId && <p className="hint">{t("syslog.locked")}</p>}
@@ -446,10 +453,12 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
       <Section title={t("visibility.sec.target")}>
         <div className="field-row">
           <Field label={t("visibility.host")} value={host} onChange={setHost} w="lg" mono />
-          <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} optional />
         </div>
-        <Field label={t("visibility.gnmi.ca")} value={ca} onChange={setCa} w="full" mono />
+        <Advanced changed={Number(port !== "9339") + Number(ca !== "")}>
+          <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
+          <Field label={t("visibility.gnmi.ca")} value={ca} onChange={setCa} w="full" mono />
+        </Advanced>
       </Section>
       <Section title={t("visibility.sec.query")} description={t("visibility.gnmi.note")}>
         <Field label={t("visibility.gnmi.paths")} value={paths} onChange={setPaths} w="full" mono />

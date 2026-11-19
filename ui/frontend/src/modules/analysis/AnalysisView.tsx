@@ -1,3 +1,4 @@
+import { Advanced } from "../../components/Advanced";
 import { useState, type ReactNode } from "react";
 import { showHidden } from "../../lib/safeText";
 import { Terminal } from "../../components/Terminal";
@@ -55,9 +56,9 @@ function Findings({ core, job, device, head }: { core: CoreAPI; job: string; dev
     <>
       <Section title={t("analysis.section.run")}>
         {head}
-        <div className="field-row">
+        <Advanced changed={round !== "0" ? 1 : 0}>
           <Field label={t("analysis.round")} type="number" value={round} onChange={setRound} w="sm" />
-        </div>
+        </Advanced>
       </Section>
       <div className="actions"><button className="primary" disabled={!job || q.busy} aria-busy={q.busy} onClick={() => q.run(() => core.analysisRun(job, Number(round) || 0, device))}>{t("analysis.run")}{runKbd}</button></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
@@ -180,9 +181,11 @@ function Timeline({ core, job, device, head }: { core: CoreAPI; job: string; dev
         {head}
         <div className="field-row">
           <Field label={t("analysis.around")} value={around} onChange={setAround} w="lg" mono />
-          <Field label={t("analysis.window")} type="number" value={win} onChange={setWin} w="sm" />
         </div>
-        <Field label={t("analysis.tl.pcap")} hint={t("analysis.tl.note")} value={pcap} onChange={setPcap} w="full" mono />
+        <Advanced changed={Number(win !== "30") + Number(pcap !== "")}>
+          <Field label={t("analysis.window")} type="number" value={win} onChange={setWin} w="sm" />
+          <Field label={t("analysis.tl.pcap")} hint={t("analysis.tl.note")} value={pcap} onChange={setPcap} w="full" mono />
+        </Advanced>
       </Section>
       <div className="actions"><button className="primary" disabled={!job || q.busy} aria-busy={q.busy} onClick={() => load(around)}>{t("analysis.tl.view")}{runKbd}</button></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}

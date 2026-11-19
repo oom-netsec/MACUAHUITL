@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Notice } from "../../components/Field";
 import { ResultPanel, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -36,10 +37,12 @@ export function LeakSection({ core }: { core: CoreAPI }) {
         <Field label={t("forensic.leak.job")} value={job} onChange={setJob} w="lg" mono />
         <Field label={t("forensic.leak.device")} value={device} onChange={setDevice} w="md" mono />
       </div>
+      <Advanced label={t("forensic.section.thresholds")} changed={Number(rounds !== "3") + Number(growth !== "1024")}>
       <div className="field-row">
         <Field label={t("forensic.leak.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />
         <Field label={t("forensic.leak.growth")} type="number" value={growth} onChange={setGrowth} w="sm" />
       </div>
+      </Advanced>
       <div className="actions">
         <button className="primary" disabled={!job.trim() || q.busy} aria-busy={q.busy}
           onClick={() => q.run(() => core.forensicLeaks(job.trim(), device.trim(), Number(rounds) || 0, Number(growth) || 0))}>{t("forensic.leak.btn")}{runKbd}</button>

@@ -1,6 +1,7 @@
 import { plural } from "../../lib/plural";
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Badge, ResultPanel, Section } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
@@ -53,12 +54,12 @@ export function PatternsSection({ core, active = true, refreshMs = 10_000 }: { c
         <SourcePicker value={src} onChange={setSrc} />
         {src.kind === "capture" && <Check label={t("forensic.pat.live", { n: Math.round(refreshMs / 1000) })} checked={live} onChange={setLive} />}
       </Section>
-      <Section title={t("forensic.section.thresholds")}>
+      <Advanced label={t("forensic.section.thresholds")} changed={Number(burst !== "5") + Number(win !== "60")}>
         <div className="field-row">
           <Field label={t("forensic.pat.burst")} type="number" value={burst} onChange={setBurst} w="sm" />
           <Field label={t("forensic.pat.win")} type="number" value={win} onChange={setWin} w="sm" />
         </div>
-      </Section>
+      </Advanced>
       <div className="actions"><button className="primary" disabled={!source || busy} aria-busy={busy} onClick={run}>{t("forensic.pat.btn")}{runKbd}</button></div>
       {err && <Notice kind="error">{err}</Notice>}
       {!rep && !err && <FirstRun what="forensic.empty.patterns" />}

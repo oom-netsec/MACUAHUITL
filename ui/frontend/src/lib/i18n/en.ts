@@ -3044,4 +3044,8 @@ export const en: Record<Key, string> = {
   "common.advanced.changed": "{label} · changed: {n}",
   "security.csr.subject": "Subject details",
   "backup.restore.maxLines.bad": "Between 0 and 1000 (0 = no limit).",
+  "calc.bgp.more": "More attributes",
+  "change.upgrade.integrity": "Verify integrity (optional)",
+  "packs.export.meta": "Metadata (optional)",
+  "common.advanced.error": "there is an error inside",
 };

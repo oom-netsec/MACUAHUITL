@@ -1,6 +1,7 @@
 import { plural } from "../../lib/plural";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Notice, TextArea } from "../../components/Field";
 import { ResultPanel, Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
@@ -36,13 +37,13 @@ export function DebugSection({ core }: { core: CoreAPI }) {
           <Field label={t("forensic.orPath")} value={path} onChange={setPath} w="full" mono />
         </div>
       </Section>
-      <Section title={t("forensic.section.filters")}>
+      <Advanced label={t("forensic.section.filters")} changed={Number(noise !== "") + Number(famMin !== "20") + Number(rareMax !== "2")}>
         <TextArea label={t("forensic.debug.noise")} value={noise} onChange={setNoise} rows={3} />
         <div className="field-row">
           <Field label={t("forensic.debug.famMin")} type="number" value={famMin} onChange={setFamMin} w="sm" />
           <Field label={t("forensic.debug.rareMax")} type="number" value={rareMax} onChange={setRareMax} w="sm" />
         </div>
-      </Section>
+      </Advanced>
       <div className="actions"><button className="primary" disabled={(!text.trim() && !path.trim()) || q.busy} aria-busy={q.busy} onClick={run}>{t("forensic.debug.btn")}{runKbd}</button></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.debug" />}

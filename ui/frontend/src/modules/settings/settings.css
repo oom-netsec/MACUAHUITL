@@ -19,6 +19,5 @@
 .storage-dirs dt { color: var(--text-2); }
 .storage-dirs dd { margin: 0; min-width: 0; }
 .storage-dirs code, .storage-cmd code { word-break: break-all; }
-.storage-group { margin: var(--s-4) 0 var(--s-3); padding: 0; border: 0; display: grid; gap: var(--s-2); min-width: 0; }
-.storage-group > legend { font-weight: 600; padding: 0; margin-bottom: var(--s-1); }
+.storage-group { padding: 0; border: 0; display: grid; gap: var(--s-2); min-width: 0; }
 .storage-cmd { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-1); }

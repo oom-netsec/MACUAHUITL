@@ -49,3 +49,15 @@ test("ya está abierto en el DOM cuando corren los efectos del padre (el foco al
   rerender(<Parent n={1} />);
   expect(seen).toBe(true);
 });
+
+test("con un error presente (forceOpen booleano) el summary lo dice aunque el usuario lo cierre", async () => {
+  render(<Advanced forceOpen><p>x</p></Advanced>);
+  await userEvent.click(screen.getByText(/Opciones avanzadas/));
+  expect(details().open).toBe(false);
+  expect(details().querySelector("summary")).toHaveTextContent("Opciones avanzadas · hay un error dentro");
+});
+
+test("un contador de intentos no marca error (puede estar ya corregido)", () => {
+  render(<Advanced forceOpen={3}><p>x</p></Advanced>);
+  expect(details().querySelector("summary")).toHaveTextContent(/^Opciones avanzadas$/);
+});

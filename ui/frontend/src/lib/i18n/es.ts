@@ -3043,6 +3043,10 @@ export const es = {
   "common.advanced.changed": "{label} · cambiadas: {n}",
   "security.csr.subject": "Datos del sujeto",
   "backup.restore.maxLines.bad": "Entre 0 y 1000 (0 = sin tope).",
+  "calc.bgp.more": "Más atributos",
+  "change.upgrade.integrity": "Verificar integridad (opcional)",
+  "packs.export.meta": "Metadatos (opcional)",
+  "common.advanced.error": "hay un error dentro",
 };
 
 export type Key = keyof typeof es;
