@@ -3113,9 +3113,6 @@ export const es = {
   "hostkey.new": "El equipo presenta una llave de host que no conocías. Compara esta huella con la del equipo y confía en ella solo si coincide.",
   "hostkey.ack": "Entiendo que la llave de este equipo cambió",
   "hostkey.noLogin": "No se pudo obtener la huella de los equipos (falló el Login Test): no hay nada que comparar ni confiar desde aquí.",
-  "change.trust": "Confirmo la huella {fp} de {target}",
-  "fps.accepted.hint.multi": "Con un equipo: SHA256:…; con varios: EQUIPO=SHA256:… (EQUIPO:PUERTO=SHA256:… si no es el 22; una IPv6 con puerto va entre corchetes: [2001:db8::1]:2222=SHA256:…), separadas por espacios o comas",
-  "fps.needHost": "Con varios equipos, escribe cada huella como EQUIPO=HUELLA (EQUIPO:PUERTO=HUELLA si no es el 22; IPv6 con puerto entre corchetes): una huella sin equipo valdría para cualquiera.",
 };
 
 export type Key = keyof typeof es;

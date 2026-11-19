@@ -3114,7 +3114,4 @@ export const en: Record<Key, string> = {
   "hostkey.new": "The device presented a host key you did not know. Compare this fingerprint with the device's and trust it only if it matches.",
   "hostkey.ack": "I understand this device's host key changed",
   "hostkey.noLogin": "Could not get the devices' fingerprints (the Login Test failed): there is nothing to compare or trust from here.",
-  "change.trust": "I confirm the host key fingerprint {fp} for {target}",
-  "fps.accepted.hint.multi": "One device: SHA256:…; several: DEVICE=SHA256:… (DEVICE:PORT=SHA256:… if not 22; an IPv6 with a port goes in brackets: [2001:db8::1]:2222=SHA256:…), separated by spaces or commas",
-  "fps.needHost": "With several devices, write each fingerprint as DEVICE=FINGERPRINT (DEVICE:PORT=FINGERPRINT if not 22; IPv6 with a port in brackets): a fingerprint without a device would be valid for any of them.",
 };
