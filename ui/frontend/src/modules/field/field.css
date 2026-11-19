@@ -1,2 +1,0 @@
-/* Campo: el comando de copia y las transferencias comparten panel; cada terminal ocupa solo lo que necesita. */
-.field-out .result .console { min-height: 0; }

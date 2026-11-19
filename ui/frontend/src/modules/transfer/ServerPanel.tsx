@@ -3,10 +3,10 @@ import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
-import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
+import { Check, Console, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import type { CoreAPI, NetInterface } from "../../lib/core";
 import { Badge, EmptyState, ResultPanel, Section } from "../../components/Page";
-import { CopyButton } from "../../components/Data";
+import { CopyButton, formatDuration } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
@@ -20,7 +20,7 @@ import { showHidden } from "../../lib/safeText";
 // Solo estos dos motivos traen una orden para copiar (la app nunca la aplica): sysctl del puerto negado y chmod/icacls de la carpeta de recepción abierta.
 const CMD_LABEL: Record<string, Key> = { "fileserve.err.port_denied": "transfer.portDenied.cmd", "fileserve.err.recv_dir_open": "transfer.recvDirOpen.cmd" };
 const errCmd = (i?: ErrInfo) => (i && CMD_LABEL[i.reason] ? i.metadata.cmd ?? "" : "");
-import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
+import { nftLeftoverCmd, portFor, serveProblem, splitList, splitPaths } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
 
@@ -34,15 +34,16 @@ function Log({ lines }: { lines: TransferLine[] }) {
     <div className="table-wrap flat">
     <table>
       <caption>{t("transfer.log")}</caption>
-      <thead><tr><th>{t("transfer.log.client")}</th><th>{t("transfer.log.file")}</th><th>{t("transfer.log.bytes")}</th><th>SHA-256</th><th>{t("transfer.log.result")}</th></tr></thead>
+      <thead><tr><th>{t("transfer.log.client")}</th><th>{t("transfer.log.file")}</th><th>{t("transfer.log.bytes")}</th><th>{t("transfer.log.duration")}</th><th>SHA-256</th><th>{t("transfer.log.result")}</th></tr></thead>
       <tbody>
         {lines.map((l, i) => (
           <tr key={i}>
             <td>{l.Client}</td>
             <td>{showHidden(l.File)} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
+            <td className="num">{l.Rejected ? "" : formatDuration(l.Duration / 1e6)}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
-            <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {l.Error}</td>
+            <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {showHidden(l.Error ?? "")}</td>
           </tr>
         ))}
       </tbody>
@@ -147,7 +148,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     const mine = b.filter((x) => x.runId === s.runId);
     return mine.length ? { ...s, lines: s.lines.concat(mine.map((x) => x.line)).slice(-500) } : s;
   })), 2000);
-  // Montado siempre (como Campo): cambiar de pestaña no pierde servidores ni su registro.
+  // Montado siempre: cambiar de pestaña no pierde servidores ni su registro.
   useEffect(() => core.onTransfer((e) => {
     if (e.ready) {
       seen.current.add(e.runId);
@@ -182,7 +183,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     try {
       await core.transferServe({
         protocol: proto, listen: host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`, allowAny: any,
-        files: splitList(files), fromDir, write, recvDir: write ? recvDir : "", allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
+        files: splitPaths(files), fromDir, write, recvDir: write ? recvDir : "", allow: splitList(allow), seconds: Number(minutes) * 60, legacySsh: ssh && legacy,
       });
     } catch (e) {
       setErr(errorText(e), errInfo(e));
@@ -203,7 +204,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
         <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />
-        <Field label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} />
+        <TextArea label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} rows={2} mono />
         <Check label={t("transfer.write")} checked={write} onChange={setWrite} />
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
@@ -219,7 +220,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {any && <Notice kind="warn">{t("transfer.any.warn")}</Notice>}
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
-        <div className="actions"><RunButton primary kbd disabled={starting} onClick={start} missing={[!any && !listen && t("need.listen"), !write && !fromDir && splitList(files).length === 0 && t("need.serveFiles")]}>{t("transfer.open")}</RunButton></div>
+        <div className="actions"><RunButton primary kbd disabled={starting} onClick={start} missing={[!any && !listen && t("need.listen"), !write && !fromDir && splitPaths(files).length === 0 && t("need.serveFiles")]}>{t("transfer.open")}</RunButton></div>
         {(err.text || loadErr) && <Notice kind="error">{err.text || loadErr}</Notice>}
         {err.text && err.cmd && <Console label={t(err.label)} text={err.cmd} copy={core.copyText} />}
       </Section>

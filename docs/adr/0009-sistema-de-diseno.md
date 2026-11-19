@@ -114,7 +114,7 @@ Todos los pares texto/fondo pasan AA (≥ 4.5:1) en ambos temas; la tabla calcul
   - bóveda;
   - ejecuciones en curso (con lista al hacer click);
   - trabajos de Patrol armados;
-  - servidores de Campo escuchando;
+  - servidores de Transferencias escuchando;
   - modo asistido;
   - idioma y tema.
 - **Franja roja del modo asistido:** aparece arriba del contenido en cualquier módulo mientras haya una ejecución asistida viva. No se cierra; lleva a la ejecución.

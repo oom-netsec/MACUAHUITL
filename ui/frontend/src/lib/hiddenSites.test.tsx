@@ -5,7 +5,6 @@ import { I18nProvider } from "./i18n";
 import { NavContext } from "../app/activity";
 import { SyslogTable } from "../modules/tools/SyslogTable";
 import { TrapsTable } from "../modules/visibility/VisParts";
-import { FieldView } from "../modules/field/FieldView";
 import { SavedHosts } from "../modules/terminal/SavedHosts";
 import { DriftView } from "../modules/drift/DriftView";
 import { AnalysisView } from "../modules/analysis/AnalysisView";
@@ -31,19 +30,6 @@ test("Syslog: el mensaje del equipo", () => {
 test("Trampas SNMP: el resumen", () => {
   wrap(<TrapsTable rows={[{ id: 1, at: "2026-11-01T10:00:00Z", From: "10.0.0.1:162", Name: "linkDown", Summary: `s ${RAW}` } as never]} />);
   expect(screen.getByText(`s ${SHOWN}`)).toBeVisible();
-});
-
-test("Campo: archivo y error de la transferencia", async () => {
-  const core = fakeCore({ serveStart: vi.fn(async () => "s1") });
-  wrap(<FieldView core={core} />);
-  await userEvent.type(screen.getByLabelText("IP de escucha (la de la interfaz hacia el equipo)"), "10.0.0.5");
-  await userEvent.type(screen.getByLabelText(/Archivos/), "/a");
-  await userEvent.click(screen.getByRole("button", { name: "Servir" }));
-  act(() => { core.emitServe({ runId: "s1", listening: "10.0.0.5:69", hint: "" }); core.emitServe({ runId: "s1", transfer: JSON.stringify({ Client: "10.0.0.9", File: `f${RAW}`, Bytes: 1, Duration: 1e9, Result: "error", Error: `e${RAW}` }) }); });
-  const li = (await screen.findByRole("list", { name: "Transferencias" })).querySelector("li")!;
-  expect(li.textContent).toContain(`f${SHOWN}`);
-  expect(li.textContent).toContain(`e${SHOWN}`);
-  noRaw(li.textContent);
 });
 
 test("Terminal → hosts guardados: nombre en el botón y en su nombre accesible", async () => {

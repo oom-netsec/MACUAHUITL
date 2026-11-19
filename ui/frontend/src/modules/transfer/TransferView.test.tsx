@@ -524,3 +524,35 @@ test("Abrir servidor nombra la IP y los archivos que faltan y deja de hacerlo al
   expect(go()).toBeEnabled();
   expect(go()).not.toHaveAccessibleDescription();
 });
+
+test("los archivos sueltos aceptan coma, punto y coma y saltos de línea", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.type(screen.getByLabelText(/Archivos sueltos/), "/a.bin, /b.bin;/c.bin{Enter}/d.bin");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ files: ["/a.bin", "/b.bin", "/c.bin", "/d.bin"] }));
+  expect(screen.getByLabelText(/salto de línea/)).toBeInTheDocument();
+});
+
+test("una ruta con espacios es un solo archivo (Windows: C:\\Users\\Juan Pérez\\…)", async () => {
+  const core = setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.type(screen.getByLabelText(/Archivos sueltos/), "/home/juan pérez/c9300.bin, /tmp/b.bin");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ files: ["/home/juan pérez/c9300.bin", "/tmp/b.bin"] }));
+});
+
+test("el registro del servidor muestra la duración de cada transferencia", async () => {
+  const core = await openServer(setup());
+  act(() => {
+    core.emitTransfer({ runId: "r1", ready: ready() });
+    core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.1", File: "c4.bin", Bytes: 2048, Duration: 2.5e9, Result: "ok", Dir: "read", dirCode: "read" } });
+  });
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  await waitFor(() => expect(within(card).getByRole("table")).toBeInTheDocument());
+  const table = within(card).getByRole("table");
+  expect(within(table).getByRole("columnheader", { name: "Duración" })).toBeInTheDocument();
+  expect(within(table).getAllByRole("row")[1]).toHaveTextContent("3 s"); // 2,5 s redondeado por formatDuration
+});
