@@ -119,9 +119,12 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 		s.d.Audit("metrics.ports.live.failed", host, fmt.Sprintf("run=%s reason=%q guard=revoked", run, i18n.English(err)))
 		return nil, connErr(ctx, err)
 	}
-	acc := map[string]bool{}
-	for _, fp := range r.AcceptedHostKeyFingerprints {
-		acc[fp] = true
+	acc, err := service.HostKeyAccepts(ctx, []string{transport.HostKeyID(host, port)}, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys)
+	if err != nil {
+		cred.Enable.Destroy()
+		cred.Password.Destroy()
+		cred.SSHKey.Destroy()
+		return nil, err
 	}
 	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: acc}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
 	sess, err := transport.OpenSSH(ctx, g, run, host, port, cred, hk, transport.SSHOptions{AllowLegacy: r.LegacySsh, OnLegacy: func(n string) { s.d.Audit("metrics.ssh.legacy", host, n) }})

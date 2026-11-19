@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package macuahuitl.v1;
 
+import "macuahuitl/v1/common.proto";
+
 option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
 
 // Terminal SSH interactiva (Fase 16b). Es manual: lo que el ingeniero teclea va directo al
@@ -21,6 +23,8 @@ message TerminalOpen {
   uint32 port = 3;     // 0 = 22
   string credential_id = 4;
   repeated string accepted_host_key_fingerprints = 5;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 10;
   uint32 rows = 6;     // 0 = 24
   uint32 cols = 7;     // 0 = 200
   // Fase 44: abrir un host guardado de la libreta. host_id es EXCLUSIVO: el núcleo toma la dirección, el puerto, la

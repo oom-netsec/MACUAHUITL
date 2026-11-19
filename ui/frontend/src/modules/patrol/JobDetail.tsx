@@ -18,6 +18,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   const t = useT();
   const stateLabel = useStateLabel();
   const [login, setLogin] = useState<LoginResult[]>([]);
+  // trusted: equipos (target del Login Test) cuya huella el ingeniero confirmó; la huella viaja atada a su equipo.
   const [trusted, setTrusted] = useState<Set<string>>(new Set());
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState<ArmResult | null>(null);
@@ -75,7 +76,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
   const arm = async () => {
     setErr(""); setBusy("arm");
     try {
-      const r = await core.armJob(job.id, [...trusted], [...excluded]);
+      const r = await core.armJob(job.id, [], login.filter((l) => !l.passed && l.fingerprint && trusted.has(l.target)).map((l) => ({ host: l.target, fingerprint: l.fingerprint })), [...excluded]);
       setArmed(r);
       await subscribe([job.id], true);
       // Sin Login Test previo (reintento de un arranque fallido) no hay lista: la reconstruye el efecto al quedar armado.
@@ -147,7 +148,7 @@ export function JobDetail({ core, job, phases, onChanged, onRemoved, subscribe }
                         <td className="mono">{l.target}</td>
                         <td>{l.passed ? t("patrol.login.ok", { platform: l.platform }) : t("patrol.login.fail", { step: step(l.failedStep), detail: l.detail })}</td>
                         <td>
-                          {!l.passed && l.fingerprint && <Check label={t("patrol.login.trust", { fp: l.fingerprint })} checked={trusted.has(l.fingerprint)} onChange={() => toggle(trusted, setTrusted, l.fingerprint)} />}
+                          {!l.passed && l.fingerprint && <Check label={t("patrol.login.trust", { fp: l.fingerprint })} checked={trusted.has(l.target)} onChange={() => toggle(trusted, setTrusted, l.target)} />}
                           {!l.passed && !l.fingerprint && <Check label={t("patrol.login.exclude", { target: l.target })} checked={excluded.has(l.target)} onChange={() => toggle(excluded, setExcluded, l.target)} />}
                         </td>
                       </tr>

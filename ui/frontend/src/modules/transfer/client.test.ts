@@ -81,7 +81,7 @@ test("la petición de descarga lleva credencial, huellas, segundos, bytes, hash 
     proto: "scp", cred: "c1", accepted: "SHA256:aaa SHA256:bbb", maxMB: "2", minutes: "3", hash: sha, legacy: true, name: "x.bin", destDir: "/d", insecure: true,
   }));
   expect(p).toEqual({
-    url: "scp://192.0.2.1//c4.bin", destDir: "/d", credentialId: "c1", acceptedHostKeys: ["SHA256:aaa", "SHA256:bbb"], legacySsh: true, insecure: false,
+    url: "scp://192.0.2.1//c4.bin", destDir: "/d", credentialId: "c1", acceptedHostKeys: ["SHA256:aaa", "SHA256:bbb"], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:aaa" }, { host: "192.0.2.1", fingerprint: "SHA256:bbb" }], legacySsh: true, insecure: false,
     name: "x.bin", maxBytes: 2 * 1024 * 1024, seconds: 180, sha256: sha,
   });
   expect(getParams(f({ hash: "a".repeat(32) }))).toMatchObject({ md5: "a".repeat(32) });
@@ -179,4 +179,10 @@ test("destDir: en Windows una carpeta de destino rechazada es error de clientErr
     expect(clientErrors(f({ dir: "put", src: "C:\\x\\f", destDir: "\\\\srv\\s" })).destDir).toBeUndefined(); // al enviar no se usa
   } finally { setOSForTests(undefined); }
   expect(clientErrors(f({ dir: "get", destDir: "\\\\srv\\s\\d" })).destDir).toBeUndefined();
+});
+
+test("la huella del cliente SSH va atada al equipo con su puerto, y sin puerto estándar", () => {
+  expect(getParams(f({ proto: "sftp", host: "sw1.lab", port: "2222", portTouched: true, accepted: "SHA256:aaa" }))).toMatchObject({ acceptedKeys: [{ host: "sw1.lab:2222", fingerprint: "SHA256:aaa" }] });
+  expect(putParams(f({ dir: "put", src: "/h/a.txt", proto: "scp", host: "2001:db8::1", accepted: "SHA256:aaa" }))).toMatchObject({ acceptedKeys: [{ host: "[2001:db8::1]", fingerprint: "SHA256:aaa" }] });
+  expect(getParams(f({ proto: "https", accepted: "SHA256:aaa" }))).not.toHaveProperty("acceptedKeys");
 });

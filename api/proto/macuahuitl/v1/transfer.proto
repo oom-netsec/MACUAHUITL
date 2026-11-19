@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package macuahuitl.v1;
 
+import "macuahuitl/v1/common.proto";
+
 option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
 
 // Transferencias (Fase 22a): servidores temporales de archivos (TFTP, FTP, SCP, SFTP y HTTP) y
@@ -136,6 +138,8 @@ message GetRequest {
   string sha512 = 7;
   bool insecure = 8;                  // https sin verificar el certificado (se audita)
   repeated string accepted_host_key_fingerprints = 9;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 13;
   int64 max_bytes = 10;               // 0 = 2 GiB
   int32 timeout_seconds = 11;         // 0 = 30 min; máximo 4 h
   bool legacy_ssh = 12;               // scp y sftp hacia equipos con SSH antiguo (se audita)
@@ -151,6 +155,8 @@ message PutRequest {
   string name = 3;                    // archivo regular de primer nivel de from_dir
   string credential_id = 4;
   repeated string accepted_host_key_fingerprints = 5;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 9;
   int64 max_bytes = 6;
   int32 timeout_seconds = 7;
   bool legacy_ssh = 8;
@@ -180,6 +186,8 @@ message BrowseRequest {
   string credential_id = 2;           // bóveda; obligatoria para scp y sftp, opcional en ftp
   string path = 3;                    // carpeta remota; vacío = la de la URL
   repeated string accepted_host_key_fingerprints = 4;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 9;
   bool insecure = 5;                  // https sin verificar el certificado (se audita)
   bool legacy_ssh = 6;
   int32 max_entries = 7;              // 0 = 2000; máximo 20000
@@ -209,6 +217,8 @@ message GetManyRequest {
   string dest_dir = 3;                // carpeta local; vacío = outputs/recibidos/<sello>/
   string credential_id = 4;
   repeated string accepted_host_key_fingerprints = 5;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 10;
   bool insecure = 6;
   int64 max_bytes = 7;                // por archivo; 0 = 2 GiB
   int32 timeout_seconds = 8;          // por archivo; 0 = 30 min

@@ -126,7 +126,7 @@ func TestLoginChangedKeyReachesManifest(t *testing.T) {
 	_, otherKey := simulator.Start(t, e.simCfg)
 	e.d.Hosts.Add(hostport(e.spec.Targets[0]), otherKey)
 	r := LoginTest(context.Background(), e.d, "j", e.spec, true, nil)
-	r = LoginTest(context.Background(), e.d, "j", e.spec, true, map[string]bool{r[0].Fingerprint: true})
+	r = LoginTest(context.Background(), e.d, "j", e.spec, true, map[string]map[string]bool{HostKeyID(e.spec.Targets[0]): {r[0].Fingerprint: true}})
 	if !r[0].Passed || r[0].ChangedHostKey == nil || r[0].ChangedHostKey.Old == "" {
 		t.Fatalf("got %+v", r[0])
 	}

@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -58,8 +60,42 @@ func (e *HostKeyError) status() string { return [...]string{"known", "unknown", 
 
 // HostKeyPolicy es la decisión del trabajo sobre llaves no conocidas.
 type HostKeyPolicy struct {
-	Accepted      map[string]bool // huellas aceptadas por el ingeniero en el Login Test
-	AcceptChanged bool            // casilla del trabajo; por defecto false (spec §12.2)
+	// Accepted: huellas aceptadas por el ingeniero, por equipo (clave de HostKeyID). Cubre unknown y changed
+	// solo en ese host:puerto.
+	Accepted      map[string]map[string]bool
+	AcceptChanged bool // casilla del trabajo; por defecto false (spec §12.2)
+}
+
+// HostKeyID es la clave host:puerto con la que known_hosts guarda un equipo y con la que se atan las huellas
+// aceptadas: la dirección tal como se marca, host en minúsculas, puerto 22 si es 0, IPv6 entre corchetes.
+func HostKeyID(host string, port uint16) string {
+	if port == 0 {
+		port = 22
+	}
+	return normID(host, strconv.Itoa(int(port)))
+}
+
+// normID es la única normalización: una IP se escribe como la canonicaliza netip (la que muestra el Login Test);
+// un nombre, en minúsculas.
+func normID(host, port string) string {
+	if a, err := netip.ParseAddr(host); err == nil {
+		host = a.String()
+	}
+	return net.JoinHostPort(strings.ToLower(host), port)
+}
+
+// ParseHostKeyID normaliza lo que escribe el usuario: «host», «host:puerto», «[v6]:puerto», «v6» o «[v6]».
+func ParseHostKeyID(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	host, ps, err := net.SplitHostPort(s)
+	if err != nil { // sin puerto
+		host, ps = strings.Trim(s, "[]"), "22"
+	}
+	port, perr := strconv.ParseUint(ps, 10, 16)
+	if host == "" || perr != nil || port == 0 {
+		return "", fmt.Errorf("transport: destino de llave de host inválido: %q", s)
+	}
+	return HostKeyID(host, uint16(port)), nil
 }
 
 // KnownHosts es el registro de llaves de host de la app. Formato propio, una línea por equipo:
@@ -90,7 +126,7 @@ func hostKeyID(hostport string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("transport: %q: %w", hostport, err)
 	}
-	return net.JoinHostPort(strings.ToLower(h), p), nil
+	return normID(h, p), nil
 }
 
 func (k *KnownHosts) load() (map[string]ssh.PublicKey, error) {
@@ -99,6 +135,7 @@ func (k *KnownHosts) load() (map[string]ssh.PublicKey, error) {
 		return nil, fmt.Errorf("%w: %v", ErrKnownHosts, err)
 	}
 	out := map[string]ssh.PublicKey{}
+	migrated := false
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for n := 1; sc.Scan(); n++ {
 		ln := strings.TrimSpace(sc.Text())
@@ -110,7 +147,20 @@ func (k *KnownHosts) load() (map[string]ssh.PublicKey, error) {
 		if !ok || perr != nil {
 			return nil, i18n.Wrap("transport.err.known_hosts_ln", ErrKnownHosts, i18n.A("n", n))
 		}
-		out[id] = key
+		nid := id
+		if n, err := hostKeyID(id); err == nil {
+			nid = n
+		}
+		if nid != id {
+			migrated = true
+			if _, dup := out[nid]; dup { // la canónica ya estaba: gana sobre la grafía vieja
+				continue
+			}
+		}
+		out[nid] = key
+	}
+	if migrated { // migración en lectura: se reescribe con las claves canónicas sin perder ninguna llave
+		k.save(out) // mejor esfuerzo: si no se puede escribir, igual se reconoce en memoria
 	}
 	return out, nil
 }
@@ -159,6 +209,11 @@ func (k *KnownHosts) add(hostport string, key ssh.PublicKey) error {
 		return err
 	}
 	m[id] = key
+	return k.save(m)
+}
+
+// save reescribe known_hosts completo. Requiere k.mu.
+func (k *KnownHosts) save(m map[string]ssh.PublicKey) error {
 	ids := make([]string, 0, len(m))
 	for i := range m {
 		ids = append(ids, i)
@@ -188,14 +243,16 @@ func (k *KnownHosts) Callback(p HostKeyPolicy, onEvent func(audit.Entry)) ssh.Ho
 			return err
 		}
 		fp := Fingerprint(key)
+		id, _ := hostKeyID(hostport) // check ya lo validó
+		byHost := p.Accepted[id][fp]
 		switch {
 		case status == HostKeyKnown:
 			return nil
-		case status == HostKeyChanged && (p.Accepted[fp] || p.AcceptChanged):
+		case status == HostKeyChanged && (byHost || p.AcceptChanged):
 			// Toda llave cambiada aceptada queda con la huella anterior y la nueva (spec §12.2).
 			onEvent(audit.Entry{Action: "hostkey.accepted_changed", Target: hostport, Detail: old + " -> " + fp})
 			return k.add(hostport, key)
-		case p.Accepted[fp]:
+		case status == HostKeyUnknown && byHost:
 			onEvent(audit.Entry{Action: "hostkey.accepted", Target: hostport, Detail: fp})
 			return k.add(hostport, key)
 		}

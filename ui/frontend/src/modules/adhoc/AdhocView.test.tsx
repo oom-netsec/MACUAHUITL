@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdhocView, parseTarget } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
@@ -29,7 +29,7 @@ test("ejecuta el lote, espera el resultado y muestra por equipo, tabla, CSV y Ma
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
   await userEvent.click(await screen.findByRole("button", { name: "Por equipo" }));
   expect(await screen.findByText(/== SW1/)).toBeInTheDocument();
-  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "192.0.2.1", port: 0 }, { address: "sw2", port: 2222 }], "c1", expect.stringContaining("show version"), []);
+  expect(core.adhocStart).toHaveBeenCalledWith([{ address: "192.0.2.1", port: 0 }, { address: "sw2", port: 2222 }], "c1", expect.stringContaining("show version"), [], []);
   expect(adhocResult).toHaveBeenCalledTimes(2);
   await userEvent.click(screen.getByRole("button", { name: "Tabla" }));
   expect(screen.getByText("tiempo agotado")).toBeInTheDocument();
@@ -99,7 +99,25 @@ test("un lote sin armar explica por qué y manda las huellas aceptadas al reinte
   await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
   await screen.findByRole("button", { name: "Tabla" });
-  expect(adhocStart).toHaveBeenLastCalledWith([{ address: "192.0.2.1", port: 0 }], "c1", expect.any(String), ["SHA256:abc"]);
+  expect(adhocStart).toHaveBeenLastCalledWith([{ address: "192.0.2.1", port: 0 }], "c1", expect.any(String), [], [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }]);
+});
+
+// Seguridad: con varios equipos una huella sin equipo valdría para cualquiera; no se manda y se pide EQUIPO=HUELLA.
+test("con varios equipos una huella sola no se manda; EQUIPO=HUELLA sí, con su puerto", async () => {
+  const adhocStart = vi.fn(async () => ({ jobId: "j1", armed: true, detail: "" }));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart });
+  render(<AdhocView core={core} pollMs={1} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1 sw2:2222");
+  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "SHA256:abc");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("EQUIPO=HUELLA");
+  expect(adhocStart).not.toHaveBeenCalled();
+  await userEvent.clear(screen.getByLabelText(/Huellas SHA256 aceptadas/));
+  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "192.0.2.1=SHA256:abc sw2:2222=SHA256:def");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
+  await waitFor(() => expect(adhocStart).toHaveBeenCalledWith(expect.any(Array), "c1", expect.any(String), [],
+    [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }, { host: "sw2:2222", fingerprint: "SHA256:def" }]));
 });
 
 test("el rechazo del núcleo (comando que no es de lectura) se muestra como alerta", async () => {

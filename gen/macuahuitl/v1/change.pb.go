@@ -166,9 +166,11 @@ type CaptureChangeRequest struct {
 	ChangeId                    string                 `protobuf:"bytes,1,opt,name=change_id,json=changeId,proto3" json:"change_id,omitempty"`
 	Phase                       ChangePhase            `protobuf:"varint,2,opt,name=phase,proto3,enum=macuahuitl.v1.ChangePhase" json:"phase,omitempty"`
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,3,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	ExcludedDeviceIds           []string               `protobuf:"bytes,4,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys  []*AcceptedHostKey `protobuf:"bytes,5,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	ExcludedDeviceIds []string           `protobuf:"bytes,4,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CaptureChangeRequest) Reset() {
@@ -218,6 +220,13 @@ func (x *CaptureChangeRequest) GetPhase() ChangePhase {
 func (x *CaptureChangeRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *CaptureChangeRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -790,15 +799,16 @@ var File_macuahuitl_v1_change_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_change_proto_rawDesc = "" +
 	"\n" +
-	"\x1amacuahuitl/v1/change.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/patrol.proto\x1a\x19macuahuitl/v1/tools.proto\"A\n" +
+	"\x1amacuahuitl/v1/change.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/patrol.proto\x1a\x19macuahuitl/v1/tools.proto\x1a\x1amacuahuitl/v1/common.proto\"A\n" +
 	"\x13CreateChangeRequest\x12*\n" +
 	"\x04spec\x18\x01 \x01(\v2\x16.macuahuitl.v1.JobSpecR\x04spec\"3\n" +
 	"\x14CreateChangeResponse\x12\x1b\n" +
-	"\tchange_id\x18\x01 \x01(\tR\bchangeId\"\xda\x01\n" +
+	"\tchange_id\x18\x01 \x01(\tR\bchangeId\"\xa8\x02\n" +
 	"\x14CaptureChangeRequest\x12\x1b\n" +
 	"\tchange_id\x18\x01 \x01(\tR\bchangeId\x120\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.ChangePhaseR\x05phase\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\x03 \x03(\tR\x1bacceptedHostKeyFingerprints\x12.\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\x03 \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\x05 \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12.\n" +
 	"\x13excluded_device_ids\x18\x04 \x03(\tR\x11excludedDeviceIds\"\x9e\x01\n" +
 	"\x15CaptureChangeResponse\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x14\n" +
@@ -880,34 +890,36 @@ var file_macuahuitl_v1_change_proto_goTypes = []any{
 	(*CheckComplianceRequest)(nil),  // 12: macuahuitl.v1.CheckComplianceRequest
 	(*CheckComplianceResponse)(nil), // 13: macuahuitl.v1.CheckComplianceResponse
 	(*JobSpec)(nil),                 // 14: macuahuitl.v1.JobSpec
-	(*timestamppb.Timestamp)(nil),   // 15: google.protobuf.Timestamp
-	(*ToolReport)(nil),              // 16: macuahuitl.v1.ToolReport
+	(*AcceptedHostKey)(nil),         // 15: macuahuitl.v1.AcceptedHostKey
+	(*timestamppb.Timestamp)(nil),   // 16: google.protobuf.Timestamp
+	(*ToolReport)(nil),              // 17: macuahuitl.v1.ToolReport
 }
 var file_macuahuitl_v1_change_proto_depIdxs = []int32{
 	14, // 0: macuahuitl.v1.CreateChangeRequest.spec:type_name -> macuahuitl.v1.JobSpec
 	0,  // 1: macuahuitl.v1.CaptureChangeRequest.phase:type_name -> macuahuitl.v1.ChangePhase
-	15, // 2: macuahuitl.v1.CaptureChangeResponse.window_ends_at:type_name -> google.protobuf.Timestamp
-	5,  // 3: macuahuitl.v1.ListChangesResponse.changes:type_name -> macuahuitl.v1.ChangeSummary
-	16, // 4: macuahuitl.v1.GetChangeReportResponse.report:type_name -> macuahuitl.v1.ToolReport
-	16, // 5: macuahuitl.v1.CheckUpgradeResponse.report:type_name -> macuahuitl.v1.ToolReport
-	16, // 6: macuahuitl.v1.CheckComplianceResponse.report:type_name -> macuahuitl.v1.ToolReport
-	1,  // 7: macuahuitl.v1.ChangeService.CreateChange:input_type -> macuahuitl.v1.CreateChangeRequest
-	3,  // 8: macuahuitl.v1.ChangeService.CaptureChange:input_type -> macuahuitl.v1.CaptureChangeRequest
-	6,  // 9: macuahuitl.v1.ChangeService.ListChanges:input_type -> macuahuitl.v1.ListChangesRequest
-	8,  // 10: macuahuitl.v1.ChangeService.GetChangeReport:input_type -> macuahuitl.v1.GetChangeReportRequest
-	10, // 11: macuahuitl.v1.ChangeService.CheckUpgrade:input_type -> macuahuitl.v1.CheckUpgradeRequest
-	12, // 12: macuahuitl.v1.ChangeService.CheckCompliance:input_type -> macuahuitl.v1.CheckComplianceRequest
-	2,  // 13: macuahuitl.v1.ChangeService.CreateChange:output_type -> macuahuitl.v1.CreateChangeResponse
-	4,  // 14: macuahuitl.v1.ChangeService.CaptureChange:output_type -> macuahuitl.v1.CaptureChangeResponse
-	7,  // 15: macuahuitl.v1.ChangeService.ListChanges:output_type -> macuahuitl.v1.ListChangesResponse
-	9,  // 16: macuahuitl.v1.ChangeService.GetChangeReport:output_type -> macuahuitl.v1.GetChangeReportResponse
-	11, // 17: macuahuitl.v1.ChangeService.CheckUpgrade:output_type -> macuahuitl.v1.CheckUpgradeResponse
-	13, // 18: macuahuitl.v1.ChangeService.CheckCompliance:output_type -> macuahuitl.v1.CheckComplianceResponse
-	13, // [13:19] is the sub-list for method output_type
-	7,  // [7:13] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	15, // 2: macuahuitl.v1.CaptureChangeRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	16, // 3: macuahuitl.v1.CaptureChangeResponse.window_ends_at:type_name -> google.protobuf.Timestamp
+	5,  // 4: macuahuitl.v1.ListChangesResponse.changes:type_name -> macuahuitl.v1.ChangeSummary
+	17, // 5: macuahuitl.v1.GetChangeReportResponse.report:type_name -> macuahuitl.v1.ToolReport
+	17, // 6: macuahuitl.v1.CheckUpgradeResponse.report:type_name -> macuahuitl.v1.ToolReport
+	17, // 7: macuahuitl.v1.CheckComplianceResponse.report:type_name -> macuahuitl.v1.ToolReport
+	1,  // 8: macuahuitl.v1.ChangeService.CreateChange:input_type -> macuahuitl.v1.CreateChangeRequest
+	3,  // 9: macuahuitl.v1.ChangeService.CaptureChange:input_type -> macuahuitl.v1.CaptureChangeRequest
+	6,  // 10: macuahuitl.v1.ChangeService.ListChanges:input_type -> macuahuitl.v1.ListChangesRequest
+	8,  // 11: macuahuitl.v1.ChangeService.GetChangeReport:input_type -> macuahuitl.v1.GetChangeReportRequest
+	10, // 12: macuahuitl.v1.ChangeService.CheckUpgrade:input_type -> macuahuitl.v1.CheckUpgradeRequest
+	12, // 13: macuahuitl.v1.ChangeService.CheckCompliance:input_type -> macuahuitl.v1.CheckComplianceRequest
+	2,  // 14: macuahuitl.v1.ChangeService.CreateChange:output_type -> macuahuitl.v1.CreateChangeResponse
+	4,  // 15: macuahuitl.v1.ChangeService.CaptureChange:output_type -> macuahuitl.v1.CaptureChangeResponse
+	7,  // 16: macuahuitl.v1.ChangeService.ListChanges:output_type -> macuahuitl.v1.ListChangesResponse
+	9,  // 17: macuahuitl.v1.ChangeService.GetChangeReport:output_type -> macuahuitl.v1.GetChangeReportResponse
+	11, // 18: macuahuitl.v1.ChangeService.CheckUpgrade:output_type -> macuahuitl.v1.CheckUpgradeResponse
+	13, // 19: macuahuitl.v1.ChangeService.CheckCompliance:output_type -> macuahuitl.v1.CheckComplianceResponse
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_change_proto_init() }
@@ -917,6 +929,7 @@ func file_macuahuitl_v1_change_proto_init() {
 	}
 	file_macuahuitl_v1_patrol_proto_init()
 	file_macuahuitl_v1_tools_proto_init()
+	file_macuahuitl_v1_common_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

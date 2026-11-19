@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -176,5 +177,19 @@ func TestGetPortStatusEnVivoConLaBovedaCerrada(t *testing.T) {
 	g.d.V.LockAll()
 	if _, err := g.svc.GetPortStatus(context.Background(), &v1.GetPortStatusRequest{Device: g.host, Port: g.port, CredentialId: g.cred, AcceptedHostKeyFingerprints: []string{g.fp}}); status.Code(err) != codes.FailedPrecondition {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// El campo nuevo ata la huella al equipo: con el host correcto entra; con otro host o puerto no.
+func TestGetPortStatusEnVivoHuellaPorHost(t *testing.T) {
+	g := newLive(t, map[string]string{"show interfaces status": fixture(t, "ios152_show-interfaces-status")})
+	req := &v1.GetPortStatusRequest{Device: g.host, Port: g.port, CredentialId: g.cred}
+	req.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: "10.9.9.9", Fingerprint: g.fp}, {Host: g.host + ":" + strconv.Itoa(int(g.port)+1), Fingerprint: g.fp}}
+	if _, err := g.svc.GetPortStatus(context.Background(), req); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("la huella de otro host no debe entrar: %v", err)
+	}
+	req.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: g.host + ":" + strconv.Itoa(int(g.port)), Fingerprint: g.fp}}
+	if _, err := g.svc.GetPortStatus(context.Background(), req); err != nil {
+		t.Fatalf("campo nuevo: %v", err)
 	}
 }

@@ -59,7 +59,7 @@ export interface PatrolAPI {
   onEvent(cb: (e: CoreEvent) => void): () => void;
   createJob(spec: JobSpec): Promise<string>;
   loginTest(jobId: string): Promise<LoginResult[]>;
-  armJob(jobId: string, accept: string[], exclude: string[]): Promise<ArmResult>;
+  armJob(jobId: string, accept: string[], acceptedKeys: { host: string; fingerprint: string }[], exclude: string[]): Promise<ArmResult>;
   cancelJob(jobId: string): Promise<void>;
   // Sin includePast: activos y terminados hoy; con él, también los días anteriores (el núcleo los poda a los 7 días).
   listJobs(opts?: { includePast?: boolean }): Promise<Job[]>;
@@ -77,7 +77,7 @@ export const patrolWails = (call: Call): PatrolAPI => ({
   onEvent: (cb) => Events.On("core:event", (e) => cb(e.data as CoreEvent)),
   createJob: (s) => call("CreateJob", JSON.stringify(s)),
   loginTest: (id) => call("LoginTest", id),
-  armJob: (id, a, x) => call("ArmJob", id, a, x),
+  armJob: (id, a, k, x) => call("ArmJob", id, a, k, x),
   cancelJob: (id) => call("CancelJob", id),
   listJobs: (o) => call("ListJobs", { includePast: false, ...o }),
   removeJobs: (sel) => call("RemoveJobs", { jobIds: sel.jobIds }),

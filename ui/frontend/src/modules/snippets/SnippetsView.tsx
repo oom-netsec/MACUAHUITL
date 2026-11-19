@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
+import { resolveAccepted } from "../../lib/hostkeys";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
@@ -77,7 +78,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     try {
       const res = await core.planTemplateSnippet({
         target: targetOf(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
-        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted } : {}),
+        ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted, acceptedHostKeys: resolveAccepted(fps, [targetOf(equipo, credId)]).keys } : {}),
       });
       if (mine === seq.current) setPlan(res);
     } catch (e) {

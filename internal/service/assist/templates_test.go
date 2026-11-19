@@ -169,12 +169,12 @@ func TestPlanWithRefusesAPlatformTheTemplateDoesNotSupport(t *testing.T) {
 		built = true
 		return assist.DevicePlan{}, nil
 	}
-	_, _, err := r.svc.planWith(context.Background(), r.target, []string{r.fp}, []string{"show version"}, nil, &fn, []string{"nxos"}, false, "x", nil, build)
+	_, _, err := r.svc.planWith(context.Background(), r.target, []string{r.fp}, nil, []string{"show version"}, nil, &fn, []string{"nxos"}, false, "x", nil, build)
 	if code(err) != codes.FailedPrecondition || built || !strings.Contains(err.Error(), "nxos") {
 		t.Fatalf("err=%v built=%v", err, built)
 	}
 	// Con la del equipo en la lista (el simulador es IOS-XE) sí sigue hasta armar el plan.
-	_, _, _ = r.svc.planWith(context.Background(), r.target, []string{r.fp}, []string{"show version"}, nil, &fn, []string{"ios", "ios-xe"}, false, "x", nil, build)
+	_, _, _ = r.svc.planWith(context.Background(), r.target, []string{r.fp}, nil, []string{"show version"}, nil, &fn, []string{"ios", "ios-xe"}, false, "x", nil, build)
 	if !built {
 		t.Fatal("una plataforma soportada no debe rechazarse")
 	}

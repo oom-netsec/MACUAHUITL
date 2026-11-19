@@ -11,7 +11,7 @@ usage: mctl <command>
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
          export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);
          each conflict needs a decision per BACKUP ID (first column) or label, or --all; if one is missing nothing is imported)
-  job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept FINGERPRINT]... [--exclude DEVICE]... ID
+  job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept [DEVICE=]FINGERPRINT]... [--exclude DEVICE]... ID
         cancel ID | list [--all] | watch ID
         rm ID... | clear --finished   (remove from history; the evidence on disk is not deleted)
   playbooks [--platform P]
@@ -42,7 +42,7 @@ usage: mctl <command>
         ca init --name N [--days D] [--out FOLDER] | ca sign --ca FOLDER --csr CSR -o CERT [--profile P]
         export --cert C [--chain CA] [--key KEY] --format p12|p12-legacy|pem|der -o OUTPUT | decode -f FILE
   ike   decode -f FILE [--json]   (IKEv1, IKEv2 and IPsec debug/show)
-  change create -f change.yaml | pre|post [--accept FINGERPRINT]... [--exclude DEVICE]... [--no-wait] ID | list
+  change create -f change.yaml | pre|post [--accept [DEVICE=]FINGERPRINT]... [--exclude DEVICE]... [--no-wait] ID | list
          diff ID [--device DEVICE] [--json]   (configuration lines that changed between PRE and POST)
          report ID | report --pre FOLDER --post FOLDER   [--json]
   upgrade check --outputs FILE --image NAME [--size BYTES] [--md5 HEX] [--verify FILE] [--json]
@@ -86,7 +86,7 @@ usage: mctl <command>
   ports rollbacks                   saved rollbacks of runs that left devices changed (they survive a restart; cred rotate does not: it is by hand)
   ports rollback RUN [--accept-age]  applies that rollback with a confirmation at each step (also snippet rollback and restore rollback; --accept-age if more than 24 h have passed)
   ports rollback discard RUN        discards that rollback without applying it
-  run -d DEVICE... -c "show ..." | -f FILE --cred ID [--accept FINGERPRINT] [--csv|--md|--json]
+  run -d DEVICE... -c "show ..." | -f FILE --cred ID [--accept [DEVICE=]FINGERPRINT] [--csv|--md|--json]
         (read-only batch: a one-round Patrol job; every command goes through CheckDenied)
   drift JOB|FOLDER [--round N] [--device DEVICE] [--json]
         (running-config of round N against N-1 per device, without volatile lines; read-only)
@@ -108,7 +108,7 @@ usage: mctl <command>
          gets in, write memory is requested (mandatory: without it the device goes back to the previous hash on reload); only if it ends [OK],
          --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (previous)";
          if the new session does not get in or you reject write memory, the rollback is proposed through the original session)
-  backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
+  backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept [DEVICE=]FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
         (saves show running-config in the backups folder, outputs/respaldos/DEVICE/, with 0600; a Patrol job: read-only.
          With --every and --rounds it is scheduled and the core saves each round)
   backup collect (JOB | --dir FOLDER) [--keep N] [--json]   saves what a job (or the folder of a run already removed from history) has collected (idempotent)

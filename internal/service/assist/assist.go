@@ -291,14 +291,14 @@ func planErr(ctx context.Context, err error, device string) error {
 
 // planOn es lo común de planear: abre una sesión de solo lectura (ventana de guard plan-ID con defer Revoke), corre pre, deja que build arme el
 // plan del equipo y lo guarda con un id. Nada se manda al equipo salvo comandos de lectura.
-func (s *assistSvc) planOn(ctx context.Context, t *v1.AssistTarget, accepted []string, pre []string, fn assist.Function, writeMem bool, detail string,
+func (s *assistSvc) planOn(ctx context.Context, t *v1.AssistTarget, accepted []string, keys []*v1.AcceptedHostKey, pre []string, fn assist.Function, writeMem bool, detail string,
 	rot *rotation, build func(label string, byCmd map[string]string) (assist.DevicePlan, error)) (string, assist.Plan, error) {
-	return s.planWith(ctx, t, accepted, pre, nil, &fn, nil, writeMem, detail, rot, build)
+	return s.planWith(ctx, t, accepted, keys, pre, nil, &fn, nil, writeMem, detail, rot, build)
 }
 
 // planWith es planOn con una función que build puede reemplazar (restaurar arma la suya con la interfaz de gestión y el tope del plan) y con
 // lecturas extra que dependen de las primeras (more recibe lo leído en pre; restaurar pregunta por la salida hacia el origen de la sesión).
-func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted []string, pre []string, more func(map[string]string) []string, fnp *assist.Function, platforms []string, writeMem bool, detail string,
+func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted []string, keys []*v1.AcceptedHostKey, pre []string, more func(map[string]string) []string, fnp *assist.Function, platforms []string, writeMem bool, detail string,
 	rot *rotation, build func(label string, byCmd map[string]string) (assist.DevicePlan, error)) (string, assist.Plan, error) {
 	if err := s.vault(ctx); err != nil {
 		return "", assist.Plan{}, err
@@ -321,9 +321,9 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 		return "", assist.Plan{}, service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	defer s.d.Guard().Revoke(gid)
-	acc := map[string]bool{}
-	for _, fp := range accepted {
-		acc[fp] = true
+	acc, err := service.HostKeyAccepts(ctx, []string{transport.HostKeyID(t.Address, port)}, accepted, keys)
+	if err != nil {
+		return "", assist.Plan{}, err
 	}
 	ex := newExec(s.d, gid, map[string]target{label: tg}, transport.HostKeyPolicy{Accepted: acc})
 	defer ex.Close()
@@ -389,7 +389,7 @@ func (s *assistSvc) PlanPorts(ctx context.Context, r *v1.PlanPortsRequest) (*v1.
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	fn := assist.Ports
-	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.SessionPortReads, &fn, nil, r.WriteMemory, fmt.Sprintf("interfaces=%v", r.Interfaces), nil,
+	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, pre, assist.SessionPortReads, &fn, nil, r.WriteMemory, fmt.Sprintf("interfaces=%v", r.Interfaces), nil,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			return assist.PortsPlan(label, r.Interfaces, ch, outs)
 		})
@@ -450,7 +450,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, more, &fn, platforms, r.WriteMemory, detail, nil, build)
+	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, pre, more, &fn, platforms, r.WriteMemory, detail, nil, build)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +537,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		}
 	}
 	rot := &rotation{user: r.User, secret: secret, updateCred: r.UpdateCredentialId, generated: generated}
-	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.CredRotate, true /* write memory es obligatorio */, "user="+r.User, rot,
+	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, pre, assist.CredRotate, true /* write memory es obligatorio */, "user="+r.User, rot,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			return assist.CredRotatePlan(label, assist.CredRotateChange{User: r.User, NewSecret: secret, ConnectedUser: connected}, outs)
 		})

@@ -99,7 +99,7 @@ func jobLoginTest(c *cli.Env, args []string) error {
 		failed++
 		fmt.Fprint(c.Out, cli.T("mctl.patrol.login_fail", "addr", r.Target.GetAddress(), "step", strings.TrimPrefix(r.FailedStep.String(), "LOGIN_TEST_STEP_"), "detail", r.Detail))
 		if r.HostKeyFingerprint != "" {
-			fmt.Fprint(c.Out, cli.T("mctl.patrol.login_fp", "fp", r.HostKeyFingerprint, "id", id))
+			fmt.Fprint(c.Out, cli.T("mctl.patrol.login_fp", "addr", r.Target.GetAddress(), "fp", r.HostKeyFingerprint, "id", id))
 		}
 		fmt.Fprintln(c.Out)
 	}
@@ -121,7 +121,11 @@ func jobArm(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return cli.Err("mctl.patrol.arm_need_id")
 	}
-	r, err := v1.NewPatrolServiceClient(c.Conn).ArmJob(context.Background(), &v1.ArmJobRequest{JobId: fs.Arg(0), AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
+	fps, keys, err := cli.AcceptKeys(accept, nil)
+	if err != nil {
+		return err
+	}
+	r, err := v1.NewPatrolServiceClient(c.Conn).ArmJob(context.Background(), &v1.ArmJobRequest{JobId: fs.Arg(0), AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys, ExcludedDeviceIds: exclude})
 	if err != nil {
 		return err
 	}
@@ -280,7 +284,7 @@ func jobWatch(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
+const help = `  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept [EQUIPO=]HUELLA]... [--exclude EQUIPO]... ID
         cancel ID | list [--all] | watch ID
         rm ID... | clear --finished   (quitan del historial; la evidencia en disco no se borra)
   playbooks [--platform P]`

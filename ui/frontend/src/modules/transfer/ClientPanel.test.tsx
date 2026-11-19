@@ -88,7 +88,7 @@ test("la descarga manda credencial, huellas, tiempo, tamaño, hash por largo y S
   await userEvent.click(screen.getByLabelText(/Permitir algoritmos SSH antiguos/));
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
   expect(core.transferGet).toHaveBeenCalledWith({
-    url: "scp://192.0.2.1//c4.bin", destDir: "", credentialId: "c1", acceptedHostKeys: ["SHA256:abc"], insecure: false, legacySsh: true,
+    url: "scp://192.0.2.1//c4.bin", destDir: "", credentialId: "c1", acceptedHostKeys: ["SHA256:abc"], acceptedKeys: [{ host: "192.0.2.1", fingerprint: "SHA256:abc" }], insecure: false, legacySsh: true,
     name: "x.bin", maxBytes: 2097152, seconds: 180, md5: "a".repeat(32),
   });
 });

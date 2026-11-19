@@ -106,7 +106,7 @@ func (e *env) trust(t *testing.T) {
 	if len(r) != 1 || r[0].FailedStep != "host_key" || r[0].Fingerprint == "" {
 		t.Fatalf("first login test = %+v", r)
 	}
-	r = LoginTest(context.Background(), e.d, "j", e.spec, true, map[string]bool{r[0].Fingerprint: true})
+	r = LoginTest(context.Background(), e.d, "j", e.spec, true, map[string]map[string]bool{HostKeyID(e.spec.Targets[0]): {r[0].Fingerprint: true}})
 	if !r[0].Passed {
 		t.Fatalf("login test after accepting = %+v", r)
 	}

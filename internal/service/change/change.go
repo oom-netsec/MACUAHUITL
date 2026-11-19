@@ -143,7 +143,7 @@ func (s *changeSvc) CaptureChange(ctx context.Context, r *v1.CaptureChangeReques
 	rec.jobs[r.Phase] = cj.JobId
 	s.mu.Unlock()
 	s.d.Audit("change.capture", rec.id, fmt.Sprintf("phase=%s job=%s", name, cj.JobId))
-	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
+	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		// El trabajo queda creado: se revisa con LoginTest y se arma con ArmJob, como cualquier otro.
 		return &v1.CaptureChangeResponse{JobId: cj.JobId, Detail: status.Convert(err).Message()}, nil

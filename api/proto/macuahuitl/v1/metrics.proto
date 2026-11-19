@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package macuahuitl.v1;
 
+import "macuahuitl/v1/common.proto";
+
 option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
 
 // Datos para las gráficas y la vista de frente del switch (Fase 19). Todo de solo lectura:
@@ -101,6 +103,8 @@ message GetPortStatusRequest {
   uint32 port = 4;                    // en vivo: puerto SSH; 0 = 22
   string credential_id = 5;           // en vivo: credencial de la bóveda
   repeated string accepted_host_key_fingerprints = 6;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 8;
   bool legacy_ssh = 7;                // en vivo: equipos con SSH antiguo (se audita)
 }
 

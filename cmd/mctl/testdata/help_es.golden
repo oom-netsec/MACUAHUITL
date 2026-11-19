@@ -11,7 +11,7 @@ uso: mctl <comando>
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);
          cada conflicto necesita una decisión por ID EN EL RESPALDO (primera columna) o etiqueta, o --all; si falta una no se importa nada)
-  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
+  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept [EQUIPO=]HUELLA]... [--exclude EQUIPO]... ID
         cancel ID | list [--all] | watch ID
         rm ID... | clear --finished   (quitan del historial; la evidencia en disco no se borra)
   playbooks [--platform P]
@@ -42,7 +42,7 @@ uso: mctl <comando>
         ca init --name N [--days D] [--out CARPETA] | ca sign --ca CARPETA --csr CSR -o CERT [--profile P]
         export --cert C [--chain CA] [--key LLAVE] --format p12|p12-legacy|pem|der -o SALIDA | decode -f ARCHIVO
   ike   decode -f ARCHIVO [--json]   (debug/show de IKEv1, IKEv2 e IPsec)
-  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
+  change create -f cambio.yaml | pre|post [--accept [EQUIPO=]HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
          diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]
@@ -86,7 +86,7 @@ uso: mctl <comando>
   ports rollbacks                   reversas guardadas de ejecuciones que dejaron equipos cambiados (sobreviven al reinicio; cred rotate no: es a mano)
   ports rollback EJECUCION [--accept-age]  aplica esa reversa con confirmación por paso (también snippet rollback y restore rollback; --accept-age si pasaron más de 24 h)
   ports rollback discard EJECUCION  descarta esa reversa sin aplicarla
-  run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept HUELLA] [--csv|--md|--json]
+  run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept [EQUIPO=]HUELLA] [--csv|--md|--json]
         (lote de solo lectura: un trabajo de Patrol de una ronda; todo comando pasa por CheckDenied)
   drift TRABAJO|CARPETA [--round N] [--device EQUIPO] [--json]
         (running-config de la ronda N contra la N-1 por equipo, sin líneas volátiles; solo lee)
@@ -108,7 +108,7 @@ uso: mctl <comando>
          entra, se pide write memory (obligatorio: sin él el equipo vuelve al hash anterior al reiniciar); solo si sale [OK],
          --update-cred deja el secreto en la bóveda y la credencial anterior se conserva como "<etiqueta> (previous)";
          si la sesión nueva no entra o rechazas write memory, se propone la reversa por la sesión original)
-  backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]
+  backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept [EQUIPO=]HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]
         (guarda show running-config en outputs/respaldos/EQUIPO/ con 0600; un trabajo de Patrol: solo lectura.
          Con --every y --rounds queda programado y el núcleo guarda cada ronda)
   backup collect (TRABAJO | --dir CARPETA) [--keep N] [--json]   guarda lo que un trabajo (o la carpeta de una corrida ya quitada del historial) lleva recolectado (idempotente)

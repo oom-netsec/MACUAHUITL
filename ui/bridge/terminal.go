@@ -11,13 +11,14 @@ import (
 // ---- Terminal SSH (Fase 16b): manual, una sesión por pestaña ----
 
 type TerminalDTO struct {
-	Name         string   `json:"name"`
-	Address      string   `json:"address"`
-	Port         uint32   `json:"port"`
-	CredentialID string   `json:"credentialId"`
-	Accept       []string `json:"accept"`
-	Rows         uint32   `json:"rows"`
-	Cols         uint32   `json:"cols"`
+	Name         string               `json:"name"`
+	Address      string               `json:"address"`
+	Port         uint32               `json:"port"`
+	CredentialID string               `json:"credentialId"`
+	Accept       []string             `json:"accept"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	Rows         uint32               `json:"rows"`
+	Cols         uint32               `json:"cols"`
 	// HostID abre un host guardado y es exclusivo: con él no viajan dirección, puerto ni credencial.
 	HostID string `json:"hostId"`
 	// ExpectedStartupCommand es la orden de inicio que la UI mostró; si no coincide con la guardada el núcleo no conecta.
@@ -25,7 +26,7 @@ type TerminalDTO struct {
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
-	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
+	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
 	if d.HostID != "" {
 		o.HostId = d.HostID
 	} else {

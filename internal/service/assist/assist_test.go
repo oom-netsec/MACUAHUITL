@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -710,5 +711,18 @@ func TestPortKeysNormalizaLaDireccion(t *testing.T) {
 	}
 	if reflect.DeepEqual(mk("10.0.0.1"), mk("10.0.0.2")) {
 		t.Error("equipos distintos comparten candado")
+	}
+}
+
+// El campo nuevo ata la huella al equipo: la de otro host no entra, la del host y puerto sí.
+func TestHuellaPorHostEnElPlan(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	req := &v1.PlanPortsRequest{Target: r.target, Interfaces: []string{gi1}, Vlan: 20, AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: "10.9.9.9", Fingerprint: r.fp}}}
+	if _, err := r.svc.PlanPorts(context.Background(), req); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("la huella de otro host no debe entrar: %v", err)
+	}
+	req.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: r.target.Address + ":" + strconv.Itoa(int(r.target.Port)), Fingerprint: r.fp}}
+	if _, err := r.svc.PlanPorts(context.Background(), req); err != nil {
+		t.Fatalf("campo nuevo: %v", err)
 	}
 }

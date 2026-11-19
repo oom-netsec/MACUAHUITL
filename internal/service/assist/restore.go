@@ -57,7 +57,7 @@ func (s *assistSvc) PlanRestore(ctx context.Context, r *v1.PlanRestoreRequest) (
 	var rp assist.RestorePlan
 	var buildErr error
 	var fn assist.Function
-	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, assist.RestoreDiffPre(), assist.RestoreEgressPre, &fn, nil, r.WriteMemory,
+	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, assist.RestoreDiffPre(), assist.RestoreEgressPre, &fn, nil, r.WriteMemory,
 		fmt.Sprintf("backup=%s partial=%t", r.BackupId, r.AllowPartial), nil,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			rp, buildErr = assist.RestoreDiffPlan(label, ch, outs)

@@ -30,6 +30,9 @@ type LoginResult struct {
 // Hostport es el host:puerto de un equipo tal como lo muestran el Login Test y los eventos (IPv6 entre corchetes).
 func Hostport(t Target) string { return hostport(t) }
 
+// HostKeyID es la clave con la que se atan las huellas aceptadas a este equipo: la misma que ve el callback de llaves.
+func HostKeyID(t Target) string { return transport.HostKeyID(t.Address, port(t)) }
+
 func hostport(t Target) string {
 	if a, err := netip.ParseAddr(t.Address); err == nil {
 		return netip.AddrPortFrom(a, port(t)).String()
@@ -155,8 +158,8 @@ func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk
 }
 
 // LoginTest prueba cada equipo. Interactivo: una llave desconocida devuelve su huella para
-// confirmar, y las huellas en accepted se guardan. Silencioso: aplica la política del trabajo.
-func LoginTest(ctx context.Context, d Deps, jobID string, s Spec, interactive bool, accepted map[string]bool) []LoginResult {
+// confirmar, y las huellas en accepted (por equipo, clave HostKeyID) se guardan. Silencioso: aplica la política del trabajo.
+func LoginTest(ctx context.Context, d Deps, jobID string, s Spec, interactive bool, accepted map[string]map[string]bool) []LoginResult {
 	out := make([]LoginResult, len(s.Targets))
 	if err := d.Guard.Allow(ctx, jobID, addresses(s)); err != nil {
 		for i, t := range s.Targets {

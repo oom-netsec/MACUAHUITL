@@ -1,4 +1,5 @@
 import type { ErrInfo } from "../../lib/coreError";
+import type { AcceptedKey } from "../../lib/hostkeys";
 // Contrato del módulo con el puente (ui/bridge/transfer.go) y su implementación de Wails.
 import { Events } from "@wailsio/runtime";
 
@@ -26,15 +27,15 @@ export interface TransferServer { serverId: string; protocol: string; listening:
 export interface TransferResult { path: string; bytes: number; md5: string; sha256: string; verified: string; seconds: number; report: string }
 export interface TransferGetParams {
   url: string; destDir: string; credentialId: string; sha256?: string; md5?: string; sha512?: string;
-  acceptedHostKeys: string[]; name?: string; insecure?: boolean; legacySsh?: boolean; maxBytes?: number; seconds?: number;
+  acceptedHostKeys: string[]; acceptedKeys?: AcceptedKey[]; name?: string; insecure?: boolean; legacySsh?: boolean; maxBytes?: number; seconds?: number;
 }
-export interface TransferPutParams { url: string; fromDir: string; name: string; credentialId: string; acceptedHostKeys: string[]; legacySsh?: boolean; maxBytes?: number; seconds?: number }
+export interface TransferPutParams { url: string; fromDir: string; name: string; credentialId: string; acceptedHostKeys: string[]; acceptedKeys?: AcceptedKey[]; legacySsh?: boolean; maxBytes?: number; seconds?: number }
 export interface TransferHintInfo { standardPort: number; nftables: string; remove: string; note?: string; noteCode?: string }
 
 
 // ---- Explorador remoto, avance y descarga múltiple (Fase 19) ----
 export interface TransferBrowseParams {
-  url: string; credentialId?: string; path?: string; acceptedHostKeys?: string[];
+  url: string; credentialId?: string; path?: string; acceptedHostKeys?: string[]; acceptedKeys?: AcceptedKey[];
   insecure?: boolean; legacySsh?: boolean; maxEntries?: number; seconds?: number;
 }
 export interface RemoteEntry {
@@ -54,7 +55,7 @@ export interface TransferListing {
 export interface TransferGetManyParams {
   url: string; // carpeta remota
   names: string[]; // nombres base, hasta 200
-  destDir: string; credentialId?: string; acceptedHostKeys?: string[]; insecure?: boolean; legacySsh?: boolean;
+  destDir: string; credentialId?: string; acceptedHostKeys?: string[]; acceptedKeys?: AcceptedKey[]; insecure?: boolean; legacySsh?: boolean;
   maxBytes?: number; seconds?: number; // por archivo
 }
 // Eventos de una ejecución asíncrona (transfer:progress, transfer:file, transfer:finished), todos con el runId que devolvió la llamada.

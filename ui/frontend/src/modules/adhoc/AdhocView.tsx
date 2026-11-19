@@ -11,7 +11,7 @@ import { parseTargets } from "../patrol/PatrolView";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { parseFingerprints } from "../../lib/hostkeys";
+import { resolveAccepted } from "../../lib/hostkeys";
 
 // Lotes: comandos de solo lectura en varios equipos, como un trabajo de Patrol de una ronda.
 // El núcleo rechaza todo comando que no sea de lectura; la app no aplica configuración.
@@ -46,7 +46,11 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const run = () => {
     setNote(""); setPicked("");
     return r.run(async () => {
-      const st = await core.adhocStart(parseTargets(devices).map(parseTarget), cred, commands, parseFingerprints(accept));
+      const targets = parseTargets(devices).map(parseTarget);
+      // Con varios equipos una huella sin equipo no se manda: valdría para cualquiera. El campo viejo ya no se usa.
+      const keys = resolveAccepted(accept, targets);
+      if (keys.ambiguous) throw new Error(t("fps.needHost"));
+      const st = await core.adhocStart(targets, cred, commands, [], keys.keys);
       if (!st.armed) { setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail })); return null; }
       const deadline = Date.now() + maxWaitMs;
       for (;;) {
@@ -78,7 +82,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
       <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} w="lg" />
       <TextArea label={t("adhoc.devices")} value={devices} onChange={setDevices} rows={3} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
-      <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />
+      <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
       <div className="actions">
         <button className="primary" disabled={r.busy || !cred || !devices.trim() || !commands.trim()} aria-busy={r.busy} onClick={run}>
           {t(r.busy ? "adhoc.running" : "adhoc.run")}<kbd aria-hidden="true">Ctrl ↵</kbd>

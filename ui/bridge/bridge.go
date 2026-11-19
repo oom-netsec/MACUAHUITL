@@ -462,9 +462,9 @@ type ArmDTO struct {
 	MissingInhibitors []string  `json:"missingInhibitors"`
 }
 
-func (b *Bridge) ArmJob(jobID string, accept, exclude []string) (ArmDTO, error) {
+func (b *Bridge) ArmJob(jobID string, accept []string, acceptedKeys []AcceptedHostKeyDTO, exclude []string) (ArmDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ArmDTO, error) {
-		r, err := v1.NewPatrolServiceClient(c).ArmJob(ctx, &v1.ArmJobRequest{JobId: jobID, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
+		r, err := v1.NewPatrolServiceClient(c).ArmJob(ctx, &v1.ArmJobRequest{JobId: jobID, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys), ExcludedDeviceIds: exclude})
 		if err != nil {
 			return ArmDTO{}, err
 		}

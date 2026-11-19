@@ -159,6 +159,60 @@ func (x *Target) GetDeviceId() string {
 	return ""
 }
 
+// Huella de llave de host aceptada para un equipo concreto: host es la dirección tal como se marca
+// («10.0.0.1», «sw1.lab», «sw1.lab:2222», «[2001:db8::1]:22»); sin puerto vale 22.
+type AcceptedHostKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Fingerprint   string                 `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptedHostKey) Reset() {
+	*x = AcceptedHostKey{}
+	mi := &file_macuahuitl_v1_common_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptedHostKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptedHostKey) ProtoMessage() {}
+
+func (x *AcceptedHostKey) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_common_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptedHostKey.ProtoReflect.Descriptor instead.
+func (*AcceptedHostKey) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_common_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AcceptedHostKey) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *AcceptedHostKey) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
 var File_macuahuitl_v1_common_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_common_proto_rawDesc = "" +
@@ -167,7 +221,10 @@ const file_macuahuitl_v1_common_proto_rawDesc = "" +
 	"\x06Target\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12\x1b\n" +
-	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId*\xc6\x02\n" +
+	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\"G\n" +
+	"\x0fAcceptedHostKey\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint*\xc6\x02\n" +
 	"\vDeviceState\x12\x1c\n" +
 	"\x18DEVICE_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13DEVICE_STATE_QUEUED\x10\x01\x12\x1b\n" +
@@ -195,10 +252,11 @@ func file_macuahuitl_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_macuahuitl_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_macuahuitl_v1_common_proto_goTypes = []any{
-	(DeviceState)(0), // 0: macuahuitl.v1.DeviceState
-	(*Target)(nil),   // 1: macuahuitl.v1.Target
+	(DeviceState)(0),        // 0: macuahuitl.v1.DeviceState
+	(*Target)(nil),          // 1: macuahuitl.v1.Target
+	(*AcceptedHostKey)(nil), // 2: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_common_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -219,7 +277,7 @@ func file_macuahuitl_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_common_proto_rawDesc), len(file_macuahuitl_v1_common_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

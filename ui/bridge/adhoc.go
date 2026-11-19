@@ -31,9 +31,9 @@ type AdhocResultDTO struct {
 }
 
 // AdhocStart crea y arma el lote; si no se arma (llave de host nueva, bóveda), Detail dice por qué.
-func (b *Bridge) AdhocStart(targets []AdhocTargetDTO, credentialID, commands string, accept []string) (AdhocStartDTO, error) {
+func (b *Bridge) AdhocStart(targets []AdhocTargetDTO, credentialID, commands string, accept []string, acceptedKeys []AcceptedHostKeyDTO) (AdhocStartDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (AdhocStartDTO, error) {
-		req := &v1.StartAdhocRequest{CredentialId: credentialID, Commands: commands, AcceptedHostKeyFingerprints: accept}
+		req := &v1.StartAdhocRequest{CredentialId: credentialID, Commands: commands, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys)}
 		for _, t := range targets {
 			req.Targets = append(req.Targets, &v1.Target{Address: t.Address, Port: t.Port})
 		}

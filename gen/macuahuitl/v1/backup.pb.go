@@ -32,9 +32,11 @@ type StartBackupRequest struct {
 	Rounds                      uint32                 `protobuf:"varint,6,opt,name=rounds,proto3" json:"rounds,omitempty"`                                          // con intervalo: cuántas veces
 	IncludeSecrets              bool                   `protobuf:"varint,7,opt,name=include_secrets,json=includeSecrets,proto3" json:"include_secrets,omitempty"`    // sin enmascarar; por defecto se enmascaran
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,8,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
-	ExcludedDeviceIds           []string               `protobuf:"bytes,9,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+	AcceptedHostKeys  []*AcceptedHostKey `protobuf:"bytes,10,rep,name=accepted_host_keys,json=acceptedHostKeys,proto3" json:"accepted_host_keys,omitempty"`
+	ExcludedDeviceIds []string           `protobuf:"bytes,9,rep,name=excluded_device_ids,json=excludedDeviceIds,proto3" json:"excluded_device_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StartBackupRequest) Reset() {
@@ -119,6 +121,13 @@ func (x *StartBackupRequest) GetIncludeSecrets() bool {
 func (x *StartBackupRequest) GetAcceptedHostKeyFingerprints() []string {
 	if x != nil {
 		return x.AcceptedHostKeyFingerprints
+	}
+	return nil
+}
+
+func (x *StartBackupRequest) GetAcceptedHostKeys() []*AcceptedHostKey {
+	if x != nil {
+		return x.AcceptedHostKeys
 	}
 	return nil
 }
@@ -611,7 +620,7 @@ var File_macuahuitl_v1_backup_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_backup_proto_rawDesc = "" +
 	"\n" +
-	"\x1amacuahuitl/v1/backup.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/common.proto\x1a\x19macuahuitl/v1/tools.proto\"\xf9\x02\n" +
+	"\x1amacuahuitl/v1/backup.proto\x12\rmacuahuitl.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amacuahuitl/v1/common.proto\x1a\x19macuahuitl/v1/tools.proto\"\xc7\x03\n" +
 	"\x12StartBackupRequest\x12/\n" +
 	"\atargets\x18\x01 \x03(\v2\x15.macuahuitl.v1.TargetR\atargets\x12#\n" +
 	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12\x18\n" +
@@ -620,7 +629,9 @@ const file_macuahuitl_v1_backup_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x05 \x01(\rR\x0fintervalSeconds\x12\x16\n" +
 	"\x06rounds\x18\x06 \x01(\rR\x06rounds\x12'\n" +
 	"\x0finclude_secrets\x18\a \x01(\bR\x0eincludeSecrets\x12C\n" +
-	"\x1eaccepted_host_key_fingerprints\x18\b \x03(\tR\x1bacceptedHostKeyFingerprints\x12.\n" +
+	"\x1eaccepted_host_key_fingerprints\x18\b \x03(\tR\x1bacceptedHostKeyFingerprints\x12L\n" +
+	"\x12accepted_host_keys\x18\n" +
+	" \x03(\v2\x1e.macuahuitl.v1.AcceptedHostKeyR\x10acceptedHostKeys\x12.\n" +
 	"\x13excluded_device_ids\x18\t \x03(\tR\x11excludedDeviceIds\"\x9c\x01\n" +
 	"\x13StartBackupResponse\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x14\n" +
@@ -682,30 +693,32 @@ var file_macuahuitl_v1_backup_proto_goTypes = []any{
 	(*ListBackupsResponse)(nil),    // 8: macuahuitl.v1.ListBackupsResponse
 	(*DiffBackupsResponse)(nil),    // 9: macuahuitl.v1.DiffBackupsResponse
 	(*Target)(nil),                 // 10: macuahuitl.v1.Target
-	(*timestamppb.Timestamp)(nil),  // 11: google.protobuf.Timestamp
-	(*ToolReport)(nil),             // 12: macuahuitl.v1.ToolReport
+	(*AcceptedHostKey)(nil),        // 11: macuahuitl.v1.AcceptedHostKey
+	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
+	(*ToolReport)(nil),             // 13: macuahuitl.v1.ToolReport
 }
 var file_macuahuitl_v1_backup_proto_depIdxs = []int32{
 	10, // 0: macuahuitl.v1.StartBackupRequest.targets:type_name -> macuahuitl.v1.Target
-	11, // 1: macuahuitl.v1.StartBackupResponse.window_ends_at:type_name -> google.protobuf.Timestamp
-	12, // 2: macuahuitl.v1.CollectBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	12, // 3: macuahuitl.v1.ListBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	12, // 4: macuahuitl.v1.DiffBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	0,  // 5: macuahuitl.v1.BackupService.StartBackup:input_type -> macuahuitl.v1.StartBackupRequest
-	2,  // 6: macuahuitl.v1.BackupService.CollectBackups:input_type -> macuahuitl.v1.CollectBackupsRequest
-	4,  // 7: macuahuitl.v1.BackupService.ListBackups:input_type -> macuahuitl.v1.ListBackupsRequest
-	5,  // 8: macuahuitl.v1.BackupService.GetBackup:input_type -> macuahuitl.v1.GetBackupRequest
-	7,  // 9: macuahuitl.v1.BackupService.DiffBackups:input_type -> macuahuitl.v1.DiffBackupsRequest
-	1,  // 10: macuahuitl.v1.BackupService.StartBackup:output_type -> macuahuitl.v1.StartBackupResponse
-	3,  // 11: macuahuitl.v1.BackupService.CollectBackups:output_type -> macuahuitl.v1.CollectBackupsResponse
-	8,  // 12: macuahuitl.v1.BackupService.ListBackups:output_type -> macuahuitl.v1.ListBackupsResponse
-	6,  // 13: macuahuitl.v1.BackupService.GetBackup:output_type -> macuahuitl.v1.GetBackupResponse
-	9,  // 14: macuahuitl.v1.BackupService.DiffBackups:output_type -> macuahuitl.v1.DiffBackupsResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	11, // 1: macuahuitl.v1.StartBackupRequest.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	12, // 2: macuahuitl.v1.StartBackupResponse.window_ends_at:type_name -> google.protobuf.Timestamp
+	13, // 3: macuahuitl.v1.CollectBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	13, // 4: macuahuitl.v1.ListBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	13, // 5: macuahuitl.v1.DiffBackupsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	0,  // 6: macuahuitl.v1.BackupService.StartBackup:input_type -> macuahuitl.v1.StartBackupRequest
+	2,  // 7: macuahuitl.v1.BackupService.CollectBackups:input_type -> macuahuitl.v1.CollectBackupsRequest
+	4,  // 8: macuahuitl.v1.BackupService.ListBackups:input_type -> macuahuitl.v1.ListBackupsRequest
+	5,  // 9: macuahuitl.v1.BackupService.GetBackup:input_type -> macuahuitl.v1.GetBackupRequest
+	7,  // 10: macuahuitl.v1.BackupService.DiffBackups:input_type -> macuahuitl.v1.DiffBackupsRequest
+	1,  // 11: macuahuitl.v1.BackupService.StartBackup:output_type -> macuahuitl.v1.StartBackupResponse
+	3,  // 12: macuahuitl.v1.BackupService.CollectBackups:output_type -> macuahuitl.v1.CollectBackupsResponse
+	8,  // 13: macuahuitl.v1.BackupService.ListBackups:output_type -> macuahuitl.v1.ListBackupsResponse
+	6,  // 14: macuahuitl.v1.BackupService.GetBackup:output_type -> macuahuitl.v1.GetBackupResponse
+	9,  // 15: macuahuitl.v1.BackupService.DiffBackups:output_type -> macuahuitl.v1.DiffBackupsResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_backup_proto_init() }

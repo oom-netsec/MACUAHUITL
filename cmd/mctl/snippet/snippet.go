@@ -53,8 +53,12 @@ func plan(c *cli.Env, host string, g *common, set func(*v1.PlanSnippetRequest)) 
 	if err != nil {
 		return err
 	}
+	fps, keys, err := cli.AcceptKeys(g.accept, []string{cli.HostPort(addr, port)})
+	if err != nil {
+		return err
+	}
 	req := &v1.PlanSnippetRequest{Target: &v1.AssistTarget{Name: addr, Address: addr, Port: port, CredentialId: g.credID},
-		WriteMemory: g.writeMe, AcceptedHostKeyFingerprints: g.accept}
+		WriteMemory: g.writeMe, AcceptedHostKeyFingerprints: fps, AcceptedHostKeys: keys}
 	set(req)
 	cl := v1.NewAssistServiceClient(c.Conn)
 	res, err := cl.PlanSnippet(context.Background(), req)

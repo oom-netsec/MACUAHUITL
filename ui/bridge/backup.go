@@ -29,9 +29,9 @@ type BackupGetDTO struct {
 }
 
 // BackupStart crea y arma el respaldo; con intervalSeconds > 0 queda programado (rounds veces).
-func (b *Bridge) BackupStart(targets []AdhocTargetDTO, credentialID string, startup bool, keep, intervalSeconds, rounds uint32, secrets bool, accept []string) (BackupStartDTO, error) {
+func (b *Bridge) BackupStart(targets []AdhocTargetDTO, credentialID string, startup bool, keep, intervalSeconds, rounds uint32, secrets bool, accept []string, acceptedKeys []AcceptedHostKeyDTO) (BackupStartDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (BackupStartDTO, error) {
-		req := &v1.StartBackupRequest{CredentialId: credentialID, Startup: startup, Keep: keep, IntervalSeconds: intervalSeconds, Rounds: rounds, IncludeSecrets: secrets, AcceptedHostKeyFingerprints: accept}
+		req := &v1.StartBackupRequest{CredentialId: credentialID, Startup: startup, Keep: keep, IntervalSeconds: intervalSeconds, Rounds: rounds, IncludeSecrets: secrets, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys)}
 		for _, t := range targets {
 			req.Targets = append(req.Targets, &v1.Target{Address: t.Address, Port: t.Port})
 		}

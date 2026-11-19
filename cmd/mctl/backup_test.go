@@ -69,3 +69,20 @@ func TestBackupCommands(t *testing.T) {
 		t.Fatal("diff con un solo ID")
 	}
 }
+
+// Los destinos se cuentan después de --exclude también en backup run.
+func TestBackupAcceptContandoExcluidos(t *testing.T) {
+	e := startCore(t)
+	must(t, "maestra\nmaestra\n", "vault", "create")
+	cred := strings.TrimSpace(must(t, "pw-lab\nen-lab\n", "cred", "add", "--label", "lab", "--user", "admin"))
+	ap := netip.MustParseAddrPort(e.target)
+	dev := fmt.Sprintf("%s:%d", ap.Addr(), ap.Port())
+	out, _ := mctl(t, "", "backup", "run", "-d", dev, "--cred", cred)
+	job := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(out)[1]
+	lt, _ := mctl(t, "", "job", "logintest", job)
+	fp := regexp.MustCompile(`SHA256:\S+`).FindString(lt)
+	out = must(t, "", "backup", "run", "-d", dev, "-d", "10.9.9.9", "--exclude", "10.9.9.9", "--cred", cred, "--accept", fp)
+	if !strings.Contains(out, "1 respaldo(s) guardado(s)") {
+		t.Fatalf("run = %q", out)
+	}
+}

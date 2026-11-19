@@ -41,7 +41,8 @@ function PrePost({ core }: { core: CoreAPI }) {
   const [out, setOut] = useState("");
   const [current, setCurrent] = useState("");
   const [login, setLogin] = useState<LoginResult[]>([]);
-  const [trusted, setTrusted] = useState<Set<string>>(new Set());
+  const [trusted, setTrusted] = useState<Set<string>>(new Set()); // pares «equipo\nhuella»: otra huella del mismo equipo NO queda confirmada
+  const pair = (l: { target: string; fingerprint: string }) => `${l.target}\n${l.fingerprint}`;
   const [msg, setMsg] = useState<{ kind: "info" | "warn"; text: string } | null>(null);
   const [err, setErr] = useState("");
   const [devices, setDevices] = useState<DeviceReport[] | null>(null);
@@ -67,7 +68,7 @@ function PrePost({ core }: { core: CoreAPI }) {
     await refresh();
   });
   const capture = (phase: "pre" | "post") => guard(async () => {
-    const r = await core.changeCapture(current, phase, [...trusted], []);
+    const r = await core.changeCapture(current, phase, [], login.filter((l) => l.fingerprint && trusted.has(pair(l))).map((l) => ({ host: l.target, fingerprint: l.fingerprint })), []);
     if (r.armed) {
       setLogin([]);
       setMsg({ kind: "info", text: t("change.capturing", { phase: phase.toUpperCase(), job: r.jobId }) });
@@ -83,7 +84,7 @@ function PrePost({ core }: { core: CoreAPI }) {
     setDevices(rep.devices ?? []); setNote(rep.note ?? ""); setUnmasked(!!rep.unmasked);
     setRep({ name: changes.find((c) => c.id === id)?.name ?? id, json: JSON.stringify(rep, null, 2) });
   });
-  const toggle = (fp: string, on: boolean) => setTrusted((s) => { const n = new Set(s); if (on) n.add(fp); else n.delete(fp); return n; });
+  const toggle = (key: string, on: boolean) => setTrusted((s) => { const n = new Set(s); if (on) n.add(key); else n.delete(key); return n; });
 
   return (
     <>
@@ -109,7 +110,7 @@ function PrePost({ core }: { core: CoreAPI }) {
             <button onClick={() => capture("post")}>{t("change.capture", { phase: "POST" })}</button>
           </div>
           {login.filter((l) => l.fingerprint).map((l) => (
-            <Check key={l.fingerprint} label={t("change.trust", { fp: l.fingerprint, target: l.target })} checked={trusted.has(l.fingerprint)} onChange={(v) => toggle(l.fingerprint, v)} />
+            <Check key={l.target} label={t("change.trust", { fp: l.fingerprint, target: l.target })} checked={trusted.has(pair(l))} onChange={(v) => toggle(pair(l), v)} />
           ))}
           {login.filter((l) => !l.passed && !l.fingerprint).map((l) => <Notice key={l.target} kind="warn"><code>{l.target}</code> {l.failedStep} {l.detail}</Notice>)}
         </Section>

@@ -45,6 +45,7 @@ export interface PortStatusQuery {
   port?: number; // en vivo: puerto SSH (0 = 22)
   credentialId?: string; // en vivo
   acceptedHostKeys?: string[];
+  acceptedKeys?: { host: string; fingerprint: string }[]; // la huella atada al equipo (device:port); el campo viejo solo vale con un destino
   legacySsh?: boolean;
 }
 export interface PortInfo {

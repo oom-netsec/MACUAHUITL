@@ -29,6 +29,8 @@ func init() {
 		"transport.err.known_hosts":         e("transport: known_hosts ilegible o dañado", "transport: known_hosts unreadable or damaged"),
 		"transport.hostkey.unknown":         e("transport: llave de host desconocida de {host}: {fingerprint}", "transport: unknown host key from {host}: {fingerprint}", "host", "fingerprint"),
 		"transport.hostkey.changed":         e("transport: llave de host cambiada de {host}: {fingerprint}", "transport: changed host key from {host}: {fingerprint}", "host", "fingerprint"),
+		"hostkey.err.accept_ambiguous":      e("indica a qué equipo corresponde cada huella (host=huella): el campo anterior solo vale con un destino", "say which device each fingerprint belongs to (host=fingerprint): the old field only works with a single target"),
+		"hostkey.err.accept_invalid":        e("destino de huella aceptada inválido: {host}", "invalid accepted fingerprint target: {host}", "host"),
 		"transport.hostkey.known":           e("transport: llave de host conocida de {host}: {fingerprint}", "transport: known host key from {host}: {fingerprint}", "host", "fingerprint"),
 		"platform.err.prompt_timeout":       e("platform: el equipo no mostró prompt a tiempo", "platform: the device did not show a prompt in time"),
 		"platform.err.first_login":          e("platform: el equipo pide cambiar la contraseña o aceptar el EULA en el primer inicio de sesión; hazlo a mano y vuelve a probar", "platform: the device asks to change the password or accept the EULA at first login; do it by hand and try again"),

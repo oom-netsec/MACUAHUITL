@@ -5,7 +5,7 @@ package i18n
 func init() {
 	add(map[string]entry{
 		"mctl.flag.usage":                        {Es: "uso:", En: "usage:"},
-		"mctl.flag.accept":                       {Es: "huella SHA256 confirmada (repetible)", En: "confirmed SHA256 fingerprint (repeatable)"},
+		"mctl.flag.accept":                       {Es: "huella SHA256 confirmada, sola o como EQUIPO=HUELLA (repetible)", En: "confirmed SHA256 fingerprint, alone or as DEVICE=FINGERPRINT (repeatable)"},
 		"mctl.flag.accept-trunk":                 {Es: "con --remove, acepta borrar una VLAN que viaja por trunks", En: "with --remove, accept deleting a VLAN carried over trunks"},
 		"mctl.flag.accept-vtp":                   {Es: "acepta que el cambio se propague por VTP", En: "accept that the change propagates through VTP"},
 		"mctl.flag.acct":                         {Es: "Accounting Start y Stop", En: "Accounting Start and Stop"},

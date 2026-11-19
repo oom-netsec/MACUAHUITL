@@ -7,6 +7,7 @@ option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahui
 import "google/protobuf/timestamp.proto";
 import "macuahuitl/v1/patrol.proto";
 import "macuahuitl/v1/tools.proto";
+import "macuahuitl/v1/common.proto";
 
 // Ventana de cambio (Fase 11). La app nunca aplica configuración: recolecta con
 // Patrol (solo comandos de lectura) y compara. Los reportes viajan como ToolReport
@@ -46,6 +47,8 @@ message CaptureChangeRequest {
   string change_id = 1;
   ChangePhase phase = 2;
   repeated string accepted_host_key_fingerprints = 3;
+  // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
+  repeated AcceptedHostKey accepted_host_keys = 5;
   repeated string excluded_device_ids = 4;
 }
 

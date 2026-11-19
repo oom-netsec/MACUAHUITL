@@ -8,6 +8,7 @@ export interface CredRotateRequest {
   updateCredentialId?: string;
   writeMemory?: boolean;
   acceptedHostKeyFingerprints?: string[];
+  acceptedHostKeys?: { host: string; fingerprint: string }[];
 }
 
 export interface CredRotateAPI {

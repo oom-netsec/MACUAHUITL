@@ -11,7 +11,7 @@ export interface Topo { text: string; json: string; svg: string }
 
 export interface ChangeAPI {
   changeCreate(spec: ChangeSpec): Promise<string>;
-  changeCapture(changeId: string, phase: "pre" | "post", accept: string[], exclude: string[]): Promise<CaptureResult>;
+  changeCapture(changeId: string, phase: "pre" | "post", accept: string[], acceptedKeys: { host: string; fingerprint: string }[], exclude: string[]): Promise<CaptureResult>;
   listChanges(): Promise<ChangeSummary[]>;
   changeReport(changeId: string, preDir: string, postDir: string): Promise<Report>;
   upgradeCheck(r: UpgradeRequest): Promise<Report>;
@@ -23,7 +23,7 @@ type Call = <T>(method: string, ...args: unknown[]) => Promise<T>;
 
 export const changeWails = (call: Call): ChangeAPI => ({
   changeCreate: (s) => call("ChangeCreate", JSON.stringify(s)),
-  changeCapture: (id, p, a, x) => call("ChangeCapture", id, p, a, x),
+  changeCapture: (id, p, a, k, x) => call("ChangeCapture", id, p, a, k, x),
   listChanges: () => call("ListChanges"),
   changeReport: (id, pre, post) => call("ChangeReport", id, pre, post),
   upgradeCheck: (r) => call("UpgradeCheck", r),

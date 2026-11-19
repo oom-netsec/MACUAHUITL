@@ -185,44 +185,46 @@ func resultDTO(r *v1.TransferResult) TransferResultDTO {
 }
 
 type TransferGetDTO struct {
-	URL          string   `json:"url"`
-	DestDir      string   `json:"destDir"`
-	Name         string   `json:"name"`
-	CredentialID string   `json:"credentialId"`
-	SHA256       string   `json:"sha256"`
-	MD5          string   `json:"md5"`
-	SHA512       string   `json:"sha512"`
-	Insecure     bool     `json:"insecure"`
-	HostKeys     []string `json:"acceptedHostKeys"`
-	MaxBytes     int64    `json:"maxBytes"`
-	Seconds      int      `json:"seconds"`
-	LegacySSH    bool     `json:"legacySsh"`
+	URL          string               `json:"url"`
+	DestDir      string               `json:"destDir"`
+	Name         string               `json:"name"`
+	CredentialID string               `json:"credentialId"`
+	SHA256       string               `json:"sha256"`
+	MD5          string               `json:"md5"`
+	SHA512       string               `json:"sha512"`
+	Insecure     bool                 `json:"insecure"`
+	HostKeys     []string             `json:"acceptedHostKeys"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	MaxBytes     int64                `json:"maxBytes"`
+	Seconds      int                  `json:"seconds"`
+	LegacySSH    bool                 `json:"legacySsh"`
 }
 
 func (b *Bridge) TransferGet(d TransferGetDTO) (TransferResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TransferResultDTO, error) {
 		r, err := v1.NewTransferServiceClient(c).Get(ctx, &v1.GetRequest{Url: d.URL, DestDir: d.DestDir, Name: d.Name, CredentialId: d.CredentialID,
-			Sha256: d.SHA256, Md5: d.MD5, Sha512: d.SHA512, Insecure: d.Insecure, AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes,
+			Sha256: d.SHA256, Md5: d.MD5, Sha512: d.SHA512, Insecure: d.Insecure, AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys), MaxBytes: d.MaxBytes,
 			TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
 		return resultDTO(r.GetResult()), err
 	})
 }
 
 type TransferPutDTO struct {
-	URL          string   `json:"url"`
-	FromDir      string   `json:"fromDir"`
-	Name         string   `json:"name"`
-	CredentialID string   `json:"credentialId"`
-	HostKeys     []string `json:"acceptedHostKeys"`
-	MaxBytes     int64    `json:"maxBytes"`
-	Seconds      int      `json:"seconds"`
-	LegacySSH    bool     `json:"legacySsh"`
+	URL          string               `json:"url"`
+	FromDir      string               `json:"fromDir"`
+	Name         string               `json:"name"`
+	CredentialID string               `json:"credentialId"`
+	HostKeys     []string             `json:"acceptedHostKeys"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	MaxBytes     int64                `json:"maxBytes"`
+	Seconds      int                  `json:"seconds"`
+	LegacySSH    bool                 `json:"legacySsh"`
 }
 
 func (b *Bridge) TransferPut(d TransferPutDTO) (TransferResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TransferResultDTO, error) {
 		r, err := v1.NewTransferServiceClient(c).Put(ctx, &v1.PutRequest{Url: d.URL, FromDir: d.FromDir, Name: d.Name, CredentialId: d.CredentialID,
-			AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
+			AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys), MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
 		return resultDTO(r.GetResult()), err
 	})
 }
@@ -252,14 +254,15 @@ func (b *Bridge) TransferHint(protocol, ip string, port int) (TransferHintDTO, e
 // ---- Explorador remoto, avance y descarga múltiple (Fase 19) ----
 
 type TransferBrowseDTO struct {
-	URL          string   `json:"url"`
-	CredentialID string   `json:"credentialId"`
-	Path         string   `json:"path"`
-	HostKeys     []string `json:"acceptedHostKeys"`
-	Insecure     bool     `json:"insecure"`
-	LegacySSH    bool     `json:"legacySsh"`
-	MaxEntries   int      `json:"maxEntries"`
-	Seconds      int      `json:"seconds"`
+	URL          string               `json:"url"`
+	CredentialID string               `json:"credentialId"`
+	Path         string               `json:"path"`
+	HostKeys     []string             `json:"acceptedHostKeys"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	Insecure     bool                 `json:"insecure"`
+	LegacySSH    bool                 `json:"legacySsh"`
+	MaxEntries   int                  `json:"maxEntries"`
+	Seconds      int                  `json:"seconds"`
 }
 
 type RemoteEntryDTO struct {
@@ -287,7 +290,7 @@ type TransferListingDTO struct {
 
 func (b *Bridge) TransferBrowse(d TransferBrowseDTO) (TransferListingDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TransferListingDTO, error) {
-		r, err := v1.NewTransferServiceClient(c).Browse(ctx, &v1.BrowseRequest{Url: d.URL, CredentialId: d.CredentialID, Path: d.Path, AcceptedHostKeyFingerprints: d.HostKeys,
+		r, err := v1.NewTransferServiceClient(c).Browse(ctx, &v1.BrowseRequest{Url: d.URL, CredentialId: d.CredentialID, Path: d.Path, AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys),
 			Insecure: d.Insecure, LegacySsh: d.LegacySSH, MaxEntries: int32(d.MaxEntries), TimeoutSeconds: int32(d.Seconds)})
 		if status.Code(err) == codes.Unimplemented {
 			out := TransferListingDTO{Reason: status.Convert(err).Message(), Entries: []RemoteEntryDTO{}}
@@ -306,15 +309,16 @@ func (b *Bridge) TransferBrowse(d TransferBrowseDTO) (TransferListingDTO, error)
 }
 
 type TransferGetManyDTO struct {
-	URL          string   `json:"url"` // carpeta remota
-	Names        []string `json:"names"`
-	DestDir      string   `json:"destDir"`
-	CredentialID string   `json:"credentialId"`
-	HostKeys     []string `json:"acceptedHostKeys"`
-	Insecure     bool     `json:"insecure"`
-	MaxBytes     int64    `json:"maxBytes"`
-	Seconds      int      `json:"seconds"`
-	LegacySSH    bool     `json:"legacySsh"`
+	URL          string               `json:"url"` // carpeta remota
+	Names        []string             `json:"names"`
+	DestDir      string               `json:"destDir"`
+	CredentialID string               `json:"credentialId"`
+	HostKeys     []string             `json:"acceptedHostKeys"`
+	AcceptedKeys []AcceptedHostKeyDTO `json:"acceptedKeys"`
+	Insecure     bool                 `json:"insecure"`
+	MaxBytes     int64                `json:"maxBytes"`
+	Seconds      int                  `json:"seconds"`
+	LegacySSH    bool                 `json:"legacySsh"`
 }
 
 // emitTransfer traduce un evento del stream a los del puente: transfer:progress {runId, index, count, name,
@@ -377,7 +381,7 @@ func (b *Bridge) TransferGetAsync(d TransferGetDTO) (string, error) {
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).GetStream(ctx, &v1.GetStreamRequest{Request: &v1.GetRequest{Url: d.URL, DestDir: d.DestDir, Name: d.Name, CredentialId: d.CredentialID,
-		Sha256: d.SHA256, Md5: d.MD5, Sha512: d.SHA512, Insecure: d.Insecure, AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes,
+		Sha256: d.SHA256, Md5: d.MD5, Sha512: d.SHA512, Insecure: d.Insecure, AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys), MaxBytes: d.MaxBytes,
 		TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH}})
 	if err != nil {
 		b.finish(id, cancel)
@@ -397,7 +401,7 @@ func (b *Bridge) TransferPutAsync(d TransferPutDTO) (string, error) {
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).PutStream(ctx, &v1.PutStreamRequest{Request: &v1.PutRequest{Url: d.URL, FromDir: d.FromDir, Name: d.Name, CredentialId: d.CredentialID,
-		AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH}})
+		AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys), MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH}})
 	if err != nil {
 		b.finish(id, cancel)
 		return "", wrapErr(err)
@@ -418,7 +422,7 @@ func (b *Bridge) TransferGetMany(d TransferGetManyDTO) (string, error) {
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).GetMany(ctx, &v1.GetManyRequest{Url: d.URL, Names: d.Names, DestDir: d.DestDir, CredentialId: d.CredentialID,
-		AcceptedHostKeyFingerprints: d.HostKeys, Insecure: d.Insecure, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
+		AcceptedHostKeyFingerprints: d.HostKeys, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Insecure: d.Insecure, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
 	if err != nil {
 		b.finish(id, cancel)
 		return "", wrapErr(err)

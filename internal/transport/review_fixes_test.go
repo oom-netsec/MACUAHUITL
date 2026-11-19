@@ -66,7 +66,7 @@ func TestAcceptedChangedKeepsOldFingerprint(t *testing.T) {
 	k1, k2 := newKey(t), newKey(t)
 	kh.Add(hp, k1)
 	var ev []audit.Entry
-	kh.Callback(HostKeyPolicy{Accepted: map[string]bool{Fingerprint(k2): true}}, func(e audit.Entry) { ev = append(ev, e) })(hp, remote, k2)
+	kh.Callback(HostKeyPolicy{Accepted: acc(hp, k2)}, func(e audit.Entry) { ev = append(ev, e) })(hp, remote, k2)
 	if len(ev) != 1 || ev[0].Action != "hostkey.accepted_changed" || !strings.Contains(ev[0].Detail, Fingerprint(k1)) {
 		t.Fatalf("events = %+v", ev)
 	}

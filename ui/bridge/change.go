@@ -44,13 +44,13 @@ type CaptureDTO struct {
 
 var changePhases = map[string]v1.ChangePhase{"pre": v1.ChangePhase_CHANGE_PHASE_PRE, "post": v1.ChangePhase_CHANGE_PHASE_POST}
 
-func (b *Bridge) ChangeCapture(changeID, phase string, accept, exclude []string) (CaptureDTO, error) {
+func (b *Bridge) ChangeCapture(changeID, phase string, accept []string, acceptedKeys []AcceptedHostKeyDTO, exclude []string) (CaptureDTO, error) {
 	ph, ok := changePhases[phase]
 	if !ok {
 		return CaptureDTO{}, b.bridgeErr(i18n.New("bridge.err.phase", i18n.A("phase", phase)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (CaptureDTO, error) {
-		r, err := v1.NewChangeServiceClient(c).CaptureChange(ctx, &v1.CaptureChangeRequest{ChangeId: changeID, Phase: ph, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
+		r, err := v1.NewChangeServiceClient(c).CaptureChange(ctx, &v1.CaptureChangeRequest{ChangeId: changeID, Phase: ph, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys), ExcludedDeviceIds: exclude})
 		if err != nil {
 			return CaptureDTO{}, err
 		}

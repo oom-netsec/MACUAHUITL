@@ -38,7 +38,7 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 		nl := &xfer.NoListingError{Proto: "tftp", Reason: "TFTP no tiene comando para listar carpetas"}
 		return nil, noListing(ctx, nl)
 	}
-	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
+	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.AcceptedHostKeys, r.LegacySsh)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 		if err == nil {
 			idx, name := i, n
 			res, err = s.get(ctx, &v1.GetRequest{Url: batchURL(base, n), DestDir: dest, CredentialId: r.CredentialId, Insecure: r.Insecure,
-				AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, MaxBytes: r.MaxBytes, TimeoutSeconds: r.TimeoutSeconds, LegacySsh: r.LegacySsh},
+				AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, MaxBytes: r.MaxBytes, TimeoutSeconds: r.TimeoutSeconds, LegacySsh: r.LegacySsh},
 				func(p xfer.Progress) {
 					if pace.allow() {
 						ev.send(&v1.GetManyResponse{Event: progressEvent(idx, len(names), name, p)})
