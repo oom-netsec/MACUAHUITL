@@ -11,7 +11,9 @@ import type { PortStatus } from "../metrics/api";
 import { toFront } from "./front";
 import { FrontPanel } from "./FrontPanel";
 import "./ports.css";
-import { parseFingerprints, resolveAccepted } from "../../lib/hostkeys";
+import { hostKeyFromError, hostOfTarget, parseFingerprints, resolveAccepted, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { errInfo } from "../../lib/coreError";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
 
 type Shut = "" | "shut" | "noshut";
 
@@ -33,10 +35,27 @@ export function PortsView({ core }: { core: CoreAPI }) {
   const [active, setActive] = useState(false);
   const [planned, setPlanned] = useState(false);
   const front = useResult<PortStatus>();
+  const [hk, setHk] = useState<HostKeyInfo | null>(null);
   // Los puertos elegidos son los que están escritos en el campo Interfaces: el panel y el campo son una sola selección.
   const names = ifaces.split(/[\s,]+/).filter(Boolean);
   const toggle = (name: string) => setIfaces((names.includes(name) ? names.filter((n) => n !== name) : [...names, name]).join(", "));
 
+
+  // extra: pares (equipo, huella) aceptados con un clic, solo para este reintento (el campo de huellas es del plan asistido).
+  const readPorts = (extra: AcceptedKey[] = []) => {
+    setHk(null);
+    return front.run(async () => {
+      const d = targetOf(equipo, credId);
+      const keys = [...(pairs(d).acceptedKeys ?? []), ...extra];
+      try {
+        return await core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...(keys.length ? { acceptedKeys: keys } : {}) });
+      } catch (e) {
+        const info = hostKeyFromError(errorText(e), errInfo(e));
+        setHk(info && { ...info, host: hostOfTarget(d) }); // el par va atado al destino que se consultó
+        throw e;
+      }
+    });
+  };
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
@@ -66,15 +85,16 @@ export function PortsView({ core }: { core: CoreAPI }) {
       <AssistBanner active={active} />
       <Section title={t("ports.section.target")}>
         <div className="field-row">
-          <Field label={t("assist.device")} value={equipo} onChange={setEquipo} w="lg" mono />
+          <Field label={t("assist.device")} value={equipo} onChange={(v) => { setEquipo(v); setHk(null); }} w="lg" mono />
           <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
         </div>
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>
         <div className="actions">
-          <RunButton busy={front.busy} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred")]} onClick={() => front.run(() => { const d = targetOf(equipo, credId); return core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...pairs(d) }); })}>{t("ports.read")}</RunButton>
+          <RunButton busy={front.busy} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred")]} onClick={() => readPorts()}>{t("ports.read")}</RunButton>
         </div>
-        {front.error && <Notice kind="error">{front.error}</Notice>}
+        {front.error && !hk && <Notice kind="error">{front.error}</Notice>}
+        {hk && <HostKeyTrust items={[hk]} busy={front.busy} onTrust={readPorts} />}
         {front.data?.warnings.map((w) => <Notice key={w} kind="warn">{w}</Notice>)}
         {front.data && (front.data.ports.length
           ? <FrontPanel ports={front.data.ports.map(toFront)} selected={new Set(names)} onToggle={toggle} />

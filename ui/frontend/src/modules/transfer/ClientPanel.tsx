@@ -9,13 +9,16 @@ import type { CoreAPI } from "../../lib/core";
 import { ResultPanel, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { TransferResult } from "./api";
-import { absoluteSlash, buildURL, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
-import { hostKeyFromError } from "./validate";
+import { absoluteSlash, buildURL, sshTarget, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
+import { hostKeyFromError, hostOfTarget, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
 import { errInfo } from "../../lib/coreError";
 
 // El archivo bajado no tiene el hash esperado (xfer) o el publicado (SHA-512 de Cisco): se descartó.
 const DIGEST_REASONS = ["xfer.err.digest", "transfer.svc.sha512"];
 
+// Los pares aceptados con un clic se suman a los que ya salían del formulario; nunca van como lista suelta de huellas.
+const withKeys = <P extends { acceptedKeys?: AcceptedKey[] }>(p: P, extra: AcceptedKey[]): P => (extra.length ? { ...p, acceptedKeys: [...(p.acceptedKeys ?? []), ...extra] } : p);
 const label = (p: ClientProto) => p.toUpperCase();
 // Campos con error que viven dentro de «Opciones avanzadas».
 const advancedKeys = ["hash", "maxMB", "minutes"];
@@ -27,7 +30,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
     dir: "get", proto: "tftp", host: "", port: "", portTouched: false, path: "", cred: "", hash: "", name: "", destDir: "", src: "",
     accepted: "", maxMB: "", minutes: "", legacy: false, insecure: false,
   });
-  const set = (o: Partial<ClientForm>) => setF((x) => ({ ...x, ...o }));
+  const set = (o: Partial<ClientForm>) => { setPending(null); setF((x) => ({ ...x, ...o })); }; // la huella pendiente es de ese destino: si algo cambia, no se reintenta
   const [paste, setPaste] = useState("");
   const [pasteMsg, setPasteMsg] = useState<"" | "invalid" | "password">("");
   const [failed, setFailed] = useState(0); // envíos rechazados por validación: dispara el foco al primer campo inválido
@@ -37,7 +40,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [mismatch, setMismatch] = useState(false); // el hash no coincidió: por reason, o por el texto en español si no viene
-  const [pending, setPending] = useState<{ fp: string; changed: boolean } | null>(null);
+  const [pending, setPending] = useState<HostKeyInfo | null>(null);
   const [res, setRes] = useState<TransferResult | null>(null);
   useBusy(busy);
 
@@ -59,7 +62,8 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   };
   const pasteErr = pasteMsg === "password" ? t("transfer.err.urlPassword") : pasteMsg === "invalid" ? t("transfer.paste.err") : undefined;
 
-  const run = async (form: ClientForm) => {
+  // extra: pares (equipo, huella) aceptados solo para este reintento; no se guardan en el formulario.
+  const run = async (form: ClientForm, extra: AcceptedKey[] = []) => {
     setTried(true);
     const bad = Object.keys(clientErrors(form));
     if (bad.length) {
@@ -68,23 +72,19 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
     }
     setErr(""); setPending(null); setRes(null); setBusy(true);
     try {
-      setRes(await (form.dir === "get" ? core.transferGet(getParams(form)) : core.transferPut(putParams(form))));
+      setRes(await (form.dir === "get" ? core.transferGet(withKeys(getParams(form), extra)) : core.transferPut(withKeys(putParams(form), extra))));
     } catch (e) {
       const m = errorText(e);
       const info = errInfo(e);
       const hk = hostKeyFromError(m, info);
       setMismatch(info ? DIGEST_REASONS.includes(info.reason) : /no coincide/.test(m));
-      if (hk) setPending(hk); else setErr(m);
+      if (hk) setPending({ ...hk, host: hostOfTarget(sshTarget(form)) }); else setErr(m); // el par va atado al destino que se pidió
     } finally {
       setBusy(false);
     }
   };
   // Aceptar es un acto explícito del usuario sobre esa huella; se reintenta con ella y queda en la bitácora del núcleo.
-  const accept = () => {
-    const next = { ...f, accepted: [f.accepted.trim(), pending!.fp].filter(Boolean).join(" ") };
-    setF(next);
-    void run(next);
-  };
+  const accept = (keys: AcceptedKey[]) => void run(f, keys);
   const protos = f.dir === "put" ? putProtos : clientProtos;
   const showFix = tried && Object.keys(errors).length > 0;
   return (
@@ -134,13 +134,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
       {showFix && <Notice kind="error">{t("transfer.err.fix")}</Notice>}
       {busy && <p role="status" className="meta">{t("transfer.working")}</p>}
       {err && <Notice kind="error">{mismatch ? <>{t("transfer.mismatch")} {err}</> : err}</Notice>}
-      {pending && (
-        <Notice kind="warn">
-          <p>{pending.changed ? t("transfer.hostKey.changed") : t("transfer.hostKey.new")}</p>
-          <p><code>{pending.fp}</code></p>
-          <button type="button" onClick={accept}>{t("transfer.hostKey.accept")}</button>
-        </Notice>
-      )}
+      {pending && <HostKeyTrust items={[pending]} busy={busy} onTrust={accept} />}
     </Section>
       {res && (
         <ResultPanel pad title={t("transfer.result")} status={{ tone: "ok", label: res.verified === "ok" ? t("transfer.verified") : t("transfer.done") }}>

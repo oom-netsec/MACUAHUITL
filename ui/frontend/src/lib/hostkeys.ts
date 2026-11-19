@@ -53,3 +53,15 @@ export function hostKeyFromError(msg: string, info?: ErrInfo): HostKeyInfo | nul
   const m = /(?:llave de host (desconocida|cambiada)|(unknown|changed) host key).*?(SHA256:[A-Za-z0-9+/=]+)/.exec(msg);
   return m ? { fp: m[3], changed: (m[1] ?? m[2]) === "cambiada" || m[2] === "changed" } : null;
 }
+
+// Equipos que el Login Test rechazó por su llave de host (huella nueva o cambiada). Lo demás (auth, TCP…) no se acepta con una huella.
+interface LoginRow { target: string; passed: boolean; failedStep: string; fingerprint: string; reason?: string; args?: Record<string, string> }
+const HK_REASON = /^transport\.hostkey\.(unknown|changed)$/;
+// Paso HOST_KEY sin reason reconocible: se trata como llave cambiada (pide la casilla «Entiendo que cambió»).
+export function hostKeysFromLogin(rows: LoginRow[]): HostKeyInfo[] {
+  // El reason puede venir directo o como causa de otro (args.cause_reason), igual que en hostKeyFromError.
+  const hk = (l: LoginRow) => [l.reason, l.args?.cause_reason].find((r) => r && HK_REASON.test(r));
+  return rows
+    .filter((l) => !l.passed && l.fingerprint && (hk(l) || l.failedStep.endsWith("HOST_KEY")))
+    .map((l) => ({ fp: l.fingerprint, changed: hk(l) ? hk(l)!.endsWith("changed") : true, host: l.args?.host || l.target, keyType: l.args?.key_type || undefined }));
+}

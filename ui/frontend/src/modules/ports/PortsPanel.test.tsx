@@ -101,3 +101,30 @@ test("la huella aceptada viaja atada al equipo y su puerto", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Leer puertos (solo lectura)" }));
   expect(core.portStatus).toHaveBeenCalledWith({ device: "10.0.0.5", port: 2222, credentialId: "c1", acceptedHostKeys: ["SHA256:abc"], acceptedKeys: [{ host: "10.0.0.5:2222", fingerprint: "SHA256:abc" }] });
 });
+
+const hkErr = (reason: string) => Object.assign(new Error("transport: llave de host"), { cause: { code: "FailedPrecondition", reason, metadata: { host: "otro-nombre:22", fingerprint: "SHA256:AbC123+/x", key_type: "ssh-ed25519" } } });
+
+test("una huella nueva en Leer puertos se muestra y no se reintenta hasta «Confiar y reintentar»", async () => {
+  const portStatus = vi.fn().mockRejectedValueOnce(hkErr("transport.hostkey.unknown")).mockResolvedValueOnce(live);
+  await read({ portStatus });
+  expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
+  expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub")).toBeInTheDocument();
+  expect(portStatus).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Gi1/0/14, conectado, VLAN 20" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
+  expect(await screen.findByRole("button", { name: "Gi1/0/14, conectado, VLAN 20" })).toBeInTheDocument();
+  expect(portStatus).toHaveBeenLastCalledWith({ device: "10.0.0.5", port: 2222, credentialId: "c1", acceptedHostKeys: [], acceptedKeys: [{ host: "10.0.0.5:2222", fingerprint: "SHA256:AbC123+/x" }] }); // un par con el destino, nunca la lista suelta
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+});
+
+test("una huella cambiada en Leer puertos muestra el aviso de peligro", async () => {
+  await read({ portStatus: vi.fn().mockRejectedValue(hkErr("transport.hostkey.changed")) });
+  expect(await screen.findByRole("alert")).toHaveTextContent("CAMBIÓ");
+});
+
+test("si se cambia el equipo, la huella pendiente desaparece: no se reintenta contra otro con la huella del primero", async () => {
+  await read({ portStatus: vi.fn().mockRejectedValue(hkErr("transport.hostkey.unknown")) });
+  expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "9");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+});

@@ -1,4 +1,4 @@
-import { hostKeyFromError, keygenCommands, parseFingerprints, resolveAccepted } from "./hostkeys";
+import { hostKeyFromError, hostKeysFromLogin, keygenCommands, parseFingerprints, resolveAccepted } from "./hostkeys";
 
 const b64 = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
 
@@ -58,4 +58,23 @@ test("resolveAccepted: EQUIPO=HUELLA y EQUIPO:PUERTO=HUELLA, repetibles, valen c
   // Una suelta mezclada con pares sigue siendo ambigua; una huella que no es SHA-256 se descarta.
   expect(resolveAccepted(`10.0.0.1=${b64} ${b64}`, two)).toMatchObject({ ambiguous: true });
   expect(resolveAccepted("10.0.0.1=MD5:aa:bb =SHA256:x", two)).toEqual({ keys: [], ambiguous: false });
+});
+
+test("hostKeysFromLogin toma solo los equipos rechazados por llave de host, con tipo y cambio por reason", () => {
+  const row = (o: object) => ({ target: "10.0.0.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:aaa", ...o });
+  expect(hostKeysFromLogin([
+    row({}),
+    row({ target: "10.0.0.2:22", fingerprint: "SHA256:bbb", reason: "transport.hostkey.changed", args: { key_type: "ssh-ed25519", host: "10.0.0.2:22" } }),
+    row({ target: "10.0.0.3:22", fingerprint: "", failedStep: "LOGIN_TEST_STEP_AUTH" }),
+    row({ target: "10.0.0.4:22", passed: true, failedStep: "LOGIN_TEST_STEP_UNSPECIFIED", fingerprint: "SHA256:ccc" }),
+    row({ target: "10.0.0.5:22", failedStep: "LOGIN_TEST_STEP_AUTH", fingerprint: "SHA256:ddd" }),
+  ])).toEqual([
+    { fp: "SHA256:aaa", changed: true, host: "10.0.0.1:22" }, // paso HOST_KEY sin reason: se trata como cambiada (pide la casilla)
+    { fp: "SHA256:bbb", changed: true, host: "10.0.0.2:22", keyType: "ssh-ed25519" },
+  ]);
+});
+
+test("hostKeysFromLogin lee el reason envuelto (args.cause_reason) igual que hostKeyFromError", () => {
+  const row = { target: "10.0.0.2:22", passed: false, failedStep: "LOGIN_TEST_STEP_AUTH", detail: "", platform: "", fingerprint: "SHA256:bbb", reason: "login.failed", args: { cause_reason: "transport.hostkey.changed" } };
+  expect(hostKeysFromLogin([row])).toEqual([{ fp: "SHA256:bbb", changed: true, host: "10.0.0.2:22" }]);
 });
