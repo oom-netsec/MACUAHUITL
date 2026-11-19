@@ -7,7 +7,7 @@ import { ExportMenu } from "../../components/Files";
 import { tableCsv, tableMarkdown } from "../../lib/tableExport";
 import type { AnalysisReport, AnalysisWarning, CoreAPI, DiffReport, Severity, TimelineEvent, TimelineReport } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult } from "../../components/Page";
 import { useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { vocab } from "../../lib/vocab";
@@ -212,9 +212,10 @@ export function AnalysisView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("analysis.title")} description={t("analysis.desc")}
       tabs={<Tabs label={t("analysis.view")} value={sub} onChange={setSub} tabs={subs.map(([s, k]) => [s, t(k)])} />}>
-      {sub === "findings" && <Findings core={core} job={job} device={device} head={head} />}
-      {sub === "diff" && <Diff core={core} job={job} device={device} head={head} />}
-      {sub === "timeline" && <Timeline core={core} job={job} device={device} head={head} />}
+      <TabPanels value={sub} render={(s) => {
+        const P = { findings: Findings, diff: Diff, timeline: Timeline }[s];
+        return <P core={core} job={job} device={device} head={head} />;
+      }} />
     </Page>
   );
 }

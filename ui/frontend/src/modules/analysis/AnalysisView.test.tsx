@@ -1,3 +1,4 @@
+import { shown } from "../../test-utils";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AnalysisView } from "./AnalysisView";
@@ -18,7 +19,7 @@ const report: AnalysisReport = {
 };
 
 async function typeJob() {
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
 }
 
 test("hallazgos agrupados por severidad con evidencia expandible", async () => {
@@ -102,7 +103,7 @@ test("línea de tiempo con ventana de correlación alrededor de un evento", asyn
   render(<AnalysisView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "Línea de tiempo" }));
   await typeJob();
-  await userEvent.type(screen.getByLabelText("Equipo (opcional)"), "RTR2");
+  await userEvent.type(shown("Equipo (opcional)"), "RTR2");
   await userEvent.type(screen.getByLabelText("Captura pcap (opcional, ruta absoluta)"), "/c.pcap");
   await userEvent.click(screen.getByRole("button", { name: "Ver línea de tiempo" }));
   expect(core.analysisTimeline).toHaveBeenLastCalledWith("/o/lab", "", 30, "RTR2", "/c.pcap");
@@ -113,4 +114,13 @@ test("línea de tiempo con ventana de correlación alrededor de un evento", asyn
   await userEvent.click(within(rows[1]).getByRole("button", { name: /±30 s/ }));
   await waitFor(() => expect(core.analysisTimeline).toHaveBeenLastCalledWith("/o/lab", "2026-11-04T10:09:18.64Z", 30, "RTR2", "/c.pcap"));
   expect(screen.getByLabelText("Alrededor de (RFC 3339)")).toHaveValue("2026-11-04T10:09:18.64Z");
+});
+
+test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
+  render(<AnalysisView core={fakeCore()} />);
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
+  await userEvent.click(screen.getByRole("tab", { name: "Diferencias" }));
+  expect(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" })).toHaveValue("/o/lab");
+  await userEvent.click(screen.getByRole("tab", { name: /^Hallazgos/ }));
+  expect(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" })).toHaveValue("/o/lab");
 });

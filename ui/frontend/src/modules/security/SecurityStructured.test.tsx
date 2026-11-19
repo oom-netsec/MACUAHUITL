@@ -1,3 +1,4 @@
+import { shown } from "../../test-utils";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SecurityView } from "./SecurityView";
@@ -6,10 +7,10 @@ import type { IkeReportData, RadiusReportData, TacacsReportData, PkiReportData }
 
 // Fase 30b: las tarjetas salen del informe estructurado; si el método nuevo falla, del texto de siempre.
 async function fillRadius() {
-  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "a");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "p");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "10.0.0.20");
+  await userEvent.type(shown("Secreto compartido"), "s");
+  await userEvent.type(shown("Usuario de prueba"), "a");
+  await userEvent.type(shown("Contraseña de prueba"), "p");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
 }
 
@@ -127,10 +128,10 @@ test("tacacs usa el informe estructurado", async () => {
   const core = fakeCore({ secTacacsReport: vi.fn(async () => rep), secTacacs: vi.fn(async () => "no debe llamarse") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
-  await userEvent.type(screen.getByLabelText("Servidor"), "h");
-  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s");
-  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "a");
-  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "p");
+  await userEvent.type(screen.getByRole("textbox", { name: "Servidor" }), "h");
+  await userEvent.type(shown("Secreto compartido"), "s");
+  await userEvent.type(shown("Usuario de prueba"), "a");
+  await userEvent.type(shown("Contraseña de prueba"), "p");
   await userEvent.click(screen.getByRole("button", { name: "Probar" }));
   expect(await screen.findByText("service=shell")).toBeInTheDocument();
   expect(core.secTacacs).not.toHaveBeenCalled();
@@ -142,7 +143,7 @@ test("decodificar certificado usa el informe estructurado y muestra autofirmado 
   const core = fakeCore({ secPkiDecodeReport: vi.fn(async () => rep), secPkiDecode: vi.fn(async () => "no debe llamarse") });
   render(<SecurityView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
-  await userEvent.type(screen.getByLabelText("Certificado o CSR a decodificar"), "PEM");
+  await userEvent.type(shown("Certificado o CSR a decodificar"), "PEM");
   await userEvent.click(screen.getByRole("button", { name: "Decodificar certificado" }));
   expect(await screen.findByText("Autofirmado")).toBeInTheDocument();
   expect(screen.getByText("digitalSignature, serverAuth")).toBeInTheDocument();

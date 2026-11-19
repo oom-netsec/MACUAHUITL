@@ -185,3 +185,11 @@ test("vlsm: franjas apiladas por subred con su proporción, y el espacio libre",
   // La tabla del núcleo sigue siendo el equivalente en texto.
   expect(screen.getByRole("table", { name: "VLSM sobre 10.0.0.0/24" })).toBeInTheDocument();
 });
+
+test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
+  render(<CalcView core={fakeCore()} />);
+  await userEvent.type(screen.getByLabelText(/^Prefijo/), "10.0.0.1/31");
+  await userEvent.click(screen.getByRole("tab", { name: "VLSM" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Subred" }));
+  expect(screen.getByLabelText(/^Prefijo/)).toHaveValue("10.0.0.1/31");
+});

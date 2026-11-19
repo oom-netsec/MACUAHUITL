@@ -57,6 +57,14 @@ export function Tabs<T extends string>({ label, value, onChange, tabs }: { label
   );
 }
 
+// Subvistas que conservan su estado: se montan al visitarlas y después solo se ocultan (hidden), como los módulos de App.
+export function TabPanels<T extends string>({ value, render }: { value: T; render: (id: T) => ReactNode }) {
+  const [seen, setSeen] = useState<T[]>([value]);
+  const all = seen.includes(value) ? seen : [...seen, value];
+  if (all !== seen) setSeen(all);
+  return <>{all.map((id) => <div key={id} className="tab-panel" hidden={id !== value}>{render(id)}</div>)}</>;
+}
+
 // Una llamada al núcleo con su estado: ocupado, último resultado y error legible. Reemplaza los useReport de cada módulo.
 export function useResult<T>() {
   const [s, setS] = useState<{ busy: boolean; data: T | null; error: string }>({ busy: false, data: null, error: "" });

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ForensicView } from "./ForensicView";
 import { PatternsSection } from "./PatternsSection";
@@ -307,4 +307,30 @@ test("memoria: con miles de procesos solo se dibujan las filas visibles", async 
   const table = await screen.findByRole("table", { name: "Procesos con memoria creciente" });
   expect(table).toHaveAttribute("aria-rowcount", "1501");
   expect(within(table).getAllByRole("row").length).toBeLessThan(100);
+});
+
+test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
+  render(<ForensicView core={fakeCore()} />);
+  await userEvent.type(screen.getByLabelText("Mnemónico o patrón"), "%SYS");
+  await userEvent.click(screen.getByRole("tab", { name: "Flapping" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Mensajes" }));
+  expect(screen.getByLabelText("Mnemónico o patrón")).toHaveValue("%SYS");
+});
+
+test("syslog en vivo: oculta la subpestaña no relee; al volver, sí", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const core = fakeCore({ forensicPatterns: vi.fn(async () => prep([])) });
+    const { rerender } = render(<PatternsSection core={core} refreshMs={1000} active />);
+    await userEvent.selectOptions(screen.getByLabelText("Fuente"), "capture");
+    await userEvent.click(screen.getByLabelText(/En vivo: releer la captura/));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(core.forensicPatterns).toHaveBeenCalledTimes(1);
+    rerender(<PatternsSection core={core} refreshMs={1000} active={false} />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(core.forensicPatterns).toHaveBeenCalledTimes(1);
+    rerender(<PatternsSection core={core} refreshMs={1000} active />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(core.forensicPatterns).toHaveBeenCalledTimes(2);
+  } finally { vi.useRealTimers(); }
 });

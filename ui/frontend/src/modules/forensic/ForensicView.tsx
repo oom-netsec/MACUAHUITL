@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
-import { Page, Tabs } from "../../components/Page";
+import { Page, TabPanels, Tabs } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import { CrashSection } from "./CrashSection";
 import { DebugSection } from "./DebugSection";
@@ -19,12 +19,10 @@ export function ForensicView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("forensic.title")} description={t("forensic.desc")}
       tabs={<Tabs label={t("forensic.sections")} value={sec} onChange={setSec} tabs={sections.map((s) => [s, t(`forensic.sec.${s}`)])} />}>
-      {sec === "msg" && <MsgSection core={core} />}
-      {sec === "crash" && <CrashSection core={core} />}
-      {sec === "patterns" && <PatternsSection core={core} />}
-      {sec === "flap" && <FlapSection core={core} />}
-      {sec === "debug" && <DebugSection core={core} />}
-      {sec === "leak" && <LeakSection core={core} />}
+      <TabPanels value={sec} render={(s) => {
+        const P = { msg: MsgSection, crash: CrashSection, flap: FlapSection, debug: DebugSection, leak: LeakSection }[s as Exclude<Section, "patterns">];
+        return s === "patterns" ? <PatternsSection core={core} active={sec === "patterns"} /> : <P core={core} />;
+      }} />
     </Page>
   );
 }

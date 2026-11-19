@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { vocab } from "../../lib/vocab";
 import type { CapacityResult, CoreAPI, FindResult, HealthResult, InventoryResult, PathResult, SummaryResult, TraceResult } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
-import { EmptyState, Page, ResultPanel, Tabs, useResult } from "../../components/Page";
+import { EmptyState, Page, ResultPanel, TabPanels, Tabs, useResult } from "../../components/Page";
 import { useLang, useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import { formatDateTime } from "../../components/Data";
@@ -101,6 +101,7 @@ function Found({ core, q, setQ }: { core: CoreAPI; q: string; setQ: (v: string) 
 function Trace({ core, initial }: { core: CoreAPI; initial: string }) {
   const t = useT();
   const [q, setQ] = useState(initial);
+  useEffect(() => { setQ(initial); }, [initial]); // la subvista sigue montada: toma la búsqueda del padre (la de Búsqueda o la que llega del menú de equipo), como antes al remontar
   const tr = useResult<TraceResult>();
   const r = tr.data;
   const hops = r?.hops ?? [];
@@ -347,13 +348,12 @@ export function FleetView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("fleet.title")} description={t("fleet.intro")}
       tabs={<Tabs label={t("fleet.nav")} value={sub} onChange={setSub} tabs={subs.map((s) => [s, t(`fleet.sub.${s}`)])} />}>
-      {sub === "result" && <Found core={core} q={q} setQ={setQ} />}
-      {sub === "trace" && <Trace core={core} initial={q} />}
-      {sub === "path" && <Path core={core} />}
-      {sub === "health" && <Health core={core} />}
-      {sub === "summary" && <Summary core={core} />}
-      {sub === "capacity" && <Capacity core={core} />}
-      {sub === "inventory" && <Inventory core={core} />}
+      <TabPanels value={sub} render={(s) => {
+        if (s === "result") return <Found core={core} q={q} setQ={setQ} />;
+        if (s === "trace") return <Trace core={core} initial={q} />;
+        const P = { path: Path, health: Health, summary: Summary, capacity: Capacity, inventory: Inventory }[s];
+        return <P core={core} />;
+      }} />
     </Page>
   );
 }

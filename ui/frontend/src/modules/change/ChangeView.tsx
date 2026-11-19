@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
 import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
-import { Badge, EmptyState, Page, ResultPanel, Section, Tabs, useResult, type Tone } from "../../components/Page";
+import { Badge, EmptyState, Page, ResultPanel, Section, TabPanels, Tabs, useResult, type Tone } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
@@ -31,7 +31,7 @@ function worst(devs: DeviceReport[], t: (k: Key) => string): { tone: Tone; label
   return { tone: verdictTone[v], label: t(verdictKey[v]) };
 }
 
-function PrePost({ core }: { core: CoreAPI }) {
+function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
   const t = useT();
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
@@ -51,7 +51,7 @@ function PrePost({ core }: { core: CoreAPI }) {
   const [unmasked, setUnmasked] = useState(false);
 
   const refresh = () => core.listChanges().then(setChanges).catch((e) => setErr(errorText(e)));
-  useEffect(() => { refresh(); }, [core]);
+  useEffect(() => { if (active) refresh(); }, [core, active]); // la subvista sigue montada: al volver a ella se relee (una captura pudo terminar)
 
   const guard = async (f: () => Promise<void>) => {
     setErr(""); setMsg(null);
@@ -248,9 +248,7 @@ export function ChangeView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("nav.change")} description={t("change.desc")}
       tabs={<Tabs label={t("change.tool")} value={sub} onChange={setSub} tabs={subs.map(([s, l]) => [s, t(l)] as [Sub, string])} />}>
-      {sub === "prepost" && <PrePost core={core} />}
-      {sub === "upgrade" && <Upgrade core={core} />}
-      {sub === "compliance" && <Compliance core={core} />}
+      <TabPanels value={sub} render={(s) => s === "prepost" ? <PrePost core={core} active={sub === "prepost"} /> : s === "upgrade" ? <Upgrade core={core} /> : <Compliance core={core} />} />
       <AssistBanner active={active} />
       {liveErr && <Notice kind="error">{liveErr}</Notice>}
       {live && <AssistExecution core={core} plan={null} onStarted={() => {}} onActive={setActiveLive} onError={setLiveErr} />}

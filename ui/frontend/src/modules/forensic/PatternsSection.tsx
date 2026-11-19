@@ -15,7 +15,7 @@ const SHOW_STEP = 100;
 
 // Syslog inteligente: agrupa por patrón (números, interfaces y direcciones normalizados), cuenta y marca ráfagas.
 // refreshMs: cada cuánto se vuelve a leer la captura del receptor syslog cuando se pide «en vivo».
-export function PatternsSection({ core, refreshMs = 10_000 }: { core: CoreAPI; refreshMs?: number }) {
+export function PatternsSection({ core, active = true, refreshMs = 10_000 }: { core: CoreAPI; active?: boolean; refreshMs?: number }) {
   const t = useT();
   const [src, setSrc] = useState<SourceState>(emptySource);
   const [burst, setBurst] = useState("5");
@@ -42,10 +42,10 @@ export function PatternsSection({ core, refreshMs = 10_000 }: { core: CoreAPI; r
   const runRef = useRef(run);
   runRef.current = run;
   useEffect(() => {
-    if (!liveOn) return;
+    if (!liveOn || !active) return; // oculta (otra subpestaña): no relee
     const id = setInterval(() => { void runRef.current(); }, refreshMs);
     return () => clearInterval(id);
-  }, [liveOn, refreshMs]);
+  }, [liveOn, active, refreshMs]);
   return (
     <>
       <Intro text={t("forensic.pat.intro")} />
