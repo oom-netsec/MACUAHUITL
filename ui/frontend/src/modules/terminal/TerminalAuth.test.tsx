@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TerminalView } from "./TerminalView";
 import { fakeCore } from "../../lib/fake";
@@ -287,4 +287,56 @@ test.each([
   expect(req).toMatchObject({ hostId: sampleHosts[0].id, ...want });
   expect(req).not.toHaveProperty("credentialId");
   expect(req).not.toHaveProperty("address");
+});
+
+// ---- Segunda revisión (47t-6b) ----
+const frames = async () => { await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); await new Promise((r) => requestAnimationFrame(() => r(null))); }); };
+const splitWithPrompts = async () => {
+  const core = await sessionWithPrompt();
+  (core.terminalOpen as ReturnType<typeof vi.fn>).mockResolvedValueOnce("t2");
+  await userEvent.click(screen.getByText("Nueva sesión"));
+  await abrir("192.0.2.2");
+  await userEvent.click(screen.getAllByRole("tab")[0]);
+  await userEvent.click(screen.getByLabelText("Dividir"));
+  await waitFor(() => expect(FakeTerm.all.length).toBe(2));
+  act(() => { core.emitTerminal(prompt); core.emitTerminal({ ...prompt, runId: "t2" }); });
+  await screen.findAllByRole("form");
+  return core;
+};
+
+test("vista dividida: llega done al panel de foco mientras se teclea en el buscador, el foco no se roba", async () => {
+  const core = await splitWithPrompts();
+  await userEvent.click(screen.getAllByRole("form")[0]); // el panel izquierdo es el de foco
+  const right = screen.getByRole("searchbox");
+  right.focus();
+  FakeTerm.all.forEach((t) => t.focus.mockClear());
+  act(() => core.emitTerminal({ runId: "t1", done: true }));
+  await frames();
+  expect(right).toHaveFocus();
+  expect(FakeTerm.all[0].focus).not.toHaveBeenCalled();
+});
+
+test("vista dividida: al contestar en el panel derecho, el foco vuelve a su terminal", async () => {
+  const core = await splitWithPrompts();
+  const right = within(screen.getAllByRole("form")[1]).getByLabelText("Verification code:");
+  await userEvent.click(right); // el panel derecho pasa a ser el de foco
+  FakeTerm.all.forEach((t) => t.focus.mockClear());
+  const form = screen.getAllByRole("form")[1];
+  await userEvent.type(right, OTP);
+  await userEvent.type(within(form).getByLabelText("Password:"), `${SECRET}{Enter}`);
+  await waitFor(() => expect(core.terminalAnswer).toHaveBeenCalledWith("t2", 1, expect.anything()));
+  await frames();
+  expect(FakeTerm.all[1].focus).toHaveBeenCalled();
+});
+
+test("llave CAMBIADA: otra huella sobre el mismo botón llega con la casilla sin marcar", async () => {
+  const mk = (fp: string) => ({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.changed", metadata: { host: "192.0.2.1", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } });
+  const core = await sessionWithPrompt();
+  act(() => core.emitTerminal(mk("AAAA")));
+  await userEvent.click(await screen.findByLabelText("Entiendo que la llave de este equipo cambió"));
+  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeEnabled();
+  act(() => core.emitTerminal(mk("BBBB")));
+  await frames();
+  expect(screen.getByLabelText("Entiendo que la llave de este equipo cambió")).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeDisabled();
 });
