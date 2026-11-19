@@ -1,4 +1,5 @@
 import { Advanced } from "../../components/Advanced";
+import { RunButton } from "../../components/RunButton";
 import { useState, type ReactNode } from "react";
 import { showHidden } from "../../lib/safeText";
 import { Terminal } from "../../components/Terminal";
@@ -20,7 +21,6 @@ const subs: [Sub, Key][] = [["findings", "analysis.sub.findings"], ["diff", "ana
 const sevs: [Severity, Key][] = [["critica", "analysis.sev.critica"], ["alta", "analysis.sev.alta"], ["media", "analysis.sev.media"], ["baja", "analysis.sev.baja"], ["info", "analysis.sev.info"]];
 const sevName = Object.fromEntries(sevs) as Record<Severity, Key>;
 
-const runKbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
 
 // Antes de la primera consulta: el análisis sale de un trabajo de Patrol terminado.
 function NoRun() {
@@ -60,7 +60,7 @@ function Findings({ core, job, device, head }: { core: CoreAPI; job: string; dev
           <Field label={t("analysis.round")} type="number" value={round} onChange={setRound} w="sm" />
         </Advanced>
       </Section>
-      <div className="actions"><button className="primary" disabled={!job || q.busy} aria-busy={q.busy} onClick={() => q.run(() => core.analysisRun(job, Number(round) || 0, device))}>{t("analysis.run")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={q.busy} missing={[!job && t("need.job")]} onClick={() => q.run(() => core.analysisRun(job, Number(round) || 0, device))}>{t("analysis.run")}</RunButton></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!r && !q.error && <NoRun />}
       {r && (
@@ -110,7 +110,7 @@ function Diff({ core, job, device, head }: { core: CoreAPI; job: string; device:
           <Field label={t("analysis.roundB")} type="number" value={to} onChange={setTo} w="sm" />
         </div>
       </Section>
-      <div className="actions"><button className="primary" disabled={!job || q.busy} aria-busy={q.busy} onClick={() => q.run(() => core.analysisDiff(job, Number(from), Number(to), device))}>{t("analysis.compare")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={q.busy} missing={[!job && t("need.job")]} onClick={() => q.run(() => core.analysisDiff(job, Number(from), Number(to), device))}>{t("analysis.compare")}</RunButton></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!q.data && !q.error && <NoRun />}
       {q.data?.devices.map((d) => (
@@ -187,7 +187,7 @@ function Timeline({ core, job, device, head }: { core: CoreAPI; job: string; dev
           <Field label={t("analysis.tl.pcap")} hint={t("analysis.tl.note")} value={pcap} onChange={setPcap} w="full" mono />
         </Advanced>
       </Section>
-      <div className="actions"><button className="primary" disabled={!job || q.busy} aria-busy={q.busy} onClick={() => load(around)}>{t("analysis.tl.view")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={q.busy} missing={[!job && t("need.job")]} onClick={() => load(around)}>{t("analysis.tl.view")}</RunButton></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!q.data && !q.error && <NoRun />}
       {q.data && (

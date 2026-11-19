@@ -141,3 +141,14 @@ test("exportar: nombre, descripción, autor y licencia van en «Metadatos (opcio
   await userEvent.click(within(d).getByRole("button", { name: "Exportar" }));
   await waitFor(() => expect(exp).toHaveBeenCalledWith(expect.objectContaining({ author: "Yo", license: "MIT", name: "", description: "" })));
 });
+
+test("exportar nombra el editor y la selección que faltan y deja de hacerlo al completarlos", async () => {
+  const { d } = await openExport();
+  const go = within(d).getByRole("button", { name: "Exportar" });
+  expect(go).toHaveAccessibleDescription("Falta: indicar un editor válido, elegir al menos un script o los playbooks.");
+  await userEvent.type(within(d).getByLabelText(/Editor y nombre/), "yo/mis");
+  expect(go).toHaveAccessibleDescription("Falta: elegir al menos un script o los playbooks.");
+  await userEvent.click(await within(d).findByRole("checkbox", { name: /Mi script/ }));
+  expect(go).toBeEnabled();
+  expect(go).not.toHaveAccessibleDescription();
+});

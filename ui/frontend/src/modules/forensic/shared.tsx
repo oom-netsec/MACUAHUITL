@@ -62,6 +62,9 @@ export function toSource(s: SourceState): LogSource | null {
   }
 }
 
+// Lo que falta de la fuente elegida (vacío si ya sirve).
+export const sourceMissing = (t: (k: "need.text" | "need.path" | "need.job") => string, s: SourceState) => !toSource(s) && t(s.kind === "path" ? "need.path" : s.kind === "job" ? "need.job" : "need.text");
+
 // SourcePicker elige de dónde salen los mensajes: texto pegado, archivo local, captura del receptor syslog o show logging de un trabajo de Patrol.
 export function SourcePicker({ value, onChange }: { value: SourceState; onChange: (s: SourceState) => void }) {
   const t = useT();

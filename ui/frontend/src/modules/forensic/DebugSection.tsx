@@ -1,4 +1,5 @@
 import { plural } from "../../lib/plural";
+import { RunButton } from "../../components/RunButton";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Advanced } from "../../components/Advanced";
@@ -7,7 +8,7 @@ import { ResultPanel, Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import type { DebugGroup, DebugReport } from "./api";
-import { FirstRun, Intro, Warnings, runKbd } from "./shared";
+import { FirstRun, Intro, Warnings } from "./shared";
 import { DataTable, type Column } from "../../components/DataTable";
 
 // Filtro de debugs: agrupa las líneas repetidas, oculta el ruido y marca las anomalías. Solo texto o archivo: sin conexión en vivo.
@@ -44,7 +45,7 @@ export function DebugSection({ core }: { core: CoreAPI }) {
           <Field label={t("forensic.debug.rareMax")} type="number" value={rareMax} onChange={setRareMax} w="sm" />
         </div>
       </Advanced>
-      <div className="actions"><button className="primary" disabled={(!text.trim() && !path.trim()) || q.busy} aria-busy={q.busy} onClick={run}>{t("forensic.debug.btn")}{runKbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={q.busy} onClick={run} missing={[!text.trim() && !path.trim() && t("need.textOrPath")]}>{t("forensic.debug.btn")}</RunButton></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && <FirstRun what="forensic.empty.debug" />}
       {rep && (

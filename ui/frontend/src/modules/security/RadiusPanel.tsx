@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { Check, Field, Select } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
@@ -6,7 +7,7 @@ import { useT } from "../../lib/i18n";
 import type { RadiusReportData } from "./api";
 import { useForm } from "../../lib/useForm";
 import { ResultCards } from "./SecCards";
-import { kbd, Outcome, probe, Raw, type Probe } from "./shared";
+import { Outcome, probe, Raw, type Probe } from "./shared";
 import { useSecrets } from "./useSecrets";
 
 const portTypes = (none: string): [string, string][] => [["ethernet", "Ethernet (15)"], ["wireless-802.11", "Wireless-802.11 (19)"], ["virtual", "Virtual (5)"], ["async", "Async (0)"], ["", none]];
@@ -69,7 +70,7 @@ export function RadiusPanel({ core }: { core: CoreAPI }) {
         </Advanced>
       )}
       <p className="hint">{t("security.radiusNote")}</p>
-      <div className="actions"><button className="primary" disabled={!f.host || !s.ready(!f.statusServer) || r.busy} aria-busy={r.busy} onClick={go}>{t("security.test")}{kbd}</button></div>
+      <div className="actions"><RunButton primary kbd busy={r.busy} onClick={go} missing={[!f.host && t("need.target"), ...s.missing(!f.statusServer)]}>{t("security.test")}</RunButton></div>
       <Outcome r={r} bare empty={t("security.radius.empty")}>{r.data && <ResultCards kind="radius" text={r.data.text} report={r.data.report} fallback={<Raw text={r.data.text} />} />}</Outcome>
     </>
   );

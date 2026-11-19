@@ -1,9 +1,10 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Check, Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import { useForm } from "../../lib/useForm";
-import { kbd, useCalc } from "./shared";
+import { useCalc } from "./shared";
 
 const layerKinds = (t: ReturnType<typeof useT>): [string, string][] => [
   ["gre", "GRE (24)"], ["gre-key", t("calc.layer.greKey")], ["esp-tunnel", t("calc.layer.espTunnel")], ["esp-transport", t("calc.layer.espTransport")],
@@ -46,7 +47,7 @@ export function MtuPanel({ core }: { core: CoreAPI }) {
       </Section>
       <Check label={t("calc.mtu.inner6")} checked={inner6} onChange={set("inner6")} />
       <div className="actions">
-        <button className="primary" disabled={layers.length === 0 || c.busy} aria-busy={c.busy} onClick={() => c.run("mtu", { physical: Number(physical) || 0, layers, innerIpv6: inner6 })}>{t("calc.mtu.btn")}{kbd}</button>
+        <RunButton primary kbd busy={c.busy} missing={[layers.length === 0 && t("need.layers")]} onClick={() => c.run("mtu", { physical: Number(physical) || 0, layers, innerIpv6: inner6 })}>{t("calc.mtu.btn")}</RunButton>
       </div>
       {c.view}
     </>

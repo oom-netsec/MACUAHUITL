@@ -1,4 +1,5 @@
 import { Advanced } from "../../components/Advanced";
+import { RunButton } from "../../components/RunButton";
 import { useState } from "react";
 import { showHidden } from "../../lib/safeText";
 import type { CoreAPI, DriftReport } from "../../lib/core";
@@ -31,8 +32,8 @@ export function DriftView({ core }: { core: CoreAPI }) {
         </div>
       </Advanced>
       <div className="actions">
-        <button className="primary" disabled={!job.trim() || q.busy} aria-busy={q.busy}
-          onClick={() => q.run(() => core.driftRun(job.trim(), Number(round) || 0, device.trim()))}>{t("drift.btn")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+        <RunButton primary kbd busy={q.busy} missing={[!job.trim() && t("need.job")]}
+          onClick={() => q.run(() => core.driftRun(job.trim(), Number(round) || 0, device.trim()))}>{t("drift.btn")}</RunButton>
       </div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {!rep && !q.error && (

@@ -1,11 +1,12 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { Field, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import { useForm } from "../../lib/useForm";
-import { kbd, list, Outcome } from "./shared";
+import { list, Outcome } from "./shared";
 import { algorithms, type Pem } from "./pki";
 
 interface CsrForm {
@@ -41,8 +42,8 @@ export function CsrCard({ core }: { core: CoreAPI }) {
           <Field label={t("security.keyPassword")} type="password" value={f.keyPassword} onChange={set("keyPassword")} autoComplete="new-password" w="md" />
         </div>
         <div className="actions">
-          <button className="primary" disabled={!f.cn || !f.keyPassword || r.busy} aria-busy={r.busy}
-            onClick={() => { void r.run(() => core.secPkiCsr({ cn: f.cn, o: f.o, ou: f.ou, l: f.l, st: f.st, c: f.c, dns: list(f.dns), ips: list(f.ips), algorithm: f.sealedKey ? "" : f.algorithm, sealedKey: f.sealedKey, keyPassword: f.keyPassword })); set("keyPassword")(""); }}>{t("security.csr.generate")}{kbd}</button>
+          <RunButton primary kbd busy={r.busy} missing={[!f.cn && t("need.cn"), !f.keyPassword && t("need.keyPassword")]}
+            onClick={() => { void r.run(() => core.secPkiCsr({ cn: f.cn, o: f.o, ou: f.ou, l: f.l, st: f.st, c: f.c, dns: list(f.dns), ips: list(f.ips), algorithm: f.sealedKey ? "" : f.algorithm, sealedKey: f.sealedKey, keyPassword: f.keyPassword })); set("keyPassword")(""); }}>{t("security.csr.generate")}</RunButton>
         </div>
       </Section>
       <Outcome r={r}>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, VaultBackupAction, VaultBackupPreview, VaultBackupResult, VaultBackupState } from "../../lib/core";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Badge, ResultPanel, Section, type Tone } from "../../components/Page";
@@ -78,13 +79,13 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
       {sshKeys > 0 && <Notice kind="warn">{t("vault.backup.keys.before", { n: String(sshKeys) })}</Notice>}
       <Check label={t("vault.backup.confirm")} checked={sure} onChange={setSure} />
       <div className="actions">
-        <button type="button" disabled={!sure || busy} aria-busy={busy} onClick={exportBackup}><Icon name="download" />{t("vault.backup.export")}</button>
+        <RunButton busy={busy} missing={[!sure && t("need.backupSure")]} onClick={exportBackup}><Icon name="download" />{t("vault.backup.export")}</RunButton>
       </div>
       <div className="field-row">
         <Field label={t("vault.backup.import.phrase")} type="password" value={imp} onChange={setImp} autoComplete="off" w="md" />
       </div>
       <div className="actions">
-        <button type="button" disabled={!imp || busy} aria-busy={busy} onClick={importBackup}><Icon name="upload" />{t("vault.backup.import")}</button>
+        <RunButton busy={busy} missing={[!imp && t("need.backupPhrase")]} onClick={importBackup}><Icon name="upload" />{t("vault.backup.import")}</RunButton>
       </div>
       {preview && <PreviewPanel core={core} preview={preview} onClose={end} onExpired={expired} onClosed={() => { setPreview(null); onClosed(); }} setMsg={setMsg} />}
     </Section>
@@ -115,7 +116,7 @@ function PreviewPanel({ core, preview, onClose, onExpired, onClosed, setMsg }: {
   };
   return (
     <ResultPanel title={t("vault.backup.preview")} pad
-      actions={<><button type="button" className="primary" disabled={!ready || busy} aria-busy={busy} onClick={apply}>{t("vault.backup.apply")}</button><button type="button" onClick={() => onClose()}>{t("vault.backup.cancel")}</button></>}>
+      actions={<><RunButton primary quiet busy={busy} missing={[!ready && t("need.backupDecisions")]} onClick={apply}>{t("vault.backup.apply")}</RunButton><button type="button" onClick={() => onClose()}>{t("vault.backup.cancel")}</button></>}>
       <table>
         <thead><tr><th>{t("vault.col.label")}</th><th>{t("vault.col.user")}</th><th>{t("vault.backup.col.state")}</th><th>{t("vault.backup.col.action")}</th></tr></thead>
         <tbody>

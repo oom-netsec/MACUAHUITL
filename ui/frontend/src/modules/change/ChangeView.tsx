@@ -1,5 +1,6 @@
 import { Advanced } from "../../components/Advanced";
-import { useEffect, useState } from "react";
+import { RunButton } from "../../components/RunButton";
+import { useEffect, useId, useState } from "react";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
 import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
@@ -101,7 +102,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
           <Field label={t("change.outDir")} value={out} onChange={setOut} w="lg" mono />
         </Advanced>
         <div className="actions">
-          <button className="primary" disabled={!name || !targets || !cred} onClick={create}>{t("change.create")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <RunButton primary kbd onClick={create} missing={[!name && t("need.name"), !targets && t("need.targets"), !cred && t("need.cred")]}>{t("change.create")}</RunButton>
         </div>
       </Section>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
@@ -129,7 +130,7 @@ function PrePost({ core, active = true }: { core: CoreAPI; active?: boolean }) {
                     <td><button className="quiet sm" onClick={() => { setCurrent(c.id); setLogin([]); setTrusted(new Set()); }} aria-current={current === c.id ? "true" : undefined}>{c.name}</button></td>
                     <td>{c.preState ? <Badge tone={stateTone(c.preState)}>{jobState(t, c.preState)}</Badge> : "—"}</td>
                     <td>{c.postState ? <Badge tone={stateTone(c.postState)}>{jobState(t, c.postState)}</Badge> : "—"}</td>
-                    <td className="row-actions"><button className="sm" disabled={c.preState !== "completed" || c.postState !== "completed"} onClick={() => showReport(c.id)} aria-label={t("change.reportOf", { name: c.name })}>{t("change.report")}</button></td>
+                    <td className="row-actions"><ReportButton c={c} t={t} onClick={() => showReport(c.id)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -200,7 +201,7 @@ function Upgrade({ core }: { core: CoreAPI }) {
           <TextArea label={t("change.upgrade.verify")} value={verify} onChange={setVerify} rows={3} />
         </Advanced>
         <div className="actions">
-          <button className="primary" disabled={!outputs || !image || r.busy} aria-busy={r.busy} onClick={check}>{t("change.upgrade.check")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <RunButton primary kbd busy={r.busy} onClick={check} missing={[!outputs && t("need.upgradeOutputs"), !image && t("need.upgradeImage")]}>{t("change.upgrade.check")}</RunButton>
         </div>
       </Section>
       <Outcome r={r} empty={t("change.upgrade.empty")} />
@@ -230,10 +231,22 @@ function Compliance({ core }: { core: CoreAPI }) {
         <TextArea label={t("change.compliance.config")} value={config} onChange={setConfig} rows={8} />
         <TextArea label={t("change.compliance.template")} value={template} onChange={setTemplate} rows={6} />
         <div className="actions">
-          <button className="primary" disabled={!config || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.complianceCheck(config, template))}>{t("change.compliance.eval")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <RunButton primary kbd busy={r.busy} onClick={() => r.run(() => core.complianceCheck(config, template))} missing={[!config && t("need.config")]}>{t("change.compliance.eval")}</RunButton>
         </div>
       </Section>
       <Outcome r={r} empty={t("change.compliance.empty")} />
+    </>
+  );
+}
+
+// «Reporte» pide PRE y POST completos; si falta alguno, la fila lo dice (descripción accesible).
+function ReportButton({ c, t, onClick }: { c: ChangeSummary; t: ReturnType<typeof useT>; onClick: () => void }) {
+  const id = useId();
+  const need = [c.preState !== "completed" && t("need.pre"), c.postState !== "completed" && t("need.post")].filter(Boolean).join(", ");
+  return (
+    <>
+      <button className="sm" disabled={!!need} aria-describedby={need ? id : undefined} onClick={onClick} aria-label={t("change.reportOf", { name: c.name })}>{t("change.report")}</button>
+      {need && <span id={id} className="sr">{t("need.list", { list: need })}</span>}
     </>
   );
 }

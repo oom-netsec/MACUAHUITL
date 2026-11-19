@@ -1,9 +1,10 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { Field } from "../../components/Field";
 import { useT } from "../../lib/i18n";
 import { useForm } from "../../lib/useForm";
-import { kbd, useCalc } from "./shared";
+import { useCalc } from "./shared";
 
 interface TcpForm { bw: string; rtt: string; win: string; loss: string; mss: string }
 const initial: TcpForm = { bw: "", rtt: "", win: "", loss: "", mss: "" };
@@ -27,8 +28,8 @@ export function TcpPanel({ core }: { core: CoreAPI }) {
       </div>
       </Advanced>
       <div className="actions">
-        <button className="primary" disabled={!bw || !rtt || c.busy} aria-busy={c.busy}
-          onClick={() => c.run("tcp", { bandwidth: bw, rttMs: Number(rtt), window: win, lossPercent: Number(loss) || 0, mss: Number(mss) || 0 })}>{t("calc.tcp.btn")}{kbd}</button>
+        <RunButton primary kbd busy={c.busy} missing={[!bw && t("need.bandwidth"), !rtt && t("need.rtt")]}
+          onClick={() => c.run("tcp", { bandwidth: bw, rttMs: Number(rtt), window: win, lossPercent: Number(loss) || 0, mss: Number(mss) || 0 })}>{t("calc.tcp.btn")}</RunButton>
       </div>
       {c.view}
     </>

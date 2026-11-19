@@ -357,3 +357,37 @@ test("csr: los datos del sujeto van plegados y cuentan los llenos; CN, SAN y con
   await userEvent.type(screen.getByLabelText("ST"), "CDMX");
   expect(det.querySelector("summary")).toHaveTextContent("Datos del sujeto · cambiadas: 2");
 });
+
+test("Probar de RADIUS y TACACS+ nombran lo que falta y dejan de hacerlo al completarlo", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  const go = () => screen.getByRole("button", { name: "Probar" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: indicar el equipo, escribir el secreto compartido o elegirlo de la bóveda, indicar el usuario de prueba o elegirlo de la bóveda.");
+  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
+  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s");
+  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+  await userEvent.click(screen.getByRole("tab", { name: "TACACS+" }));
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription(/^Falta: indicar el equipo, escribir el secreto compartido/);
+});
+
+test("PKI: Generar CSR, Crear CA, Firmar y Exportar nombran lo que falta", async () => {
+  render(<SecurityView core={fakeCore()} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  const b = (n: string) => screen.getByRole("button", { name: n });
+  expect(b("Generar CSR")).toHaveAccessibleDescription("Falta: indicar el nombre común (CN), escribir la contraseña de la llave.");
+  await userEvent.type(screen.getByLabelText("CN"), "x");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave"), "k");
+  expect(b("Generar CSR")).toBeEnabled();
+  expect(b("Generar CSR")).not.toHaveAccessibleDescription();
+  expect(b("Crear CA")).toHaveAccessibleDescription("Falta: indicar el nombre, escribir la contraseña de la CA.");
+  expect(b("Firmar")).toHaveAccessibleDescription("Falta: pegar el certificado de la CA, pegar la llave sellada de la CA, pegar la solicitud (CSR), escribir la contraseña de la CA.");
+  expect(b("Exportar")).toHaveAccessibleDescription("Falta: pegar el certificado, indicar la ruta.");
+  await userEvent.type(screen.getByLabelText("Nombre de la CA"), "CA");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave de la CA"), "p");
+  expect(b("Crear CA")).toBeEnabled();
+  expect(b("Crear CA")).not.toHaveAccessibleDescription();
+  expect(b("Firmar")).toHaveAccessibleDescription("Falta: pegar el certificado de la CA, pegar la llave sellada de la CA, pegar la solicitud (CSR).");
+});

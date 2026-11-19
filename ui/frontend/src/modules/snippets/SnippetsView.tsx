@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { resolveAccepted } from "../../lib/hostkeys";
@@ -97,7 +98,6 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     }
   };
 
-  const canPlan = equipo.trim() !== "" && credId !== "" && !!sel && formReady(sel, values);
 
   return (
     <Page title={t("nav.snippets")} description={t("snippets.hint")}>
@@ -139,7 +139,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
         <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={edit(setFps)} w="full" mono />
       </Section>
       <div className="actions">
-        <button className="primary" disabled={!canPlan || active} onClick={doPlan}>{t("assist.plan")}</button>
+        <RunButton primary disabled={active} onClick={doPlan} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred"), !sel ? t("need.snippet") : !formReady(sel, values) && t("need.snippetFields")]}>{t("assist.plan")}</RunButton>
       </div>
       {warn && <Notice kind="warn">{warn}</Notice>}
       {err && <Notice kind="error">{err}</Notice>}

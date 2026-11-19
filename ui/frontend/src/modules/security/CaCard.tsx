@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { RunButton } from "../../components/RunButton";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
@@ -35,7 +36,7 @@ export function CaCard({ core }: { core: CoreAPI }) {
           <Field label={t("security.ca.password")} type="password" value={f.password} onChange={set("password")} autoComplete="new-password" w="md" />
         </div>
         <div className="actions">
-          <button disabled={!f.name || !f.password || init.busy} aria-busy={init.busy} onClick={() => init.run(() => core.secPkiCaInit(f.name, Number(f.days) || 3650, f.algorithm, f.password))}>{t("security.ca.create")}</button>
+          <RunButton busy={init.busy} missing={[!f.name && t("need.name"), !f.password && t("need.caPassword")]} onClick={() => init.run(() => core.secPkiCaInit(f.name, Number(f.days) || 3650, f.algorithm, f.password))}>{t("security.ca.create")}</RunButton>
         </div>
         <Outcome r={init}>{init.data && <Terminal text={init.data.text} aria-label={t("common.output")} />}</Outcome>
         <TextArea label={t("security.ca.cert")} value={f.caCert} onChange={set("caCert")} rows={4} />
@@ -47,8 +48,8 @@ export function CaCard({ core }: { core: CoreAPI }) {
           <Field label={t("security.ca.certDays")} type="number" value={f.certDays} onChange={set("certDays")} w="sm" mono />
         </div>
         <div className="actions">
-          <button disabled={!f.caCert || !f.caKey || !f.csr || !f.password || sign.busy} aria-busy={sign.busy}
-            onClick={() => { void sign.run(() => core.secPkiCaSign(f.caCert, f.caKey, f.password, f.csr, f.profile, Number(f.certDays) || 365)); set("password")(""); }}>{t("security.ca.sign")}</button>
+          <RunButton busy={sign.busy} missing={[!f.caCert && t("need.caCert"), !f.caKey && t("need.caKey"), !f.csr && t("need.csr"), !f.password && t("need.caPassword")]}
+            onClick={() => { void sign.run(() => core.secPkiCaSign(f.caCert, f.caKey, f.password, f.csr, f.profile, Number(f.certDays) || 365)); set("password")(""); }}>{t("security.ca.sign")}</RunButton>
         </div>
       </Section>
       <Outcome r={sign}>

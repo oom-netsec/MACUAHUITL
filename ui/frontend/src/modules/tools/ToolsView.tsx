@@ -1,4 +1,5 @@
 import { Advanced } from "../../components/Advanced";
+import { RunButton } from "../../components/RunButton";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { CoreAPI, SyslogEvent } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -120,12 +121,12 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
         {needsDeep && <Notice kind="warn">{t("dns.needsDeep")}</Notice>}
       </Section>
       <div className="actions">
-        <button className="primary" disabled={needsDeep || (!name && mode !== "exposure") || r.busy} aria-busy={r.busy}
+        <RunButton primary kbd busy={r.busy} disabled={needsDeep} missing={[!name && mode !== "exposure" && t("need.name")]}
           onClick={() => r.run(async () => {
             const req = { mode, name: dnsUses.name(mode) ? name : "", type: dnsUses.type(mode) ? type : "", servers: list, deep, dnssec: dnsUses.dnssec(mode) && dnssec };
             const d = core.toolsDnsReport && await core.toolsDnsReport(req); // un error se muestra, sin repetir con el método de texto
             return d?.text ? { text: d.text, rep: d } : { text: await core.toolsDns(req) };
-          })}>{t("dns.query")}{runKbd}</button>
+          })}>{t("dns.query")}</RunButton>
       </div>
       <TextResult core={core} r={r} view={({ text, rep }) => {
         const tr = mode === "trace" ? parseTrace(rep ? rep.json : text) : null;

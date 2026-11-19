@@ -40,7 +40,7 @@ export function useSecrets(core: CoreAPI) {
     </Section>
   );
   const values = { secretCredId, secret: secretCredId ? "" : secret, credId, username: credId ? "" : username, password: credId ? "" : password };
-  const ready = (needUser: boolean) => (!!secretCredId || !!secret) && (!needUser || !!credId || !!username);
+  const missing = (needUser: boolean) => [!secretCredId && !secret && t("need.sharedSecret"), needUser && !credId && !username && t("need.testUser")];
   const clear = () => { set("secret")(""); set("password")(""); }; // se llama justo después de r.run: los valores ya se tomaron
-  return { view, values, ready, clear };
+  return { view, values, missing, clear };
 }

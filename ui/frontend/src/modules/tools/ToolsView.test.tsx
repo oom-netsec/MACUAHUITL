@@ -107,3 +107,13 @@ test.each(Object.entries(dnsFields))("DNS %s: solo muestra y manda los campos qu
   await userEvent.click(screen.getByRole("button", { name: "Consultar" }));
   await waitFor(() => expect(core.toolsDns).toHaveBeenCalledWith({ mode, name: f.name ? "example.com" : "", type: f.type ? "MX" : "", servers: f.servers ? ["1.1.1.1"] : [], deep: true, dnssec: f.dnssec }));
 });
+
+test("Consultar DNS nombra el nombre que falta y deja de hacerlo al escribirlo", async () => {
+  render(<DnsPanel core={fakeCore()} />);
+  const go = () => screen.getByRole("button", { name: "Consultar" });
+  expect(go()).toBeDisabled();
+  expect(go()).toHaveAccessibleDescription("Falta: indicar el nombre.");
+  await userEvent.type(screen.getByLabelText("Nombre"), "example.com");
+  expect(go()).toBeEnabled();
+  expect(go()).not.toHaveAccessibleDescription();
+});

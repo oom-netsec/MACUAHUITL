@@ -228,3 +228,16 @@ test("sin paquetes: el mismo aviso con el enlace al release (solo el enlace; nad
   expect(screen.getByText("https://github.com/oom-netsec/MACUAHUITL/releases/latest")).toBeVisible();
   expect(screen.getByRole("button", { name: "Copiar enlace de la página de versiones" })).toBeVisible();
 });
+
+test("instalar nombra el desplazamiento que falta aceptar y deja de hacerlo al aceptarlo", async () => {
+  const inspect = vi.fn(async () => ({ pack: sampleThirdParty, playbookIds: [], scriptIds: [], replacedVersion: "", sha256: "abc", displaced: ["ios-xe/viejo"] }));
+  view(fakeCore({ packInspect: inspect, pickPath: vi.fn(async () => "/tmp/x.mpack") }));
+  await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
+  const d = await screen.findByRole("dialog");
+  const go = within(d).getByRole("button", { name: "Instalar" });
+  expect(go).toBeDisabled();
+  expect(go).toHaveAccessibleDescription("Falta: aceptar que se desplazan los elementos indicados.");
+  await userEvent.click(within(d).getByRole("checkbox", { name: /ios-xe\/viejo/ }));
+  expect(go).toBeEnabled();
+  expect(go).not.toHaveAccessibleDescription();
+});

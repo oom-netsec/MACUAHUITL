@@ -501,3 +501,22 @@ test("con la bóveda cerrada, la credencial lo dice y lleva a abrirla en vez de 
   await userEvent.click(await screen.findByRole("button", { name: "Abrir bóveda" }));
   expect(go).toHaveBeenCalledWith("vault");
 });
+
+test("Planear y Leer puertos nombran lo que falta y dejan de hacerlo al completarlo", async () => {
+  render(<PortsView core={fakeCore({ listCredentials: vi.fn(async () => [...creds, { ...creds[0], id: "c2", label: "otra" }]) })} />); // con una sola se preelige
+  await screen.findByRole("option", { name: "otra (admin)" });
+  const planBtn = screen.getByRole("button", { name: "Planear (solo lectura)" });
+  const read = screen.getByRole("button", { name: "Leer puertos (solo lectura)" });
+  expect(planBtn).toBeDisabled();
+  expect(planBtn).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial, indicar las interfaces, elegir qué cambiar (VLAN, VLAN de voz, descripción o estado).");
+  expect(read).toHaveAccessibleDescription("Falta: indicar el equipo, elegir una credencial.");
+  await userEvent.type(screen.getByLabelText("Equipo (IP o nombre[:puerto])"), "10.0.0.5");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  await userEvent.type(screen.getByLabelText("Interfaces"), "Gi1/0/1");
+  expect(read).toBeEnabled();
+  expect(read).not.toHaveAccessibleDescription();
+  expect(planBtn).toHaveAccessibleDescription("Falta: elegir qué cambiar (VLAN, VLAN de voz, descripción o estado).");
+  await userEvent.type(screen.getByLabelText("VLAN de acceso"), "20");
+  expect(planBtn).toBeEnabled();
+  expect(planBtn).not.toHaveAccessibleDescription();
+});

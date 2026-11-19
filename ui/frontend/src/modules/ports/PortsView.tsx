@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RunButton } from "../../components/RunButton";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
@@ -59,7 +60,6 @@ export function PortsView({ core }: { core: CoreAPI }) {
     }
   };
 
-  const canPlan = equipo.trim() !== "" && credId !== "" && ifaces.trim() !== "" && (vlan !== "" || voice !== "" || desc !== "" || shut !== "");
 
   return (
     <Page title={t("ports.title")} description={t("ports.hint")}>
@@ -72,7 +72,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
       </Section>
       <Section title={t("ports.section.panel")} description={t("ports.panel.hint")}>
         <div className="actions">
-          <button disabled={!equipo.trim() || !credId || front.busy} aria-busy={front.busy} onClick={() => front.run(() => { const d = targetOf(equipo, credId); return core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...pairs(d) }); })}>{t("ports.read")}</button>
+          <RunButton busy={front.busy} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred")]} onClick={() => front.run(() => { const d = targetOf(equipo, credId); return core.portStatus({ device: d.address, port: d.port ?? 0, credentialId: credId, acceptedHostKeys: parseFingerprints(fps), ...pairs(d) }); })}>{t("ports.read")}</RunButton>
         </div>
         {front.error && <Notice kind="error">{front.error}</Notice>}
         {front.data?.warnings.map((w) => <Notice key={w} kind="warn">{w}</Notice>)}
@@ -94,7 +94,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
         <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
       </Section>
       <div className="actions">
-        <button className="primary" disabled={!canPlan || active} onClick={doPlan}>{t("assist.plan")}</button>
+        <RunButton primary disabled={active} onClick={doPlan} missing={[!equipo.trim() && t("need.target"), !credId && t("need.cred"), !ifaces.trim() && t("need.ifaces"), (vlan === "" && voice === "" && desc === "" && shut === "") && t("need.portChange")]}>{t("assist.plan")}</RunButton>
       </div>
       {err && <Notice kind="error">{err}</Notice>}
       {!planned && !active && <EmptyState icon="ops" title={t("ports.empty.title")}>{t("ports.empty")}</EmptyState>}

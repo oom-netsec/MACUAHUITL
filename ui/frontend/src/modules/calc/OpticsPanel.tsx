@@ -1,10 +1,11 @@
 import type { CoreAPI } from "../../lib/core";
+import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { Field, Select } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import { useForm } from "../../lib/useForm";
-import { kbd, useCalc } from "./shared";
+import { useCalc } from "./shared";
 
 const fibers = (t: ReturnType<typeof useT>): [string, string][] => [["smf-1310", t("calc.fiber.smf1310")], ["smf-1550", t("calc.fiber.smf1550")], ["mmf-850", t("calc.fiber.mmf850")], ["mmf-1300", t("calc.fiber.mmf1300")]];
 
@@ -53,7 +54,7 @@ export function OpticsPanel({ core }: { core: CoreAPI }) {
           <Field label={t("calc.optics.margin")} type="number" value={margin} onChange={set("margin")} w="md" mono />
         </div>
         </Advanced>
-        <div className="actions"><button className="primary" disabled={!tx || !rx || !km || c.busy} aria-busy={c.busy} onClick={budget}>{t("calc.optics.btn")}{kbd}</button></div>
+        <div className="actions"><RunButton primary kbd busy={c.busy} onClick={budget} missing={[!tx && t("need.opticsTx"), !rx && t("need.opticsRx"), !km && t("need.km")]}>{t("calc.optics.btn")}</RunButton></div>
       </Section>
       <Section title={t("calc.optics.convHead")}>
         <Field label={t("calc.optics.power")} value={power} onChange={set("power")} w="md" mono />

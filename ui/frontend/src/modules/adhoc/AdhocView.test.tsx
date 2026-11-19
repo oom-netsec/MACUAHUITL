@@ -152,3 +152,20 @@ test("el bucle de consulta tiene tope de tiempo y lo dice", async () => {
   expect(adhocResult.mock.calls.length).toBe(n);
   expect(screen.getByRole("button", { name: "Ejecutar lote" })).toBeEnabled();
 });
+
+test("Ejecutar lote nombra lo que falta y deja de hacerlo al completarlo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred, { ...cred, id: "c2", label: "otra" }]) }); // con una sola se preelige
+  render(<AdhocView core={core} />);
+  await screen.findByRole("option", { name: "lab (admin)" });
+  const run = () => screen.getByRole("button", { name: "Ejecutar lote" });
+  expect(run()).toBeDisabled();
+  expect(run()).toHaveAccessibleDescription("Falta: elegir una credencial, indicar los equipos.");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
+  expect(run()).toHaveAccessibleDescription("Falta: indicar los equipos.");
+  await userEvent.clear(screen.getByLabelText("Comandos (uno por línea)"));
+  expect(run()).toHaveAccessibleDescription("Falta: indicar los equipos, escribir los comandos.");
+  await userEvent.type(screen.getByLabelText("Comandos (uno por línea)"), "show clock");
+  await userEvent.type(screen.getByLabelText("Equipos (IP o nombre, con :puerto opcional)"), "192.0.2.1");
+  expect(run()).toBeEnabled();
+  expect(run()).not.toHaveAccessibleDescription();
+});
