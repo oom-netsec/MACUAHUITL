@@ -78,7 +78,6 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const [cred, setCred] = useState("");
   const [typed, setTyped] = useState(false); // sin credencial: el equipo pregunta usuario y contraseña en la propia terminal
   const [user, setUser] = useState(""); // usuario opcional en modo tecleado; vacío = «login as:»
-  const [noCred, setNoCred] = useState(false); // el host elegido de la libreta no tiene credencial utilizable: se elige una
   const [device, setDevice] = useState("");
   const [accept, setAccept] = useState("");
   const [err, setErr] = useState("");
@@ -197,6 +196,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
+  // usr solo lo pasa quien sabe que el host no tiene credencial (modo tecleado); con credencial va vacío o el núcleo lo rechaza.
   const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "", usr = user, keys: AcceptedKey[] = []) => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setOpenHk(null); setErr(t("ssh.logInUse")); return; }
@@ -205,7 +205,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
       const base = { name: label, accept: parseFingerprints(accepted), ...(keys.length ? { acceptedKeys: keys } : {}), rows: size.current.rows, cols: size.current.cols };
-      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
+      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
       const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
@@ -360,12 +360,14 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       )}
     </div>
   );
+  // Sin credencial de contraseña a la vista (llave, sin credencial o bóveda cerrada) se abre por hostId y el núcleo decide; el usuario solo viaja si su campo se ve.
+  const shownUser = typed || !credOk ? user : "";
   const form = (
     <>
-      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand); }} />
-      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); if (ok) setCred(h.credentialId); setTyped(false); setNoCred(!ok); }} />
+      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); }} />
+      <HostPicker core={core} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={noCred ? "" : typed || !credOk ? TYPED : credOk} placeholder={noCred ? t("ssh.credPick") : undefined} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); setNoCred(false); }} w="md" hint={noCred ? t("hosts.pick.noCred") : undefined} options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
+        <Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
         {(typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
         <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
@@ -380,7 +382,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         <p id={`${logId}-h`} className="hint">{t("ssh.logHelp")}</p>
       </div>
       <div className="actions">
-        <button className="primary" disabled={busy || noCred || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : credOk, undefined, "", typed || !credOk ? user : "")}>
+        <button className="primary" disabled={busy || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : credOk, undefined, "", typed || !credOk ? user : "")}>
           {busy ? t("ssh.connectingBtn") : <>{t("ssh.openTab")}<kbd aria-hidden="true">Ctrl ↵</kbd></>}
         </button>
       </div>
