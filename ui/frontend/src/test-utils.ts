@@ -17,11 +17,11 @@ export function findFiberState(container: Element, marker: string): boolean {
   let root: any = key ? (container as any)[key] : null; // eslint-disable-line @typescript-eslint/no-explicit-any
   while (root?.return) root = root.return; // sube hasta la raíz
   if (root?.stateNode?.current) root = root.stateNode.current;
-  const seen = new Set<unknown>();
+  const seen = new Map<unknown, number>(); // objeto -> profundidad mínima con que se exploró
   const has = (v: unknown, depth = 0): boolean => {
     if (typeof v === "string") return v.includes(marker);
-    if (!v || typeof v !== "object" || typeof v === "function" || depth > 6 || seen.has(v) || v instanceof Node || v instanceof Window) return false;
-    seen.add(v);
+    if (!v || typeof v !== "object" || typeof v === "function" || depth > 6 || (seen.get(v) ?? Infinity) <= depth || v instanceof Node || v instanceof Window) return false;
+    seen.set(v, depth);
     return Object.values(v as object).some((x) => has(x, depth + 1));
   };
   const walk = (f: any): boolean => { // eslint-disable-line @typescript-eslint/no-explicit-any
