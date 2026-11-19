@@ -20,8 +20,6 @@ export const es = {
   "nav.syslog": "Syslog",
   "nav.vault": "Bóveda",
   "nav.audit": "Auditoría",
-  "nav.ping": "Ping",
-  "nav.traceroute": "Traceroute",
   "nav.nmap": "nmap",
   "nav.iperf3": "iperf3",
   "nav.capture": "Captura",
@@ -3120,6 +3118,18 @@ export const es = {
   "job.other": "Otra carpeta…",
   "job.other.label": "ID o ruta del trabajo",
   "listen.any.warn": "Cualquier equipo de la red podrá inyectar datos falsos (syslog, traps o flujos) en la evidencia mientras esté abierto.",
+  "nav.pingTrace": "Ping y traceroute",
+  "diag.title.pingTrace": "Ping y traceroute",
+  "diag.desc.pingTrace": "Alcance, latencia y ruta hacia un mismo destino; cada herramienta corre por separado y se detiene por separado.",
+  "diag.pt.tools": "Herramientas",
+  "diag.resolved": "{name} → {ip} ({family})",
+  "diag.resolved.label": "IP resuelta",
+  "need.diagTool": "marcar Ping o Traceroute",
+  "device.ping": "Ping",
+  "device.traceroute": "Traceroute",
+  "diag.stopTool": "Detener {tool}",
+  "diag.cancelTool": "Cancelar {tool}",
+  "diag.clearTool": "Limpiar {tool}",
 };
 
 export type Key = keyof typeof es;

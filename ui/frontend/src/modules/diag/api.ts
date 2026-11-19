@@ -5,7 +5,9 @@ export interface NetInterface { name: string; up: boolean; loopback: boolean; ad
 // #200 (contrato en #218): pingSummary en diag:done y sweepPoint en diag:line, que arma el puente desde RunResponse.
 export interface PingSummary { sent: number; received: number; lossPct: number; minMs: number; avgMs: number; maxMs: number; mdevMs: number }
 export interface SweepPoint { size: number; sent: number; received: number; result: "ok" | "loss" | "frag" }
-export interface DiagEvent { runId: string; line?: string; done?: boolean; exitCode?: number; outputPath?: string; error?: string; canceled?: boolean; pingSummary?: PingSummary; sweepPoint?: SweepPoint }
+// Solo en el primer evento de ping/traceroute cuando el destino era un nombre y el núcleo lo resolvió (contratos-front, diag.run).
+export interface ResolvedTarget { name: string; ip: string; family: "ipv4" | "ipv6" }
+export interface DiagEvent { runId: string; resolved?: ResolvedTarget; line?: string; done?: boolean; exitCode?: number; outputPath?: string; error?: string; canceled?: boolean; pingSummary?: PingSummary; sweepPoint?: SweepPoint }
 
 export interface DiagAPI {
   diagRun(tool: string, targets: string[], options: Record<string, string>): Promise<string>;

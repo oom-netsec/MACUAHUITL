@@ -135,7 +135,7 @@ test("Ctrl+Enter en la paleta solo abre el módulo: no pulsa el primario de ning
   expect(await screen.findByRole("heading", { name: "Auditoría" })).toBeVisible();
   await userEvent.type(within(await palette()).getByRole("combobox"), "ping");
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
-  expect(await screen.findByRole("heading", { name: "Ping" })).toBeVisible();
+  expect(await screen.findByRole("heading", { name: "Ping y traceroute" })).toBeVisible();
   await act(async () => {});
   expect(auditVerify).not.toHaveBeenCalled();
 });

@@ -915,6 +915,9 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 				return
 			}
 			ev := map[string]any{"runId": id}
+			if rt := r.GetResolved(); rt != nil { // solo viene en el primer evento
+				ev["resolved"] = map[string]any{"name": rt.Name, "ip": rt.Ip, "family": rt.Family}
+			}
 			sp := r.GetSweepPoint()
 			// Una línea vacía de la salida también cuenta; la única que se omite es la del evento que solo trae run_id (el primero).
 			if r.OutputLine != "" || (sp == nil && r.RunId == "") {

@@ -1,17 +1,14 @@
 import { Advanced } from "../../components/Advanced";
 import { RunButton } from "../../components/RunButton";
-import { useContext, useEffect, useId, useRef, useState } from "react";
-import { useBatch } from "../../lib/useBatch";
-import { showHidden, stripAnsi } from "../../lib/safeText";
-import type { CoreAPI, DiagEvent, NetInterface, PingSummary, SweepPoint } from "../../lib/core";
-import { Check, Field, Notice, Select, errorText } from "../../components/Field";
+import { useContext, useEffect, useId, useState } from "react";
+import type { CoreAPI, NetInterface } from "../../lib/core";
+import { Check, Field, Notice, Select } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { CopyButton } from "../../components/Data";
-import { ModuleIdContext, useBusy, useInbox, useNav } from "../../app/activity";
+import { ModuleIdContext, useInbox, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
-import { outputsErrorText } from "../../lib/outputsError";
-import { errInfo } from "../../lib/coreError";
+import { useDiagRun, type DiagSpec } from "./useDiagRun";
 import { PingOptions, PingSummaryCard, SweepTable } from "./PingExt";
 import { PING_FORM0, ipFamily, patchForm, pingOptions, type PingForm } from "./pingOpts";
 import { DiagViz } from "./DiagViz";
@@ -29,11 +26,6 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const setP = (p: Partial<PingForm>) => setPf((f) => patchForm(f, p));
   const count = pf.count;
   const ping = pingOptions(pf, isWindows());
-  const [summary, setSummary] = useState<PingSummary | null>(null);
-  const [sweep, setSweep] = useState<SweepPoint[]>([]);
-  const [stoppable, setStoppable] = useState(false); // ping continuo o con duración: se detiene con resumen
-  const [fam, setFam] = useState<"4" | "6" | "?">("4"); // familia del ping en curso; «?» = Auto con un nombre de host
-  const [interval, setInterval_] = useState(1); // segundos entre paquetes: escala el eje de la gráfica
   const [hops, setHops] = useState("30");
   const [ports, setPorts] = useState("");
   const [scan, setScan] = useState<"connect" | "syn" | "udp" | "ping">("connect");
@@ -47,18 +39,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [ifaces, setIfaces] = useState<NetInterface[]>([]);
   const [ifState, setIfState] = useState<"loading" | "ok" | "error">("loading");
   const [filter, setFilter] = useState("");
-  const [runId, setRunId] = useState("");
-  const [lines, setLines] = useState<string[]>([]);
-  const [result, setResult] = useState<{ ok: boolean; text: string; code?: number; path?: string; canceled?: boolean } | null>(null);
-  const [t0, setT0] = useState(0); // inicio de la ejecución en segundos Unix: eje de tiempo de las gráficas
-  const [err, setErr] = useState("");
-  // Eventos que llegan antes de conocer el ID de la ejecución (un fallo inmediato, la primera línea).
-  // Solo se guardan mientras arranca: con varias vistas montadas, una inactiva no acumula lo ajeno.
-  const pending = useRef<DiagEvent[]>([]);
-  const starting = useRef(false);
-  const [launching, setLaunching] = useState(false); // igual que starting pero visible: apaga el botón mientras arranca
-  const runRef = useRef("");
-  useBusy(!!runId);
+  const { runId, lines, setLines, result, summary, sweep, stoppable, fam, interval, t0, err, launching, started, start, stop, cancel } = useDiagRun(core);
   // El menú de equipo manda la dirección al módulo con su id (ping, traceroute…); cada instancia toma solo la suya.
   const moduleId = useContext(ModuleIdContext);
   const needsTarget = tool !== "pcap" && !(tool === "iperf3" && mode === "server");
@@ -75,78 +56,24 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const binds = localIPs(ifaces);
   const bindIP = binds.includes(bind) ? bind : binds[0] ?? "";
   const portOk = (isWindows() ? /^[1-9]\d{0,4}$/ : /^[1-9]\d{3,4}$/).test(port) && Number(port) <= 65535; // sin ceros a la izquierda: el núcleo los rechaza
-  // Las líneas pasan a pantalla una vez cada FLUSH_MS; al terminar se vacía el lote antes de mostrar el resultado.
-  const batch = useBatch<string>((b) => setLines((l) => { const all = l.concat(b); return all.length > 5000 ? all.slice(-4000) : all; }));
-  const apply = (e: DiagEvent) => {
-    if (e.pingSummary) setSummary(e.pingSummary);
-    if (e.sweepPoint) setSweep((l) => [...l.filter((p) => p.size !== e.sweepPoint!.size), e.sweepPoint!]);
-    if (e.done) {
-      batch.flush();
-      setStoppable(false);
-      setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
-        ? { ok: false, text: t("diag.error", { msg: errorText(new Error(e.error)) }) }
-        : { ok: true, text: t("diag.done", { code: e.exitCode ?? 0, path: e.outputPath ?? "" }), code: e.exitCode ?? 0, path: e.outputPath });
-      runRef.current = "";
-      setRunId("");
-    } else if (e.line !== undefined) {
-      batch.push(showHidden(stripAnsi(e.line).replace(/\r$/, ""))); // sin ESC; lo demás oculto (bidi, controles) se ve como código
-    }
-  };
-  const applyRef = useRef(apply); // el suscriptor se crea una vez: sin esto se quedaría con el t del primer render
-  applyRef.current = apply;
-  useEffect(
-    () =>
-      core.onDiag((e: DiagEvent) => {
-        if (starting.current) {
-          pending.current.push(e);
-          return;
-        }
-        if (e.runId === runRef.current) applyRef.current(e);
-      }),
-    [core],
-  );
-
-  const run = async () => {
-    if (starting.current) return; // doble clic o clic más Ctrl+Enter: un solo arranque
-    starting.current = true; setLaunching(true); // antes del await: si no, el segundo disparo pasa
-    if (server && !localIPs(await loadIfaces()).includes(bindIP)) { starting.current = false; setLaunching(false); return setErr(t("diag.bind.gone", { ip: bindIP })); } // la IP ya no está (DHCP, VPN)
-    batch.reset(); setErr(""); setLines([]); setResult(null); setSummary(null); setSweep([]); setT0(Math.floor(Date.now() / 1000));
+  const run = () => start(async () => {
+    if (server && !localIPs(await loadIfaces()).includes(bindIP)) return t("diag.bind.gone", { ip: bindIP }); // la IP ya no está (DHCP, VPN)
     const options: Record<string, string> = {};
     let targets: string[] = [];
+    let extra: Partial<DiagSpec> = {};
     switch (tool) {
-      case "ping": Object.assign(options, ping.options); targets = [target]; setStoppable(!!(ping.options.continuous || ping.options.duration)); setFam((ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?")); setInterval_(Number(ping.options.interval) || 1); break;
+      case "ping": Object.assign(options, ping.options); targets = [target]; extra = { stoppable: !!(ping.options.continuous || ping.options.duration), fam: (ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?"), interval: Number(ping.options.interval) || 1 }; break;
       case "traceroute": options.max_hops = hops; targets = [target]; break;
       case "nmap": options.scan = scan; if (ports && scan !== "ping") options.ports = ports; if (skipDisc && scan !== "ping") options.skip_discovery = "true"; targets = [target]; break; // -Pn con scan=ping: diag.err.skip_with_ping
       case "iperf3": options.mode = mode; if (mode === "client") { options.seconds = seconds; targets = [target]; } else { options.bind = bindIP; options.port = port; } break;
       case "pcap": options.interface = iface; options.seconds = seconds; if (filter) options.filter = filter; break;
     }
-    pending.current = [];
-    runRef.current = "";
-    try {
-      const id = await core.diagRun(tool, targets, options);
-      runRef.current = id;
-      setRunId(id);
-      starting.current = false;
-      const early = pending.current.filter((e) => e.runId === id);
-      pending.current = [];
-      early.forEach((e) => applyRef.current(e));
-    } catch (e) {
-      starting.current = false;
-      setStoppable(false);
-      const i = errInfo(e);
-      setErr(i?.reason === "diag.err.opt_windows" ? t("diag.err.opt_windows", { key: i.metadata.key ?? "" }) : outputsErrorText(e, t));
-    } finally {
-      setLaunching(false);
-    }
-  };
-  // NotFound: el ping ya había terminado, no hay nada que detener.
-  const stop = () => core.diagStop(runId).catch((e) => { if (!/NotFound/.test(`${errInfo(e)?.code ?? ""} ${String(e)}`)) setErr(errorText(e)); });
-  const cancel = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));
+    return { tool, targets, options, ...extra };
+  });
 
   const status = runId ? { tone: "info" as const, label: t("diag.status.running") }
     : result?.canceled ? { tone: "" as const, label: t("diag.status.canceled") }
     : result ? (result.ok ? { tone: "ok" as const, label: t("diag.status.done") } : { tone: "bad" as const, label: t("diag.status.failed") }) : undefined;
-  const started = !!runId || lines.length > 0 || !!result || !!err;
 
   return (
     <Page title={t(`diag.title.${tool}`)} description={t(`diag.desc.${tool}`)}>
