@@ -487,3 +487,27 @@ test("con «todas las interfaces» el selector de IP no se muestra y el envío u
   await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
   expect(screen.getByLabelText("IP de escucha")).toBeInTheDocument();
 });
+
+test("servidor: puerto, duración, todas las interfaces e IP permitidas van plegados; cuentan los cambios y un error ahí abre el panel", async () => {
+  setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  const det = screen.getByLabelText("Puerto").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Puerto", /Duración/, /Escuchar en todas las interfaces/, /IP permitidas/]) expect(det).toContainElement(screen.getByLabelText(l));
+  await userEvent.click(screen.getByLabelText(/Escuchar en todas las interfaces/));
+  expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
+  expect(screen.getByText(/Cualquier equipo de las redes conectadas/)).toBeInTheDocument(); // el aviso sigue fuera
+  expect(det).not.toContainElement(screen.getByText(/Cualquier equipo de las redes conectadas/));
+  expect(det.open).toBe(false);
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("indica las IP permitidas");
+  expect(det.open).toBe(true);
+});
+
+test("servidor: recibir por TFTP deja «IP permitidas» a la vista, fuera de Avanzado", async () => {
+  setup();
+  await screen.findByRole("option", { name: /192.0.2.10/ });
+  await userEvent.click(screen.getByLabelText(/Permitir recibir/));
+  expect(screen.getByLabelText(/IP permitidas/).closest("details")).toBeNull();
+});

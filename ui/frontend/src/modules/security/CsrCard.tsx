@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Field, Select, TextArea } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
@@ -20,20 +21,20 @@ export function CsrCard({ core }: { core: CoreAPI }) {
   return (
     <>
       <Section title="CSR">
-        <div className="field-row">
-          <Field label="CN" value={f.cn} onChange={set("cn")} w="lg" mono />
-          <Field label={t("security.csr.c")} value={f.c} onChange={set("c")} w="xs" mono />
-        </div>
-        <div className="field-row">
-          <Field label="O" value={f.o} onChange={set("o")} w="md" />
-          <Field label="OU" value={f.ou} onChange={set("ou")} w="md" />
-          <Field label="L" value={f.l} onChange={set("l")} w="md" />
-          <Field label="ST" value={f.st} onChange={set("st")} w="md" />
-        </div>
+        <Field label="CN" value={f.cn} onChange={set("cn")} w="lg" mono />
         <div className="field-row">
           <Field label={t("security.csr.sanDns")} value={f.dns} onChange={set("dns")} w="lg" mono />
           <Field label={t("security.csr.sanIp")} value={f.ips} onChange={set("ips")} w="lg" mono />
         </div>
+        <Advanced label={t("security.csr.subject")} changed={(["o", "ou", "l", "st", "c"] as const).filter((k) => f[k] !== "").length}>
+          <div className="field-row">
+            <Field label="O" value={f.o} onChange={set("o")} w="md" />
+            <Field label="OU" value={f.ou} onChange={set("ou")} w="md" />
+            <Field label="L" value={f.l} onChange={set("l")} w="md" />
+            <Field label="ST" value={f.st} onChange={set("st")} w="md" />
+            <Field label={t("security.csr.c")} value={f.c} onChange={set("c")} w="xs" mono />
+          </div>
+        </Advanced>
         <TextArea label={t("security.csr.sealedExisting")} value={f.sealedKey} onChange={set("sealedKey")} rows={3} />
         <div className="field-row">
           {!f.sealedKey && <Select label={t("security.algorithm")} value={f.algorithm} onChange={set("algorithm")} options={algorithms} w="md" />}

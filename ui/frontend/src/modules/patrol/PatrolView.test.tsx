@@ -670,3 +670,20 @@ test("armar manda solo la huella del equipo confirmado, atada a ese equipo", asy
   await userEvent.click(screen.getByRole("button", { name: "Armar trabajo" }));
   await waitFor(() => expect(core.armJob).toHaveBeenCalledWith("j1", [], [{ host: "10.0.0.2:22", fingerprint: "SHA256:same" }], []));
 });
+
+test("las opciones de salida, ventana y seguridad van plegadas; cuentan los cambios y los avisos de peligro quedan fuera", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  render(<PatrolView core={core} />);
+  const mask = await screen.findByLabelText("Enmascarar secretos en las salidas");
+  const det = mask.closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Archivos de salida", "Empaquetado .zip", /Eliminar archivos sueltos/, /Ventana/, /Aceptar llaves de host/]) expect(det).toContainElement(screen.getByLabelText(l));
+  for (const l of ["Nombre del trabajo", "Carpeta de salida", /Intervalo/, "Rondas"]) expect(det).not.toContainElement(screen.getByLabelText(l));
+  expect(det.querySelector("summary")).toHaveTextContent(/^Opciones avanzadas$/);
+  await userEvent.click(mask);
+  await userEvent.click(screen.getByLabelText(/Aceptar llaves de host/));
+  expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 2");
+  expect(det.open).toBe(false);
+  for (const a of screen.getAllByRole("alert")) expect(det).not.toContainElement(a);
+  expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(2);
+});

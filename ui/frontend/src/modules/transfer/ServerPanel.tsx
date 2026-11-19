@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { Advanced } from "../../components/Advanced";
 import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -22,6 +23,7 @@ import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
 
+const advKeys: Key[] = ["transfer.err.port", "transfer.err.allow", "transfer.err.anyAllow", "transfer.err.minutes"]; // validaciones de campos dentro de Avanzado
 const protos: [TransferProto, string][] = [["tftp", "TFTP"], ["ftp", "FTP"], ["scp", "SCP"], ["sftp", "SFTP"], ["http", "HTTP"]];
 
 function Log({ lines }: { lines: TransferLine[] }) {
@@ -163,9 +165,14 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const ssh = proto === "scp" || proto === "sftp";
   const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
   const missing = (!any && !listen) || (!write && !fromDir && splitList(files).length === 0); // datos requeridos; el resto lo explica serveProblem al abrir
+  const [bad, setBad] = useState<{ k: Key | null; n: number }>({ k: null, n: 0 }); // última razón de validación y nº de intento: si cae en Avanzado, se abre (también al repetir)
+  // Con TFTP + recibir la lista de IP es obligatoria: se queda a la vista, fuera de Avanzado.
+  const allowVisible = write && proto === "tftp";
+  const allowField = <Field label={t("transfer.allow")} hint={t("transfer.allow.hint")} value={allow} onChange={setAllow} />;
   const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otro servidor
   const start = async () => {
     const p = serveProblem(form);
+    setBad((b) => ({ k: p, n: b.n + 1 }));
     if (p) { setErr(t(p)); return; }
     setErr(""); clearLoadErr();
     const host = any ? "0.0.0.0" : listen;
@@ -192,18 +199,23 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
           <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); }} options={protos} w="sm" />
           {!any && <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={listen} onChange={setListen} w="md"
             options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />}
-          <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />
-          <Field label={t("transfer.minutes")} type="number" value={minutes} onChange={setMinutes} w="sm" />
         </div>
         {proto === "ftp" && <Notice kind="warn">{t("transfer.ftpWarn")}</Notice>}
-        <Check label={t("transfer.any")} checked={any} onChange={setAny} />
-        {any && <Notice kind="warn">{t("transfer.any.warn")}</Notice>}
         <PathField label={t("transfer.fromDir")} hint={t("transfer.fromDir.hint")} value={fromDir} onChange={setFromDir} pick={() => core.pickPath({ title: t("transfer.fromDir"), directory: true })} />
         <Field label={t("transfer.files")} hint={t("transfer.files.hint")} value={files} onChange={setFiles} />
         <Check label={t("transfer.write")} checked={write} onChange={setWrite} />
         {write && proto === "tftp" && <Notice kind="warn">{t("transfer.udpWarn")}</Notice>}
         {write && <PathField label={t("transfer.recvDir")} hint={t("transfer.recvDir.hint")} value={recvDir} onChange={setRecvDir} pick={() => core.pickPath({ title: t("transfer.recvDir"), directory: true })} />}
-        <Field label={t("transfer.allow")} hint={t("transfer.allow.hint")} value={allow} onChange={setAllow} />
+        {allowVisible && allowField}
+        <Advanced changed={[port !== portFor(proto), minutes !== "30", any, !allowVisible && allow.trim() !== ""].filter(Boolean).length} forceOpen={bad.k && advKeys.includes(bad.k) && !(allowVisible && bad.k === "transfer.err.allow") ? bad.n : 0}>
+          <div className="field-row">
+            <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />
+            <Field label={t("transfer.minutes")} type="number" value={minutes} onChange={setMinutes} w="sm" />
+          </div>
+          <Check label={t("transfer.any")} checked={any} onChange={setAny} />
+          {!allowVisible && allowField}
+        </Advanced>
+        {any && <Notice kind="warn">{t("transfer.any.warn")}</Notice>}
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
         <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>

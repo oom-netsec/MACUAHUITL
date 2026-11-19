@@ -90,3 +90,24 @@ test("el foco va al título del panel al abrirlo y vuelve al botón «Restaurar�
   await userEvent.click(screen.getByRole("button", { name: /^Cerrar/ }));
   expect(screen.getByRole("button", { name: `Restaurar ${clear.id}` })).toHaveFocus();
 });
+
+test("tope y plan parcial van plegados y cuentan los cambios; la interfaz de gestión queda a la vista", async () => {
+  await open();
+  const det = screen.getByLabelText("Tope de líneas de cambio").closest("details")!;
+  expect(det.open).toBe(false);
+  for (const l of ["Tope de líneas de cambio", /Plan parcial/]) expect(det).toContainElement(screen.getByLabelText(l));
+  for (const l of [/Interfaz de gestión/, /write memory/]) expect(det).not.toContainElement(screen.getByLabelText(l));
+  await userEvent.click(screen.getByLabelText(/Plan parcial/));
+  expect(det.querySelector("summary")).toHaveTextContent("Opciones avanzadas · cambiadas: 1");
+  expect(det.open).toBe(false);
+});
+
+test("un tope de líneas fuera de rango abre Avanzado y dice por qué no se puede planear", async () => {
+  await open();
+  const det = screen.getByLabelText("Tope de líneas de cambio").closest("details")!;
+  await userEvent.clear(screen.getByLabelText("Tope de líneas de cambio"));
+  await userEvent.type(screen.getByLabelText("Tope de líneas de cambio"), "2000");
+  expect(det.open).toBe(true);
+  expect(screen.getByLabelText("Tope de líneas de cambio")).toHaveAccessibleDescription(/Entre 0 y 1000/);
+  expect(planBtn()).toBeDisabled();
+});

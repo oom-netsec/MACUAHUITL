@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { CoreAPI } from "../../lib/core";
 import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
@@ -115,15 +116,17 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
       <Section title={t("backup.sec.run")}>
         <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
         <TextArea label={t("backup.devices")} value={devices} onChange={setDevices} rows={3} />
-        <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
-        <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
-        {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="field-row end">
-          <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
           <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
           {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
           <Field label={t("fps.accepted")} hint={t("fps.accepted.hint.multi")} value={accept} onChange={setAccept} w="lg" mono />
         </div>
+        <Advanced changed={[startup, secrets, keep !== "30"].filter(Boolean).length}>
+          <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
+          <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
+          <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
+        </Advanced>
+        {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="actions">
           <button className="primary" disabled={busy || !cred || !devices.trim()} aria-busy={busy} onClick={run}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
         </div>

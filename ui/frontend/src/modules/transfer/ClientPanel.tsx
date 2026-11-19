@@ -3,6 +3,7 @@ import { CredentialSelect, useCredentials } from "../../components/CredentialSel
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, TextArea, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
+import { Advanced } from "../../components/Advanced";
 import { Segmented } from "../../components/Segmented";
 import type { CoreAPI } from "../../lib/core";
 import { ResultPanel, Section } from "../../components/Page";
@@ -29,7 +30,6 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const set = (o: Partial<ClientForm>) => setF((x) => ({ ...x, ...o }));
   const [paste, setPaste] = useState("");
   const [pasteMsg, setPasteMsg] = useState<"" | "invalid" | "password">("");
-  const [advOpen, setAdvOpen] = useState(false);
   const [failed, setFailed] = useState(0); // envíos rechazados por validación: dispara el foco al primer campo inválido
   const formRef = useRef<HTMLDivElement>(null);
   const { creds, vault, error: vaultError } = useCredentials(core);
@@ -63,7 +63,6 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
     setTried(true);
     const bad = Object.keys(clientErrors(form));
     if (bad.length) {
-      if (bad.some((k) => advancedKeys.includes(k))) setAdvOpen(true); // el error está en un panel plegado: se abre
       setFailed((n) => n + 1);
       return;
     }
@@ -116,8 +115,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
       ) : (
         <PathField label={t("transfer.src")} error={shown("src")} value={f.src} onChange={(src) => set({ src })} pick={() => core.pickPath({ title: t("transfer.src") })} />
       )}
-      <details className="adv" open={advOpen} onToggle={(e) => setAdvOpen(e.currentTarget.open)}>
-        <summary>{t("transfer.adv")}</summary>
+      <Advanced forceOpen={tried && Object.keys(errors).some((k) => advancedKeys.includes(k)) ? failed : 0}>
         <div onPaste={(e) => { if (apply(e.clipboardData.getData("text"))) e.preventDefault(); }} onBlur={(e) => apply((e.target as HTMLInputElement).value)}>
           <Field label={t("transfer.paste")} hint={t("transfer.paste.hint")} error={pasteErr} value={paste} onChange={setPaste} w="full" mono />
         </div>
@@ -131,7 +129,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
         {ssh && <Check label={t("transfer.legacy")} checked={f.legacy} onChange={(legacy) => set({ legacy })} />}
         {f.dir === "get" && f.proto === "https" && <Check label={t("transfer.insecure")} checked={f.insecure} onChange={(insecure) => set({ insecure })} />}
         {f.dir === "get" && f.proto === "https" && f.insecure && <Notice kind="warn">{t("transfer.insecure.warn")}</Notice>}
-      </details>
+      </Advanced>
       <div className="actions"><button className="primary" disabled={busy} aria-busy={busy} onClick={() => run(f)}>{f.dir === "get" ? t("transfer.get") : t("transfer.put")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
       {showFix && <Notice kind="error">{t("transfer.err.fix")}</Notice>}
       {busy && <p role="status" className="meta">{t("transfer.working")}</p>}

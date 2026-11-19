@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Check, Field, Select } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -25,13 +26,13 @@ export function TacacsPanel({ core }: { core: CoreAPI }) {
         </div>
       </Section>
       {s.view(true)}
-      <Section title={t("security.sec.authz")}>
+      <Advanced label={t("security.sec.authz")} changed={(["authenType", "command", "accounting"] as const).filter((k) => f[k] !== initial[k]).length}>
         <div className="field-row">
           <Select label={t("security.authen")} value={f.authenType} onChange={set("authenType")} options={[["ascii", t("security.authenAscii")], ["pap", "PAP"]]} w="md" />
           <Field label={t("security.tacCommand")} value={f.command} onChange={set("command")} w="lg" mono />
         </div>
         <Check label={t("security.accounting")} checked={f.accounting} onChange={set("accounting")} />
-      </Section>
+      </Advanced>
       <div className="actions">
         <button className="primary" disabled={!f.host || !s.ready(true) || r.busy} aria-busy={r.busy}
           onClick={() => { void r.run(() => probe(core.secTacacsReport, core.secTacacs, { host: f.host, port: Number(f.port) || 49, ...s.values, authenType: f.authenType, command: f.command, accounting: f.accounting })); s.clear(); }}>{t("security.test")}{kbd}</button>

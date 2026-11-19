@@ -1,4 +1,5 @@
 import type { CoreAPI } from "../../lib/core";
+import { Advanced } from "../../components/Advanced";
 import { Check, Field, Select } from "../../components/Field";
 import { Section, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -19,6 +20,9 @@ const initial: RadiusForm = {
   host: "", authPort: "1812", acctPort: "1813", method: "pap", nasIp: "", nasId: "",
   portType: "ethernet", serviceType: "framed", called: "", calling: "", statusServer: false, accounting: false,
 };
+
+// Campos de Avanzado: «cambiadas» cuenta los que difieren de su valor inicial (el puerto de accounting solo si accounting está activo).
+const attrKeys: (keyof RadiusForm)[] = ["method", "portType", "serviceType", "nasIp", "nasId", "called", "calling", "accounting", "acctPort"];
 
 export function RadiusPanel({ core }: { core: CoreAPI }) {
   const t = useT();
@@ -46,7 +50,7 @@ export function RadiusPanel({ core }: { core: CoreAPI }) {
       </Section>
       {s.view(!f.statusServer)}
       {!f.statusServer && (
-        <Section title={t("security.sec.attrs")}>
+        <Advanced label={t("security.sec.attrs")} changed={attrKeys.filter((k) => (k !== "acctPort" || f.accounting) && f[k] !== initial[k]).length}>
           <div className="field-row">
             <Select label={t("security.method")} value={f.method} onChange={set("method")} options={[["pap", "PAP"], ["chap", "CHAP"], ["mschapv2", "MS-CHAPv2"]]} w="md" />
             <Select label="NAS-Port-Type" value={f.portType} onChange={set("portType")} options={portTypes(t("security.noSend"))} w="md" />
@@ -62,7 +66,7 @@ export function RadiusPanel({ core }: { core: CoreAPI }) {
           </div>
           <Check label={t("security.accounting")} checked={f.accounting} onChange={set("accounting")} />
           {f.accounting && <Field label={t("security.acctPort")} type="number" value={f.acctPort} onChange={set("acctPort")} w="sm" mono />}
-        </Section>
+        </Advanced>
       )}
       <p className="hint">{t("security.radiusNote")}</p>
       <div className="actions"><button className="primary" disabled={!f.host || !s.ready(!f.statusServer) || r.busy} aria-busy={r.busy} onClick={go}>{t("security.test")}{kbd}</button></div>
