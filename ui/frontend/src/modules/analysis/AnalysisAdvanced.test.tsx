@@ -10,9 +10,9 @@ test("hallazgos: la ronda va plegada, cuenta y se sigue enviando; trabajo y equi
   render(<AnalysisView core={core} />);
   const d = screen.getByLabelText("Ronda (0 = todas)").closest("details")!;
   expect(d.open).toBe(false);
-  expect(d).not.toContainElement(screen.getByLabelText("Trabajo (ID o carpeta)"));
+  expect(d).not.toContainElement(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }));
   expect(d).not.toContainElement(screen.getByLabelText("Equipo (opcional)"));
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   await userEvent.clear(screen.getByLabelText("Ronda (0 = todas)"));
   await userEvent.type(screen.getByLabelText("Ronda (0 = todas)"), "2");
   expect(sum(d)).toHaveTextContent("cambiadas: 1");
@@ -28,7 +28,7 @@ test("línea de tiempo: ventana y captura van plegadas, cuentan y se siguen envi
   expect(d.open).toBe(false);
   expect(d).toContainElement(screen.getByLabelText(/^Captura pcap/));
   expect(d).not.toContainElement(screen.getByLabelText(/^Alrededor de/));
-  await userEvent.type(screen.getByLabelText("Trabajo (ID o carpeta)"), "/o/lab");
+  await userEvent.type(screen.getByRole("textbox", { name: "Trabajo (ID o carpeta)" }), "/o/lab");
   await userEvent.type(screen.getByLabelText(/^Captura pcap/), "/c.pcap");
   await userEvent.clear(screen.getByLabelText("Ventana (s)"));
   await userEvent.type(screen.getByLabelText("Ventana (s)"), "60");
