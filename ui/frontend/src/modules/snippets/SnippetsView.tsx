@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { passwordCreds } from "../vault/api";
-import type { CoreAPI, Credential } from "../../lib/core";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
+import type { CoreAPI } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import type { PortsPlanResult } from "../ports/api";
-import { useVaultVersion } from "../../lib/vaultSignal";
 import type { SnippetTemplate } from "./api";
 import { FieldInput, useTx } from "./FieldInput";
 import { errInfo } from "../../lib/coreError";
@@ -22,7 +21,7 @@ type Platform = "" | "ios" | "ios-xe";
 export function SnippetsView({ core }: { core: CoreAPI }) {
   const t = useT();
   const tx = useTx();
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
   const [equipo, setEquipo] = useState("");
   const [platform, setPlatform] = useState<Platform>("");
@@ -41,11 +40,6 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
   // Número de la última acción que invalida el plan: una respuesta (plan o error) de una petición anterior se descarta.
   const seq = useRef(0);
 
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => {
-    // Con la bóveda cerrada la lista se vacía y el error queda a la vista; al reabrirla se limpia.
-    core.listCredentials().then(passwordCreds).then((c) => { setCreds(c); setErr(""); setCredId((cur) => (c.some((x) => x.id === cur) ? cur : c[0]?.id ?? "")); }).catch((e) => { setCreds([]); setErr(errorText(e)); });
-  }, [core, vv]);
 
   useEffect(() => {
     let alive = true;
@@ -110,7 +104,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       <Section title={t("snippets.section.target")}>
         <div className="field-row">
           <Field label={t("assist.device")} value={equipo} onChange={edit(setEquipo)} w="lg" mono />
-          <Select label={t("assist.cred")} value={credId} onChange={edit(setCredId)} w="md" options={creds.map((c) => [c.id, `${c.label} (${c.username})`])} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={edit(setCredId)} />
           <Select<Platform> label={t("snippets.platform")} value={platform} onChange={edit(setPlatform)} w="sm" options={[["", t("snippets.platform.all")], ["ios", "IOS"], ["ios-xe", "IOS-XE"]]} />
         </div>
       </Section>

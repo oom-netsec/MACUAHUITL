@@ -271,7 +271,7 @@ test("una llave de host nueva pide aceptar la huella y reintenta con ella", asyn
     .mockResolvedValueOnce({ path: "/o/x", bytes: 1, md5: "a".repeat(32), sha256: "b".repeat(64), verified: "", seconds: 0, report: "" });
   const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
   await client(core, "scp://admin@192.0.2.1/ios.bin");
-  await userEvent.selectOptions(await screen.findByLabelText("Credencial de la bóveda"), "c1");
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
   expect(await screen.findByText("SHA256:AbC123+/x")).toBeInTheDocument();
   expect(get).toHaveBeenCalledTimes(1);
@@ -393,7 +393,7 @@ test("una llave de host nueva en inglés, con reason, también pide aceptar la h
   const get = vi.fn().mockRejectedValueOnce(Object.assign(new Error("transport: unknown host key from 192.0.2.1:22: SHA256:AbC123+/x"), { cause }));
   const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
   await client(core, "scp://admin@192.0.2.1/ios.bin");
-  await userEvent.selectOptions(await screen.findByLabelText("Credencial de la bóveda"), "c1");
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
   expect(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
 });

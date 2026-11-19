@@ -62,7 +62,7 @@ test("no crea el trabajo si faltan datos y dice cuáles", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   render(<PatrolView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Crear trabajo" }));
-  expect(screen.getByRole("alert")).toHaveTextContent("Datos incompletos: nombre del trabajo, equipos, credencial, un playbook o comandos, carpeta de salida.");
+  expect(screen.getByRole("alert")).toHaveTextContent("Datos incompletos: nombre del trabajo, equipos, un playbook o comandos, carpeta de salida.");
   expect(core.createJob).not.toHaveBeenCalled();
 });
 

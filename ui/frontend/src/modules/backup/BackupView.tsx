@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { passwordCreds } from "../vault/api";
-import type { CoreAPI, Credential } from "../../lib/core";
-import { Check, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
+import type { CoreAPI } from "../../lib/core";
+import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { DiffView } from "../../components/DiffView";
@@ -19,7 +19,6 @@ import { BackupTimeline } from "./BackupTimeline";
 import { useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import "./backup.css";
-import { useVaultVersion } from "../../lib/vaultSignal";
 import { parseFingerprints } from "../../lib/hostkeys";
 
 // Respaldos: running-config (y startup-config) de cada equipo en outputs/respaldos/, con permisos 0600.
@@ -27,7 +26,7 @@ import { parseFingerprints } from "../../lib/hostkeys";
 
 export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {
   const t = useT();
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   useInbox("backup", setDevices); // desde el menú de equipo
@@ -54,8 +53,6 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const [shown, setShown] = useState<{ meta: BackupEntry; text: string } | null>(null);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const reload = useCallback(async () => {
     try { const l = await core.backupList(""); if (alive.current) { setList(l); setSel((s) => s.filter((id) => l.backups.some((b) => b.id === id))); } } catch (e) { if (alive.current) setErr(errorText(e)); }
@@ -111,7 +108,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   return (
     <Page title={t("backup.title")} description={<>{t("backup.intro.a")}<code>outputs/respaldos/</code>{t("backup.intro.b")}</>}>
       <Section title={t("backup.sec.run")}>
-        <Select label={t("backup.cred")} value={cred} onChange={setCred} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} w="md" />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
         <TextArea label={t("backup.devices")} value={devices} onChange={setDevices} rows={3} />
         <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
         <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
@@ -139,7 +136,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <button className="quiet" onClick={reload}>{t("backup.refresh")}</button>
         </div>
       </Section>
-      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} onClose={() => { // el foco vuelve al «Restaurar» de la fila; si no, caería en <body>
+      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} vault={vault} onClose={() => { // el foco vuelve al «Restaurar» de la fila; si no, caería en <body>
         const id = restoring.id;
         setRestoring(null);
         [...document.querySelectorAll<HTMLElement>("[data-restore]")].find((b) => b.dataset.restore === id)?.focus();

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { passwordCreds } from "../vault/api";
-import type { ChangeSummary, CoreAPI, Credential, LoginResult } from "../../lib/core";
-import { Check, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
+import type { ChangeSummary, CoreAPI, LoginResult } from "../../lib/core";
+import { Check, Field, Notice, TextArea, errorText } from "../../components/Field";
 import { Badge, EmptyState, Page, ResultPanel, Section, Tabs, useResult, type Tone } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import { ExportMenu } from "../../components/Files";
@@ -12,7 +12,6 @@ import { outputsErrorText } from "../../lib/outputsError";
 import { jobState } from "../../lib/vocab";
 import type { Key } from "../../lib/i18n/es";
 import "./change.css";
-import { useVaultVersion } from "../../lib/vaultSignal";
 import { PendingRollbacks } from "../../components/PendingRollbacks";
 import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { assistOwner } from "../../app/useShellStatus";
@@ -34,7 +33,7 @@ function worst(devs: DeviceReport[], t: (k: Key) => string): { tone: Tone; label
 
 function PrePost({ core }: { core: CoreAPI }) {
   const t = useT();
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [changes, setChanges] = useState<ChangeSummary[]>([]);
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
@@ -51,11 +50,7 @@ function PrePost({ core }: { core: CoreAPI }) {
   const [unmasked, setUnmasked] = useState(false);
 
   const refresh = () => core.listChanges().then(setChanges).catch((e) => setErr(errorText(e)));
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => {
-    core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : "")); }).catch(() => setCreds([]));
-    refresh();
-  }, [core, vv]);
+  useEffect(() => { refresh(); }, [core]);
 
   const guard = async (f: () => Promise<void>) => {
     setErr(""); setMsg(null);
@@ -98,7 +93,7 @@ function PrePost({ core }: { core: CoreAPI }) {
           <Field label={t("change.targets")} value={targets} onChange={setTargets} w="lg" mono />
         </div>
         <div className="field-row">
-          <Select label={t("assist.cred")} value={cred} onChange={setCred} w="md" options={[["", t("change.pick")], ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])]} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} />
           <Field label={t("change.outDir")} value={out} onChange={setOut} w="lg" mono />
         </div>
         <div className="actions">

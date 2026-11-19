@@ -1,16 +1,15 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { passwordCreds } from "../vault/api";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { useBusy } from "../../app/activity";
-import { Check, Console, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
+import { Check, Console, Field, Notice, PathField, TextArea, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { Segmented } from "../../components/Segmented";
-import type { CoreAPI, Credential } from "../../lib/core";
+import type { CoreAPI } from "../../lib/core";
 import { ResultPanel, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { TransferResult } from "./api";
 import { absoluteSlash, buildURL, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
 import { hostKeyFromError } from "./validate";
-import { useVaultVersion } from "../../lib/vaultSignal";
 import { errInfo } from "../../lib/coreError";
 
 // El archivo bajado no tiene el hash esperado (xfer) o el publicado (SHA-512 de Cisco): se descartó.
@@ -33,7 +32,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [advOpen, setAdvOpen] = useState(false);
   const [failed, setFailed] = useState(0); // envíos rechazados por validación: dispara el foco al primer campo inválido
   const formRef = useRef<HTMLDivElement>(null);
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -41,8 +40,6 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [pending, setPending] = useState<{ fp: string; changed: boolean } | null>(null);
   const [res, setRes] = useState<TransferResult | null>(null);
   useBusy(busy);
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l ?? []); setF((x) => ((l ?? []).some((c) => c.id === x.cred) ? x : { ...x, cred: "" })); }).catch(() => setCreds([])); }, [core, vv]);
 
   useEffect(() => { if (failed) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [failed]);
 
@@ -112,8 +109,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
         </div>
       </div>
       {usesCred(f.proto) && (
-        <Select label={t("transfer.cred")} hint={ssh ? t("transfer.cred.need") : t("transfer.cred.anon")} error={shown("cred")} value={f.cred} onChange={(cred) => set({ cred })}
-          options={[["", t("common.select")], ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])]} />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} hint={ssh ? t("transfer.cred.need") : t("transfer.cred.anon")} error={shown("cred")} value={f.cred} onChange={(cred) => set({ cred })} optional />
       )}
       {f.dir === "get" ? (
         <PathField label={t("transfer.destDir")} hint={t("transfer.destDir.hint")} value={f.destDir} onChange={(destDir) => set({ destDir })} pick={() => core.pickPath({ title: t("transfer.destDir"), directory: true })} />

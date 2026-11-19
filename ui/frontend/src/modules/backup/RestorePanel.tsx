@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
-import { Check, Field, Notice, Select, errorText } from "../../components/Field";
+import { CredentialSelect, type VaultGate } from "../../components/CredentialSelect";
+import { Check, Field, Notice, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { PortsPlanResult } from "../ports/api";
@@ -29,10 +30,9 @@ function Refused({ items, title }: { items: RestoreRefusal[]; title: string }) {
   );
 }
 
-export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; onClose: () => void }) {
+export function RestorePanel({ core, entry, creds, vault, onClose }: { core: CoreAPI; entry: BackupEntry; creds: Credential[]; vault: VaultGate; onClose: () => void }) {
   const t = useT();
-  const [credId, setCredId] = useState(creds[0]?.id ?? "");
-  useEffect(() => { setCredId((c) => c || creds[0]?.id || ""); }, [creds]);
+  const [credId, setCredId] = useState("");
   const [equipo, setEquipo] = useState(guessAddress(entry.device));
   const [mgmt, setMgmt] = useState("");
   const [maxLines, setMaxLines] = useState("200");
@@ -77,7 +77,7 @@ export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; e
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">
         <Field label={t("backup.restore.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-        <Select label={t("backup.restore.cred")} value={credId} onChange={setCredId} options={creds.map((c) => [c.id, `${c.label} (${c.username})`])} w="md" />
+        <CredentialSelect creds={creds} vault={vault} notice={false} value={credId} onChange={setCredId} />
       </div>
       <div className="field-row">
         <Field label={t("backup.restore.mgmt")} value={mgmt} onChange={setMgmt} w="lg" mono />

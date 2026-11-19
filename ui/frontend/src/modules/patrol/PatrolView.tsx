@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { passwordCreds } from "../vault/api";
-import type { CoreAPI, Credential, Job, JobPhase, VaultState } from "../../lib/core";
+import { useCredentials } from "../../components/CredentialSelect";
+import type { CoreAPI, Job, JobPhase } from "../../lib/core";
 import { Notice, errorText } from "../../components/Field";
 import { Page } from "../../components/Page";
 import { useBusy, useNav } from "../../app/activity";
@@ -27,8 +27,7 @@ const samePhase = (a: JobPhase, b: JobPhase) => (a.at === b.at || sec(a.at) === 
 export function PatrolView({ core }: { core: CoreAPI }) {
   const t = useT();
   const go = useNav();
-  const [vault, setVault] = useState<VaultState | null>(null);
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: credErr } = useCredentials(core);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   // Fases que llegaron en vivo y que el núcleo aún no devolvió en ListJobs.
@@ -78,17 +77,8 @@ export function PatrolView({ core }: { core: CoreAPI }) {
 
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
-    let live = true; // un cambio de bóveda posterior no se pisa con una respuesta vieja
     setErr(""); // recarga (bóveda o núcleo reconectado): el error del intento anterior ya no vale; si vuelve a fallar, reaparece
-    core.vaultStatus().then(async (s) => {
-      if (!live) return;
-      setVault(s.state);
-      if (s.state !== "unlocked") return setCreds([]); // bóveda cerrada: no quedan credenciales a la vista
-      const l = passwordCreds(await core.listCredentials());
-      if (live) setCreds(l);
-    }).catch((e) => { if (live) setErr(errorText(e)); });
     refreshJobs();
-    return () => { live = false; };
   }, [core, vv, refreshJobs]);
 
   useEffect(() => core.onEvent((e) => {
@@ -111,7 +101,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
     <Page title={t("patrol.title")} description={t("patrol.desc")}>
       <div className="patrol">
         <div className="patrol-main">
-          {err && <Notice kind="error">{err}</Notice>}
+          {(err || credErr) && <Notice kind="error">{err || credErr}</Notice>}
           {(vault === "absent" || vault === "locked") && (
             <Notice kind="info">
               {t(vault === "absent" ? "patrol.vault.absent" : "patrol.vault.locked")}
@@ -120,7 +110,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
           )}
           {job
             ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} onRemoved={async () => { await refreshJobs(); setSelected(null); focusNew(); }} subscribe={subscribeJobs} />
-            : <NewJobForm core={core} creds={creds} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
+            : <NewJobForm core={core} creds={creds} vault={vault} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
         </div>
         <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)}
           onClearFinished={async (ids) => {

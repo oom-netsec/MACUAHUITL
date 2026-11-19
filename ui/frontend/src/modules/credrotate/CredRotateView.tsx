@@ -1,18 +1,17 @@
-import { useEffect, useState } from "react";
-import { passwordCreds } from "../vault/api";
-import type { CoreAPI, Credential } from "../../lib/core";
+import { useState } from "react";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
+import type { CoreAPI } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
-import { Check, Field, Notice, Select, errorText } from "../../components/Field";
+import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import type { PortsPlanResult } from "../ports/api";
 import { useT } from "../../lib/i18n";
 import type { CredRotateRequest } from "./api";
 import "./credrotate.css";
-import { useVaultVersion } from "../../lib/vaultSignal";
 
 export function CredRotateView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [credId, setCredId] = useState("");
   const [update, setUpdate] = useState("");
   const [equipo, setEquipo] = useState("");
@@ -25,11 +24,6 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
   const [active, setActive] = useState(false);
   const [planned, setPlanned] = useState(false);
 
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => {
-    // Con la bóveda cerrada la lista se vacía y el error queda a la vista; al reabrirla se limpia.
-    core.listCredentials().then(passwordCreds).then((c) => { setCreds(c); setErr(""); setCredId((cur) => (c.some((x) => x.id === cur) ? cur : c[0]?.id ?? "")); }).catch((e) => { setCreds([]); setErr(errorText(e)); });
-  }, [core, vv]);
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setPlanned(true);
@@ -54,13 +48,13 @@ export function CredRotateView({ core }: { core: CoreAPI }) {
       <Section title={t("credrotate.section.target")}>
         <div className="field-row">
           <Field label={t("assist.device")} value={equipo} onChange={setEquipo} w="lg" mono />
-          <Select label={t("credrotate.cred")} value={credId} onChange={setCredId} w="md" options={creds.map((c) => [c.id, `${c.label} (${c.username})`])} />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={credId} onChange={setCredId} />
         </div>
       </Section>
       <Section title={t("credrotate.section.secret")}>
         <div className="field-row">
           <Field label={t("credrotate.user")} value={user} onChange={setUser} w="md" mono />
-          <Select label={t("credrotate.vault")} value={update} onChange={setUpdate} w="lg" options={[["", t("credrotate.vault.none")], ...creds.map((c): [string, string] => [c.id, `${c.label} (${c.username})`])]} />
+          <CredentialSelect creds={creds} vault={vault} notice={false} value={update} onChange={setUpdate} label={t("credrotate.vault")} optional w="lg" />
         </div>
         <Check label={t("credrotate.generate")} checked={generate} onChange={setGenerate} />
         {!generate && <Field label={t("credrotate.secret")} type="password" value={secret} onChange={setSecret} autoComplete="new-password" w="md" />}

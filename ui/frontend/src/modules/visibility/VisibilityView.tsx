@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { passwordCreds } from "../vault/api";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { Hl, Terminal } from "../../components/Terminal";
-import type { CoreAPI, Credential, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
+import type { CoreAPI, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
@@ -16,7 +16,6 @@ import { useBatch, MAX_LIVE } from "../../lib/useBatch";
 import { Sparkline } from "../../components/charts/Mini";
 import { IfaceCharts, TalkerBars, TrapsTable, busiest, trend, type Counter, type Sample, type TrapMsg, type TrapRow } from "./VisParts";
 import "./visibility.css";
-import { useVaultVersion } from "../../lib/vaultSignal";
 
 type Sub = "topo" | "snmp" | "traps" | "flows" | "gnmi";
 const subs: [Sub, Key][] = [["topo", "visibility.sub.topo"], ["snmp", "visibility.sub.snmp"], ["traps", "visibility.sub.traps"], ["flows", "visibility.sub.flows"], ["gnmi", "visibility.sub.gnmi"]];
@@ -106,16 +105,6 @@ function Report({ r }: { r: { busy: boolean; data: string | null; error: string 
 
 const kbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
 
-function useCredentials(core: CoreAPI) {
-  const t = useT();
-  const [creds, setCreds] = useState<Credential[]>([]);
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => {
-    core.listCredentials().then(passwordCreds).then(setCreds).catch(() => setCreds([])); // bóveda cerrada: sin lista
-  }, [core, vv]);
-  return [["", t("visibility.none")], ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])] as [string, string][];
-}
-
 const words = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 
 function TopoPanel({ core }: { core: CoreAPI }) {
@@ -179,7 +168,7 @@ type PanelProps = { core: CoreAPI; active: boolean; onRun: (running: boolean) =>
 
 function SnmpPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
-  const credOpts = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [host, setHost] = useState("");
   const [port, setPort] = useState("161");
   const [version, setVersion] = useState<"2c" | "3">("2c");
@@ -209,7 +198,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
           <Select label={t("visibility.version")} value={version} onChange={setVersion} options={[["2c", "v2c"], ["3", "v3 authPriv"]]} w="md" />
         </div>
         <div className="field-row">
-          <Select label={t("visibility.snmp.cred")} value={cred} onChange={setCred} options={credOpts} w="lg" />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} hint={t("visibility.snmp.credHint")} w="lg" />
           {version === "3" && (
             <>
               <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
@@ -287,7 +276,7 @@ function SnmpPanel({ core, active, onRun }: PanelProps) {
 
 function TrapsPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
-  const credOpts = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [addr, setAddr] = useState("127.0.0.1:1162");
   const [any, setAny] = useState(false);
   const [save, setSave] = useState(false);
@@ -322,7 +311,7 @@ function TrapsPanel({ core, active, onRun }: PanelProps) {
       <Section title={t("visibility.sec.listen")} description={t("visibility.traps.note")}>
         <div className="field-row">
           <Field label={t("visibility.listenAddr")} value={addr} onChange={(v) => { setAddr(v); o.touch("addr"); }} w="lg" mono error={o.errors.addr} />
-          <Select label={t("visibility.traps.user")} value={cred} onChange={setCred} options={credOpts} w="lg" />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} label={t("visibility.traps.user")} optional w="lg" />
           {cred && (
             <>
               <Select label={t("visibility.auth")} value={auth} onChange={setAuth} options={authOpts} w="md" />
@@ -432,7 +421,7 @@ interface GnmiUpd { id?: number; Path?: string; Value?: unknown; Sync?: boolean;
 
 function GnmiPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
-  const credOpts = useCredentials(core);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [host, setHost] = useState("");
   const [port, setPort] = useState("9339");
   const [cred, setCred] = useState("");
@@ -458,7 +447,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
         <div className="field-row">
           <Field label={t("visibility.host")} value={host} onChange={setHost} w="lg" mono />
           <Field label={t("visibility.port")} type="number" value={port} onChange={setPort} w="xs" mono />
-          <Select label={t("visibility.gnmi.cred")} value={cred} onChange={setCred} options={credOpts} w="md" />
+          <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} optional />
         </div>
         <Field label={t("visibility.gnmi.ca")} value={ca} onChange={setCa} w="full" mono />
       </Section>

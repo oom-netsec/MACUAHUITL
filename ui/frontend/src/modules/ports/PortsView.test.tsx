@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { PortsView } from "./PortsView";
 import { fakeCore } from "../../lib/fake";
 import { samplePlan } from "./fake";
-import { ModuleIdContext } from "../../app/activity";
+import { ModuleIdContext, NavContext } from "../../app/activity";
 import { START, clickWhenReady, confirmStep, lineText } from "../../lib/assistTestkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
@@ -492,4 +492,12 @@ test("si assistWatch falla justo al arrancar, la ejecución queda «sin conexió
   await plan(core);
   await start();
   expect(await screen.findByRole("button", { name: /Volver a enganchar/ })).toBeInTheDocument();
+});
+
+test("con la bóveda cerrada, la credencial lo dice y lleva a abrirla en vez de un select vacío", async () => {
+  const go = vi.fn();
+  const core = fakeCore({ vaultStatus: vi.fn(async () => ({ state: "locked" as const, armedJobs: [] })) });
+  render(<NavContext.Provider value={{ go, inbox: {} }}><PortsView core={core} /></NavContext.Provider>);
+  await userEvent.click(await screen.findByRole("button", { name: "Abrir bóveda" }));
+  expect(go).toHaveBeenCalledWith("vault");
 });

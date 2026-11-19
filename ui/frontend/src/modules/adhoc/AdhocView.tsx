@@ -1,8 +1,8 @@
 import { plural } from "../../lib/plural";
-import { passwordCreds } from "../vault/api";
+import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { useEffect, useRef, useState } from "react";
-import type { AdhocResult, CoreAPI, Credential } from "../../lib/core";
-import { Field, Notice, Select, TextArea } from "../../components/Field";
+import type { AdhocResult, CoreAPI } from "../../lib/core";
+import { Field, Notice, TextArea } from "../../components/Field";
 import { ExportMenu } from "../../components/Files";
 import { AdhocMatrix } from "./AdhocMatrix";
 import { EmptyState, Page, ResultPanel, useResult } from "../../components/Page";
@@ -11,7 +11,6 @@ import { parseTargets } from "../patrol/PatrolView";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { useVaultVersion } from "../../lib/vaultSignal";
 import { parseFingerprints } from "../../lib/hostkeys";
 
 // Lotes: comandos de solo lectura en varios equipos, como un trabajo de Patrol de una ronda.
@@ -32,7 +31,7 @@ export function parseTarget(s: string): { address: string; port: number } {
 // maxWaitMs: tope de la espera del resultado; pasado, se deja de preguntar (el trabajo sigue en Patrol).
 export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { core: CoreAPI; pollMs?: number; maxWaitMs?: number }) {
   const t = useT();
-  const [creds, setCreds] = useState<Credential[]>([]);
+  const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   const [commands, setCommands] = useState(["show version", "show ip interface brief"].join("\n"));
@@ -43,8 +42,6 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const r = useResult<AdhocResult | null>();
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const run = () => {
     setNote(""); setPicked("");
@@ -78,7 +75,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
 
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
-      <Select label={t("assist.cred")} value={cred} onChange={setCred} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} w="lg" />
+      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={setCred} w="lg" />
       <TextArea label={t("adhoc.devices")} value={devices} onChange={setDevices} rows={3} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
       <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />
