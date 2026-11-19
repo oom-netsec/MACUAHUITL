@@ -124,9 +124,17 @@ func (b *Bridge) TerminalSend(id, data string) error {
 // TerminalAnswer manda las respuestas de una ronda de preguntas (una por pregunta, mismo seq) por el mismo stream.
 // Las respuestas son secretos: no se guardan, no se registran y los bytes enviados se ponen en ceros al volver.
 func (b *Bridge) TerminalAnswer(id string, seq uint32, answers []string) error {
+	return wrapErr(b.terminalAnswer(id, seq, answers, nil))
+}
+
+// afterClear (solo pruebas) recibe los bytes ya puestos en ceros: así se ve que el clear() ocurre.
+func (b *Bridge) terminalAnswer(id string, seq uint32, answers []string, afterClear func([][]byte)) error {
 	bs := make([][]byte, len(answers))
 	for i, a := range answers {
 		bs[i] = []byte(a)
+	}
+	if afterClear != nil {
+		defer afterClear(bs)
 	}
 	defer func() {
 		for _, x := range bs {

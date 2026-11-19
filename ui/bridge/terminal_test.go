@@ -1,10 +1,12 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -171,5 +173,101 @@ func TestTerminalCerrarEnPregunta(t *testing.T) {
 	}
 	if g := <-ft.got; g != "abort-before-answer" {
 		t.Fatalf("got %q", g)
+	}
+}
+
+// rondasTerminal pregunta dos veces (seq 1 y 2) y reporta lo recibido; nunca repite los secretos.
+type rondasTerminal struct {
+	v1.UnimplementedTerminalServiceServer
+	got chan string
+}
+
+func (f rondasTerminal) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
+	if _, err := st.Recv(); err != nil {
+		return err
+	}
+	for seq := uint32(1); seq <= 2; seq++ {
+		st.Send(&v1.OpenTerminalResponse{AuthPrompt: &v1.AuthPrompt{Seq: seq, Prompts: []*v1.AuthQuestion{{Text: "Password: "}}}})
+		m, err := st.Recv()
+		if err != nil {
+			return nil
+		}
+		a := m.GetAuthAnswer()
+		f.got <- fmt.Sprintf("answer %d %q", a.Seq, a.Answers[0])
+	}
+	st.Send(&v1.OpenTerminalResponse{Opened: "ok"})
+	for {
+		if _, err := st.Recv(); err != nil {
+			return nil
+		}
+	}
+}
+
+func rondasSetup(t *testing.T) (*Bridge, *recorder, rondasTerminal) {
+	d, _ := os.MkdirTemp("", "brg")
+	t.Cleanup(func() { os.RemoveAll(d) })
+	sock := ipctest.Addr(d)
+	l, _ := ipc.Listen(sock)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	ft := rondasTerminal{got: make(chan string, 4)}
+	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterTerminalServiceServer(r, ft) })
+	rec := &recorder{}
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
+	Start(ctx, b)
+	return b, rec, ft
+}
+
+// Varias rondas: cada pregunta (seq 1 y 2) se emite y se contesta con su seq; los eventos emitidos no llevan el secreto.
+func TestTerminalVariasRondasSinSecretoEnEventos(t *testing.T) {
+	const secreto = "S3cr3to-marcador"
+	b, rec, ft := rondasSetup(t)
+	id, err := b.TerminalOpen(TerminalDTO{Address: "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.waitFor(t, `terminal:auth {"instruction":"","name":"","prompts":[{"echo":false,"text":"Password: "}],"runId":"`+id+`","seq":1}`)
+	if err := b.TerminalAnswer(id, 1, []string{secreto}); err != nil {
+		t.Fatal(err)
+	}
+	if g := <-ft.got; g != `answer 1 "`+secreto+`"` {
+		t.Fatalf("ronda 1: %q", g)
+	}
+	rec.waitFor(t, `terminal:auth {"instruction":"","name":"","prompts":[{"echo":false,"text":"Password: "}],"runId":"`+id+`","seq":2}`)
+	if err := b.TerminalAnswer(id, 2, []string{secreto + "2"}); err != nil {
+		t.Fatal(err)
+	}
+	if g := <-ft.got; g != `answer 2 "`+secreto+`2"` {
+		t.Fatalf("ronda 2: %q", g)
+	}
+	rec.waitFor(t, `terminal:opened {"opened":"ok","recording":"","runId":"`+id+`"}`)
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	for _, e := range rec.evs {
+		if strings.Contains(e, secreto) {
+			t.Fatalf("el evento lleva el secreto: %s", e)
+		}
+	}
+}
+
+// Los bytes de las respuestas se ponen en ceros al volver (si se quita el clear, esta prueba falla).
+func TestTerminalAnswerPoneEnCerosLosBytes(t *testing.T) {
+	b, rec, _ := rondasSetup(t)
+	id, err := b.TerminalOpen(TerminalDTO{Address: "192.0.2.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.waitFor(t, `terminal:auth {"instruction":"","name":"","prompts":[{"echo":false,"text":"Password: "}],"runId":"`+id+`","seq":1}`)
+	called := false
+	err = b.terminalAnswer(id, 1, []string{"secreto"}, func(bs [][]byte) {
+		called = true
+		for _, x := range bs {
+			if !bytes.Equal(x, make([]byte, len(x))) {
+				t.Errorf("quedó sin borrar: %q", x)
+			}
+		}
+	})
+	if err != nil || !called {
+		t.Fatal(err, called)
 	}
 }

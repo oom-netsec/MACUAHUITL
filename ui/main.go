@@ -58,6 +58,7 @@ func main() {
 		Icon: icon,
 		// Con la etiqueta production Wails descarta su registro: sin esto, un pánico cerraría la ventana sin rastro.
 		// Solo avisos y errores, a stderr (el journal de la sesión).
+		// No bajar a Debug: wails registra los argumentos de las llamadas, incluidas las respuestas de autenticación de la terminal.
 		Logger: slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn})),
 		// Wayland toma el app_id de este nombre y GNOME busca macuahuitl.desktop con él para el ícono del dock;
 		// fijo para que no dependa del nombre del ejecutable.
