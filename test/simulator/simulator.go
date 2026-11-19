@@ -40,7 +40,8 @@ type Config struct {
 	DropDuringCommand                    string        // al recibir este comando manda media salida y corta
 	DropDuringCommands                   []string      // lo mismo con varios comandos: cada sesión corta en el primero de la lista que reciba
 	KeyboardInteractive                  bool          // además de password, ofrece keyboard-interactive y re-pregunta 3 veces como IOS
-	Attempts                             *atomic.Int32 // si no es nil, cuenta cada contraseña recibida (password o KI)
+	Attempts                             *atomic.Int32 // si no es nil, cuenta cada contraseña recibida (password o KI); con OTP, cada ronda
+	OTP                                  string        // si no está vacío, keyboard-interactive hace una ronda MFA (contraseña + código); una respuesta mala es un fallo
 	SlowCommand                          string        // este comando tarda SlowDelay en responder
 	SlowDelay                            time.Duration
 	StreamCommand                        string // este comando manda StreamLines líneas, una cada SlowDelay (una salida grande y lenta)
@@ -190,7 +191,7 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 			return nil, errors.New("llave no autorizada")
 		}
 	}
-	if !c.NoPassword {
+	if !c.NoPassword && c.OTP == "" { // con MFA el método password no existe: solo se entra por keyboard-interactive con el código
 		cfg.PasswordCallback = func(m ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
 			if c.Attempts != nil {
 				c.Attempts.Add(1)
@@ -201,7 +202,21 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 			return nil, errors.New("acceso denegado")
 		}
 	}
-	if c.KeyboardInteractive && !c.NoPassword {
+	if c.OTP != "" && !c.NoPassword {
+		cfg.KeyboardInteractiveCallback = func(m ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
+			ans, err := ch("MFA", "Enter password and code", []string{"Password: ", "Verification code: "}, []bool{false, true})
+			if err != nil {
+				return nil, err
+			}
+			if c.Attempts != nil {
+				c.Attempts.Add(1)
+			}
+			if len(ans) == 2 && dev.checkLogin(m.User(), ans[0]) && ans[1] == c.OTP {
+				return nil, nil
+			}
+			return nil, errors.New("acceso denegado")
+		}
+	} else if c.KeyboardInteractive && !c.NoPassword {
 		cfg.KeyboardInteractiveCallback = func(m ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
 			for i := 0; i < 3; i++ {
 				ans, err := ch("", "", []string{"Password: "}, []bool{false})

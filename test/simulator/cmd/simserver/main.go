@@ -22,12 +22,13 @@ func (tb) Fatalf(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...); os.
 func main() {
 	transcripts := flag.String("transcripts", "", "carpeta de transcripciones (test/transcripts/ios-xe)")
 	addrFile := flag.String("addrfile", "", "archivo donde escribir host:puerto al estar listo")
+	otp := flag.String("otp", "", "si no está vacío, el login pide contraseña y este código (MFA)")
 	flag.Parse()
 	if *transcripts == "" || *addrFile == "" {
-		fmt.Fprintln(os.Stderr, "uso: simserver -transcripts DIR -addrfile ARCHIVO")
+		fmt.Fprintln(os.Stderr, "uso: simserver -transcripts DIR -addrfile ARCHIVO [-otp CÓDIGO]")
 		os.Exit(2)
 	}
-	addr, _ := simulator.Start(tb{}, simulator.Config{Hostname: "SW-LAB-01", Username: "admin", Password: "pw-lab", Enable: "en-lab", Transcripts: *transcripts})
+	addr, _ := simulator.Start(tb{}, simulator.Config{Hostname: "SW-LAB-01", Username: "admin", Password: "pw-lab", Enable: "en-lab", OTP: *otp, Transcripts: *transcripts})
 	// Atómico: el script nunca lee un archivo a medio escribir.
 	tmp := *addrFile + ".tmp"
 	err := os.WriteFile(tmp, []byte(addr), 0o644)
