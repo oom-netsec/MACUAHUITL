@@ -49,11 +49,15 @@ type stuckStream struct {
 	ctx     context.Context
 	release chan struct{}
 	first   chan string
+	opened  chan string // si no es nil, recibe la ruta de cada archivo que abre el sink
 	sent    int
 }
 
 func (s *stuckStream) Context() context.Context { return s.ctx }
 func (s *stuckStream) Send(m *v1.SyslogResponse) error {
+	if m.RotatedPath != "" && s.opened != nil {
+		s.opened <- m.RotatedPath
+	}
 	if s.sent++; s.sent == 1 {
 		s.first <- m.Listening
 		return nil
@@ -129,33 +133,40 @@ func TestSyslogCambiarLaCarpetaAplicaALaSiguiente(t *testing.T) {
 	d := servicetest.New(t)
 	vieja := d.Outputs()
 	nueva := filepath.Join(t.TempDir(), "nueva")
-	st := &stuckStream{ctx: context.Background(), release: make(chan struct{}), first: make(chan string, 1)}
-	close(st.release)
-	done := make(chan error, 1)
-	go func() {
-		done <- (&toolsSvc{d: d}).Syslog(&v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true, Format: "crudo"}, st)
-	}()
-	addr := <-st.first
-	d.S.Apply(nueva, service.IngestDefaults{}) // cambia con la escucha en curso
-	if err := syslogdtest.SendUDP(addr, "<14>sigue en la vieja", 1); err != nil {
-		t.Fatal(err)
+	// escucha corre una escucha con archivo, le manda msg y la cierra cuando el sink abrió su archivo: sin un
+	// DurationSeconds corto que, con el runner de Windows cargado, se acababa antes de que llegara el datagrama.
+	escucha := func(msg string, mientras func()) {
+		t.Helper()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		st := &stuckStream{ctx: ctx, release: make(chan struct{}), first: make(chan string, 1), opened: make(chan string, 4)}
+		close(st.release)
+		done := make(chan error, 1)
+		go func() {
+			done <- (&toolsSvc{d: d}).Syslog(&v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 60, Save: true, Format: "crudo"}, st)
+		}()
+		addr := <-st.first
+		mientras()
+		if err := syslogdtest.SendUDP(addr, msg, 1); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-st.opened:
+		case <-time.After(10 * time.Second):
+			cancel()
+			<-done // que la escucha cierre antes de que la limpieza borre la carpeta
+			t.Fatal("el sink no abrió su archivo")
+		}
+		cancel()
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	escucha("<14>sigue en la vieja", func() { d.S.Apply(nueva, service.IngestDefaults{}) }) // cambia con la escucha en curso
 	if f, _ := filepath.Glob(filepath.Join(vieja, "syslog", "*.log")); len(f) != 1 {
 		t.Fatalf("la escucha en curso debía seguir en %s: %v", vieja, f)
 	}
-	st2 := &stuckStream{ctx: context.Background(), release: make(chan struct{}), first: make(chan string, 1)}
-	close(st2.release)
-	go func() {
-		done <- (&toolsSvc{d: d}).Syslog(&v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true, Format: "crudo"}, st2)
-	}()
-	addr = <-st2.first
-	syslogdtest.SendUDP(addr, "<14>va a la nueva", 1)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+	escucha("<14>va a la nueva", func() {})
 	if f, _ := filepath.Glob(filepath.Join(nueva, "syslog", "*.log")); len(f) != 1 {
 		t.Fatalf("la escucha nueva debía escribir en %s: %v", nueva, f)
 	}

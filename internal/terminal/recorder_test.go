@@ -493,32 +493,45 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 		t.Skip("lenta (con -race el detector multiplica el costo de las expresiones regulares)")
 	}
 	line := strings.Repeat("a", 79) + "\r\n"
-	run := func(size int) time.Duration {
-		var data []byte
+	// once mide una corrida: tiempo y bytes reservados (TotalAlloc no depende de la carga).
+	once := func(data []byte) (time.Duration, uint64) {
+		var m0, m1 runtime.MemStats
+		runtime.ReadMemStats(&m0)
+		r, _ := newRec()
+		start := time.Now()
+		for i := 0; i < len(data); i += 4096 {
+			r.Output(data[i:min(i+4096, len(data))])
+		}
+		r.Close()
+		d := time.Since(start)
+		runtime.ReadMemStats(&m1)
+		return d, m1.TotalAlloc - m0.TotalAlloc
+	}
+	gen := func(size int) (data []byte) {
 		for len(data) < size {
 			data = append(data, line...)
 		}
-		best := time.Hour
-		for k := 0; k < 2 && best > 6*time.Second; k++ {
-			r, _ := newRec()
-			start := time.Now()
-			for i := 0; i < len(data); i += 4096 {
-				r.Output(data[i:min(i+4096, len(data))])
-			}
-			r.Close()
-			best = min(best, time.Since(start))
-		}
-		return best
+		return data
 	}
-	t1, t5 := run(1<<20), run(5<<20)
-	t.Logf("1 MB en %v, 5 MB en %v", t1, t5)
-	// El tope absoluto está medido en los runners de Linux; el de Windows (Defender, menos CPU) tarda más sin que sea
-	// regresión. La proporción de abajo, que es la que detecta el crecimiento cuadrático, vale en todos.
-	if runtime.GOOS == "linux" && t5 > 6*time.Second {
-		t.Errorf("5 MB tardó %v", t5)
+	d1, d5 := gen(1<<20), gen(5<<20)
+	// Intercaladas y el mejor de tres: un cambio de carga de otra suite pega en las dos medidas por igual.
+	t1, t5 := time.Duration(1<<63-1), time.Duration(1<<63-1)
+	var a1, a5 uint64
+	for range 3 {
+		d, a := once(d1)
+		t1, a1 = min(t1, d), a
+		d, a = once(d5)
+		t5, a5 = min(t5, d), a
 	}
+	t.Logf("1 MB en %v (%d B reservados), 5 MB en %v (%d B)", t1, a1, t5, a5)
+	// Sin tope absoluto de tiempo: medía la velocidad de la máquina (falló con 6,1 s en local con otra suite corriendo),
+	// no la forma. Las proporciones detectan el crecimiento cuadrático; la de memoria además es determinista y atrapa la
+	// forma más común (copiar el búfer acumulado en cada trozo).
 	if t5 > 12*t1+500*time.Millisecond { // lineal ≈ 5×; cuadrático ≈ 25×
 		t.Errorf("el tiempo no crece en forma lineal: 1 MB %v, 5 MB %v", t1, t5)
+	}
+	if a5 > 7*a1 {
+		t.Errorf("la memoria no crece en forma lineal: 1 MB %d B, 5 MB %d B", a1, a5)
 	}
 }
 
