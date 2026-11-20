@@ -29,6 +29,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
@@ -596,7 +597,11 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		for {
 			n, err := r.Read(buf)
 			if n > 0 {
-				chunks <- append([]byte(nil), buf[:n]...)
+				select {
+				case chunks <- append([]byte(nil), buf[:n]...):
+				case <-readerExit: // el repartidor ya salió (cliente ido): no quedarse bloqueado en el canal
+					return
+				}
 			}
 			if err != nil {
 				readErr = err
@@ -605,12 +610,15 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		}
 	}()
 	var lg *telnetLogin
+	var pass *secret.Secret // del login automático: lo destruye la goroutine que lo usa, al salir
 	if telnet && !typed {
-		lg = newTelnetLogin(cred.Username, cred.Password, w, s.loginQuiet, s.loginFirst, s.loginNext)
+		pass, cred.Password = cred.Password, nil
+		lg = newTelnetLogin(cred.Username, pass, w, s.loginQuiet, s.loginFirst, s.loginNext)
 		loginActive.Store(true)
 	}
 	go func() { // chunks → pantalla y grabación (y el login automático); solo este goroutine envía por el stream desde aquí
 		defer close(readerExit)
+		defer pass.Destroy()
 		for {
 			var quiet, limit <-chan time.Time
 			if lg != nil {
@@ -637,8 +645,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 				lg.expired()
 			}
 			if lg != nil && lg.state == loginAfterPass && loginActive.Load() { // la contraseña ya salió: lo tecleado vuelve a pasar
+				pass.Destroy()
 				loginActive.Store(false)
-				loginMode.Store("auto") // un rechazo visto después lo cambia a manual
+				loginMode.Store("sent") // el veredicto del equipo lo cambia a auto o manual
 			}
 			if lg != nil && lg.finished {
 				loginMode.Store(lg.result)

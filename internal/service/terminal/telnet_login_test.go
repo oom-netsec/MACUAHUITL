@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
@@ -80,7 +78,9 @@ func TestTelnetCredencialPasswordDeLineaYBanner(t *testing.T) {
 		t.Errorf("el equipo recibió %d contraseñas, quería 1", att.Load())
 	}
 	close(st.in)
-	wait(t, done)
+	if err := wait(t, done); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Contraseña rechazada: se manda una sola vez, avisa y sigue a mano (la sesión no se corta).
@@ -134,5 +134,50 @@ func TestTelnetCredencialDeLlave(t *testing.T) {
 	if err := wait(t, done); reason(t, err) != "terminal.err.key_credential" || conns.Load() != 0 {
 		t.Fatalf("err = %v, conexiones = %d", err, conns.Load())
 	}
-	_ = codes.FailedPrecondition
+}
+
+// Revisión de 48-3: un AAA lento (el equipo calla tras la contraseña) no se da por entrada; el rechazo que llega
+// después se ve, se avisa y se audita.
+func TestTelnetCredencialRechazoLento(t *testing.T) {
+	r, att := newTelnetCredRig(t, simulator.Config{Password: "pw", TelnetVerdictDelay: 800 * time.Millisecond}, "MARCA-MALA-LENTA")
+	st, done, cancel := r.session(r.open)
+	defer cancel()
+	if out := st.waitFor(t, "a mano"); !strings.Contains(out, "rechaz") {
+		t.Errorf("aviso = %q", out)
+	}
+	if att.Load() != 1 {
+		t.Fatalf("el equipo recibió %d contraseñas, quería 1", att.Load())
+	}
+	close(st.in)
+	wait(t, done)
+	if a := r.d.AuditText(); !strings.Contains(a, "login=manual") {
+		t.Errorf("auditoría sin login=manual:\n%s", a)
+	}
+}
+
+// Sin veredicto antes de cerrar (el equipo sigue callado): la auditoría dice que se mandó, no que entró.
+func TestTelnetCredencialSinVeredicto(t *testing.T) {
+	r, _ := newTelnetCredRig(t, simulator.Config{Password: "pw", TelnetVerdictDelay: time.Hour}, "pw")
+	st, done, cancel := r.session(r.open)
+	defer cancel()
+	st.waitFor(t, "Password: ")
+	time.Sleep(600 * time.Millisecond) // varias veces loginQuiet: si diera «auto» por silencio, ya lo habría hecho
+	close(st.in)
+	wait(t, done)
+	if a := r.d.AuditText(); !strings.Contains(a, "login=sent") {
+		t.Errorf("auditoría sin login=sent:\n%s", a)
+	}
+}
+
+// Una credencial sin contraseña no gasta un intento con una respuesta vacía: pasa a mano sin mandar nada.
+func TestTelnetCredencialSinContrasena(t *testing.T) {
+	r, att := newTelnetCredRig(t, simulator.Config{Password: "pw"}, "")
+	st, done, cancel := r.session(r.open)
+	defer cancel()
+	st.waitFor(t, "a mano")
+	if att.Load() != 0 {
+		t.Errorf("mandó %d contraseñas vacías", att.Load())
+	}
+	close(st.in)
+	wait(t, done)
 }

@@ -45,7 +45,7 @@ El núcleo contesta el login solo cuando el pedido trae `credential_id` (o un ho
 - **Nada de lo enviado se graba ni se audita.** Las respuestas del núcleo no pasan por el grabador (solo la salida del
   equipo, que no hace eco de la contraseña). La auditoría dice `credential=<id> user=%q protocol=telnet login=auto|manual`,
   nunca la contraseña. Los buffers se borran al enviarse.
-- **Credencial de llave SSH:** no sirve para Telnet: `FailedPrecondition` `terminal.err.telnet_key_credential`.
+- **Credencial de llave SSH:** no sirve para Telnet: `FailedPrecondition` `terminal.err.key_credential`.
 
 ## Bloques (cada uno con su prueba roja primero; PRs de a uno)
 

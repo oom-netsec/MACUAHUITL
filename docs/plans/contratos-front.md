@@ -1461,5 +1461,8 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
   guardada también viaja en texto claro.»). Si el equipo no pregunta a tiempo, `terminal.telnet.manual_login`; si
   rechaza la credencial, `terminal.telnet.login_rejected`. En los dos casos la sesión sigue y se teclea a mano; la
   contraseña nunca se reintenta.
-- **Lo tecleado** antes de que el núcleo mande la contraseña se descarta; después pasa normal.
-- **Auditoría:** `credential=<id> user="…" protocol=telnet cleartext=true` y, al cerrar, `login=auto` o `login=manual`.
+- **Lo tecleado** antes de que el núcleo mande la contraseña se descarta (el aviso de la credencial lo dice); después
+  pasa normal. Una credencial sin contraseña no se usa: aviso `manual_login`, sin mandar nada.
+- **Auditoría:** `credential=<id> user="…" protocol=telnet cleartext=true` y, al cerrar, `login=auto` (el equipo mostró
+  su prompt), `login=manual` (rechazó o no preguntó: se siguió a mano) o `login=sent` (la contraseña salió y el equipo no
+  dio veredicto antes de cerrar o en 10 s).

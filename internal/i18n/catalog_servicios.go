@@ -33,7 +33,7 @@ func init() {
 		"terminal.auth.login":                   e("usuario: ", "login as: "),
 		"terminal.err.telnet_field":             e("con Telnet no van usuario, huellas ni host de la libreta", "username, host key fingerprints and a saved host do not apply to Telnet"),
 		"terminal.err.protocol":                 e("protocolo de terminal desconocido", "unknown terminal protocol"),
-		"terminal.telnet.cleartext_cred":        e("La credencial guardada también viaja en texto claro.", "The stored credential also travels in clear text."),
+		"terminal.telnet.cleartext_cred":        e("La credencial guardada también viaja en texto claro. El núcleo contesta el login con ella; lo que teclees antes se descarta.", "The stored credential also travels in clear text. The core answers the login with it; anything you type before that is discarded."),
 		"terminal.telnet.manual_login":          e("El equipo no hizo la pregunta de login esperada a tiempo: sigue a mano.", "The device did not ask the expected login question in time: continue by hand."),
 		"terminal.telnet.login_rejected":        e("El equipo rechazó la credencial guardada (no se reintenta): sigue a mano.", "The device rejected the stored credential (it is not retried): continue by hand."),
 		"terminal.telnet.cleartext":             e("Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del equipo.", "Telnet: everything travels in clear text, password included, and the device identity is not verified."),
