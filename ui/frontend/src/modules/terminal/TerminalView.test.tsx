@@ -393,3 +393,11 @@ test("una llave de host cambiada llega por errorInfo y ofrece aceptarla aunque e
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
 });
+
+test("mientras se abre una sesión, el selector de la libreta queda deshabilitado: no salen dos aperturas", async () => {
+  const core = setup({ terminalOpen: vi.fn(() => new Promise<string>(() => {})) });
+  const pick = await screen.findByLabelText("Host de la libreta");
+  await userEvent.selectOptions(pick, "b".repeat(32)); // sin credencial: abre al elegir
+  await waitFor(() => expect(pick).toBeDisabled());
+  expect(core.terminalOpen).toHaveBeenCalledTimes(1);
+});
