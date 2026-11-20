@@ -17,7 +17,7 @@ import (
 // Lecturas de solo lectura de la libreta de hosts para los servicios que no la administran (Patrol, cambio asistido,
 // terminal). Quien llama no debe tener una transacción ni filas abiertas: el núcleo tiene una sola conexión.
 
-const hostCols = `id, name, address, port, platform, folder, tags_json, credential_id, notes, startup_command, created_at, updated_at`
+const hostCols = `id, name, address, port, platform, folder, tags_json, credential_id, notes, startup_command, created_at, updated_at, protocol`
 
 // GenericHostAt dice si hay un host guardado linux o windows en esa dirección y puerto (0 = 22). La dirección se
 // normaliza igual que la libreta: minúsculas, y en IP netip con Unmap. Un error de la base es err; un host que no
@@ -41,7 +41,7 @@ func SavedHost(db *sql.DB, id string) (devices.Host, error) {
 	var h devices.Host
 	var tags, created, updated string
 	err := db.QueryRow(`SELECT `+hostCols+` FROM hosts WHERE id = ?`, id).Scan(&h.ID, &h.Name, &h.Address, &h.Port, &h.Platform, &h.Folder, &tags,
-		&h.CredentialID, &h.Notes, &h.StartupCommand, &created, &updated)
+		&h.CredentialID, &h.Notes, &h.StartupCommand, &created, &updated, &h.Protocol)
 	if err != nil {
 		return h, err
 	}

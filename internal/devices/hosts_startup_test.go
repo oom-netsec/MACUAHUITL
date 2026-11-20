@@ -105,7 +105,7 @@ func TestPlataformasGenericas(t *testing.T) {
 func TestCSVOrdenDeInicio(t *testing.T) {
 	hs := []FileHost{{Name: "box", Address: "10.0.0.2", Platform: "windows", StartupCommand: "wsl -d Ubuntu-26.04 --cd ~"}, {Name: "sw", Address: "10.0.0.3", Platform: "ios"}}
 	b, err := MarshalHostsCSV(hs)
-	if err != nil || !strings.Contains(string(b), ",notes,startup_command\n") {
+	if err != nil || !strings.Contains(string(b), ",notes,startup_command,protocol\n") {
 		t.Fatalf("%s %v", b, err)
 	}
 	got, err := ParseHostsCSV(b)
@@ -122,7 +122,7 @@ func TestCSVOrdenDeInicio(t *testing.T) {
 		t.Fatalf("columnas de más: %+v", got)
 	}
 	// una fila con orden inválida sale en errors con su campo
-	malo := cabecera + "\nsw,10.0.0.1,22,ios-xe,,,,,show version\nbox,10.0.0.2,22,linux,,,,,ls\u202e\n"
+	malo := cabecera + "\nsw,10.0.0.1,22,ios-xe,,,,,show version,\nbox,10.0.0.2,22,linux,,,,,ls\u202e,\n"
 	got, err = ParseHostsCSV([]byte(malo))
 	if err != nil || len(got.Hosts) != 0 || len(got.Errors) != 2 || got.Errors[0].Field != "startup_command" || got.Errors[1].Field != "startup_command" {
 		t.Fatalf("malo: %+v %v", got, err)

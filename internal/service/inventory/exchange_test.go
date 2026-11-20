@@ -297,7 +297,7 @@ func TestExportaYImportaCSV(t *testing.T) {
 	}
 	b, _ := os.ReadFile(csv)
 	txt := string(b)
-	if !strings.HasPrefix(txt, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command\n") || !strings.Contains(txt, "admin lab") || strings.Contains(txt, "sha256") || strings.Contains(txt, "hunter2") {
+	if !strings.HasPrefix(txt, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n") || !strings.Contains(txt, "admin lab") || strings.Contains(txt, "sha256") || strings.Contains(txt, "hunter2") {
 		t.Fatalf("csv:\n%s", txt)
 	}
 	cid := ""
@@ -470,7 +470,7 @@ func TestJSONSinSumaAvisaYValidaCampoPorCampo(t *testing.T) {
 func TestPlantillaYDescripcionDeCampos(t *testing.T) {
 	s, _ := nuevoSvc(t)
 	f, err := s.HostsImportFormat(bg, &v1.HostsImportFormatRequest{})
-	if err != nil || len(f.Fields) != 9 || f.MaxRows != 1000 || f.MaxBytes != 5<<20 {
+	if err != nil || len(f.Fields) != 10 || f.MaxRows != 1000 || f.MaxBytes != 5<<20 {
 		t.Fatalf("formato: %v %v", f, err)
 	}
 	if n := f.Fields[0]; n.Name != "name" || n.Type != "texto" || !n.Required || n.Example != "SW-CORE" || n.Description == "" {

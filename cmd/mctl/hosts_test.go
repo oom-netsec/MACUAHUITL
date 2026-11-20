@@ -211,7 +211,7 @@ func TestHostsCSVYErroresPorLinea(t *testing.T) {
 	if out := must(t, "", "hosts", "export", "--out", csv); !strings.Contains(out, "exportados 1") {
 		t.Fatalf("export csv: %q", out)
 	}
-	if b, _ := os.ReadFile(csv); !strings.HasPrefix(string(b), "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command\n") {
+	if b, _ := os.ReadFile(csv); !strings.HasPrefix(string(b), "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n") {
 		t.Fatalf("csv: %s", b)
 	}
 	if _, err := mctl(t, "", "hosts", "export", "--out", filepath.Join(dir, "h.txt")); err == nil {
@@ -261,7 +261,7 @@ func TestHostsPlantilla(t *testing.T) {
 		if strings.Count(pv, "new") != 3 || strings.Contains(pv, "inválid") || strings.Contains(pv, "conflict") {
 			t.Fatalf("la plantilla %s no pasa limpia:\n%s", f, pv)
 		}
-		if f == "csv" && !strings.HasPrefix(out, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command\n") {
+		if f == "csv" && !strings.HasPrefix(out, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n") {
 			t.Fatalf("csv:\n%s", out)
 		}
 		if f == "json" && strings.Contains(out, "sha256") {

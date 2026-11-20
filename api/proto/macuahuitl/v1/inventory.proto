@@ -65,6 +65,9 @@ message Device {
   // en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
   // llega con metadata.field = "startup_command", como los demás campos del host.
   string startup_command = 14;
+  // Fase 48-4: protocolo del host de la libreta, «ssh» (vacío) o «telnet». Con telnet el puerto por omisión es el 23 y no
+  // hay orden de inicio; solo la terminal interactiva lo usa. Error de validación: metadata.field = "protocol".
+  string protocol = 15;
 }
 
 message ListDevicesRequest {

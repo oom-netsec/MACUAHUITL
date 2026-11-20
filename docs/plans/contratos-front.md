@@ -1466,3 +1466,18 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
 - **Auditoría:** `credential=<id> user="…" protocol=telnet cleartext=true` y, al cerrar, `login=auto` (el equipo mostró
   su prompt), `login=manual` (rechazó o no preguntó: se siguió a mano) o `login=sent` (la contraseña salió y el equipo no
   dio veredicto antes de cerrar o en 10 s).
+
+### Telnet en la libreta de hosts (fase 48-4)
+
+- **`Device.protocol`** (campo 15 de inventory.proto): `""`/`"ssh"` o `"telnet"`. `PutDevice` guarda `"ssh"` si viene
+  vacío; `ListDevices` lo devuelve siempre. Otro valor: `InvalidArgument` `hosts.invalid_protocol` (`field=protocol`).
+- **Puerto:** `profile.port` se elige igual que antes; vacío = 22 con ssh, 23 con telnet.
+- **Telnet no admite** orden de inicio (`hosts.invalid_startup_command`, `field=startup_command`) ni una credencial de solo
+  llave (aunque el host sea linux o windows).
+- **Terminal por `host_id`:** el protocolo y el puerto salen del host. El pedido no lleva `protocol` (con `host_id` da
+  `terminal.err.host_and_address`). Un host telnet con credencial abre con login automático (48-3); sin credencial, se
+  teclea.
+- **Export/import:** el JSON lleva `"protocol": "telnet"` solo en hosts telnet (un host ssh sale igual que antes, misma
+  suma); el CSV suma la columna `protocol` al final y sigue aceptando los archivos sin ella.
+- **Patrol, respaldos, ad hoc y cambios** usan SSH siempre: al elegir equipos de la libreta para esas tareas, la UI no
+  debería ofrecer hosts telnet (marcarían SSH al puerto 23 y fallarían).

@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -180,4 +181,54 @@ func TestTelnetCredencialSinContrasena(t *testing.T) {
 	}
 	close(st.in)
 	wait(t, done)
+}
+
+// Fase 48-4: un host Telnet de la libreta abre por Telnet con su protocolo y puerto; con credencial, el núcleo contesta
+// el login; sin credencial, se teclea. El pedido no trae protocolo (lo pone el host).
+func TestTelnetPorHostDeLaLibreta(t *testing.T) {
+	for _, conCred := range []bool{true, false} {
+		r, att := newTelnetCredRig(t, simulator.Config{Password: "pw"}, "pw")
+		cred := ""
+		if conCred {
+			cred = r.open.CredentialId
+		}
+		if _, err := r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at,protocol)
+			VALUES('h1','viejo',?,?,'ios','','[]',?,'','','t','t','telnet')`, r.host, r.port, cred); err != nil {
+			t.Fatal(err)
+		}
+		st, done, cancel := r.session(&v1.TerminalOpen{HostId: "h1"})
+		if first := <-st.out; first.Opened != r.host+":"+strconv.Itoa(int(r.port)) {
+			t.Fatalf("primer evento = %+v", first)
+		}
+		if !conCred {
+			st.waitFor(t, "Username: ")
+			st.data("admin\r")
+			st.waitFor(t, "Password: ")
+			st.data("pw\r")
+		}
+		st.waitFor(t, "SW1>")
+		if att.Load() != 1 {
+			t.Errorf("con credencial %v: %d contraseñas", conCred, att.Load())
+		}
+		close(st.in)
+		if err := wait(t, done); err != nil {
+			t.Fatal(err)
+		}
+		cancel()
+		if a := r.d.AuditText(); !strings.Contains(a, "protocol=telnet") || !strings.Contains(a, "host=h1") {
+			t.Errorf("auditoría:\n%s", a)
+		}
+	}
+}
+
+// Con host_id el protocolo lo pone el host: un pedido que además trae protocolo se rechaza sin marcar.
+func TestHostConProtocoloEnElPedido(t *testing.T) {
+	r, _ := newTelnetCredRig(t, simulator.Config{Password: "pw"}, "pw")
+	r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at,protocol)
+		VALUES('h1','viejo',?,?,'ios','','[]','','','','t','t','telnet')`, r.host, r.port)
+	_, done, cancel := r.session(&v1.TerminalOpen{HostId: "h1", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET})
+	defer cancel()
+	if err := wait(t, done); reason(t, err) != "terminal.err.host_and_address" {
+		t.Fatalf("err = %v", err)
+	}
 }

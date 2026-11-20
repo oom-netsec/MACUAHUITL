@@ -110,10 +110,10 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO pack_removed VALUES('ios-xe/x','oom/ios-xe')`); err != nil {
 				t.Fatalf("sin pack_removed: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t','')`); err != nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t','','ssh')`); err != nil {
 				t.Fatalf("sin hosts: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t','')`); err == nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t','','ssh')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
 			files, _ := migrations.ReadDir("migrations")
@@ -413,5 +413,31 @@ func TestMigracionJobRootsNoRompeUnaBaseConDatos(t *testing.T) {
 	var n, r int
 	if err := db.QueryRow(`SELECT (SELECT count(*) FROM jobs), (SELECT count(*) FROM job_roots)`).Scan(&n, &r); err != nil || n != 1 || r != 0 {
 		t.Fatalf("jobs = %d job_roots = %d err = %v", n, r, err)
+	}
+}
+
+// Fase 48-4: la columna protocol nace en «ssh» para los hosts que ya existían.
+func TestMigracionProtocoloDelHost(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.db")
+	seed(t, p, []string{"0001_init.sql", "0002_preferences.sql", "0003_job_history.sql", "0004_scripts.sql",
+		"0005_script_collections.sql", "0006_hosts.sql", "0007_pack_removed.sql", "0008_pack_hidden.sql",
+		"0009_audit_at.sql", "0010_host_startup.sql", "0011_host_folders.sql", "0012_job_roots.sql"})
+	old, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,created_at,updated_at)
+		VALUES('a','n','10.0.0.1',22,'ios','','[]','','','t','t')`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	db, err := Open(p) // aplica 0013 sobre el host que ya existía
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var s string
+	if err := db.QueryRow(`SELECT protocol FROM hosts WHERE id='a'`).Scan(&s); err != nil || s != "ssh" {
+		t.Fatalf("protocol = %q %v", s, err)
 	}
 }
