@@ -42,7 +42,7 @@ const XTermPane = lazy(() => import("./XTermPane"));
 // La salida viva se resalta con las reglas de la app (lib/termAnsi): solo líneas completas y sin ESC; el texto limpio (búsqueda, descarga y registro) no lleva códigos.
 
 interface Tab {
-  key: number; label: string; device: string; cred: string; user: string; ask?: AuthPrompt; hostId?: string; startup?: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
+  key: number; label: string; device: string; cred: string; user: string; ask?: AuthPrompt; hostId?: string; startup?: string; proto: "ssh" | "telnet"; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
   logPath: string; logAt: Date | null; logErr: string; // registro opcional en el archivo que eligió la persona
 }
 interface LogState { path: string; last: string; chain: Promise<void> }
@@ -65,6 +65,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [creds, setCreds] = useState<Credential[]>([]);
   const [cred, setCred] = useState("");
+  const [proto, setProto] = useState<"ssh" | "telnet">("ssh"); // Telnet: sin credencial, usuario, huellas ni libreta; el login se teclea en la terminal
   const [typed, setTyped] = useState(false); // sin credencial: el equipo pregunta usuario y contraseña en la propia terminal
   const [user, setUser] = useState(""); // usuario opcional en modo tecleado; vacío = «login as:»
   const [device, setDevice] = useState("");
@@ -126,7 +127,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const ask = { seq: e.seq ?? 0, name: e.name ?? "", instruction: e.instruction ?? "", prompts: e.prompts };
       patch(e.runId, (t) => ({ ...t, ask }));
     } else if (e.opened) {
-      patch(e.runId, (t) => ({ ...t, ask: undefined, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
+      patch(e.runId, (t) => ({ ...t, ask: undefined, status: { k: t.proto === "telnet" ? "ssh.connectedTelnet" : "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
     } else if (e.data) {
       const d = e.data;
       texts.current.set(e.runId, cleanTerminal(texts.current.get(e.runId) ?? "", d, logs.current.has(e.runId) ? LOG_MAX : undefined));
@@ -186,7 +187,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
   // usr solo lo pasa quien sabe que el host no tiene credencial (modo tecleado); con credencial va vacío o el núcleo lo rechaza.
-  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "", usr = user, keys: AcceptedKey[] = []) => {
+  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "", usr = user, keys: AcceptedKey[] = [], pr = proto) => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setOpenHk(null); setErr(t("ssh.logInUse")); return; }
     setErr(""); setOpenHk(null); setBusy(true);
@@ -194,9 +195,9 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
       const base = { name: label, accept: parseFingerprints(accepted), ...(keys.length ? { acceptedKeys: keys } : {}), rows: size.current.rows, cols: size.current.cols };
-      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
+      const runId = await core.terminalOpen(pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, protocol: "telnet", address: tg.address, port: tg.port } : hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
-      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
+      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, proto: pr, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
       // La pestaña se registra ya (no al renderizar) para que ningún evento se quede sin dueño.
       tabsRef.current = [...tabsRef.current, tab];
@@ -209,7 +210,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       if (newRef.current) newRef.current.open = false;
     } catch (e) {
       const hk = hostKeyFromError(errorText(e), errInfo(e));
-      if (hk) setOpenHk({ hk, dev, cred: credId, user: usr, hostId, startup });
+      if (hk && pr === "ssh") setOpenHk({ hk, dev, cred: credId, user: usr, hostId, startup });
       else setErr(errorText(e));
     } finally { setBusy(false); }
   };
@@ -310,14 +311,14 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   };
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {
-    const hk = tab.err ? hostKeyFromError(tab.err, tab.errInfo) : null;
+    const hk = tab.err && tab.proto === "ssh" ? hostKeyFromError(tab.err, tab.errInfo) : null;
     const changedStartup = tab.errInfo?.reason === "terminal.err.startup_changed"; // el host se editó (o un import cambió la orden) tras mostrarla
     return (
       <>
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
         {tab.err && <Notice kind="error">{tab.err}</Notice>}
         {changedStartup && <Notice kind="warn">{t("ssh.startupChanged")}</Notice>}
-        {hk && hostKeyNotice(hk, tab.device, tab.hostId, (keys) => { void open(accept, tab.device, tab.cred, tab.hostId, tab.startup, tab.user, keys); })}
+        {hk && hostKeyNotice(hk, tab.device, tab.hostId, (keys) => { void open(accept, tab.device, tab.cred, tab.hostId, tab.startup, tab.user, keys, tab.proto); })}
       </>
     );
   };
@@ -335,14 +336,16 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const shownUser = typed || !credOk ? user : "";
   const form = (
     <>
-      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); }} />
-      <HostPicker core={core} disabled={busy} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />
+      {proto === "ssh" && <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); }} />}
+      {proto === "ssh" && <HostPicker core={core} disabled={busy} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />}
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />
-        {(typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
-        <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
-        <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
+        <Select label={t("ssh.proto")} value={proto} onChange={setProto} w="sm" options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
+        {proto === "ssh" && <Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />}
+        {proto === "ssh" && (typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
+        <Field label={t("ssh.device")} hint={t("ssh.portDefault", { port: proto === "telnet" ? "23" : "22" })} value={device} onChange={setDevice} w="lg" mono />
+        {proto === "ssh" && <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />}
       </div>
+      {proto === "telnet" && <Notice kind="warn">{t("ssh.telnetWarn")}</Notice>}
       <div className="field ssh-logpick" data-w="lg">
         <label htmlFor={logId}>{t("ssh.logTo")}</label>
         <div className="path">
@@ -353,7 +356,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         <p id={`${logId}-h`} className="hint">{t("ssh.logHelp")}</p>
       </div>
       <div className="actions">
-        <button className="primary" disabled={busy || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : credOk, undefined, "", typed || !credOk ? user : "")}>
+        <button className="primary" disabled={busy || !device.trim()} aria-busy={busy} onClick={() => open(accept, device, typed ? "" : credOk, undefined, "", typed || !credOk ? user : "", [], proto)}>
           {busy ? t("ssh.connectingBtn") : <>{t("ssh.openTab")}<kbd aria-hidden="true">Ctrl ↵</kbd></>}
         </button>
       </div>
@@ -365,7 +368,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {/* Sin sesiones, el formulario a la vista; con sesiones se pliega en una línea y la terminal se queda con la pantalla. */}
       {!hasTabs ? <Section title={t("ssh.new")}>{form}</Section> : <details ref={newRef} className="ssh-new"><summary>{t("ssh.new")}</summary>{form}</details>}
       {err && <Notice kind="error">{err}</Notice>}
-      {openHk && hostKeyNotice(openHk.hk, openHk.dev, openHk.hostId, (keys) => { void open(accept, openHk.dev, openHk.cred, openHk.hostId, openHk.startup, openHk.user, keys); })}
+      {openHk && hostKeyNotice(openHk.hk, openHk.dev, openHk.hostId, (keys) => { void open(accept, openHk.dev, openHk.cred, openHk.hostId, openHk.startup, openHk.user, keys, "ssh"); })}
       {note && <Notice kind="warn">{t(note === "nosession" ? "ssh.scriptNoSession" : "scripts.noSend")}</Notice>}
       {tabs.length === 0 && <EmptyState icon="terminal" title={t("ssh.empty.title")}>{t("ssh.empty")}</EmptyState>}
       {cur && !second && head(cur)}

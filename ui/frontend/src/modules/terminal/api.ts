@@ -5,7 +5,7 @@ import type { AcceptedKey } from "../../lib/hostkeys";
 
 // expectedStartupCommand: la orden de inicio que la UI le mostró a la persona (vacía = el host no debe tener); si no es la guardada el núcleo no conecta.
 // Con hostId el núcleo usa dirección, puerto, credencial y orden de inicio del host guardado; la UI no manda address, port ni credentialId.
-export interface TerminalOpenRequest { name: string; hostId?: string; address?: string; port?: number; credentialId?: string; username?: string; expectedStartupCommand?: string; accept: string[]; acceptedKeys?: AcceptedKey[]; rows: number; cols: number }
+export interface TerminalOpenRequest { name: string; hostId?: string; address?: string; port?: number; credentialId?: string; username?: string; expectedStartupCommand?: string; accept: string[]; acceptedKeys?: AcceptedKey[]; rows: number; cols: number; protocol?: "telnet" }
 // Pregunta de autenticación del equipo (terminal:auth): name, instruction y una pregunta por campo; echo=false es secreto.
 export interface AuthQuestion { text: string; echo: boolean }
 export interface AuthPrompt { seq: number; name: string; instruction: string; prompts: AuthQuestion[] }

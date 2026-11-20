@@ -25,9 +25,14 @@ type TerminalDTO struct {
 	ExpectedStartupCommand string `json:"expectedStartupCommand"`
 	// Username es del modo tecleado: viaja con dirección sin credencial o con hostId (el núcleo rechaza si el host tiene credencial); vacío = «login as:».
 	Username string `json:"username"`
+	// Protocol: "telnet" o vacío/"ssh". Con telnet viajan solo dirección y puerto: usuario, credencial, host guardado y huellas no aplican.
+	Protocol string `json:"protocol"`
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
+	if d.Protocol == "telnet" { // el puente es el límite de confianza: lo que no aplica a Telnet no pasa aunque llegue
+		return &v1.TerminalOpen{Name: d.Name, Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET, Address: d.Address, Port: d.Port, Rows: d.Rows, Cols: d.Cols}
+	}
 	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
 	if d.HostID != "" {
 		o.HostId, o.Username = d.HostID, d.Username // el núcleo decide: con credencial en el host responde username_with_credential
@@ -48,6 +53,9 @@ type termSess struct {
 // TerminalOpen abre la sesión y emite terminal:opened {runId, opened, recording},
 // terminal:data {runId, data} y terminal:done {runId, error?}. Cerrar la pestaña es TerminalClose.
 func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
+	if d.Protocol != "" && d.Protocol != "ssh" && d.Protocol != "telnet" {
+		return "", b.bridgeErr(i18n.New("terminal.err.protocol", nil))
+	}
 	c, err := b.client()
 	if err != nil {
 		return "", wrapErr(err)

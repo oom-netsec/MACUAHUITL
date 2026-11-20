@@ -3123,4 +3123,8 @@ export const en: Record<Key, string> = {
   "diag.stopTool": "Stop {tool}",
   "diag.cancelTool": "Cancel {tool}",
   "diag.clearTool": "Clear {tool}",
+  "ssh.proto": "Protocol",
+  "ssh.telnetWarn": "Telnet: everything travels in clear text, password included, and the device identity is not verified. The username and password are typed in the terminal when the device asks for them.",
+  "ssh.portDefault": "Default port: {port}.",
+  "ssh.connectedTelnet": "Telnet · connected to {port}; recording to {path}",
 };
