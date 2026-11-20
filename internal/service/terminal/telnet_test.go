@@ -94,7 +94,7 @@ func (r *rig) typedTelnet() *v1.TerminalOpen {
 	return &v1.TerminalOpen{Name: r.open.Name, Address: r.open.Address, Port: r.open.Port, Protocol: r.open.Protocol}
 }
 
-// Con Telnet no aplican username, huellas, credencial guardada (hasta 48-3) ni host_id (hasta 48-4): se rechazan sin marcar.
+// Con Telnet no aplican username, huellas ni host_id (hasta 48-4): se rechazan sin marcar.
 func TestTelnetCamposQueNoAplican(t *testing.T) {
 	var conns atomic.Int32
 	r := newTelnetRig(t, simulator.Config{Conns: &conns})
@@ -104,7 +104,6 @@ func TestTelnetCamposQueNoAplican(t *testing.T) {
 		"huella par": func(o *v1.TerminalOpen) {
 			o.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: r.host, Fingerprint: "SHA256:x"}}
 		},
-		"credencial": func(o *v1.TerminalOpen) { o.CredentialId = "c1" },
 	} {
 		o := r.typedTelnet()
 		mod(o)
@@ -115,7 +114,7 @@ func TestTelnetCamposQueNoAplican(t *testing.T) {
 			t.Errorf("%s: err = %v", name, err)
 		}
 	}
-	if !strings.Contains(r.d.AuditText(), `field not valid with telnet: credential_id`) {
+	if !strings.Contains(r.d.AuditText(), `field not valid with telnet: username`) {
 		t.Errorf("la auditoría no dice qué campo:\n%s", r.d.AuditText())
 	}
 	o := &v1.TerminalOpen{HostId: "h1", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET}
