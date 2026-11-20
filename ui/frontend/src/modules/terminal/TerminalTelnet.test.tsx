@@ -65,7 +65,7 @@ test("SSH no cambia: sin protocol y con su credencial", async () => {
   expect(calls(core)[0][0]).not.toHaveProperty("protocol");
 });
 
-test("al elegir Telnet sale el aviso de texto claro y se ocultan usuario, huellas y libreta; la credencial sigue", async () => {
+test("al elegir Telnet sale el aviso de texto claro y se ocultan usuario y huellas; la libreta sigue (cada host trae su protocolo) y la credencial también", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
   render(<TerminalView core={core} />);
   expect(await screen.findByLabelText("Credencial")).toBeInTheDocument();
@@ -75,7 +75,7 @@ test("al elegir Telnet sale el aviso de texto claro y se ocultan usuario, huella
   expect(screen.getByLabelText("Credencial")).toBeInTheDocument();
   expect(screen.queryByLabelText("Usuario (opcional)")).toBeNull();
   expect(screen.queryByLabelText(/Huellas aceptadas/)).toBeNull();
-  expect(screen.queryByRole("button", { name: "Conectar a LAB-CORE" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Conectar a LAB-CORE" })).toBeVisible();
   expect(screen.getByText("Puerto por omisión: 23.")).toBeInTheDocument();
 });
 

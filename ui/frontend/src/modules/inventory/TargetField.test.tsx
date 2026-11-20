@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TargetField, TargetsField, useBookCredential } from "./TargetField";
 import { fakeCore } from "../../lib/fake";
-import { sampleHosts } from "./fake";
+import { fakeInventory, sampleHosts, telnetHost } from "./fake";
 
 const hosts = sampleHosts; // LAB-CORE 10.9.0.1 (con credencial), LAB-AP ap1.lab:2222, OFI-SW 10.8.0.1
 const pick = async (name: string) => {
@@ -99,4 +99,13 @@ test("credencial de la libreta: otro host de la libreta la reemplaza; una elegid
   await userEvent.click(screen.getByRole("button", { name: "manual" }));
   await pick("LAB-CORE");
   expect(screen.getByRole("status")).toHaveTextContent("m"); // elegida a mano
+});
+
+test("el selector de la libreta no ofrece hosts telnet (esas tareas conectan por SSH)", async () => {
+  const inv = fakeInventory([...sampleHosts, telnetHost]);
+  render(<TargetField core={fakeCore({ ...inv })} value="" onChange={() => {}} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Elegir de la libreta" }));
+  const sel = await screen.findByLabelText("Host de la libreta");
+  expect(within(sel).getByRole("option", { name: /OFI-SW/ })).toBeInTheDocument();
+  expect(within(sel).queryByRole("option", { name: /OLD-SW/ })).toBeNull();
 });

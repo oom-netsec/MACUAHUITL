@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { TerminalView } from "./TerminalView";
 import { fakeCore } from "../../lib/fake";
 import { FakeTerm } from "./xtermMock";
-import { sampleHosts } from "../inventory/fake";
+import { fakeInventory, sampleHosts, telnetHost } from "../inventory/fake";
 
 vi.mock("@xterm/xterm", async () => ({ Terminal: (await import("./xtermMock")).FakeTerm }));
 vi.mock("@xterm/addon-fit", async () => ({ FitAddon: (await import("./xtermMock")).FakeFit }));
@@ -182,4 +182,33 @@ test("un host guardado sin credencial no manda un usuario cuyo campo ya no se ve
   await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-AP" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
   expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty("username");
+});
+
+const telnetCore = (c = [cred]) => fakeCore({ ...fakeInventory([...sampleHosts, telnetHost]), listCredentials: vi.fn(async () => c) });
+
+test("un host telnet abre por hostId sin protocol, username ni huellas, y la pestaña queda como Telnet", async () => {
+  const core = telnetCore();
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin"); // el campo visible no debe viajar
+  const b = await screen.findByRole("button", { name: "Conectar a OLD-SW" });
+  expect(b.closest("li")).toHaveTextContent("Telnet");
+  await userEvent.click(b);
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).toEqual({ name: "OLD-SW", hostId: telnetHost.id, accept: [], rows: expect.any(Number), cols: expect.any(Number) });
+  act(() => { core.emitTerminal({ runId: "t1", opened: "23" }); });
+  expect(await screen.findByText(/Telnet · conectado a 23/)).toBeVisible();
+  act(() => { core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "10.8.0.9:23", fingerprint: "SHA256:abc", key_type: "ssh-ed25519" } } }); });
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).toBeNull(); // Telnet no tiene huellas
+});
+
+test("con el formulario en Telnet la lista de hosts sigue y cada host abre con su protocolo", async () => {
+  const core = telnetCore();
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Protocolo"), "telnet");
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-AP" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).toEqual({ name: "LAB-AP", hostId: sampleHosts[1].id, expectedStartupCommand: "", accept: [], rows: expect.any(Number), cols: expect.any(Number) }); // ssh, sin usuario del campo oculto
 });

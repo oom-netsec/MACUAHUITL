@@ -3128,4 +3128,10 @@ export const en: Record<Key, string> = {
   "ssh.portDefault": "Default port: {port}.",
   "ssh.connectedTelnet": "Telnet · connected to {port}; recording to {path}",
   "ssh.telnetCredWarn": "The saved credential also travels in clear text: anyone who can watch the network can see it.",
+  "hosts.f.protocol": "Protocol",
+  "hosts.f.protocol.hint": "Telnet encrypts nothing and supports neither a start command nor a key credential.",
+  "hosts.f.port.hint": "Empty = {port}",
+  "hosts.telnet.title": "Connects over Telnet",
+  "hosts.err.protocol": "The core does not recognise that protocol: pick SSH or Telnet.",
+  "hosts.err.startTelnet": "Telnet does not support a start command.",
 };

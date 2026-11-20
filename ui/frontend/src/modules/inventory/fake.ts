@@ -19,8 +19,10 @@ export const sampleDevices: KnownDevices = {
 };
 
 const host = (h: Partial<Host> & Pick<Host, "id" | "name" | "address">): Host => ({
-  port: 22, platform: "ios-xe", folder: "", tags: [], credentialId: "", credentialLabel: "", notes: "", startCommand: "", ...h,
+  port: 22, platform: "ios-xe", folder: "", tags: [], credentialId: "", credentialLabel: "", notes: "", startCommand: "", protocol: "ssh", ...h,
 });
+
+export const telnetHost: Host = host({ id: "e".repeat(32), name: "OLD-SW", address: "10.8.0.9", port: 23, platform: "ios", folder: "Oficina", protocol: "telnet" });
 
 export const sampleHosts: Host[] = [
   host({ id: "a".repeat(32), name: "LAB-CORE", address: "10.9.0.1", folder: "Lab", tags: ["core"], credentialId: "c".repeat(32), credentialLabel: "admin lab", notes: "piso 2" }),
@@ -102,7 +104,7 @@ export function fakeInventory(initial: Host[] = sampleHosts) {
       if (hosts.some((h) => h.id !== d.id && h.name.toLowerCase() === d.name.toLowerCase())) throw new Error(`ya hay un host llamado "${d.name}"`);
       if (hosts.some((h) => h.id !== d.id && key(h) === key(d))) throw new Error(`${key(d)} ya está en la libreta`);
       const { credentialLabel = "" } = hosts.find((h) => h.credentialId === d.credentialId) ?? {};
-      const h = host({ ...d, id: d.id || String(++n).padStart(32, "0"), address: d.address.toLowerCase(), port: d.port || 22, credentialLabel });
+      const h = host({ ...d, id: d.id || String(++n).padStart(32, "0"), address: d.address.toLowerCase(), port: d.port || (d.protocol === "telnet" ? 23 : 22), credentialLabel });
       if (d.folder && !hasFolder(d.folder)) { okName(d.folder); folderNames.push(d.folder); }
       hosts = d.id ? hosts.map((x) => (x.id === h.id ? h : x)) : [...hosts, h];
       return { id: h.id, warnings: [] as string[] };

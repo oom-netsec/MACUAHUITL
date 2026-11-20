@@ -1,6 +1,6 @@
-import { PLATFORMS, draftOf, formOf, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { withProtocol, PLATFORMS, draftOf, formOf, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
-const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "", startCommand: "" };
+const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "", startCommand: "", protocol: "ssh" };
 
 test("un formulario correcto no tiene errores", () => {
   expect(validateHost(ok)).toEqual({});
@@ -126,4 +126,27 @@ test("errores con nombre fijo del núcleo (fase 44): credencial de llave fuera d
   expect(coreErrorField(err("InvalidArgument", "hosts.err.x", { field: "startup_command" }))).toBe("startCommand");
   expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.folder_not_empty", { host_count: "3", name: "Lab" }))).toEqual({ n: "3" });
   expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.otra_cosa", { host_count: "3" }))).toBeNull(); // otro FailedPrecondition no pide confirmar
+});
+
+test("cambiar de protocolo vacía el puerto de omisión del anterior y conserva uno elegido", () => {
+  expect(withProtocol(ok, "telnet")).toMatchObject({ protocol: "telnet", port: "" });
+  expect(withProtocol({ ...ok, port: "23", protocol: "telnet" }, "ssh").port).toBe("");
+  expect(withProtocol({ ...ok, port: "" }, "telnet").port).toBe("");
+  expect(withProtocol({ ...ok, port: "2222" }, "telnet").port).toBe("2222");
+  expect(withProtocol({ ...ok, port: "23" }, "telnet").port).toBe("23"); // 23 no es el de omisión de ssh: se conserva
+});
+
+test("con telnet no se envía orden de inicio y el puerto vacío es 23", () => {
+  const f = { ...ok, platform: "linux" as const, startCommand: "tmux", port: "" };
+  expect(draftOf(f)).toMatchObject({ port: 22, startCommand: "tmux", protocol: "ssh" });
+  expect(draftOf({ ...f, protocol: "telnet" })).toMatchObject({ port: 23, startCommand: "", protocol: "telnet" });
+  expect(validateHost({ ...f, protocol: "telnet", startCommand: " x " })).toEqual({}); // oculta: no se valida
+});
+
+test("los reasons de protocolo y orden de inicio traen su campo y su texto", () => {
+  const e = (reason: string, field: string) => Object.assign(new Error("x"), { cause: { code: "InvalidArgument", reason, metadata: { field } } });
+  expect(coreErrorField(e("hosts.invalid_protocol", "protocol"))).toBe("protocol");
+  expect(coreErrorKey(e("hosts.invalid_protocol", "protocol"))).toBe("hosts.err.protocol");
+  expect(coreErrorField(e("hosts.invalid_startup_command", "startup_command"))).toBe("startCommand");
+  expect(coreErrorKey(e("hosts.invalid_startup_command", "startup_command"))).toBe("hosts.err.startTelnet");
 });

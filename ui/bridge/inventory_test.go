@@ -23,7 +23,7 @@ func (f *fakeInventory) ListDevices(_ context.Context, r *v1.ListDevicesRequest)
 	f.req = r
 	if r.ManualOnly { // los hosts con sus valores, sin fusionar
 		return &v1.ListDevicesResponse{Devices: []*v1.Device{{Id: "abc", Name: "CORE", Hostname: "CORE", Target: &v1.Target{Address: "10.0.0.5"}, Profile: &v1.DeviceProfile{Port: 2222},
-			Folder: "Lab", Tags: []string{"core"}, CredentialId: "cid", CredentialLabel: "admin", Notes: "n"}}}, nil
+			Folder: "Lab", Tags: []string{"core"}, CredentialId: "cid", CredentialLabel: "admin", Notes: "n", Protocol: "telnet"}}}, nil
 	}
 	return &v1.ListDevicesResponse{Warnings: []string{"q=" + r.Query}, Devices: []*v1.Device{
 		{Id: "10.0.0.1", Hostname: "SW1", Platform: "ios-xe", LastSeenMs: 99, Sources: []string{"patrol", "flota"}, Target: &v1.Target{Address: "10.0.0.1"}},
@@ -91,12 +91,12 @@ func TestInventoryBridge(t *testing.T) {
 
 	// la libreta: solo los hosts manuales, con filtros
 	hs, err := b.ListHosts("co", "Lab", "core")
-	if err != nil || len(hs) != 1 || hs[0].ID != "abc" || hs[0].Address != "10.0.0.5" || hs[0].Port != 2222 || hs[0].Tags[0] != "core" || hs[0].Platform != "" || !f.req.ManualOnly || f.req.Folder != "Lab" || f.req.Tag != "core" || f.req.Query != "co" {
+	if err != nil || len(hs) != 1 || hs[0].ID != "abc" || hs[0].Address != "10.0.0.5" || hs[0].Port != 2222 || hs[0].Tags[0] != "core" || hs[0].Platform != "" || hs[0].Protocol != "telnet" || !f.req.ManualOnly || f.req.Folder != "Lab" || f.req.Tag != "core" || f.req.Query != "co" {
 		t.Fatalf("hosts = %+v req = %+v err = %v", hs, f.req, err)
 	}
-	res, err := b.SaveHost(HostDTO{Name: "N", Address: "10.0.0.9", Port: 22, Platform: "ios", Folder: "F", Tags: []string{"t"}, CredentialID: "cid", CredentialLabel: "ignorada", Notes: "x"})
+	res, err := b.SaveHost(HostDTO{Name: "N", Address: "10.0.0.9", Port: 22, Platform: "ios", Folder: "F", Tags: []string{"t"}, CredentialID: "cid", CredentialLabel: "ignorada", Notes: "x", Protocol: "telnet"})
 	p := f.put.Device
-	if err != nil || res.ID != "nuevo" || len(res.Warnings) != 1 || p.Name != "N" || p.Target.Address != "10.0.0.9" || p.Profile.Port != 22 || p.CredentialId != "cid" || p.CredentialLabel != "" || p.Tags[0] != "t" {
+	if err != nil || res.ID != "nuevo" || len(res.Warnings) != 1 || p.Name != "N" || p.Target.Address != "10.0.0.9" || p.Profile.Port != 22 || p.CredentialId != "cid" || p.CredentialLabel != "" || p.Protocol != "telnet" || p.Tags[0] != "t" {
 		t.Fatalf("save = %+v put = %+v err = %v (la etiqueta es de solo lectura)", res, p, err)
 	}
 	if err := b.DeleteHost("abc"); err != nil {

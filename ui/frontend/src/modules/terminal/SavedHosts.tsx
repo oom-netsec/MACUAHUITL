@@ -6,7 +6,7 @@ import type { Host } from "../inventory/api";
 import { useHostsVersion } from "../inventory/signal";
 
 // Conexión de un clic: un botón por host guardado. Manda solo el id; el núcleo pone dirección, puerto, credencial y orden de inicio.
-// Sin credencial el host abre en modo tecleado. Queda deshabilitado solo si su credencial no está disponible (bóveda cerrada o borrada).
+// Los de Telnet traen su protocolo: se abren igual por id. Sin credencial el host abre en modo tecleado. Queda deshabilitado solo si su credencial no está disponible (bóveda cerrada o borrada).
 export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; creds: Credential[]; busy: boolean; onConnect: (h: Host) => void }) {
   const t = useT();
   const hv = useHostsVersion();
@@ -28,6 +28,7 @@ export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; cr
             <li key={h.id}>
               <button type="button" disabled={busy || !ok} aria-describedby={[h.startCommand ? `${id}-${h.id}-run` : "", ok ? "" : `${id}-${h.id}`].filter(Boolean).join(" ") || undefined} aria-label={t("ssh.connectHost", { name: showHidden(h.name) })} onClick={() => onConnect(h)}>{showHidden(h.name)}</button>
               <span className="meta mono"> {h.address}</span>
+              {h.protocol === "telnet" && <span className="meta"> Telnet</span>}
               {h.startCommand && <span id={`${id}-${h.id}-run`} className="meta"> {t("ssh.saved.runs")} <code className="mono">{h.startCommand}</code></span>}
               {!ok && <span id={`${id}-${h.id}`} className="hint"> {t("ssh.saved.noCred")}</span>}
             </li>

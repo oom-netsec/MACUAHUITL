@@ -195,7 +195,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
       const base = { name: label, accept: parseFingerprints(accepted), ...(keys.length ? { acceptedKeys: keys } : {}), rows: size.current.rows, cols: size.current.cols };
-      const runId = await core.terminalOpen(pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, protocol: "telnet", address: tg.address, port: tg.port, credentialId: credId } : hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
+      const runId = await core.terminalOpen(hostId && pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, hostId } : pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, protocol: "telnet", address: tg.address, port: tg.port, credentialId: credId } : hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
       const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, proto: pr, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
@@ -333,11 +333,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     </div>
   );
   // Sin credencial de contraseña a la vista (llave, sin credencial o bóveda cerrada) se abre por hostId y el núcleo decide; el usuario solo viaja si su campo se ve.
-  const shownUser = typed || !credOk ? user : "";
+  const shownUser = proto === "ssh" && (typed || !credOk) ? user : "";
   const form = (
     <>
-      {proto === "ssh" && <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser, [], "ssh"); }} />}
-      {proto === "ssh" && <HostPicker core={core} disabled={busy} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser, [], "ssh"); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />}
+      {/* Cada host abre con su propio protocolo (lo pone el núcleo): la lista sirve aunque el formulario manual esté en Telnet. */}
+      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId || h.protocol === "telnet" ? "" : shownUser, [], h.protocol === "telnet" ? "telnet" : "ssh"); }} />
+      <HostPicker core={core} disabled={busy} onPick={(h) => { if (h.protocol === "telnet" || !passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId || h.protocol === "telnet" ? "" : shownUser, [], h.protocol === "telnet" ? "telnet" : "ssh"); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />
       <div className="field-row">
         <Select label={t("ssh.proto")} value={proto} onChange={(v) => { setProto(v); setOpenHk(null); if (v === "telnet") setTyped(true); }} w="sm" options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
         {<Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />}

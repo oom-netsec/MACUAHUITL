@@ -1,11 +1,11 @@
 import { errorText } from "../../components/Field";
 import { errInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
-import type { Host, HostDraft, HostPlatform } from "./api";
+import type { Host, HostDraft, HostPlatform, HostProtocol } from "./api";
 
 // Formulario de un host: todo en texto hasta guardar. Las reglas son las del contrato (docs/plans/contratos-front.md, fase 29b);
 // el núcleo vuelve a validar y su palabra manda.
-export interface HostForm { name: string; address: string; port: string; platform: HostPlatform; folder: string; tags: string; credentialId: string; notes: string; startCommand: string }
+export interface HostForm { name: string; address: string; port: string; platform: HostPlatform; folder: string; tags: string; credentialId: string; notes: string; startCommand: string; protocol: HostProtocol }
 export type HostField = keyof HostForm;
 
 export const PLATFORMS: [HostPlatform, string][] = [["ios", "IOS"], ["ios-xe", "IOS-XE"], ["nx-os", "NX-OS"], ["asa", "ASA"], ["ftd", "FTD"], ["ise", "ISE"], ["iosxr", "IOS-XR"], ["wlc", "WLC"], ["linux", "Linux"], ["windows", "Windows"]];
@@ -16,10 +16,10 @@ export const hostPlatformOf = (p: string): HostPlatform => {
   return PLATFORMS.some(([x]) => x === v) ? (v as HostPlatform) : "";
 };
 
-export const emptyForm: HostForm = { name: "", address: "", port: "22", platform: "", folder: "", tags: "", credentialId: "", notes: "", startCommand: "" };
+export const emptyForm: HostForm = { name: "", address: "", port: "22", platform: "", folder: "", tags: "", credentialId: "", notes: "", startCommand: "", protocol: "ssh" };
 
-export const formOf = (h: Pick<Host, "name" | "address" | "port" | "platform" | "folder" | "tags" | "credentialId" | "notes" | "startCommand">): HostForm =>
-  ({ name: h.name, address: h.address, port: String(h.port || 22), platform: h.platform, folder: h.folder, tags: h.tags.join(" "), credentialId: h.credentialId, notes: h.notes, startCommand: h.startCommand ?? "" });
+export const formOf = (h: Pick<Host, "name" | "address" | "port" | "platform" | "folder" | "tags" | "credentialId" | "notes" | "startCommand"> & { protocol?: HostProtocol }): HostForm =>
+  ({ name: h.name, address: h.address, port: String(h.port || 22), platform: h.platform, folder: h.folder, tags: h.tags.join(" "), credentialId: h.credentialId, notes: h.notes, startCommand: h.startCommand ?? "", protocol: h.protocol === "telnet" ? "telnet" : "ssh" });
 
 // Agrupa por carpeta (una pasada, sin copiar arreglos): por nombre de carpeta y «sin carpeta» al final.
 export function groupByFolder<T extends { folder: string }>(list: T[]): [string, T[]][] {
@@ -33,6 +33,12 @@ export const parseTags = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 const TAG = /^[a-z0-9-]{1,24}$/;
 const FOLDER = /^[A-Za-z0-9 _.-]{1,48}$/;
 export const hasStartCommand = (p: HostPlatform) => p === "linux" || p === "windows"; // en equipos de red no aplica
+export const defaultPort = (p: HostProtocol) => (p === "telnet" ? 23 : 22);
+// Cambiar el protocolo: un puerto vacío o el de omisión del anterior se vacía (toma el del nuevo); uno elegido a mano se conserva. Telnet no admite orden de inicio.
+export function withProtocol(f: HostForm, protocol: HostProtocol): HostForm {
+  const p = f.port.trim();
+  return { ...f, protocol, port: p === "" || p === String(defaultPort(f.protocol)) ? "" : f.port, startCommand: protocol === "telnet" ? "" : f.startCommand };
+}
 // Nombre de carpeta nuevo o renombrado (sin espacios en los extremos).
 export const validFolderName = (s: string) => FOLDER.test(s) && s === s.trim();
 
@@ -47,23 +53,23 @@ export function validateHost(f: HostForm): Partial<Record<HostField, Key>> {
   const tags = parseTags(f.tags);
   if (tags.length > 10 || new Set(tags).size !== tags.length || !tags.every((t) => TAG.test(t))) e.tags = "hosts.v.tags";
   if ([...f.notes].length > 2000) e.notes = "hosts.v.notes";
-  if (hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || f.startCommand !== f.startCommand.trim() || /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
+  if (f.protocol !== "telnet" && hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || f.startCommand !== f.startCommand.trim() || /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
   return e;
 }
 
 export const draftOf = (f: HostForm, id?: string): HostDraft => ({
-  ...(id ? { id } : {}), name: f.name.trim(), address: f.address.trim(), port: f.port.trim() ? Number(f.port) : 22, platform: f.platform,
+  ...(id ? { id } : {}), name: f.name.trim(), address: f.address.trim(), port: f.port.trim() ? Number(f.port) : defaultPort(f.protocol), platform: f.platform,
   folder: f.folder, tags: parseTags(f.tags), credentialId: f.credentialId, notes: f.notes,
-  startCommand: hasStartCommand(f.platform) ? f.startCommand : "",
+  startCommand: f.protocol !== "telnet" && hasStartCommand(f.platform) ? f.startCommand : "", protocol: f.protocol,
 });
 
-const FIELDS: HostField[] = ["name", "address", "port", "platform", "folder", "tags", "notes", "credentialId", "startCommand"];
+const FIELDS: HostField[] = ["protocol", "name", "address", "port", "platform", "folder", "tags", "notes", "credentialId", "startCommand", "protocol"];
 
 // El campo y el duplicado salen de reason y metadata.field. El texto en español solo es respaldo de errores sin reason.
 // Las duplicadas van primero: el nombre del host puede contener cualquier palabra («credencial», «puerto»…).
-export function coreErrorKey(e: unknown): "hosts.err.nameDup" | "hosts.err.addrDup" | "" {
+export function coreErrorKey(e: unknown): "hosts.err.nameDup" | "hosts.err.addrDup" | "hosts.err.protocol" | "hosts.err.startTelnet" | "" {
   const i = errInfo(e);
-  if (i) return i.reason === "hosts.duplicate_name" ? "hosts.err.nameDup" : i.reason === "hosts.duplicate_address" ? "hosts.err.addrDup" : "";
+  if (i) return i.reason === "hosts.duplicate_name" ? "hosts.err.nameDup" : i.reason === "hosts.duplicate_address" ? "hosts.err.addrDup" : i.reason === "hosts.invalid_protocol" ? "hosts.err.protocol" : i.reason === "hosts.invalid_startup_command" ? "hosts.err.startTelnet" : "";
   const msg = errorText(e);
   if (/ya hay un host llamado/i.test(msg)) return "hosts.err.nameDup";
   if (/ya está en la libreta/i.test(msg)) return "hosts.err.addrDup";
