@@ -58,7 +58,8 @@ func init() {
 		"patrol.svc.login_after_arm":        e("el trabajo está {state}; el Login Test solo aplica antes de armar", "the job is {state}; the Login Test only applies before arming", "state"),
 		"patrol.svc.job_state":              e("el trabajo está {state}", "the job is {state}", "state"),
 		"patrol.svc.no_devices_left":        e("no quedan equipos", "no devices are left"),
-		"patrol.svc.login_failed":           e("Login Test falló; excluye o corrige: {failed}", "the Login Test failed; exclude or fix: {failed}", "failed"),
+		"patrol.svc.login_failed": entry{Es: "Login Test falló; excluye o corrige: {failed}", En: "the Login Test failed; exclude or fix: {failed}", Args: []string{"failed"},
+			Extra: []string{"host_keys"}}, // solo metadata: las llaves pendientes en JSON (PendingHostKey), para «Confiar y reintentar»
 		"patrol.err.reconnect_other_device": e("el equipo tras la reconexión es otro: {from} \u2192 {to}", "the device after the reconnect is a different one: {from} \u2192 {to}", "from", "to"),
 		"patrol.dev.partial":                e("{cut} {cut|comando cortado|comandos cortados} y {reconnects} {reconnects|reconexión|reconexiones}; el primero: {first}", "{cut} {cut|command|commands} cut and {reconnects} {reconnects|reconnect|reconnects}; first: {first}", "cut", "reconnects", "first"),
 	})

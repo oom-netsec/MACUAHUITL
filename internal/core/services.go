@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -25,6 +26,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -369,6 +371,24 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 	return nil
 }
 
+// pendingKey es la llave de host que el Login Test no aceptó, como PendingHostKey en JSON (protojson); vacío si el
+// equipo falló por otra cosa. host va en la forma que AcceptedHostKey.host espera de vuelta.
+func pendingKey(x patrol.LoginResult) string {
+	var he *transport.HostKeyError
+	if !errors.As(x.DetailErr, &he) {
+		return ""
+	}
+	host, err := transport.ParseHostKeyID(x.Target)
+	if err != nil {
+		return ""
+	}
+	b, err := protojson.Marshal(&v1.PendingHostKey{Host: host, Fingerprint: he.Fingerprint, KeyType: he.KeyType, Changed: he.Status == transport.HostKeyChanged})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJobResponse, error) {
 	c := s.c
 	c.markActive()
@@ -456,10 +476,13 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	res := patrol.LoginTest(ctx, c.deps(j), j.id, spec, true, accepted)
 	verified := map[string]bool{}
 	var changes []patrol.HostKeyChange
-	var failed []string
+	var failed, pending []string
 	for _, x := range res {
 		if !x.Passed {
 			failed = append(failed, x.Target+": "+x.FailedStep)
+			if p := pendingKey(x); p != "" {
+				pending = append(pending, p)
+			}
 			continue
 		}
 		verified[x.Target] = true
@@ -470,7 +493,11 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, "phase.ok_failed", i18n.A("ok", len(res)-len(failed), "failed", len(failed)))
 	if len(failed) > 0 {
-		e := i18n.New("patrol.svc.login_failed", i18n.A("failed", strings.Join(failed, "; ")))
+		args := i18n.A("failed", strings.Join(failed, "; "))
+		if len(pending) > 0 { // la UI arma «Confiar y reintentar» con esto, sin otro Login Test
+			args["host_keys"] = "[" + strings.Join(pending, ",") + "]"
+		}
+		e := i18n.New("patrol.svc.login_failed", args)
 		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, e), "login test failed: "+strings.Join(failed, "; "), e)
 	}
 	until := c.o.Now().Round(0).Add(time.Duration(spec.WindowHours) * time.Hour) // sin lectura monotónica: no avanza con el sistema suspendido

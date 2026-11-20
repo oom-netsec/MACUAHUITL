@@ -112,6 +112,9 @@ func keepOf(ctx context.Context, k uint32) (int, error) {
 
 func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (*v1.StartBackupResponse, error) {
 	s.d.MarkActive()
+	if r.JobId != "" {
+		return s.rearm(ctx, r)
+	}
 	if len(r.Targets) == 0 {
 		return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.no_targets", nil)
 	}
@@ -158,11 +161,42 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		os.Remove(lote) // vacía; Patrol la recrea si luego se arma
-		// Queda creado: se revisa con LoginTest y se arma con ArmJob; CollectBackups lo guarda al terminar.
-		return &v1.StartBackupResponse{JobId: cj.JobId, Detail: status.Convert(err).Message()}, nil
+		// Queda creado: se rearma con StartBackup{job_id} y las huellas; CollectBackups lo guarda al terminar.
+		return armFailed(cj.JobId, err), nil
 	}
 	s.watch(cj.JobId)
 	return &v1.StartBackupResponse{JobId: cj.JobId, Armed: true, WindowEndsAt: ar.WindowEndsAt}, nil
+}
+
+func armFailed(job string, err error) *v1.StartBackupResponse {
+	reason, keys := service.ArmFailure(err)
+	return &v1.StartBackupResponse{JobId: job, Detail: status.Convert(err).Message(), Reason: reason, HostKeys: keys}
+}
+
+// rearm arma de nuevo un respaldo propio que quedó sin armar, con las huellas aceptadas: el mismo trabajo, sin otro.
+func (s *backupSvc) rearm(ctx context.Context, r *v1.StartBackupRequest) (*v1.StartBackupResponse, error) {
+	s.jobsMu.Lock()
+	_, own := s.jobs[r.JobId]
+	s.jobsMu.Unlock()
+	if !own {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "backup.err.not_rearmable", i18n.A("id", r.JobId))
+	}
+	ar, err := s.d.Patrol().ArmJob(ctx, &v1.ArmJobRequest{JobId: r.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
+	if err != nil {
+		if status.Code(err) == codes.NotFound { // lo quitaron: ya no hay nada que vigilar
+			s.mu.Lock() // forget toca seen, que es de collect
+			s.forget(r.JobId, nil, false)
+			s.mu.Unlock()
+			return nil, err
+		}
+		if reason, _ := service.ArmFailure(err); status.Code(err) != codes.FailedPrecondition || reason == "patrol.svc.job_state" {
+			return nil, err // ya armado, armándose o terminado (doble clic): no es un armado fallido
+		}
+		return armFailed(r.JobId, err), nil
+	}
+	s.d.Audit("backup.rearm", r.JobId, fmt.Sprintf("accepted_host_keys=%d", len(r.AcceptedHostKeys)+len(r.AcceptedHostKeyFingerprints)))
+	s.watch(r.JobId)
+	return &v1.StartBackupResponse{JobId: r.JobId, Armed: true, WindowEndsAt: ar.WindowEndsAt}, nil
 }
 
 // watch guarda cada ronda según termina, hasta que el trabajo acaba o el núcleo se cierra.

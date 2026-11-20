@@ -35,3 +35,12 @@ message AcceptedHostKey {
   string host = 1;
   string fingerprint = 2;
 }
+
+// Una llave de host que el armado no aceptó (desconocida o cambiada). host es el que va de vuelta en
+// AcceptedHostKey.host, tal cual (dirección:puerto canónico; IPv6 entre corchetes).
+message PendingHostKey {
+  string host = 1;
+  string fingerprint = 2;
+  string key_type = 3;
+  bool changed = 4; // la llave guardada era otra
+}

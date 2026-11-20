@@ -10,6 +10,7 @@ func init() {
 		"backup.err.keep":             e("la retención máxima es {max}", "the maximum retention is {max}", "max"),
 		"backup.err.no_targets":       e("indica al menos un equipo", "specify at least one device"),
 		"backup.err.rounds":           e("con intervalo indica cuántas rondas (2 o más)", "with an interval, specify how many rounds (2 or more)"),
+		"backup.err.not_rearmable":    e("{id} no es un respaldo propio sin armar", "{id} is not one of our backups waiting to be armed", "id"),
 		"backup.err.out_dir":          e("carpeta de salida: {error}", "output folder: {error}", "error"),
 		"backup.err.diff_mismatch":    e("compara dos respaldos del mismo equipo y del mismo tipo", "compare two backups of the same device and the same type"),
 

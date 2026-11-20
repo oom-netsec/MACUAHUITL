@@ -34,6 +34,9 @@ message StartBackupRequest {
   // Huellas por equipo (host o host:puerto). Sustituye al campo anterior, que solo vale con un destino.
   repeated AcceptedHostKey accepted_host_keys = 10;
   repeated string excluded_device_ids = 9;
+  // Rearmar un respaldo propio que quedó sin armar (el job_id de una respuesta con armed=false), con las huellas
+  // aceptadas: no crea otro trabajo. Los demás campos, salvo los de huellas y excluded_device_ids, se ignoran.
+  string job_id = 11;
 }
 
 message StartBackupResponse {
@@ -41,6 +44,8 @@ message StartBackupResponse {
   bool armed = 2;
   string detail = 3; // por qué no se armó
   google.protobuf.Timestamp window_ends_at = 4;
+  string reason = 5;                       // sin armar: el motivo del catálogo (p. ej. patrol.svc.login_failed)
+  repeated PendingHostKey host_keys = 6;   // sin armar: las llaves de host pendientes por equipo
 }
 
 message CollectBackupsRequest {

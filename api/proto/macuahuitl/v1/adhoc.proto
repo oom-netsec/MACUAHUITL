@@ -33,6 +33,10 @@ message StartAdhocResponse {
   // Por qué no se armó (Login Test, bóveda…); vacío si se armó.
   string detail = 3;
   google.protobuf.Timestamp window_ends_at = 4;
+  // Sin armar: el motivo del catálogo (p. ej. patrol.svc.login_failed) y las llaves de host pendientes por equipo.
+  // Rearmar con ArmJob: si vuelve a fallar, su ErrorInfo trae lo mismo (metadata host_keys: arreglo JSON de PendingHostKey).
+  string reason = 5;
+  repeated PendingHostKey host_keys = 6;
 }
 
 message AdhocResultRequest {
