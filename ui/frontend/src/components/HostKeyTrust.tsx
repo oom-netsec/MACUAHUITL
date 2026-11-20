@@ -11,14 +11,16 @@ import { showHidden } from "../lib/safeText";
 // al equipo que la presentó, nunca suelta. La selección es por huella: marcar una marca a la vista todas las filas que la
 // presentan, y salen los pares de todas ellas. Una fila sin equipo no genera par (no se puede atar). Si alguna llave cambió, el botón
 // pide además marcar que se entiende el riesgo.
-export function HostKeyTrust({ items, busy, onTrust }: { items: HostKeyInfo[]; busy?: boolean; onTrust: (keys: AcceptedKey[]) => void }) {
+export function HostKeyTrust({ items, busy, onTrust, autoFocus = true }: { items: HostKeyInfo[]; busy?: boolean; onTrust: (keys: AcceptedKey[]) => void; autoFocus?: boolean }) {
   const t = useT();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [ack, setAck] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
   // El foco va al aviso (nunca al botón: un Enter de más aceptaría); quien lanzó la operación se recuerda para devolverle el foco.
+  // autoFocus=false: no quitarle el foco a otra cosa viva (la Terminal dividida, donde se teclea en el otro panel).
   useEffect(() => {
+    if (!autoFocus) return;
     opener.current = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
     root.current?.focus();
   }, []);
@@ -40,8 +42,8 @@ export function HostKeyTrust({ items, busy, onTrust }: { items: HostKeyInfo[]; b
           <div key={`${hk.fp}-${i}`} role="group" aria-label={name}>
             <Notice kind={hk.changed ? "error" : "warn"}>
               <p>{t(hk.changed ? "hostkey.changed.danger" : "hostkey.new")}</p>
-              {(hk.host || hk.keyType) && <p>{hk.host && <span className="mono">{showHidden(hk.host)}</span>}{hk.host && hk.keyType && " · "}{hk.keyType && <span className="mono">{hk.keyType}</span>}</p>}
-              <p><code>{hk.fp}</code></p>
+              {(hk.host || hk.keyType) && <p>{hk.host && <span className="mono">{showHidden(hk.host)}</span>}{hk.host && hk.keyType && " · "}{hk.keyType && <span className="mono">{showHidden(hk.keyType)}</span>}</p>}
+              <p><code>{showHidden(hk.fp)}</code></p>
               {kg && (
                 <>
                   <p>{t("ssh.hostKey.compare")}</p>

@@ -132,7 +132,7 @@ test("«Confiar y reintentar» reenvía el usuario y el par {host, huella}, nunc
   act(() => core.emitTerminal(prompt));
   await userEvent.type(await screen.findByLabelText("Password:"), `${SECRET}{Enter}`);
   act(() => core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.1:2222", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }));
-  await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
   const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0];
   expect(req).toMatchObject({ address: "192.0.2.1", port: 2222, credentialId: "", username: "admin", acceptedKeys: [{ host: "192.0.2.1:2222", fingerprint: `SHA256:${fp}` }] });
@@ -264,7 +264,7 @@ test("llave CAMBIADA en la Terminal: «Aceptar» exige la casilla; una nueva, un
   const mk = (reason: string) => ({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason, metadata: { host: "192.0.2.1", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } });
   const core = await sessionWithPrompt();
   act(() => core.emitTerminal(mk("transport.hostkey.changed")));
-  const btn = await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" });
+  const btn = await screen.findByRole("button", { name: "Confiar y reintentar" });
   expect(btn).toBeDisabled();
   await userEvent.click(screen.getByLabelText("Entiendo que la llave de este equipo cambió"));
   expect(btn).toBeEnabled();
@@ -274,19 +274,28 @@ test("llave CAMBIADA en la Terminal: «Aceptar» exige la casilla; una nueva, un
 
 test.each([
   ["con hk.host", { host: "10.9.0.1:22", fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }, { acceptedKeys: [{ host: "10.9.0.1:22", fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }], accept: [] }],
-  ["sin hk.host (cae al campo viejo)", { fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" }, { accept: ["SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU"] }],
 ])("reintento en modo hostId %s", async (_n, metadata, want) => {
   const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...cred, id: "c".repeat(32), kind: "password" as const }]) });
   render(<TerminalView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
   act(() => core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata } }));
-  await userEvent.click(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
   const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0];
   expect(req).toMatchObject({ hostId: sampleHosts[0].id, ...want });
   expect(req).not.toHaveProperty("credentialId");
   expect(req).not.toHaveProperty("address");
+});
+
+test("con hostId y sin hk.host el botón queda deshabilitado (falla cerrado) y no se reintenta", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...cred, id: "c".repeat(32), kind: "password" as const }]) });
+  render(<TerminalView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  act(() => core.emitTerminal({ runId: "t1", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { fingerprint: "SHA256:pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU" } } }));
+  expect(await screen.findByRole("button", { name: "Confiar y reintentar" })).toBeDisabled();
+  expect(core.terminalOpen).toHaveBeenCalledTimes(1);
 });
 
 // ---- Segunda revisión (47t-6b) ----
@@ -334,11 +343,11 @@ test("llave CAMBIADA: otra huella sobre el mismo botón llega con la casilla sin
   const core = await sessionWithPrompt();
   act(() => core.emitTerminal(mk("AAAA")));
   await userEvent.click(await screen.findByLabelText("Entiendo que la llave de este equipo cambió"));
-  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeEnabled();
   act(() => core.emitTerminal(mk("BBBB")));
   await frames();
   expect(screen.getByLabelText("Entiendo que la llave de este equipo cambió")).not.toBeChecked();
-  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeDisabled();
 });
 
 import { App } from "../../app/App";
@@ -358,4 +367,20 @@ test("Ctrl+Enter con el foco fuera del panel de preguntas no lo envía; con el f
   screen.getByLabelText("Password:").focus();
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
   await waitFor(() => expect(core.terminalAnswer).toHaveBeenCalled());
+});
+
+test("vista dividida: una huella nueva en el panel derecho NO le roba el foco a lo que se teclea en el izquierdo", async () => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const core = await sessionWithPrompt();
+  (core.terminalOpen as ReturnType<typeof vi.fn>).mockResolvedValueOnce("t2");
+  await userEvent.click(screen.getByText("Nueva sesión"));
+  await abrir("192.0.2.2");
+  await userEvent.click(screen.getAllByRole("tab")[0]);
+  await userEvent.click(screen.getByLabelText("Dividir"));
+  const search = screen.getByRole("searchbox");
+  search.focus();
+  act(() => core.emitTerminal({ runId: "t2", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.2", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }));
+  await screen.findByRole("button", { name: "Confiar y reintentar" });
+  await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+  expect(search).toHaveFocus();
 });
