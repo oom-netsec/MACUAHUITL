@@ -64,7 +64,7 @@ func labelOf(infos []vault.Info, id string) string {
 
 func hostFromPB(p *v1.Device) devices.Host {
 	h := devices.Host{Name: p.Name, Address: p.GetTarget().GetAddress(), Port: int(p.GetProfile().GetPort()), Platform: p.Platform, Folder: p.Folder,
-		Tags: append([]string{}, p.Tags...), CredentialID: p.CredentialId, Notes: p.Notes, StartupCommand: p.StartupCommand}
+		Tags: append([]string{}, p.Tags...), CredentialID: p.CredentialId, Notes: p.Notes, StartupCommand: p.StartupCommand, Protocol: p.Protocol}
 	return h
 }
 
@@ -76,6 +76,9 @@ func (s *svc) auditHost(action string, h devices.Host) {
 	if h.Platform != "" {
 		d += " platform=" + h.Platform
 	}
+	if h.Protocol == "telnet" {
+		d += " protocol=telnet"
+	}
 	if h.StartupCommand != "" { // no es un secreto (la UI avisa que no lleve): queda para saber qué corre el clic
 		d += fmt.Sprintf(" startup=%q", h.StartupCommand)
 	}
@@ -85,7 +88,7 @@ func (s *svc) auditHost(action string, h devices.Host) {
 // keyOnNonGeneric dice si h usa una credencial de solo llave (regla 7b) en un host que no es linux ni windows. Con
 // la bóveda cerrada (infos nil) no se sabe el tipo y no rechaza: lo detienen las capas siguientes.
 func keyOnNonGeneric(infos []vault.Info, h devices.Host) bool {
-	if h.CredentialID == "" || devices.IsGeneric(h.Platform) {
+	if h.CredentialID == "" || devices.IsGeneric(h.Platform) && h.Protocol != "telnet" { // Telnet no usa llaves
 		return false
 	}
 	for _, i := range infos {

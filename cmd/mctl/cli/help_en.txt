@@ -157,9 +157,9 @@
         (devices known from Patrol jobs, the fleet, the backups and the saved hosts, without duplicates per address; TEXT filters by address, name, platform, folder or tag)
   hosts list [TEXT] [--folder F] [--tag X] [--json]  |  hosts rm ID
         (saved hosts: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
-  hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command is the command the terminal runs on connect to a linux or windows host (empty clears it); single-level folder; up to 10 tags.
+  hosts add NAME --address A [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+  hosts edit ID [--name N] [--address A] [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+        (A: IP or DNS name, without user, scheme or port; port 22 by default; --protocol ssh|telnet (telnet: port 23 by default, no --startup-command; terminal only, clear text); platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command is the command the terminal runs on connect to a linux or windows host (empty clears it); single-level folder; up to 10 tags.
          --cred is the id of a vault credential (cred list): never a secret. edit only changes what is passed; --tag replaces all of them and an empty value clears the field)
   hosts folder list | add NAME | rename OLD NEW | rm NAME [--yes]  |  hosts mv --folder F ID...
         (single-level folders; list shows them with their host count, empty ones too. rm of a folder with hosts requires --yes: the hosts are not deleted, they are left without a folder.

@@ -23,6 +23,7 @@ const (
 	SrcManual = "manual" // host de la libreta
 
 	DefaultPort = 22
+	TelnetPort  = 23 // fase 48: puerto por omisión de un host con protocolo telnet
 	MaxHosts    = 5000
 
 	MaxHostName = 64
@@ -60,6 +61,7 @@ type Host struct {
 	CredentialID      string
 	Notes             string
 	StartupCommand    string // orden que el terminal manda al conectar (fase 44); solo linux y windows
+	Protocol          string // fase 48: "ssh" (por omisión) o "telnet"; solo la terminal interactiva lo usa
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -181,7 +183,15 @@ func Clean(h Host) (Host, error) {
 	if h.Address, err = canonAddr(h.Address); err != nil {
 		return h, &FieldError{Field: "address", Msg: err.Error(), Err: err}
 	}
-	if h.Port == 0 {
+	if h.Protocol = strings.ToLower(strings.TrimSpace(h.Protocol)); h.Protocol == "" { // «Telnet » de un CSV hecho a mano vale
+		h.Protocol = "ssh"
+	}
+	if h.Protocol != "ssh" && h.Protocol != "telnet" {
+		return h, fe("protocol", "hostfield.protocol")
+	}
+	if h.Port == 0 && h.Protocol == "telnet" {
+		h.Port = TelnetPort
+	} else if h.Port == 0 {
 		h.Port = DefaultPort
 	}
 	if h.Port < 1 || h.Port > 65535 {
@@ -215,6 +225,9 @@ func Clean(h Host) (Host, error) {
 		}
 		if !IsGeneric(h.Platform) {
 			return h, fe("startup_command", "hostfield.startup_platform")
+		}
+		if h.Protocol == "telnet" {
+			return h, fe("startup_command", "hostfield.startup_telnet")
 		}
 	}
 	return h, nil

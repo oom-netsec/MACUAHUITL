@@ -43,6 +43,8 @@ func init() {
 		"hostfield.name_dup_row":     e("el nombre ya está en la fila {row}", "the name is already in row {row}"),
 		"hostfield.startup_command":  e("la orden de inicio va de 1 a {max} caracteres, en una sola línea, sin espacios en los extremos ni caracteres de control o de formato (como los bidireccionales)", "the startup command must be 1 to {max} characters on a single line, with no leading or trailing spaces and no control or format characters (such as bidirectional ones)"),
 		"hostfield.startup_platform": e("la orden de inicio solo se admite en hosts linux y windows", "a startup command is only allowed on linux and windows hosts"),
+		"hostfield.startup_telnet":   e("la orden de inicio no se admite con telnet", "a startup command is not allowed with telnet"),
+		"hostfield.protocol":         e("protocolo: ssh o telnet", "protocol: ssh or telnet"),
 		"hostfield.addr_dup_row":     e("{key} ya está en la fila {row}", "{key} is already in row {row}"),
 
 		// Archivos de import (CSV y JSON)
@@ -114,7 +116,7 @@ func init() {
 		"hostfield.addr_len": {"address", ""}, "hostfield.addr_zone": {"address", ""}, "hostfield.addr_dns": {"address", ""},
 		"hostfield.addr_ip": {"address", ""}, "hostfield.name": {"name", ""}, "hostfield.port": {"port", ""},
 		"hostfield.platform": {"platform", ""}, "hostfield.folder": {"folder", ""}, "hostfield.tags_max": {"tags", ""},
-		"hostfield.tag_bad": {"tags", ""}, "hostfield.notes": {"notes", ""}, "hostfield.startup_command": {"startup_command", ""}, "hostfield.startup_platform": {"startup_command", "startup_command"}, "hostfield.credential_id": {"credential_id", ""},
+		"hostfield.tag_bad": {"tags", ""}, "hostfield.notes": {"notes", ""}, "hostfield.startup_command": {"startup_command", ""}, "hostfield.startup_platform": {"startup_command", "startup_command"}, "hostfield.credential_id": {"credential_id", ""}, "hostfield.startup_telnet": {"startup_command", "startup_command"}, "hostfield.protocol": {"protocol", ""},
 	} {
 		name := rf[1]
 		if name == "" {
@@ -192,12 +194,13 @@ func init() {
 		"hostfield.type.lista":            e("lista", "list"),
 		"hostfield.desc.name":             e("Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas).", "Host name: 1 to 64 characters, no leading or trailing spaces. Not repeated (case-insensitive)."),
 		"hostfield.desc.address":          e("IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.", "IP or DNS name, without user, scheme, port or path. The address with the port is not repeated."),
-		"hostfield.desc.port":             e("Puerto SSH, de 1 a 65535. Vacío = 22.", "SSH port, from 1 to 65535. Empty = 22."),
+		"hostfield.desc.port":             e("Puerto, de 1 a 65535. Vacío = 22 con ssh, 23 con telnet.", "Port, from 1 to 65535. Empty = 22 with ssh, 23 with telnet."),
 		"hostfield.desc.platform":         e("Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows. Empty = not set."),
 		"hostfield.desc.folder":           e("Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.", "Single-level folder: 1 to 48 characters among letters, digits, space, _, . and -. Empty = no folder."),
 		"hostfield.desc.tags":             e("Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.", "Up to 10 tags of 1 to 24 characters among a-z, 0-9 and -. In CSV separated by \";\"; in JSON, an array."),
 		"hostfield.desc.credential_label": e("Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña). Si al importar no existe una con esa etiqueta, el host queda sin credencial.", "Label of a credential in the local vault (never the user or the password). If none with that label exists on import, the host is left without a credential."),
 		"hostfield.desc.startup_command":  e("Solo hosts linux y windows: orden que el terminal manda al conectar, de 1 a 256 caracteres en una línea. No pongas secretos: queda en la auditoría y en la grabación. Vacío = shell normal.", "Linux and windows hosts only: command the terminal sends on connect, 1 to 256 characters on one line. Do not put secrets in it: it goes to the audit log and the recording. Empty = normal shell."),
+		"hostfield.desc.protocol":         e("ssh (vacío) o telnet. Telnet solo abre la terminal interactiva, sin orden de inicio, y todo viaja en texto claro. Sin puerto: 22 con ssh, 23 con telnet.", "ssh (empty) or telnet. Telnet only opens the interactive terminal, with no startup command, and everything travels in clear text. No port: 22 with ssh, 23 with telnet."),
 		"hostfield.desc.notes":            e("Notas libres, hasta 2000 caracteres.", "Free notes, up to 2000 characters."),
 	})
 }

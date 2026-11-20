@@ -20,7 +20,7 @@ func init() {
 		"prefs.err.too_big":                 e("valor de preferencia mayor de 4 KiB", "preference value larger than 4 KiB"),
 		"hosts.err.missing":                 e("falta el host", "the host is missing"),
 		"hosts.err.no_credential":           withMeta(e("la credencial no existe en la bóveda (o es una entrada del sistema)", "the credential does not exist in the vault (or it is a system entry)"), "hosts.unknown_credential", "credential_id"),
-		"hosts.err.key_credential_platform": withMeta(e("una credencial de llave solo se guarda en un host linux o windows; elige otra credencial o cambia la plataforma", "a key credential can only be saved on a linux or windows host; pick another credential or change the platform"), "hosts.key_credential_platform", "credential_id"),
+		"hosts.err.key_credential_platform": withMeta(e("una credencial de llave solo se guarda en un host linux o windows por ssh (telnet no usa llaves); elige otra credencial o cambia la plataforma o el protocolo", "a key credential can only be saved on a linux or windows host over ssh (telnet does not use keys); pick another credential or change the platform or the protocol"), "hosts.key_credential_platform", "credential_id"),
 		"hosts.err.nothing_to_export":       e("no hay hosts que exportar", "there are no hosts to export"),
 		"hosts.err.export_too_big":          e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos hosts", "the file would exceed 5 MB and the import would reject it; export fewer hosts"),
 		"hosts.err.token":                   e("token de importación desconocido; abre el archivo de nuevo", "unknown import token; open the file again"),

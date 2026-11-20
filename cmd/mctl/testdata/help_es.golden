@@ -158,9 +158,9 @@ uso: mctl <comando>
         (equipos conocidos de los trabajos de Patrol, la flota, los respaldos y la libreta de hosts, sin duplicados por dirección; TEXTO filtra por dirección, nombre, plataforma, carpeta o etiqueta)
   hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  hosts rm ID
         (libreta de hosts: los equipos que agregas a mano, la fuente «manual» de «devices»; se fusionan por dirección con lo descubierto. rm no borra la evidencia)
-  hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command es la orden que corre el terminal al conectar a un host linux o windows (vacía la borra); carpeta de un solo nivel; hasta 10 etiquetas.
+  hosts add NOMBRE --address A [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+  hosts edit ID [--name N] [--address A] [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; --protocol ssh|telnet (telnet: puerto 23 por defecto, sin --startup-command; solo la terminal, en texto claro); platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command es la orden que corre el terminal al conectar a un host linux o windows (vacía la borra); carpeta de un solo nivel; hasta 10 etiquetas.
          --cred es el id de una credencial de la bóveda (cred list): nunca un secreto. edit solo cambia lo que se pasa; --tag reemplaza todas y un valor vacío quita el campo)
   hosts folder list | add NOMBRE | rename VIEJO NUEVO | rm NOMBRE [--yes]  |  hosts mv --folder F ID...
         (carpetas de un solo nivel; list las muestra con su número de hosts, también las vacías. rm de una carpeta con hosts exige --yes: los hosts no se borran, quedan sin carpeta.

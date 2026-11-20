@@ -189,16 +189,12 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if o.Protocol > v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET { // de un cliente más nuevo: no se abre por SSH sin avisar
 		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.protocol", nil), "unknown protocol")
 	}
-	// Fase 48: Telnet no tiene usuario, huellas ni (todavía) credencial guardada u host de la libreta.
-	if f := telnetField(o); telnet && f != "" {
-		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.telnet_field", nil), "field not valid with telnet: "+f)
-	}
 	if o.HostId != "" {
-		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
+		// host_id es exclusivo: ni otra dirección, puerto, credencial ni protocolo sobre un host guardado.
 		if label == "" {
 			label = o.HostId
 		}
-		if o.Address != "" || o.Port != 0 || o.CredentialId != "" {
+		if o.Address != "" || o.Port != 0 || o.CredentialId != "" || o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED {
 			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.host_and_address", nil), "host and address")
 		}
 		h, err := service.SavedHost(s.d.DB(), o.HostId)
@@ -208,8 +204,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if err != nil {
 			return s.refuse(label, service.ErrFrom(st.Context(), codes.Internal, err), i18n.English(err))
 		}
-		label = h.Name                                                // el nombre de la libreta, no el que mande el cliente
-		if h.StartupCommand != "" && !devices.IsGeneric(h.Platform) { // Clean no lo permite: datos alterados o viejos
+		label = h.Name                                                                            // el nombre de la libreta, no el que mande el cliente
+		if h.StartupCommand != "" && (!devices.IsGeneric(h.Platform) || h.Protocol == "telnet") { // Clean no lo permite: datos alterados o viejos
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup on a non-generic host")
 		}
 		if o.Username != "" && h.CredentialID != "" {
@@ -219,6 +215,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup changed")
 		}
 		address, port, credID, startup, generic = h.Address, uint16(h.Port), h.CredentialID, h.StartupCommand, devices.IsGeneric(h.Platform)
+		telnet = h.Protocol == "telnet"
 		if typed = h.CredentialID == ""; typed && o.Username != "" { // host sin credencial: modo tecleado
 			var ok bool
 			if username, ok = cleanUser(o.Username); !ok && strings.TrimSpace(o.Username) != "" {
@@ -244,6 +241,10 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		typed = o.CredentialId == "" // sin credencial: las respuestas se piden por el stream y no se usa la bóveda
 		address, credID, port = o.Address, o.CredentialId, uint16(o.Port)
 	}
+	// Fase 48: Telnet no tiene usuario ni huellas (por dirección o por el protocolo del host guardado).
+	if f := telnetField(o); telnet && f != "" {
+		return s.refuse(cmp.Or(label, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.telnet_field", nil), "field not valid with telnet: "+f)
+	}
 	if port == 0 && telnet {
 		port = 23
 	} else if port == 0 {
@@ -268,7 +269,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
 		}
 		for _, i := range infos {
-			if i.ID == credID && i.IsKey() && !generic {
+			if i.ID == credID && i.IsKey() && (!generic || telnet) { // Telnet no usa llaves, ni en un host linux
 				return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.key_credential", nil), "key credential")
 			}
 		}
@@ -533,7 +534,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	var r io.Reader
 	var w io.Writer
-	if generic && startup != "" { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
+	if generic && startup != "" && ssh != nil { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
 		r, w, err = ssh.CommandSize(term, rows, cols, startup)
 	} else {
 		r, w, err = sess.ShellSize(term, rows, cols)
@@ -730,8 +731,6 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 // telnetField dice el primer campo del pedido que no aplica a Telnet; vacío si ninguno.
 func telnetField(o *v1.TerminalOpen) string {
 	switch {
-	case o.HostId != "":
-		return "host_id"
 	case o.Username != "":
 		return "username"
 	case len(o.AcceptedHostKeyFingerprints) > 0 || len(o.AcceptedHostKeys) > 0:

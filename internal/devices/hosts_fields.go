@@ -46,7 +46,7 @@ var HostFields = []FieldSpec{
 	campo("address", "texto", true, [3]string{"10.0.0.1", "10.0.0.2", "ap1.lab.example.com"},
 		"IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.",
 		func(h *FileHost) *string { return &h.Address }),
-	{Name: "port", Type: "entero", Examples: [3]string{"22", "22", "2222"}, Description: "Puerto SSH, de 1 a 65535. Vacío = 22.",
+	{Name: "port", Type: "entero", Examples: [3]string{"22", "23", "2222"}, Description: "Puerto, de 1 a 65535. Vacío = 22 con ssh, 23 con telnet.",
 		get: func(h FileHost) string {
 			if h.Port == 0 {
 				return ""
@@ -91,6 +91,9 @@ var HostFields = []FieldSpec{
 	campo("startup_command", "texto", false, [3]string{"", "", ""},
 		"Solo hosts linux y windows: orden que el terminal manda al conectar, de 1 a 256 caracteres en una línea. No pongas secretos: queda en la auditoría y en la grabación. Vacío = shell normal.",
 		func(h *FileHost) *string { return &h.StartupCommand }),
+	campo("protocol", "texto", false, [3]string{"", "telnet", ""},
+		"ssh (vacío) o telnet. Telnet solo abre la terminal interactiva, sin orden de inicio, y todo viaja en texto claro. Sin puerto: 22 con ssh, 23 con telnet.",
+		func(h *FileHost) *string { return &h.Protocol }),
 }
 
 // HostsHeader es el encabezado fijo del CSV.

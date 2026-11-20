@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -62,21 +63,26 @@ func hostsList(c *cli.Env, args []string) error {
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, cli.T("mctl.hosts.head_list"))
 	for _, d := range ds {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", d.Id, d.Name, d.GetTarget().GetAddress(), d.GetProfile().GetPort(), d.Platform, d.Folder, strings.Join(d.Tags, ","), d.CredentialLabel)
+		port := strconv.Itoa(int(d.GetProfile().GetPort()))
+		if d.Protocol == "telnet" {
+			port += " telnet"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", d.Id, d.Name, d.GetTarget().GetAddress(), port, d.Platform, d.Folder, strings.Join(d.Tags, ","), d.CredentialLabel)
 	}
 	return tw.Flush()
 }
 
 type hostFields struct {
-	name, address, platform, folder, cred, notes, startup string
-	port                                                  int
-	tags                                                  cli.List
+	name, address, platform, folder, cred, notes, startup, protocol string
+	port                                                            int
+	tags                                                            cli.List
 }
 
 func (f *hostFields) flags(fs *flag.FlagSet) {
 	fs.StringVar(&f.name, "name", "", "nombre")
 	fs.StringVar(&f.address, "address", "", "IP o nombre DNS")
-	fs.IntVar(&f.port, "port", 0, "puerto SSH (22 por defecto)")
+	fs.IntVar(&f.port, "port", 0, "puerto (22 con ssh, 23 con telnet)")
+	fs.StringVar(&f.protocol, "protocol", "", "ssh o telnet (ssh por defecto)")
 	fs.StringVar(&f.platform, "platform", "", "plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows")
 	fs.StringVar(&f.folder, "folder", "", "carpeta (un solo nivel)")
 	fs.Var(&f.tags, "tag", "etiqueta (repetible)")
@@ -92,7 +98,7 @@ func saved(c *cli.Env, verb, id, name string, warnings []string) {
 	}
 }
 
-// hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+// hosts add NOMBRE --address A [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
 func hostsAdd(c *cli.Env, args []string) error {
 	var f hostFields
 	fs, err := cli.Flags("hosts add", args, f.flags)
@@ -100,10 +106,10 @@ func hostsAdd(c *cli.Env, args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 || f.name != "" || f.address == "" {
-		return errors.New("uso: mctl hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
+		return errors.New("uso: mctl hosts add NOMBRE --address A [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
 	}
 	r, err := client(c).PutDevice(context.Background(), &v1.PutDeviceRequest{Device: &v1.Device{Name: fs.Arg(0), Target: &v1.Target{Address: f.address},
-		Profile: &v1.DeviceProfile{Port: uint32(f.port)}, Platform: f.platform, Folder: f.folder, Tags: f.tags, CredentialId: f.cred, Notes: f.notes, StartupCommand: f.startup}})
+		Profile: &v1.DeviceProfile{Port: uint32(f.port)}, Platform: f.platform, Folder: f.folder, Tags: f.tags, CredentialId: f.cred, Notes: f.notes, StartupCommand: f.startup, Protocol: f.protocol}})
 	if err != nil {
 		return err
 	}
@@ -111,7 +117,7 @@ func hostsAdd(c *cli.Env, args []string) error {
 	return nil
 }
 
-// hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+// hosts edit ID [--name N] [--address A] [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
 // Solo cambia lo que se pasa; --tag reemplaza todas las etiquetas y un valor vacío (--folder "", --cred "") quita el campo.
 func hostsEdit(c *cli.Env, args []string) error {
 	var f hostFields
@@ -120,7 +126,7 @@ func hostsEdit(c *cli.Env, args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("uso: mctl hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
+		return errors.New("uso: mctl hosts edit ID [--name N] [--address A] [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
 	}
 	set := map[string]bool{}
 	fs.Visit(func(fl *flag.Flag) { set[fl.Name] = true })
@@ -163,6 +169,13 @@ func hostsEdit(c *cli.Env, args []string) error {
 	}
 	if set["startup-command"] {
 		cur.StartupCommand = f.startup
+	}
+	if set["protocol"] {
+		// Si el puerto era el de omisión del protocolo anterior (22 ssh, 23 telnet) y no se pasó --port, va el del nuevo.
+		if old := cur.GetProfile().GetPort(); !set["port"] && (old == 22 && cur.Protocol != "telnet" || old == 23 && cur.Protocol == "telnet") {
+			cur.Profile = &v1.DeviceProfile{}
+		}
+		cur.Protocol = f.protocol
 	}
 	r, err := client(c).PutDevice(context.Background(), &v1.PutDeviceRequest{Device: cur})
 	if err != nil {
@@ -452,9 +465,9 @@ func hostsTemplate(c *cli.Env, args []string) error {
 
 const hostsHelp = `  hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  hosts rm ID
         (libreta de hosts: los equipos que agregas a mano, la fuente «manual» de «devices»; se fusionan por dirección con lo descubierto. rm no borra la evidencia)
-  hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
-        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command es la orden que corre el terminal al conectar a un host linux o windows (vacía la borra); carpeta de un solo nivel; hasta 10 etiquetas.
+  hosts add NOMBRE --address A [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+  hosts edit ID [--name N] [--address A] [--port N] [--protocol P] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; --protocol ssh|telnet (telnet: puerto 23 por defecto, sin --startup-command; solo la terminal, en texto claro); platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command es la orden que corre el terminal al conectar a un host linux o windows (vacía la borra); carpeta de un solo nivel; hasta 10 etiquetas.
          --cred es el id de una credencial de la bóveda (cred list): nunca un secreto. edit solo cambia lo que se pasa; --tag reemplaza todas y un valor vacío quita el campo)
   hosts folder list | add NOMBRE | rename VIEJO NUEVO | rm NOMBRE [--yes]  |  hosts mv --folder F ID...
         (carpetas de un solo nivel; list las muestra con su número de hosts, también las vacías. rm de una carpeta con hosts exige --yes: los hosts no se borran, quedan sin carpeta.

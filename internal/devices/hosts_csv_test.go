@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const cabecera = "name,address,port,platform,folder,tags,credential_label,notes,startup_command"
+const cabecera = "name,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol"
 
 // cabeceraVieja es el encabezado de antes de la fase 44, sin startup_command: sigue entrando.
 const cabeceraVieja = "name,address,port,platform,folder,tags,credential_label,notes"

@@ -211,7 +211,7 @@ func TestHostsCSVYErroresPorLinea(t *testing.T) {
 	if out := must(t, "", "hosts", "export", "--out", csv); !strings.Contains(out, "exportados 1") {
 		t.Fatalf("export csv: %q", out)
 	}
-	if b, _ := os.ReadFile(csv); !strings.HasPrefix(string(b), "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command\n") {
+	if b, _ := os.ReadFile(csv); !strings.HasPrefix(string(b), "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n") {
 		t.Fatalf("csv: %s", b)
 	}
 	if _, err := mctl(t, "", "hosts", "export", "--out", filepath.Join(dir, "h.txt")); err == nil {
@@ -261,7 +261,7 @@ func TestHostsPlantilla(t *testing.T) {
 		if strings.Count(pv, "new") != 3 || strings.Contains(pv, "inválid") || strings.Contains(pv, "conflict") {
 			t.Fatalf("la plantilla %s no pasa limpia:\n%s", f, pv)
 		}
-		if f == "csv" && !strings.HasPrefix(out, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command\n") {
+		if f == "csv" && !strings.HasPrefix(out, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n") {
 			t.Fatalf("csv:\n%s", out)
 		}
 		if f == "json" && strings.Contains(out, "sha256") {
@@ -303,5 +303,35 @@ func TestHostsEditNoFijaLoDescubierto(t *testing.T) {
 	}
 	if out := must(t, "", "hosts", "list", "ios-xe"); strings.Contains(out, "ñandú") {
 		t.Fatalf("el texto busca solo en los valores del host:\n%s", out)
+	}
+}
+
+// Fase 48-4: --protocol en add y edit; al cambiar de protocolo sin --port, el puerto de omisión sigue al protocolo
+// (22 ↔ 23) y un puerto elegido a mano se conserva; la lista marca los hosts telnet.
+func TestHostsProtocolo(t *testing.T) {
+	startCore(t)
+	tel := addHost(t, "VIEJO", "10.0.0.7", "--protocol", "telnet")
+	out := must(t, "", "hosts", "list")
+	if !strings.Contains(out, "23 telnet") {
+		t.Fatalf("la lista no marca telnet:\n%s", out)
+	}
+	ssh := addHost(t, "NUEVO", "10.0.0.8")
+	must(t, "", "hosts", "edit", ssh, "--protocol", "telnet")
+	must(t, "", "hosts", "edit", tel, "--protocol", "ssh")
+	propio := addHost(t, "PROPIO", "10.0.0.9", "--port", "2001", "--protocol", "telnet")
+	must(t, "", "hosts", "edit", propio, "--protocol", "ssh")
+	lista := must(t, "", "hosts", "list")
+	for _, l := range strings.Split(lista, "\n") {
+		switch {
+		case strings.Contains(l, "NUEVO") && !strings.Contains(l, "23 telnet"):
+			t.Errorf("ssh:22 → telnet debía quedar en 23: %q", l)
+		case strings.Contains(l, "VIEJO") && (!strings.Contains(l, "22") || strings.Contains(l, "telnet")):
+			t.Errorf("telnet:23 → ssh debía quedar en 22: %q", l)
+		case strings.Contains(l, "PROPIO") && (!strings.Contains(l, "2001") || strings.Contains(l, "telnet")):
+			t.Errorf("el puerto elegido a mano se conserva: %q", l)
+		}
+	}
+	if _, err := mctl(t, "", "hosts", "add", "MALO", "--address", "10.0.0.10", "--protocol", "rlogin"); err == nil {
+		t.Error("aceptó --protocol rlogin")
 	}
 }

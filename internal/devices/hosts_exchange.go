@@ -31,16 +31,21 @@ type FileHost struct {
 	CredentialLabel string   `json:"credential_label"`
 	Notes           string   `json:"notes"`
 	StartupCommand  string   `json:"startup_command,omitempty"` // omitempty: los archivos de antes conservan su suma
+	Protocol        string   `json:"protocol,omitempty"`        // fase 48: solo «telnet»; un host ssh se exporta igual que antes
 }
 
 // Host es el host del archivo sin credencial resuelta (CredentialID vacío).
 func (f FileHost) Host() Host {
-	return Host{Name: f.Name, Address: f.Address, Port: f.Port, Platform: f.Platform, Folder: f.Folder, Tags: f.Tags, Notes: f.Notes, StartupCommand: f.StartupCommand}
+	return Host{Name: f.Name, Address: f.Address, Port: f.Port, Platform: f.Platform, Folder: f.Folder, Tags: f.Tags, Notes: f.Notes, StartupCommand: f.StartupCommand, Protocol: f.Protocol}
 }
 
 // ToFile es el host listo para el archivo, con la etiqueta de su credencial (vacía si no tiene o no se resolvió).
 func ToFile(h Host, label string) FileHost {
-	return FileHost{Name: h.Name, Address: h.Address, Port: h.Port, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand}
+	f := FileHost{Name: h.Name, Address: h.Address, Port: h.Port, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand}
+	if h.Protocol == "telnet" {
+		f.Protocol = h.Protocol
+	}
+	return f
 }
 
 // archivoHosts: sha256 es la suma del JSON canónico del arreglo hosts; protege contra un archivo corrupto, no

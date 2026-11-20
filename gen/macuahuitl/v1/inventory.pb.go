@@ -106,8 +106,11 @@ type Device struct {
 	// en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
 	// llega con metadata.field = "startup_command", como los demás campos del host.
 	StartupCommand string `protobuf:"bytes,14,opt,name=startup_command,json=startupCommand,proto3" json:"startup_command,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Fase 48-4: protocolo del host de la libreta, «ssh» (vacío) o «telnet». Con telnet el puerto por omisión es el 23 y no
+	// hay orden de inicio; solo la terminal interactiva lo usa. Error de validación: metadata.field = "protocol".
+	Protocol      string `protobuf:"bytes,15,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -234,6 +237,13 @@ func (x *Device) GetNotes() string {
 func (x *Device) GetStartupCommand() string {
 	if x != nil {
 		return x.StartupCommand
+	}
+	return ""
+}
+
+func (x *Device) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
 	}
 	return ""
 }
@@ -1937,7 +1947,7 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x126\n" +
 	"\x17allow_legacy_algorithms\x18\x02 \x01(\bR\x15allowLegacyAlgorithms\x12\x1f\n" +
 	"\vuses_enable\x18\x03 \x01(\bR\n" +
-	"usesEnable\"\xc2\x03\n" +
+	"usesEnable\"\xde\x03\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12-\n" +
@@ -1954,7 +1964,8 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\rcredential_id\x18\v \x01(\tR\fcredentialId\x12)\n" +
 	"\x10credential_label\x18\f \x01(\tR\x0fcredentialLabel\x12\x14\n" +
 	"\x05notes\x18\r \x01(\tR\x05notes\x12'\n" +
-	"\x0fstartup_command\x18\x0e \x01(\tR\x0estartupCommand\"u\n" +
+	"\x0fstartup_command\x18\x0e \x01(\tR\x0estartupCommand\x12\x1a\n" +
+	"\bprotocol\x18\x0f \x01(\tR\bprotocol\"u\n" +
 	"\x12ListDevicesRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
 	"\x06folder\x18\x02 \x01(\tR\x06folder\x12\x10\n" +

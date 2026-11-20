@@ -150,8 +150,11 @@ func checkHeader(got []string) error {
 		norm[i] = strings.ToLower(strings.TrimSpace(g))
 		have[norm[i]] = true
 	}
-	if j := strings.Join(norm, ","); j == strings.Join(want, ",") || j == strings.Join(want[:len(want)-1], ",") {
-		return nil
+	// Los archivos de antes no traen las últimas columnas: sin protocol (fase 48) y además sin startup_command (fase 44).
+	for n := len(want); n >= len(want)-2; n-- {
+		if strings.Join(norm, ",") == strings.Join(want[:n], ",") {
+			return nil
+		}
 	}
 	var faltan, sobran []string
 	for _, w := range want {
