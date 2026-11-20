@@ -1430,3 +1430,23 @@ Solo el núcleo y el proto: el puente y la vista son de Front. Todo es aditivo; 
 - Cerrar la pestaña (cerrar el envío o cancelar) aborta la pregunta en pie. La huella nueva sigue como siempre (`FailedPrecondition` con la huella, antes de cualquier pregunta; con usuario vacío, «login as:» va antes de conectar).
 - **Auditoría** (en inglés): `terminal.open` con `credential=typed user="..."`; `terminal.failed` igual más el motivo. Nunca respuestas ni textos de preguntas, y la grabación no ve nada de la autenticación. Con la bóveda cerrada también se audita.
 - Cambia un texto: `terminal.err.no_address` ya no menciona la credencial.
+
+## Terminal por Telnet (fase 48-2)
+
+Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `protocol` todo sigue siendo SSH.
+
+- **`TerminalOpen.protocol`** (campo 12, enum `TerminalProtocol`): `TERMINAL_PROTOCOL_UNSPECIFIED` (0) y
+  `TERMINAL_PROTOCOL_SSH` (1) son SSH; `TERMINAL_PROTOCOL_TELNET` (2) abre por Telnet.
+- **Puerto:** el que venga en `port`; con 0, el 23.
+- **Login:** el equipo pregunta como texto («Username:», «Password:») y se teclea en la terminal, como en la consola
+  serie. No hay `auth_prompt` ni «login as:». Lo tecleado en «Password:» no se graba. No hay eco local: lo que se ve es
+  lo que manda el equipo.
+- **No aplican** (y se rechazan con `InvalidArgument` `terminal.err.telnet_field`, sin marcar): `username`, las huellas
+  (`accepted_host_key_fingerprints`, `accepted_host_keys`), `credential_id` (llega en 48-3) y `host_id` (llega en 48-4).
+  Telnet no tiene llave de host: no hay «Confiar y reintentar».
+- **Aviso:** después de `opened` y antes de cualquier salida del equipo llega un `data` con la línea localizada
+  `terminal.telnet.cleartext` («Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del
+  equipo.»). La UI no necesita armarlo.
+- **`opened`:** `dirección:puerto` (sin usuario: no se conoce hasta que el equipo lo pregunta).
+- **Auditoría:** `terminal.open` y `terminal.close` llevan `protocol=telnet cleartext=true`.
+- **Resize:** igual que en SSH; llega al equipo por NAWS si lo aceptó.
