@@ -66,7 +66,7 @@ These are the things MACUAHUITL does **not** guarantee. They are declared so tha
 
     What would mitigate these is exporting the audit log regularly and keeping the last head outside the machine. MACUAHUITL does not automate that, and there is no external anchor yet.
 
-15. **Telnet is clear text.** Everything a Telnet terminal sends and receives, password included, crosses the network unencrypted, and the device is not authenticated (no host key). With a stored credential, the core answers the login itself: it recognizes only `Username:`, `User Name:`, `login:` and `Password:` on a stable last line, sends the password once and never retries; that answer is not recorded or audited, but it does travel in clear text, and the copy queued for the socket lives in normal memory until the garbage collector frees it (as in limit 1). Use Telnet only where SSH is not available.
+18. **Telnet is clear text.** Everything a Telnet terminal sends and receives, password included, crosses the network unencrypted, and the device is not authenticated (no host key). With a stored credential, the core answers the login itself: it recognizes only `Username:`, `User Name:`, `login:` and `Password:` on a stable last line, sends the password once and never retries; that answer is not recorded or audited, but it does travel in clear text, and the copy queued for the socket lives in normal memory until the garbage collector frees it (as in limit 1). Use Telnet only where SSH is not available.
 
 ## Windows
 
