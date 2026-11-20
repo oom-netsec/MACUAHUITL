@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
@@ -131,4 +132,41 @@ func TestRunLanzaCuandoNoHayNucleo(t *testing.T) {
 	if sondas.Load() == 0 {
 		t.Fatal("run no consultó al lanzador con el núcleo caído")
 	}
+}
+
+// Frágil en Windows (#319): con un intervalo corto de prueba, la sonda de estado tenía un tope de 5×Interval (50 ms) y
+// un núcleo lento por la carga del runner pasaba por desconectado. El tope ya no baja de probeMin: un núcleo que
+// responde en 200 ms sigue conectado aunque el intervalo sea de 10 ms.
+func TestSondaLentaNoDesconecta(t *testing.T) {
+	sock := ipctest.Addr(t.TempDir())
+	l, err := ipc.Listen(sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterVaultServiceServer(r, lentoVault{}) })
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, func(string, any) {})
+	b.Interval = 10 * time.Millisecond
+	rctx, rcancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { b.run(rctx); close(done) }()
+	for deadline := time.Now().Add(5 * time.Second); b.Status() != "connected" && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	st := b.Status()
+	rcancel()
+	<-done
+	if st != "connected" {
+		t.Fatalf("un núcleo que responde en 200 ms quedó %q", st)
+	}
+}
+
+type lentoVault struct {
+	v1.UnimplementedVaultServiceServer
+}
+
+func (lentoVault) Status(context.Context, *v1.StatusRequest) (*v1.StatusResponse, error) {
+	time.Sleep(200 * time.Millisecond)
+	return &v1.StatusResponse{}, nil
 }

@@ -127,13 +127,17 @@ func Start(ctx context.Context, b *Bridge) {
 
 // run emite core:status (connected|disconnected). La verificación no cierra la conexión:
 // gRPC reconecta solo, y cerrarla tumbaría las llamadas en curso.
+// probeMin es el tope mínimo de la sonda de estado: con el intervalo de 1 s ya es 5 s; con intervalos cortos (pruebas)
+// un núcleo lento por la carga no pasa por desconectado.
+const probeMin = 5 * time.Second
+
 func (b *Bridge) run(ctx context.Context) {
 	t := time.NewTicker(b.Interval)
 	defer t.Stop()
 	for {
 		c, err := b.client()
 		if err == nil {
-			cctx, cancel := context.WithTimeout(ctx, 5*b.Interval)
+			cctx, cancel := context.WithTimeout(ctx, max(5*b.Interval, probeMin))
 			_, err = v1.NewVaultServiceClient(c).Status(cctx, &v1.StatusRequest{})
 			cancel()
 		}
