@@ -51,9 +51,12 @@ type Config struct {
 	IdleTimeout                          time.Duration // cierra la sesión si pasa este tiempo sin recibir una línea (exec-timeout)
 	Hangup                               *Hangup       // si no es nil, la prueba corta a mano los shells abiertos (un exec-timeout sin depender del reloj)
 	// Fase 48 (StartTelnet): login por texto. TelnetLinePassword pide solo «Password:» (password de línea, contra
-	// Password); TelnetNoEcho no ofrece WILL ECHO; TelnetBanner se escribe antes de la primera pregunta.
-	TelnetLinePassword, TelnetNoEcho bool
-	TelnetBanner                     string
+	// Password); TelnetNoEcho no ofrece WILL ECHO y no hace eco de nada (el cliente lo hace local); TelnetBanner se
+	// escribe antes de la primera pregunta; TelnetLoginDelay espera antes de ella (más que el tope del cliente = nunca
+	// pregunta); TelnetUnknownOption ofrece al conectar una opción que nadie conoce (WILL 200).
+	TelnetLinePassword, TelnetNoEcho, TelnetUnknownOption bool
+	TelnetBanner                                          string
+	TelnetLoginDelay                                      time.Duration
 	// Modo configuración (fase 16a). Interfaces da el cuerpo inicial de cada interfaz y hace que
 	// "show running-config interface X" refleje lo aplicado; ConfigErrors responde con ese texto
 	// a la línea de configuración indicada (sin aplicarla); Commands suma salidas estáticas;
@@ -155,7 +158,6 @@ func (d *device) setUser(name, pass, typ string) {
 
 const pageLines = 24
 
-// Start levanta el servidor y lo cierra con t.Cleanup.
 // prepare carga las salidas y arma el equipo que comparten el servidor SSH y el Telnet.
 func prepare(t testing.TB, c Config) (map[string]string, *device) {
 	t.Helper()
@@ -180,6 +182,7 @@ func prepare(t testing.TB, c Config) (map[string]string, *device) {
 	return outputs, dev
 }
 
+// Start levanta el servidor y lo cierra con t.Cleanup.
 func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 	t.Helper()
 	outputs, dev := prepare(t, c)
@@ -433,6 +436,7 @@ type session struct {
 	rctx    []string // contexto del running-config completo (Config.Running)
 	actx    string   // ASA multicontexto: contexto actual; "" = espacio del sistema
 	asaInit bool
+	noEcho  bool // Telnet sin WILL ECHO: el equipo no repite nada
 }
 
 func (s *session) write(str string) error {
@@ -519,7 +523,7 @@ func (s *session) readLine(echo bool) (string, error) {
 			return b.String(), nil
 		default:
 			b.WriteByte(buf[0])
-			if echo {
+			if echo && !s.noEcho {
 				s.ch.Write(buf)
 			}
 		}
