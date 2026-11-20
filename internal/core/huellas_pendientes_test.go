@@ -1,15 +1,16 @@
 package core
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
 
@@ -33,9 +34,12 @@ func TestArmadoFallidoTraeHuellasPendientes(t *testing.T) {
 	if status.Code(err) != codes.FailedPrecondition || reason != "patrol.svc.login_failed" || !strings.Contains(meta["host_keys"], k.Fingerprint) {
 		t.Fatalf("rearmado = %v %q %v", err, reason, meta)
 	}
-	var again v1.PendingHostKey
-	if err := protojson.Unmarshal([]byte(strings.Trim(meta["host_keys"], "[]")), &again); err != nil || again.Host != host || again.Fingerprint != k.Fingerprint {
-		t.Fatalf("metadata host_keys = %q (%v)", meta["host_keys"], err)
+	if _, keys := service.ArmFailure(err); len(keys) != 1 || keys[0].Host != host || keys[0].Fingerprint != k.Fingerprint || keys[0].KeyType != k.KeyType {
+		t.Fatalf("metadata host_keys = %q -> %v", meta["host_keys"], keys)
+	}
+	// La fase ARM_FAILED del trabajo no guarda la lista JSON (solo viaja en el error).
+	if s := h.summary(t, r.JobId); strings.Contains(fmt.Sprint(s.Phases), "host_keys") {
+		t.Errorf("la fase guarda host_keys: %v", s.Phases)
 	}
 	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: r.JobId, AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: k.Host, Fingerprint: k.Fingerprint}}}); err != nil {
 		t.Fatalf("con la huella pendiente aceptada: %v", err)
@@ -64,6 +68,10 @@ func TestRespaldoRearmaElMismoTrabajo(t *testing.T) {
 	}
 	if l, _ := h.patrol.ListJobs(ctx(t), &v1.ListJobsRequest{}); len(l.Jobs) != 1 {
 		t.Fatalf("creó otro trabajo: %v", l.Jobs)
+	}
+	// Revisión: otro «Confiar y reintentar» sobre el respaldo ya armado no es un armado fallido: vuelve el error.
+	if r4, err := bc.StartBackup(ctx(t), &v1.StartBackupRequest{JobId: r.JobId, AcceptedHostKeys: []*v1.AcceptedHostKey{{Host: k.Host, Fingerprint: k.Fingerprint}}}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("rearmado de un armado = %+v %v", r4, err)
 	}
 	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		res, err := bc.CollectBackups(ctx(t), &v1.CollectBackupsRequest{JobId: r.JobId})

@@ -183,8 +183,14 @@ func (s *backupSvc) rearm(ctx context.Context, r *v1.StartBackupRequest) (*v1.St
 	}
 	ar, err := s.d.Patrol().ArmJob(ctx, &v1.ArmJobRequest{JobId: r.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, AcceptedHostKeys: r.AcceptedHostKeys, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
-		if status.Code(err) != codes.FailedPrecondition { // otro estado (ya armado, quitado): no es un armado fallido
+		if status.Code(err) == codes.NotFound { // lo quitaron: ya no hay nada que vigilar
+			s.mu.Lock() // forget toca seen, que es de collect
+			s.forget(r.JobId, nil, false)
+			s.mu.Unlock()
 			return nil, err
+		}
+		if reason, _ := service.ArmFailure(err); status.Code(err) != codes.FailedPrecondition || reason == "patrol.svc.job_state" {
+			return nil, err // ya armado, armándose o terminado (doble clic): no es un armado fallido
 		}
 		return armFailed(r.JobId, err), nil
 	}

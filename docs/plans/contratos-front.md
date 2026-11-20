@@ -1497,4 +1497,10 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
   `keyType`, `changed`), la misma forma que la respuesta.
 - **Rearmar un respaldo:** `StartBackup{job_id, accepted_host_keys}` (campo 11) arma ese mismo trabajo, sin crear otro,
   y lo recoge al terminar. Si vuelve a fallar responde igual que la primera vez (`armed=false`, `reason`, `host_keys`).
-  Un `job_id` que no es un respaldo propio: `FailedPrecondition` `backup.err.not_rearmable`.
+  Un `job_id` que no es un respaldo propio: `FailedPrecondition` `backup.err.not_rearmable`. Eso también pasa si el
+  núcleo se reinició entre el primer intento y el rearmado (el seguimiento del respaldo vive en memoria): la UI crea
+  otro respaldo. Sobre un respaldo ya armado, armándose o terminado (doble clic) no hay respuesta: vuelve el error de
+  `ArmJob` (`FailedPrecondition` `patrol.svc.job_state`); quitado, `NotFound`. Con `job_id`, `targets`,
+  `credential_id` y las demás opciones del pedido se ignoran: valen las del trabajo creado.
+- La lista `host_keys` solo viaja en la respuesta y en el error: la fase ARM_FAILED del trabajo guarda el motivo y
+  `failed`, no las llaves.

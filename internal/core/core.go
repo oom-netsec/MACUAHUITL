@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -688,7 +689,12 @@ func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, code string, args 
 func (c *Core) addArmFailed(j *job, cause error) {
 	var ie *i18n.Error
 	if errors.As(cause, &ie) {
-		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, 0, ie.Code, ie.Args)
+		args := ie.Args
+		if _, ok := args["host_keys"]; ok { // la lista de llaves pendientes solo viaja en el error, no se guarda en el trabajo
+			args = maps.Clone(args)
+			delete(args, "host_keys")
+		}
+		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED, 0, ie.Code, args)
 		return
 	}
 	c.appendPhase(j, phase{At: c.o.Now(), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARM_FAILED.String(), Detail: i18n.English(cause)}, 0)
