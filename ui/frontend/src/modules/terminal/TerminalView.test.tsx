@@ -185,7 +185,7 @@ test("una llave de host nueva muestra la huella para aceptarla", async () => {
   await abrir("sw1");
   // Rechazo en la apertura (sin pestaña): la huella se muestra arriba con su botón para aceptarla, no solo como error.
   expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeEnabled();
   expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 });
 
@@ -242,7 +242,7 @@ test("una llave de host nueva ofrece aceptar la huella y reintenta con ella; la 
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
   await userEvent.clear(screen.getByLabelText(/Equipo/));
   await userEvent.type(screen.getByLabelText(/Equipo/), "10.9.9.9"); // otro equipo en el campo: la huella no se le manda
-  await userEvent.click(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
   expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ address: "192.168.3.2", accept: ["SHA256:AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK"], acceptedKeys: [{ host: "192.168.3.2", fingerprint: `SHA256:${fp}` }] }));
 });
@@ -391,7 +391,7 @@ test("una llave de host cambiada llega por errorInfo y ofrece aceptarla aunque e
   await abrir("192.168.3.2");
   act(() => { core.emitTerminal({ runId: "t1", done: true, error: "transport: clé d'hôte modifiée", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.changed", metadata: { fingerprint: `SHA256:${fp}` } } }); });
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confiar y reintentar" })).toBeInTheDocument();
 });
 
 test("mientras se abre una sesión, el selector de la libreta queda deshabilitado: no salen dos aperturas", async () => {

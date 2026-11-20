@@ -26,7 +26,8 @@ import { passwordCreds } from "../vault/api";
 import { HostPicker } from "../inventory/HostPicker";
 import { targetOf } from "../../lib/targets";
 import { SavedHosts } from "./SavedHosts";
-import { hostKeyFromError, hostOfTarget, keygenCommands, parseFingerprints, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
+import { HostKeyTrust } from "../../components/HostKeyTrust";
+import { hostKeyFromError, hostOfTarget, parseFingerprints, type AcceptedKey, type HostKeyInfo } from "../../lib/hostkeys";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
 import { useScriptsVersion } from "../scripts/signal";
@@ -59,18 +60,6 @@ const stamp = (d: Date) => { const z = (n: number) => String(n).padStart(2, "0")
 const fileBase = (label: string) => label.replace(/[^\w.-]+/g, "_");
 // Tamaño con el que se abre la sesión: el último medido o una estimación por la ventana; el ajuste real llega con terminalResize.
 const estimate = () => ({ cols: Math.max(80, Math.min(300, Math.floor((window.innerWidth - 320) / 8.4))), rows: Math.max(24, Math.min(80, Math.floor(window.innerHeight * 0.6 / 16.8))) });
-
-// Llave nueva: un clic. Llave CAMBIADA: antes hay que marcar que se entiende el riesgo.
-function TrustButton({ changed, busy, retry }: { changed: boolean; busy: boolean; retry: () => void }) {
-  const t = useT();
-  const [ack, setAck] = useState(false);
-  return (
-    <>
-      {changed && <Check label={t("ssh.hostKey.ack")} checked={ack} onChange={setAck} />}
-      <button type="button" disabled={busy || (changed && !ack)} onClick={retry}>{t("transfer.hostKey.accept")}</button>
-    </>
-  );
-}
 
 export function TerminalView({ core }: { core: CoreAPI }) {
   const t = useT();
@@ -312,30 +301,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   };
   useInbox("terminal-insert", (data) => { const ins = decodeInsert(data); if (ins) void insert(tool, ins); }); // «Enviar a la terminal» de Scripts
 
-  // Huella nueva o cambiada: se muestra con la orden para compararla y se acepta explícitamente (agrega la huella al campo y reintenta).
-  // «Confiar y reintentar» manda el par {host, huella} del destino, nunca lo del campo de huellas ni respuestas. Con un host guardado la
-  // UI no conoce la dirección: sirve la que informó el núcleo, y sin ella el campo viejo (un solo destino).
-  const trust = (hk: HostKeyInfo, dev: string, hostId: string | undefined): { accepted: string; keys: AcceptedKey[] } => {
+  // Huella nueva o cambiada: el aviso compartido (HostKeyTrust) la muestra con la orden para compararla y entrega el par {host, huella}
+  // del destino, nunca lo del campo de huellas ni respuestas. Con un host guardado la UI no conoce la dirección: sirve la que informó el
+  // núcleo; sin host el botón queda deshabilitado (falla cerrado) y la huella se pega a mano en «Huellas aceptadas».
+  const hostKeyNotice = (hk: HostKeyInfo, dev: string, hostId: string | undefined, retry: (keys: AcceptedKey[]) => void) => {
     const host = hostId ? hk.host : hostOfTarget(parseTarget(parseTargets(dev)[0] ?? ""));
-    return host ? { accepted: accept, keys: [{ host, fingerprint: hk.fp }] } : { accepted: `${accept} ${hk.fp}`.trim(), keys: [] };
-  };
-  const hostKeyNotice = (hk: HostKeyInfo, device: string, retry: () => void) => {
-    const kg = hk.keyType ? keygenCommands(hk.keyType) : null;
-    return (
-      <Notice kind="warn">
-        <p>{t(hk.changed ? "transfer.hostKey.changed" : "transfer.hostKey.new")}</p>
-        <p><span className="mono">{hk.host ?? device}</span>{hk.keyType && <> · <span className="mono">{hk.keyType}</span></>}</p>
-        <p><code>{hk.fp}</code></p>
-        {kg && (
-          <>
-            <p>{t("ssh.hostKey.compare")}</p>
-            <p>{t("ssh.hostKey.onLinux")} <code className="mono">{kg.linux}</code></p>
-            <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
-          </>
-        )}
-        <TrustButton key={hk.fp} changed={hk.changed} busy={busy} retry={retry} />
-      </Notice>
-    );
+    return <HostKeyTrust key={hk.fp} items={[{ ...hk, host }]} busy={busy} onTrust={retry} />;
   };
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {
@@ -346,7 +317,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
         {tab.err && <Notice kind="error">{tab.err}</Notice>}
         {changedStartup && <Notice kind="warn">{t("ssh.startupChanged")}</Notice>}
-        {hk && hostKeyNotice(hk, tab.device, () => { const k = trust(hk, tab.device, tab.hostId); void open(k.accepted, tab.device, tab.cred, tab.hostId, tab.startup, tab.user, k.keys); })}
+        {hk && hostKeyNotice(hk, tab.device, tab.hostId, (keys) => { void open(accept, tab.device, tab.cred, tab.hostId, tab.startup, tab.user, keys); })}
       </>
     );
   };
@@ -394,7 +365,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {/* Sin sesiones, el formulario a la vista; con sesiones se pliega en una línea y la terminal se queda con la pantalla. */}
       {!hasTabs ? <Section title={t("ssh.new")}>{form}</Section> : <details ref={newRef} className="ssh-new"><summary>{t("ssh.new")}</summary>{form}</details>}
       {err && <Notice kind="error">{err}</Notice>}
-      {openHk && hostKeyNotice(openHk.hk, openHk.dev, () => { const k = trust(openHk.hk, openHk.dev, openHk.hostId); void open(k.accepted, openHk.dev, openHk.cred, openHk.hostId, openHk.startup, openHk.user, k.keys); })}
+      {openHk && hostKeyNotice(openHk.hk, openHk.dev, openHk.hostId, (keys) => { void open(accept, openHk.dev, openHk.cred, openHk.hostId, openHk.startup, openHk.user, keys); })}
       {note && <Notice kind="warn">{t(note === "nosession" ? "ssh.scriptNoSession" : "scripts.noSend")}</Notice>}
       {tabs.length === 0 && <EmptyState icon="terminal" title={t("ssh.empty.title")}>{t("ssh.empty")}</EmptyState>}
       {cur && !second && head(cur)}
