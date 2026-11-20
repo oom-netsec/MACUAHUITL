@@ -23,15 +23,15 @@ export function useHosts(core: CoreAPI): Host[] {
 
 // Elegir un host de la libreta (búsqueda + lista agrupada por carpeta) para rellenar equipo y credencial. Escribir a mano sigue valiendo.
 // hosts: la lista ya cargada por quien lo usa (evita pedirla dos veces); filter: oculta los que no sirven a esa vista.
-export function HostPicker({ core, hosts, filter, onPick }: { core: CoreAPI; hosts?: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
-  return hosts ? <HostList hosts={hosts} filter={filter} onPick={onPick} /> : <Loaded core={core} filter={filter} onPick={onPick} />;
+export function HostPicker({ core, hosts, filter, onPick, disabled }: { core: CoreAPI; hosts?: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void; disabled?: boolean }) {
+  return hosts ? <HostList hosts={hosts} filter={filter} onPick={onPick} disabled={disabled} /> : <Loaded core={core} filter={filter} onPick={onPick} disabled={disabled} />;
 }
 
-function Loaded({ core, filter, onPick }: { core: CoreAPI; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
-  return <HostList hosts={useHosts(core)} filter={filter} onPick={onPick} />;
+function Loaded({ core, filter, onPick, disabled }: { core: CoreAPI; filter?: (h: Host) => boolean; onPick: (h: Host) => void; disabled?: boolean }) {
+  return <HostList hosts={useHosts(core)} filter={filter} onPick={onPick} disabled={disabled} />;
 }
 
-function HostList({ hosts: all, filter, onPick }: { hosts: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void }) {
+function HostList({ hosts: all, filter, onPick, disabled }: { hosts: Host[]; filter?: (h: Host) => boolean; onPick: (h: Host) => void; disabled?: boolean }) {
   const t = useT();
   const id = useId();
   const hosts = useMemo(() => (filter ? all.filter(filter) : all), [all, filter]);
@@ -48,7 +48,7 @@ function HostList({ hosts: all, filter, onPick }: { hosts: Host[]; filter?: (h: 
       <Field label={t("hosts.pick.search")} value={q} onChange={setQ} w="md" />
       <div className="field" data-w="lg">
         <label htmlFor={id}>{t("hosts.pick.label")}</label>
-        <select id={id} aria-describedby={`${id}-h`} value={sel} onChange={(e) => { setSel(e.target.value); const h = hosts.find((x) => x.id === e.target.value); if (h) onPick(h); }}>
+        <select id={id} aria-describedby={`${id}-h`} value={sel} disabled={disabled} onChange={(e) => { setSel(e.target.value); const h = hosts.find((x) => x.id === e.target.value); if (h) onPick(h); }}>
           <option value="">{t("hosts.pick.none")}</option>
           {groups.map(([folder, list]) => (
             <optgroup key={folder || "\0"} label={folder || t("hosts.folder.none")}>
