@@ -493,30 +493,36 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 		t.Skip("lenta (con -race el detector multiplica el costo de las expresiones regulares)")
 	}
 	line := strings.Repeat("a", 79) + "\r\n"
-	// run devuelve el mejor tiempo de tres y los bytes reservados en una corrida (TotalAlloc no depende de la carga).
-	run := func(size int) (time.Duration, uint64) {
-		var data []byte
+	// once mide una corrida: tiempo y bytes reservados (TotalAlloc no depende de la carga).
+	once := func(data []byte) (time.Duration, uint64) {
+		var m0, m1 runtime.MemStats
+		runtime.ReadMemStats(&m0)
+		r, _ := newRec()
+		start := time.Now()
+		for i := 0; i < len(data); i += 4096 {
+			r.Output(data[i:min(i+4096, len(data))])
+		}
+		r.Close()
+		d := time.Since(start)
+		runtime.ReadMemStats(&m1)
+		return d, m1.TotalAlloc - m0.TotalAlloc
+	}
+	gen := func(size int) (data []byte) {
 		for len(data) < size {
 			data = append(data, line...)
 		}
-		best, alloc := time.Hour, uint64(0)
-		for k := 0; k < 3; k++ { // el mejor de tres: un pico de carga de otra suite no cuenta
-			var m0, m1 runtime.MemStats
-			runtime.ReadMemStats(&m0)
-			r, _ := newRec()
-			start := time.Now()
-			for i := 0; i < len(data); i += 4096 {
-				r.Output(data[i:min(i+4096, len(data))])
-			}
-			r.Close()
-			best = min(best, time.Since(start))
-			runtime.ReadMemStats(&m1)
-			alloc = m1.TotalAlloc - m0.TotalAlloc
-		}
-		return best, alloc
+		return data
 	}
-	t1, a1 := run(1 << 20)
-	t5, a5 := run(5 << 20)
+	d1, d5 := gen(1<<20), gen(5<<20)
+	// Intercaladas y el mejor de tres: un cambio de carga de otra suite pega en las dos medidas por igual.
+	t1, t5 := time.Duration(1<<63-1), time.Duration(1<<63-1)
+	var a1, a5 uint64
+	for range 3 {
+		d, a := once(d1)
+		t1, a1 = min(t1, d), a
+		d, a = once(d5)
+		t5, a5 = min(t5, d), a
+	}
 	t.Logf("1 MB en %v (%d B reservados), 5 MB en %v (%d B)", t1, a1, t5, a5)
 	// Sin tope absoluto de tiempo: medía la velocidad de la máquina (falló con 6,1 s en local con otra suite corriendo),
 	// no la forma. Las proporciones detectan el crecimiento cuadrático; la de memoria además es determinista y atrapa la

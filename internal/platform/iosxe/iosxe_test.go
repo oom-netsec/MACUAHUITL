@@ -508,19 +508,20 @@ func TestSalidaSinSaltosGrandeEsLineal(t *testing.T) {
 	if raceOn || testing.Short() {
 		small, big = 1<<20, 4<<20
 	}
-	best := func(n int) time.Duration {
-		m := time.Duration(1<<63 - 1)
-		for range 2 {
-			d := feed(n, "SW#")
-			start := time.Now()
-			if _, err := d.untilIdle(context.Background(), 5*time.Second, d.atPrompt); err != nil {
-				t.Fatal(err)
-			}
-			m = min(m, time.Since(start))
+	once := func(n int) time.Duration {
+		d := feed(n, "SW#")
+		start := time.Now()
+		if _, err := d.untilIdle(context.Background(), 5*time.Second, d.atPrompt); err != nil {
+			t.Fatal(err)
 		}
-		return m
+		return time.Since(start)
 	}
-	a, b := best(small), best(big)
+	// Mediciones intercaladas y el mejor de tres de cada tamaño: un cambio de carga (otra suite) pega en las dos por
+	// igual y no infla la proporción (falló en local con 9,4 s contra 1,3 s midiendo primero las chicas).
+	a, b := time.Duration(1<<63-1), time.Duration(1<<63-1)
+	for range 3 {
+		a, b = min(a, once(small)), min(b, once(big))
+	}
 	if b > 6*a {
 		t.Fatalf("4 veces más bytes sin salto tardó %v contra %v: no es lineal", b, a)
 	}
