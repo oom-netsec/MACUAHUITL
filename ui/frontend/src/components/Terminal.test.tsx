@@ -56,7 +56,7 @@ test("la preferencia sobrevive a un reinicio (se lee del núcleo, no del webview
   localStorage.clear();
   resetTermPrefs();
   const { container } = render(<Terminal text="up" />);
-  expect(container.querySelector(".term")).toHaveAttribute("data-palette", "classic");
+  expect(container.querySelector(".term")).toHaveAttribute("data-palette", "tokyonight");
   await act(async () => { await setTermBackend(core); });
   expect(container.querySelector(".term")).toHaveAttribute("data-palette", "ibm");
 });
@@ -65,7 +65,7 @@ test("un valor guardado inválido cae a la paleta predeterminada", async () => {
   const core = fakeCore({ getPreference: vi.fn(async () => '{"palette":"<script>"}') });
   await act(async () => { await setTermBackend(core); });
   const { container } = render(<Terminal text="up" />);
-  expect(container.querySelector(".term")).toHaveAttribute("data-palette", "classic");
+  expect(container.querySelector(".term")).toHaveAttribute("data-palette", "tokyonight");
 });
 
 test("si el usuario cambia la paleta antes de que llegue la preferencia guardada, gana lo del usuario", async () => {

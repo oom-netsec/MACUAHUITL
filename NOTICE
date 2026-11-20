@@ -16,6 +16,14 @@ Copyright 2020 The JetBrains Mono Project Authors, under the SIL Open Font Licen
 (ui/frontend/src/assets/fonts/JetBrainsMono-OFL.txt). The OFL fonts are an authorized
 exception to the list of permissive licenses (ADR 0009).
 
+Includes a subset of the Symbols Nerd Font Mono font (Nerd Fonts v3.4.0, ui/frontend/src/assets/fonts/SymbolsNerdFontMono.woff2),
+Copyright (c) 2014 Ryan L McIntyre, under the MIT License; its glyph sets are under MIT, SIL OFL 1.1, Apache 2.0 and the
+Unlicense (Codicons, CC-BY-4.0, was removed). It includes Font Awesome Free icons, Copyright (c) 2022 Fonticons, Inc.
+(https://fontawesome.com): as font glyphs under the SIL Open Font License 1.1 (Reserved Font Name "Font Awesome"), and
+CC BY 4.0 for the same icons as SVG/JS, and the Fira Code progress glyphs, Copyright (c) 2014 The Fira Code Project
+Authors (OFL 1.1). Per-set licenses and copyright notices: ui/frontend/src/assets/fonts/SymbolsNerdFontMono-LICENSE.txt.
+The OFL, CC BY 4.0 (Font Awesome) and Unlicense (Font Logos) sets are an authorized exception for fonts (ADR 0009).
+
 The desktop interface includes these JavaScript libraries (ui/frontend, production dependencies):
 
   react, react-dom, scheduler          MIT    Copyright (c) Meta Platforms, Inc. and affiliates.

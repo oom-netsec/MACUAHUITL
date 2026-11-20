@@ -5,7 +5,7 @@ import type { Key } from "../lib/i18n/es";
 
 // Nombre traducido de cada paleta de internal/termcolor/palettes.json (el nombre del JSON queda de respaldo).
 const PALETTE_KEYS: Record<string, Key> = { classic: "term.palette.classic", p1: "term.palette.p1", p3: "term.palette.p3", ibm: "term.palette.ibm", solarized: "term.palette.solarized", light: "term.palette.light", "consola-oscura": "term.palette.consolaOscura", "consola-clara": "term.palette.consolaClara",
-  medianoche: "term.palette.medianoche", grafito: "term.palette.grafito", oceano: "term.palette.oceano", bosque: "term.palette.bosque", brasa: "term.palette.brasa", ciruela: "term.palette.ciruela", arena: "term.palette.arena", papel: "term.palette.papel", niebla: "term.palette.niebla", contraste: "term.palette.contraste" };
+  tokyonight: "term.palette.tokyonight", medianoche: "term.palette.medianoche", grafito: "term.palette.grafito", oceano: "term.palette.oceano", bosque: "term.palette.bosque", brasa: "term.palette.brasa", ciruela: "term.palette.ciruela", arena: "term.palette.arena", papel: "term.palette.papel", niebla: "term.palette.niebla", contraste: "term.palette.contraste" };
 /** Nombre de la paleta en el idioma activo (el del JSON queda de respaldo). */
 export const paletteName = (t: (k: Key) => string, p: { id: string; name: string }) => (p.id in PALETTE_KEYS ? t(PALETTE_KEYS[p.id]) : p.name);
 

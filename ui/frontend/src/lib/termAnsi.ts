@@ -9,7 +9,9 @@ import { classify, type Palette } from "./termHighlight";
 // brillantes 93 (num), 94 (info), 95 (str), 97 (prompt), 90 (dim) y blanco 37 (uprompt: el fg del tema, legible en claro y oscuro).
 const SLOT: Record<string, number> = { bad: 31, ok: 32, warn: 33, kw: 34, addr: 35, iface: 36, num: 93, info: 94, str: 95, prompt: 97, dim: 90, uprompt: 37 };
 const rgb = (hex: string) => `38;2;${parseInt(hex.slice(1, 3), 16)};${parseInt(hex.slice(3, 5), 16)};${parseInt(hex.slice(5, 7), 16)}`;
-const color = (cat: string, p: Palette) => { const hex = (p as unknown as Record<string, string>)[cat]; const c = SLOT[cat] ?? (hex && rgb(hex)); return c ? `\x1b[${c}m` : ""; };
+// Una paleta con "ansi" propio (Tokyo Night) no llena las ranuras con los roles: ahí todo va en RGB.
+// shortcut: lo ya escrito en RGB no cambia de color al cambiar de paleta; si se pide, repintar desde el texto limpio.
+const color = (cat: string, p: Palette) => { const hex = (p as unknown as Record<string, string>)[cat]; const c = (p.ansi ? undefined : SLOT[cat]) ?? (hex && rgb(hex)); return c ? `\x1b[${c}m` : ""; };
 // El prompt y el --More-- van en negrita (SGR 1 … 22), como en las terminales de escritorio; el resto solo cambia el color.
 const BOLD = new Set(["prompt", "uprompt"]);
 const paint = (cat: string, text: string, p: Palette) => (BOLD.has(cat) ? `\x1b[1m${color(cat, p)}${text}\x1b[39m\x1b[22m` : `${color(cat, p)}${text}\x1b[39m`);

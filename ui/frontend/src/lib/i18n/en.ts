@@ -1710,6 +1710,7 @@ export const en: Record<Key, string> = {
   "paste.yes": "Paste",
   "paste.no": "Cancel",
   "term.palette.medianoche": "Midnight",
+  "term.palette.tokyonight": "Tokyo Night",
   "term.palette.grafito": "Graphite",
   "term.palette.oceano": "Ocean",
   "term.palette.bosque": "Forest",

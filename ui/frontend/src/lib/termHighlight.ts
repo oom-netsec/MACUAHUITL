@@ -4,9 +4,10 @@ import rules from "../../../../internal/termcolor/rules.json";
 import palettes from "../../../../internal/termcolor/palettes.json";
 
 export interface Span { start: number; end: number; cat: string }
-export type Palette = (typeof palettes)[number];
+// "ansi" (16 colores) y "selection" son opcionales: solo la paleta que los trae (Tokyo Night) los fija; el resto los deriva de los roles.
+export type Palette = (typeof palettes)[number] & { ansi?: string[]; selection?: string };
 export const PALETTES: Palette[] = palettes;
-export const DEFAULT_PALETTE = "classic";
+export const DEFAULT_PALETTE = "tokyonight";
 export const CATEGORIES = ["ok", "bad", "warn", "info", "addr", "iface", "prompt", "uprompt", "num", "dim", "kw", "str", "ospf", "eigrp", "bgp", "rip", "static", "conn", "cred", "acl", "svc", "ver"] as const;
 
 // Tope por línea: una línea enorme (volcado binario) no debe costar regex.

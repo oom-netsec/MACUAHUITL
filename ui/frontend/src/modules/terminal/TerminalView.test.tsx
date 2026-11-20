@@ -72,7 +72,7 @@ test("la paleta elegida se aplica como tema del emulador", async () => {
   setup();
   await abrir("sw1");
   const x = await term();
-  expect(x.options.theme).toMatchObject({ background: "#0d1117", foreground: "#d6dbe3", red: "#f15350", green: "#50f179" });
+  expect(x.options.theme).toMatchObject({ background: "#1a1b26", foreground: "#c0caf5", red: "#f7768e", green: "#9ece6a" });
 });
 
 test("eventos que llegan antes de que la pestaña y su emulador existan no se pierden", async () => {
@@ -265,7 +265,7 @@ test("el emulador se abre como un emulador de terminal de escritorio: cursor de 
   setup();
   await abrir("sw1");
   const x = await term();
-  expect(x.options).toMatchObject({ cursorStyle: "block", cursorBlink: true, lineHeight: 1, fontSize: 14, scrollback: 20000 });
+  expect(x.options).toMatchObject({ cursorStyle: "bar", cursorBlink: true, lineHeight: 1.2, fontSize: 16, scrollback: 20000 });
   expect(String(x.options.fontFamily)).toMatch(/^"JetBrains Mono"/);
 });
 

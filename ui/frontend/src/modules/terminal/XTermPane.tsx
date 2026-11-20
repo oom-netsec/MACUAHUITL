@@ -4,7 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { FONT, FONT_PROBE, MARK, TERM_OPTIONS } from "./termTheme";
+import { FONT, FONT_PROBES, MARK, TERM_OPTIONS } from "./termTheme";
 import { useT } from "../../lib/i18n";
 
 export interface FindReq { q: string; dir: 1 | -1; n: number }
@@ -81,7 +81,7 @@ export default function XTermPane(p: Props) {
     ro.observe(el);
     // Con la fuente cargada la celda mide distinto: xterm solo vuelve a medir si cambia la familia, por eso el truco del espacio.
     let gone = false;
-    void document.fonts?.load(FONT_PROBE).then(() => { if (!gone) { x.options.fontFamily = `${FONT} `; fit.current(); } }).catch(() => {});
+    void Promise.allSettled(FONT_PROBES.map(([f, t]) => document.fonts?.load(f, t))).then(() => { if (!gone) { x.options.fontFamily = `${FONT} `; fit.current(); } }); // si falla la de símbolos, igual se mide con JetBrains
     return () => { gone = true; el.removeEventListener("contextmenu", onContext); el.removeEventListener("paste", onNativePaste, true); clearTimeout(timer); props.current.bind(props.current.runId, null); ro.disconnect(); x.dispose(); term.current = null; find.current = null; };
   }, []);
 

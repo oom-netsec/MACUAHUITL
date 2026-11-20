@@ -132,3 +132,16 @@ func TestPrefsFromJSONIdsAntiguos(t *testing.T) {
 		}
 	}
 }
+
+// La paleta Tokyo Night trae "ansi" (lista) y "selection" solo para la UI: Go los ignora y sigue leyendo el resto.
+func TestTokyoNightConCamposDeUI(t *testing.T) {
+	p := Lookup("tokyonight")
+	if p.ID != "tokyonight" || p.Bg != "#1a1b26" || p.Cats["ok"] == "" {
+		t.Fatalf("tokyonight = %+v", p)
+	}
+	for _, k := range []string{"ansi", "selection"} {
+		if _, ok := p.Cats[k]; ok {
+			t.Errorf("%s no debe colarse como categoría", k)
+		}
+	}
+}
