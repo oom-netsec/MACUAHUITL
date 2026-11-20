@@ -1,3 +1,4 @@
+import type { PendingKey } from "../../lib/hostkeys";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BackupView } from "./BackupView";
@@ -38,32 +39,84 @@ test("sin armar explica por qué y no espera", async () => {
   expect(core.backupCollect).not.toHaveBeenCalled();
 });
 
-test("sin armar por llave de host muestra la huella y solo con «Confiar y reintentar» respalda con ella", async () => {
-  const backupStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "Login Test falló" }).mockResolvedValueOnce({ jobId: "j10", armed: true, detail: "" });
-  const loginTest = vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.changed", args: { key_type: "ssh-rsa" } }]);
-  const core = withCreds({ backupStart, loginTest, backupCollect: vi.fn(async () => ({ state: "completed", done: true, saved: [a.id], skipped: 0, pruned: 0, warnings: [] })) });
-  render(<BackupView core={core} pollMs={1} />);
-  expect(screen.queryByLabelText(/Huellas aceptadas|Huellas SHA256 aceptadas/)).not.toBeInTheDocument();
+const hk = (o: object = {}): PendingKey => ({ host: "192.0.2.1:22", fingerprint: "SHA256:abc", keyType: "ssh-rsa", changed: true, ...o });
+const unarmed = (keys: PendingKey[], over = {}) => ({ jobId: "j9", armed: false, detail: "Login Test falló", reason: "patrol.svc.login_failed", hostKeys: keys, ...over });
+const coreErr = (reason: string) => Object.assign(new Error("rpc error"), { cause: { code: "FailedPrecondition", reason, metadata: {} } });
+const done = { backupCollect: vi.fn(async () => ({ state: "completed", done: true, saved: [a.id], skipped: 0, pruned: 0, warnings: [] })) };
+const startBackup = async () => {
   await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
   await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
+};
+
+test("sin armar muestra las huellas del núcleo (sin Login Test) y «Confiar y reintentar» rearma el mismo respaldo", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([hk()])).mockResolvedValueOnce({ jobId: "j9", armed: true, detail: "" });
+  const core = withCreds({ backupStart, ...done });
+  render(<BackupView core={core} pollMs={1} />);
+  expect(screen.queryByLabelText(/Huellas aceptadas|Huellas SHA256 aceptadas/)).not.toBeInTheDocument();
+  await startBackup();
   expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
-  expect(loginTest).toHaveBeenCalledWith("j9");
   expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_rsa_key.pub")).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("CAMBIÓ");
   expect(backupStart).toHaveBeenCalledTimes(1); // sin clic no se acepta nada
-  await userEvent.click(screen.getByRole("checkbox", { name: /Entiendo que la llave de este equipo cambió/ })); // llave cambiada
+  await userEvent.click(screen.getByRole("checkbox", { name: /Entiendo que la llave de este equipo cambió/ }));
   await userEvent.click(screen.getByRole("button", { name: "Confiar y reintentar" }));
   await waitFor(() => expect(backupStart).toHaveBeenCalledTimes(2));
-  expect(backupStart).toHaveBeenLastCalledWith(expect.objectContaining({ accept: [], acceptedKeys: [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }] }));
+  expect(backupStart).toHaveBeenLastCalledWith(expect.objectContaining({ jobId: "j9", accept: [], acceptedKeys: [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }] }));
   expect(await screen.findByText(/1 respaldo guardado/)).toBeInTheDocument();
+  expect(core.loginTest).not.toHaveBeenCalled();
+  expect(backupStart.mock.calls[0][0]).not.toHaveProperty("jobId"); // el primero crea el trabajo
 });
 
-test("si el Login Test no se puede obtener, se avisa que no hay huella", async () => {
-  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "x" })), loginTest: vi.fn(async () => { throw new Error("sin ruta"); }) });
+test("si el núcleo se reinició (backup.err.not_rearmable) se crea otro respaldo, una sola vez, con las mismas huellas", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([hk({ changed: false })]))
+    .mockRejectedValueOnce(coreErr("backup.err.not_rearmable")).mockResolvedValueOnce({ jobId: "j10", armed: true, detail: "" });
+  const core = withCreds({ backupStart, ...done });
+  render(<BackupView core={core} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  expect(await screen.findByText(/1 respaldo guardado/)).toBeInTheDocument();
+  expect(backupStart).toHaveBeenCalledTimes(3);
+  expect(backupStart.mock.calls[1][0]).toMatchObject({ jobId: "j9", acceptedKeys: [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }] });
+  expect(backupStart.mock.calls[2][0]).not.toHaveProperty("jobId");
+  expect(backupStart.mock.calls[2][0]).toMatchObject({ acceptedKeys: [{ host: "192.0.2.1:22", fingerprint: "SHA256:abc" }] });
+});
+
+test("not_rearmable no se reintenta en bucle: si el segundo intento también falla, el error se ve", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([hk({ changed: false })])).mockRejectedValue(coreErr("backup.err.not_rearmable"));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  await waitFor(() => expect(backupStart).toHaveBeenCalledTimes(3));
+  expect(await screen.findByRole("alert")).toHaveTextContent("rpc error");
+});
+
+test("un doble clic (patrol.svc.job_state) no es un error rojo ni se reintenta: avisa que ya está armado", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([hk({ changed: false })])).mockRejectedValueOnce(coreErr("patrol.svc.job_state"));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("El respaldo j9 ya estaba armado");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(backupStart).toHaveBeenCalledTimes(2);
+});
+
+test("si el rearmado vuelve a fallar con otras huellas, el aviso reaparece con ellas", async () => {
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([hk({ changed: false })])).mockResolvedValueOnce(unarmed([hk({ host: "sw2:2222", fingerprint: "SHA256:def", changed: false })]));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(await screen.findByRole("button", { name: "Confiar y reintentar" }));
+  expect(await screen.findByText("SHA256:def")).toBeInTheDocument();
+  expect(screen.queryByText("SHA256:abc")).not.toBeInTheDocument();
+});
+
+test("sin huellas pendientes solo se muestra el motivo, sin aviso de confianza ni Login Test", async () => {
+  const core = withCreds({ backupStart: vi.fn(async () => unarmed([], { detail: "bóveda bloqueada" })) });
   render(<BackupView core={core} />);
-  await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
-  await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
-  expect(await screen.findByText(/No se pudo obtener la huella/)).toBeInTheDocument();
+  await startBackup();
+  expect(await screen.findByRole("status")).toHaveTextContent("Trabajo j9 creado sin armar: bóveda bloqueada");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  expect(core.loginTest).not.toHaveBeenCalled();
+  expect(core.backupCollect).not.toHaveBeenCalled();
 });
 
 test("programar convierte minutos en segundos y no espera el resultado", async () => {
@@ -217,9 +270,9 @@ test("una restauración viva retomada muestra el aviso rojo del modo asistido", 
 
 // Seguridad: con varios equipos cada huella viaja atada a su equipo (nunca una lista suelta) y solo la de los marcados.
 test("con varios equipos el reintento manda pares (equipo, huella) de los marcados y accept vacío", async () => {
-  const row = (target: string, fingerprint: string) => ({ target, passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint, reason: "transport.hostkey.unknown" });
-  const backupStart = vi.fn().mockResolvedValueOnce({ jobId: "j9", armed: false, detail: "x" }).mockResolvedValue({ jobId: "j10", armed: false, detail: "x" });
-  const core = withCreds({ backupStart, loginTest: vi.fn(async () => [row("192.0.2.1:22", "SHA256:abc"), row("sw2:2222", "SHA256:def")]) });
+  const k = (host: string, fingerprint: string) => hk({ host, fingerprint, changed: false });
+  const backupStart = vi.fn().mockResolvedValueOnce(unarmed([k("192.0.2.1:22", "SHA256:abc"), k("sw2:2222", "SHA256:def")])).mockResolvedValue(unarmed([]));
+  const core = withCreds({ backupStart });
   render(<BackupView core={core} pollMs={1} />);
   await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1 sw2:2222");
   await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
@@ -229,15 +282,44 @@ test("con varios equipos el reintento manda pares (equipo, huella) de los marcad
   expect(backupStart).toHaveBeenLastCalledWith(expect.objectContaining({ accept: [], acceptedKeys: [{ host: "sw2:2222", fingerprint: "SHA256:def" }] }));
 });
 
-test("si cambian los equipos tras el rechazo, el panel de confianza desaparece", async () => {
-  const loginTest = vi.fn(async () => [{ target: "192.0.2.1:22", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "x", platform: "", fingerprint: "SHA256:abc", reason: "transport.hostkey.unknown" }]);
-  const core = withCreds({ backupStart: vi.fn(async () => ({ jobId: "j9", armed: false, detail: "x" })), loginTest });
+test("si cambian los equipos tras el rechazo, el panel de confianza desaparece y se crea un respaldo nuevo", async () => {
+  const backupStart = vi.fn().mockResolvedValue(unarmed([hk({ changed: false })]));
+  const core = withCreds({ backupStart });
   render(<BackupView core={core} pollMs={1} />);
   await userEvent.type(screen.getByLabelText(/Equipos/), "192.0.2.1");
   await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
   await screen.findByRole("button", { name: "Confiar y reintentar" });
   await userEvent.type(screen.getByLabelText(/Equipos/), " 192.0.2.9");
   expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Respaldar ahora" }));
+  expect(backupStart.mock.calls[1][0]).not.toHaveProperty("jobId");
+});
+
+test.each([
+  ["Guardar sin enmascarar secretos", "check"], ["Incluir también el startup-config", "check"],
+  [/Respaldos a conservar/, "type"], [/Programar cada/, "type"],
+])("cambiar %s tras el rechazo quita el aviso y el siguiente respaldo crea otro trabajo con las opciones nuevas", async (label, kind) => {
+  const backupStart = vi.fn().mockResolvedValue(unarmed([hk({ changed: false })]));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await screen.findByRole("button", { name: "Confiar y reintentar" });
+  if (kind === "check") await userEvent.click(screen.getByLabelText(label));
+  else await userEvent.type(screen.getByLabelText(label), "5");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Respaldar ahora|Programar$/ }));
+  expect(backupStart.mock.calls[1][0]).not.toHaveProperty("jobId");
+});
+
+test("una respuesta que llega después de editar el pedido no deja huellas ni trabajo viejo", async () => {
+  let late!: (v: unknown) => void;
+  const backupStart = vi.fn(() => new Promise((r) => { late = r; }));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(screen.getByLabelText("Guardar sin enmascarar secretos")); // edita con la llamada en vuelo
+  late(unarmed([hk()]));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Respaldar ahora" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  expect(screen.queryByText("SHA256:abc")).not.toBeInTheDocument();
 });
 
 test("las opciones avanzadas del respaldo van plegadas, cuentan los cambios y el aviso de secretos queda fuera", async () => {

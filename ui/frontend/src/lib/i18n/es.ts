@@ -3098,7 +3098,6 @@ export const es = {
   "hostkey.pick": "Confiar en la llave de {host}",
   "hostkey.new": "El equipo presenta una llave de host que no conocías. Compara esta huella con la del equipo y confía en ella solo si coincide.",
   "hostkey.ack": "Entiendo que la llave de este equipo cambió",
-  "hostkey.noLogin": "No se pudo obtener la huella de los equipos (falló el Login Test): no hay nada que comparar ni confiar desde aquí.",
   "ssh.credTyped": "Escribir usuario y contraseña al conectar",
   "ssh.user": "Usuario (opcional)",
   "ssh.userHint": "Vacío: la terminal pregunta «login as:». Con una credencial guardada no se usa.",
@@ -3135,6 +3134,7 @@ export const es = {
   "hosts.err.startTelnet": "Telnet no admite orden de inicio.",
   "ssh.saved.telnetCred": "Telnet · credencial en claro",
   "hosts.telnetCred": "Telnet: la credencial guardada viaja en texto claro; la ve cualquiera que pueda mirar la red.",
+  "backup.alreadyArmed": "El respaldo {job} ya estaba armado: sigue su curso, no hace falta reintentar.",
 };
 
 export type Key = keyof typeof es;

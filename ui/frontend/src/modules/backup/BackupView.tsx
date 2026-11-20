@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
+import { errInfo } from "../../lib/coreError";
 import type { CoreAPI } from "../../lib/core";
 import { Check, Field, Notice, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section } from "../../components/Page";
@@ -20,7 +21,7 @@ import { BackupTimeline } from "./BackupTimeline";
 import { useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import "./backup.css";
-import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromErr, pendingToInfo } from "../../lib/hostkeys";
 import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
@@ -32,13 +33,16 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const { creds, vault, error: vaultError } = useCredentials(core);
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
-  useInbox("backup", (d) => { setDevices(d); setHks([]); }); // desde el menú de equipo
+  useInbox("backup", (d) => { setDevices(d); clearHks(); }); // desde el menú de equipo
   const [startup, setStartup] = useState(false);
   const [secrets, setSecrets] = useState(false);
   const [keep, setKeep] = useState("30");
   const [every, setEvery] = useState("0");
   const [rounds, setRounds] = useState("2");
-  const [hks, setHks] = useState<HostKeyInfo[]>([]); // llaves que rechazó el Login Test del respaldo sin armar
+  const [hks, setHks] = useState<HostKeyInfo[]>([]); // huellas pendientes que devolvió el núcleo al no armar el respaldo
+  const [unarmed, setUnarmed] = useState(""); // respaldo creado sin armar: «Confiar y reintentar» lo rearma, no crea otro
+  const gen = useRef(0); // generación: una respuesta de una llamada anterior a una edición no fija huellas ni trabajo
+  const clearHks = () => { gen.current++; setHks([]); setUnarmed(""); };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [liveRestore, setLiveRestore] = useState(false);
@@ -65,18 +69,27 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const scheduled = Number(every) > 0;
   // accept: pares (equipo, huella) aceptados con un clic en «Confiar y reintentar», solo para este reintento.
   const run = async (accept: AcceptedKey[] = []) => {
-    setErr(""); setNote(null); setHks([]); setBusy(true);
+    const job = accept.length ? unarmed : "";
+    setErr(""); setNote(null); clearHks(); setBusy(true);
+    const mine = gen.current;
     try {
-      const st = await core.backupStart({
+      const req = {
         targets: parseTargets(devices).map(parseTarget), credentialId: cred, startup, keep: Number(keep) || 0,
         intervalSeconds: Math.round(Number(every) * 60), rounds: scheduled ? Number(rounds) : 0, secrets,
         accept: [], acceptedKeys: accept,
-      });
+      };
+      let st;
+      try { st = await core.backupStart(job ? { ...req, jobId: job } : req); } catch (e) {
+        const why = job ? errInfo(e)?.reason : "";
+        if (why === "backup.err.not_rearmable") st = await core.backupStart(req); // el núcleo se reinició: otro respaldo, una sola vez
+        else if (why === "patrol.svc.job_state") { setNote({ kind: "info", text: t("backup.alreadyArmed", { job }) }); return; } // doble clic: ya está armado
+        else { if (job && gen.current === mine) { setUnarmed(job); setHks(hostKeysFromErr(e)); } throw e; }
+      }
       if (!st.armed) {
+        if (gen.current !== mine) return; // se editó el pedido durante la llamada: esta respuesta ya no vale
         setNote({ kind: "warn", text: t("backup.notArmed", { job: st.jobId, detail: st.detail }) });
-        // El trabajo quedó creado sin armar: el Login Test dice qué huella presentó cada equipo. Se llama siempre: detail es solo
-        // texto, sin reason. No se arma con armJob: solo backupStart pone a guardar los respaldos al terminar (watch) y se programan.
-        try { setHks(hostKeysFromLogin(await core.loginTest(st.jobId))); } catch { setNote((n) => n && { ...n, text: `${n.text} ${t("hostkey.noLogin")}` }); }
+        setUnarmed(st.jobId);
+        setHks(pendingToInfo(st.hostKeys)); // el núcleo ya trae las huellas: no hace falta un Login Test
         return;
       }
       if (scheduled) { setNote({ kind: "info", text: t("backup.scheduled", { job: st.jobId }) }); return; }
@@ -118,16 +131,16 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   return (
     <Page title={t("backup.title")} description={<>{t("backup.intro.a")}<code>outputs/respaldos/</code>{t("backup.intro.b")}</>}>
       <Section title={t("backup.sec.run")}>
-        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); }} />
-        <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); } }} />
+        <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); clearHks(); }} />
+        <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); clearHks(); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); clearHks(); } }} />
         <div className="field-row end">
-          <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
-          {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
+          <Field label={t("backup.every")} type="number" value={every} onChange={(v) => { setEvery(v); clearHks(); }} w="md" />
+          {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={(v) => { setRounds(v); clearHks(); }} w="sm" />}
         </div>
         <Advanced changed={[startup, secrets, keep !== "30"].filter(Boolean).length}>
-          <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
-          <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
-          <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
+          <Check label={t("backup.startup")} checked={startup} onChange={(v) => { setStartup(v); clearHks(); }} />
+          <Check label={t("backup.secrets")} checked={secrets} onChange={(v) => { setSecrets(v); clearHks(); }} />
+          <Field label={t("backup.keep")} type="number" value={keep} onChange={(v) => { setKeep(v); clearHks(); }} w="sm" />
         </Advanced>
         {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="actions">
@@ -135,7 +148,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         </div>
         {err && <Notice kind="error">{err}</Notice>}
         {note && <Notice kind={note.kind}>{note.text}</Notice>}
-        {hks.length > 0 && <HostKeyTrust items={hks} busy={busy} onTrust={run} />}
+        {hks.length > 0 && <HostKeyTrust items={hks} busy={busy} onTrust={(k) => run(k)} />}
       </Section>
 
       <Section title={t("backup.saved.title")} description={t("backup.list.hint")}>

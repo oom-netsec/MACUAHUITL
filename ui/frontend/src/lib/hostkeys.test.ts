@@ -1,4 +1,4 @@
-import { hostKeyFromError, hostKeysFromLogin, keygenCommands, parseFingerprints, resolveAccepted } from "./hostkeys";
+import { hostKeysFromErr, pendingToInfo, hostKeyFromError, hostKeysFromLogin, keygenCommands, parseFingerprints, resolveAccepted } from "./hostkeys";
 
 const b64 = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
 
@@ -82,4 +82,33 @@ test("hostKeysFromLogin lee el reason envuelto (args.cause_reason) igual que hos
 test("hostKeysFromLogin ata el par al destino del Login Test (target), no al host de la metadata", () => {
   const row = { target: "10.0.0.7:2222", passed: false, failedStep: "LOGIN_TEST_STEP_HOST_KEY", detail: "", platform: "", fingerprint: "SHA256:x", reason: "transport.hostkey.unknown", args: { host: "10.0.0.7" } };
   expect(hostKeysFromLogin([row])[0].host).toBe("10.0.0.7:2222");
+});
+
+const errWith = (host_keys: string | undefined) => ({ cause: { code: "FailedPrecondition", reason: "patrol.svc.login_failed", metadata: host_keys === undefined ? {} : { host_keys } } });
+
+test("pendingToInfo descarta lo malformado y conserva host, huella, tipo y cambio", () => {
+  expect(pendingToInfo([
+    { host: "[2001:db8::1]:2222", fingerprint: "SHA256:a", keyType: "ssh-rsa", changed: true },
+    { host: "10.0.0.1", fingerprint: "SHA256:b" },
+    { host: "", fingerprint: "SHA256:c" }, { host: "x", fingerprint: "" }, { fingerprint: "SHA256:d" }, { host: "x" }, { host: "x", fingerprint: 5 }, null, "x", 7,
+  ])).toEqual([
+    { host: "[2001:db8::1]:2222", fp: "SHA256:a", keyType: "ssh-rsa", changed: true },
+    { host: "10.0.0.1", fp: "SHA256:b", keyType: undefined, changed: false },
+  ]);
+  expect(pendingToInfo(undefined)).toEqual([]);
+  expect(pendingToInfo({ host: "x", fingerprint: "y" })).toEqual([]);
+});
+
+test("hostKeysFromErr lee metadata.host_keys (protojson) y rechaza JSON roto o ausente", () => {
+  expect(hostKeysFromErr(errWith(JSON.stringify([{ host: "10.0.0.1:22", fingerprint: "SHA256:a", keyType: "ssh-ed25519", changed: true }, { host: "10.0.0.2:22" }]))))
+    .toEqual([{ host: "10.0.0.1:22", fp: "SHA256:a", keyType: "ssh-ed25519", changed: true }]);
+  expect(hostKeysFromErr(errWith("[{roto"))).toEqual([]);
+  expect(hostKeysFromErr(errWith('{"host":"x","fingerprint":"y"}'))).toEqual([]); // no es un arreglo
+  expect(hostKeysFromErr(errWith(undefined))).toEqual([]);
+  expect(hostKeysFromErr(new Error("sin cause"))).toEqual([]);
+});
+
+test("pendingToInfo trata un changed que no es booleano como cambiado y acota la lista", () => {
+  expect(pendingToInfo([{ host: "h", fingerprint: "f", changed: "no" }, { host: "h", fingerprint: "g" }, { host: "h", fingerprint: "i", changed: false }]).map((k) => k.changed)).toEqual([true, false, false]); // ausente = false (protojson omite el valor por omisión);
+  expect(pendingToInfo(Array.from({ length: 1000 }, (_, i) => ({ host: `h${i}`, fingerprint: "f" })))).toHaveLength(256);
 });

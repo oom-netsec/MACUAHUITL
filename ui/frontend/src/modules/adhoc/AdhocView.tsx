@@ -1,7 +1,7 @@
 import { plural } from "../../lib/plural";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { useEffect, useRef, useState } from "react";
-import type { AdhocResult, CoreAPI } from "../../lib/core";
+import type { AdhocResult, AdhocStart, CoreAPI } from "../../lib/core";
 import { Notice, TextArea } from "../../components/Field";
 import { RunButton } from "../../components/RunButton";
 import { ExportMenu } from "../../components/Files";
@@ -12,7 +12,7 @@ import { parseTarget, parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromErr, pendingToInfo } from "../../lib/hostkeys";
 import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
@@ -29,37 +29,38 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   const [commands, setCommands] = useState(["show version", "show ip interface brief"].join("\n"));
-  const [hks, setHks] = useState<HostKeyInfo[]>([]); // llaves que rechazó el Login Test del lote sin armar
+  const [hks, setHks] = useState<HostKeyInfo[]>([]); // huellas pendientes que devolvió el núcleo al no armar el lote
   const [unarmed, setUnarmed] = useState(""); // trabajo creado sin armar: «Confiar y reintentar» lo arma, no crea otro
   const [note, setNote] = useState("");
   const [picked, setPicked] = useState("");
   const [view, setView] = useState<ViewName>("matrix");
   const r = useResult<AdhocResult | null>();
+  const gen = useRef(0); // generación: una respuesta de una llamada anterior a una edición no fija huellas ni trabajo
+  const clearHks = () => { gen.current++; setHks([]); setUnarmed(""); };
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   // accept: pares (equipo, huella) aceptados con un clic en «Confiar y reintentar», solo para este reintento.
   const run = (accept: AcceptedKey[] = []) => {
-    setNote(""); setPicked(""); setHks([]);
+    setNote(""); setPicked("");
     const job = accept.length ? unarmed : "";
-    setUnarmed("");
+    clearHks();
+    const mine = gen.current;
     return r.run(async () => {
-      let st = { jobId: job, armed: true, detail: "" };
+      let st: AdhocStart = { jobId: job, armed: true, detail: "" };
       if (job) {
         try { await core.armJob(job, [], accept, []); } // mismo trabajo (ya tiene sus equipos y comandos)
-        catch (e) { // otro equipo sigue sin confiar: el panel vuelve con lo que el Login Test diga ahora, y el error se muestra
-          setUnarmed(job);
-          setHks(hostKeysFromLogin(await core.loginTest(job).catch(() => [])));
+        catch (e) { // otro equipo sigue sin confiar: el panel vuelve con las huellas del error de ArmJob, y el error se muestra
+          if (gen.current === mine) { setUnarmed(job); setHks(hostKeysFromErr(e)); }
           throw e;
         }
       }
       else st = await core.adhocStart(parseTargets(devices).map(parseTarget), cred, commands, [], accept);
       if (!st.armed) {
+        if (gen.current !== mine) return null; // se editó el pedido durante la llamada: esta respuesta ya no vale
         setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail }));
         setUnarmed(st.jobId);
-        // El lote quedó creado sin armar: el Login Test dice qué huella presentó cada equipo. La llamada se hace siempre:
-        // detail es solo texto del núcleo, sin reason que diga si la causa fue la llave de host.
-        try { setHks(hostKeysFromLogin(await core.loginTest(st.jobId))); } catch { setNote((n) => `${n} ${t("hostkey.noLogin")}`); }
+        setHks(pendingToInfo(st.hostKeys)); // el núcleo ya trae las huellas: no hace falta un Login Test
         return null;
       }
       const deadline = Date.now() + maxWaitMs;
@@ -89,9 +90,9 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
 
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
-      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); setUnarmed(""); }} w="lg" />
-      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); setUnarmed(""); } }} />
-      <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); setHks([]); setUnarmed(""); }} rows={5} />
+      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); clearHks(); }} w="lg" />
+      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); clearHks(); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); clearHks(); } }} />
+      <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); clearHks(); }} rows={5} />
       <div className="actions">
         <RunButton primary kbd busy={r.busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>
           {t(r.busy ? "adhoc.running" : "adhoc.run")}

@@ -139,7 +139,7 @@ func TestHostKeysPorHost(t *testing.T) {
 	})
 	tg := []AdhocTargetDTO{{Address: "10.0.0.1"}, {Address: "sw2.lab", Port: 2222}}
 	b.AdhocStart(tg, "c", "show clock", nil, keysIn)
-	b.BackupStart(tg, "c", true, 1, 0, 0, false, nil, keysIn)
+	b.BackupStart(tg, "c", true, 1, 0, 0, false, nil, keysIn, "")
 	b.ChangeCapture("ch", "pre", nil, keysIn, nil)
 	b.ArmJob("j", nil, keysIn, nil)
 	b.PortStatus(PortStatusQueryDTO{Device: "10.0.0.1", AcceptedKeys: keysIn})
