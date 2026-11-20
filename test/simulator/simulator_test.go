@@ -6,10 +6,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -276,5 +278,98 @@ func TestOTPSinPasswordDirecto(t *testing.T) {
 	if c, err := ssh.Dial("tcp", addr, cfg); err == nil {
 		c.Close()
 		t.Fatal("entró con password sin el código")
+	}
+}
+
+// telnetCliente es lo mínimo del lado de la prueba: lee quitando las negociaciones IAC y escribe con CR NUL.
+type telnetCliente struct {
+	c   net.Conn
+	r   *bufio.Reader
+	neg []string // negociaciones recibidas: "WILL 1", "DO 31"...
+}
+
+func dialTelnet(t *testing.T, addr string) *telnetCliente {
+	t.Helper()
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return &telnetCliente{c: c, r: bufio.NewReader(c)}
+}
+
+func (k *telnetCliente) hasta(t *testing.T, suffix string) string {
+	t.Helper()
+	k.c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var b strings.Builder
+	for !strings.HasSuffix(b.String(), suffix) {
+		c, err := k.r.ReadByte()
+		if err != nil {
+			t.Fatalf("leyendo hasta %q: %v (llegó %q)", suffix, err, b.String())
+		}
+		if c != 255 {
+			b.WriteByte(c)
+			continue
+		}
+		cmd, _ := k.r.ReadByte()
+		opt, _ := k.r.ReadByte()
+		k.neg = append(k.neg, map[byte]string{251: "WILL", 252: "WONT", 253: "DO", 254: "DONT"}[cmd]+" "+strconv.Itoa(int(opt)))
+	}
+	return b.String()
+}
+
+func (k *telnetCliente) linea(s string) { k.c.Write(append([]byte(s), '\r', 0)) }
+
+func TestTelnetLoginYComando(t *testing.T) {
+	var att atomic.Int32
+	rec := &Recorder{}
+	addr := StartTelnet(t, Config{Hostname: "SW1", Username: "admin", Password: "pw", Attempts: &att, Recorder: rec, Transcripts: transcripts(t, "ios-xe")})
+	k := dialTelnet(t, addr)
+	k.hasta(t, "Username: ")
+	k.linea("admin")
+	k.hasta(t, "Password: ")
+	k.linea("mala")
+	k.hasta(t, "% Login invalid\r\n\r\nUsername: ")
+	k.linea("admin")
+	if out := k.hasta(t, "Password: "); strings.Contains(out, "mala") {
+		t.Fatalf("hizo eco de la contraseña: %q", out)
+	}
+	k.linea("pw")
+	k.hasta(t, "SW1>")
+	k.linea("terminal length 0")
+	k.hasta(t, "SW1>")
+	k.linea("show version")
+	if out := k.hasta(t, "SW1>"); !strings.Contains(out, "Cisco") {
+		t.Fatalf("show version = %q", out)
+	}
+	if att.Load() != 2 {
+		t.Errorf("Attempts = %d, quería 2", att.Load())
+	}
+	if !slices.Contains(k.neg, "WILL 1") || !slices.Contains(k.neg, "WILL 3") || !slices.Contains(k.neg, "DO 31") {
+		t.Errorf("negociación = %v", k.neg)
+	}
+	// NAWS (RFC 1073): el tamaño que manda el cliente queda en el Recorder.
+	k.c.Write([]byte{255, 250, 31, 0, 200, 0, 24, 255, 240})
+	k.linea("")
+	k.hasta(t, "SW1>")
+	if !slices.Contains(rec.lines, "!naws 200x24") {
+		t.Errorf("Recorder = %v", rec.lines)
+	}
+}
+
+// Password de línea (sin usuario), banner con «Password:» a media línea y un equipo que no ofrece WILL ECHO.
+func TestTelnetPasswordDeLineaBannerYSinEco(t *testing.T) {
+	addr := StartTelnet(t, Config{Hostname: "SW1", Password: "pw", TelnetLinePassword: true, TelnetNoEcho: true,
+		TelnetBanner: "Authorized access only. Password: changes are logged\n"})
+	k := dialTelnet(t, addr)
+	if out := k.hasta(t, "logged\r\nPassword: "); !strings.Contains(out, "Authorized access only. Password: changes are logged") {
+		t.Fatalf("banner = %q", out)
+	}
+	k.linea("mala")
+	k.hasta(t, "% Bad passwords\r\n\r\nPassword: ")
+	k.linea("pw")
+	k.hasta(t, "SW1>")
+	if slices.Contains(k.neg, "WILL 1") {
+		t.Errorf("ofreció WILL ECHO con TelnetNoEcho: %v", k.neg)
 	}
 }
