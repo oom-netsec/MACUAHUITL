@@ -143,7 +143,7 @@ func (h *harness) summaryUntil(t *testing.T, job string, ok func(*v1.JobSummary)
 }
 
 func TestPhasesPersistAcrossRestart(t *testing.T) {
-	h := newHarness(t, nil)
+	h := newHarnessReloj(t, nil) // la ronda 2 sale al terminar la 1: con el reloj real, una ronda 1 de más de 1 s (runner de Windows) la salta
 	cred := h.ready(t)
 	job, _ := h.arm(t, cred)
 	h.waitJob(t, job, "closed")

@@ -493,13 +493,16 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 		t.Skip("lenta (con -race el detector multiplica el costo de las expresiones regulares)")
 	}
 	line := strings.Repeat("a", 79) + "\r\n"
-	run := func(size int) time.Duration {
+	// run devuelve el mejor tiempo de tres y los bytes reservados en una corrida (TotalAlloc no depende de la carga).
+	run := func(size int) (time.Duration, uint64) {
 		var data []byte
 		for len(data) < size {
 			data = append(data, line...)
 		}
-		best := time.Hour
-		for k := 0; k < 2 && best > 6*time.Second; k++ {
+		best, alloc := time.Hour, uint64(0)
+		for k := 0; k < 3; k++ { // el mejor de tres: un pico de carga de otra suite no cuenta
+			var m0, m1 runtime.MemStats
+			runtime.ReadMemStats(&m0)
 			r, _ := newRec()
 			start := time.Now()
 			for i := 0; i < len(data); i += 4096 {
@@ -507,18 +510,22 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 			}
 			r.Close()
 			best = min(best, time.Since(start))
+			runtime.ReadMemStats(&m1)
+			alloc = m1.TotalAlloc - m0.TotalAlloc
 		}
-		return best
+		return best, alloc
 	}
-	t1, t5 := run(1<<20), run(5<<20)
-	t.Logf("1 MB en %v, 5 MB en %v", t1, t5)
-	// El tope absoluto está medido en los runners de Linux; el de Windows (Defender, menos CPU) tarda más sin que sea
-	// regresión. La proporción de abajo, que es la que detecta el crecimiento cuadrático, vale en todos.
-	if runtime.GOOS == "linux" && t5 > 6*time.Second {
-		t.Errorf("5 MB tardó %v", t5)
-	}
+	t1, a1 := run(1 << 20)
+	t5, a5 := run(5 << 20)
+	t.Logf("1 MB en %v (%d B reservados), 5 MB en %v (%d B)", t1, a1, t5, a5)
+	// Sin tope absoluto de tiempo: medía la velocidad de la máquina (falló con 6,1 s en local con otra suite corriendo),
+	// no la forma. Las proporciones detectan el crecimiento cuadrático; la de memoria además es determinista y atrapa la
+	// forma más común (copiar el búfer acumulado en cada trozo).
 	if t5 > 12*t1+500*time.Millisecond { // lineal ≈ 5×; cuadrático ≈ 25×
 		t.Errorf("el tiempo no crece en forma lineal: 1 MB %v, 5 MB %v", t1, t5)
+	}
+	if a5 > 7*a1 {
+		t.Errorf("la memoria no crece en forma lineal: 1 MB %d B, 5 MB %d B", a1, a5)
 	}
 }
 
