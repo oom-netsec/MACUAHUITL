@@ -6,10 +6,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -276,5 +278,176 @@ func TestOTPSinPasswordDirecto(t *testing.T) {
 	if c, err := ssh.Dial("tcp", addr, cfg); err == nil {
 		c.Close()
 		t.Fatal("entró con password sin el código")
+	}
+}
+
+// telnetCliente es lo mínimo del lado de la prueba: lee quitando la capa Telnet (anota las negociaciones y las
+// subnegociaciones que manda el equipo) y escribe con CR NUL.
+type telnetCliente struct {
+	c   net.Conn
+	r   *bufio.Reader
+	neg []string // «WILL 1», «DO 31», «SB 24 1»…
+}
+
+func dialTelnet(t *testing.T, addr string) *telnetCliente {
+	t.Helper()
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { c.Close() })
+	return &telnetCliente{c: c, r: bufio.NewReader(c)}
+}
+
+func (k *telnetCliente) hasta(t *testing.T, suffix string) string {
+	t.Helper()
+	k.c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	var b strings.Builder
+	for !strings.HasSuffix(b.String(), suffix) {
+		c, err := k.r.ReadByte()
+		if err != nil {
+			t.Fatalf("leyendo hasta %q: %v (llegó %q)", suffix, err, b.String())
+		}
+		if c != 255 {
+			b.WriteByte(c)
+			continue
+		}
+		cmd, _ := k.r.ReadByte()
+		switch cmd {
+		case 255:
+			b.WriteByte(255)
+		case 250:
+			var sb []string
+			for {
+				x, _ := k.r.ReadByte()
+				if x == 255 {
+					if y, _ := k.r.ReadByte(); y == 240 {
+						break
+					}
+				}
+				sb = append(sb, strconv.Itoa(int(x)))
+			}
+			k.neg = append(k.neg, "SB "+strings.Join(sb, " "))
+		default:
+			opt, _ := k.r.ReadByte()
+			k.neg = append(k.neg, map[byte]string{251: "WILL", 252: "WONT", 253: "DO", 254: "DONT"}[cmd]+" "+strconv.Itoa(int(opt)))
+		}
+	}
+	return b.String()
+}
+
+func (k *telnetCliente) linea(s string) { k.c.Write(append([]byte(s), '\r', 0)) }
+
+func TestTelnetLoginYComando(t *testing.T) {
+	var att atomic.Int32
+	rec := &Recorder{}
+	addr := StartTelnet(t, Config{Hostname: "SW1", Username: "admin", Password: "pw", Attempts: &att, Recorder: rec, Transcripts: transcripts(t, "ios-xe"),
+		Commands: map[string]string{"show ff": "a\xffb\rc\n"}})
+	k := dialTelnet(t, addr)
+	k.hasta(t, "Username: ")
+	k.linea("admin")
+	k.hasta(t, "Password: ")
+	k.linea("mala")
+	k.hasta(t, "% Login invalid\r\n\r\nUsername: ")
+	k.linea("admin")
+	if out := k.hasta(t, "Password: "); strings.Contains(out, "mala") {
+		t.Fatalf("hizo eco de la contraseña: %q", out)
+	}
+	k.linea("pw")
+	k.hasta(t, "SW1>")
+	k.linea("terminal length 0")
+	k.hasta(t, "SW1>")
+	k.linea("show version")
+	if out := k.hasta(t, "SW1>"); !strings.Contains(out, "Cisco") {
+		t.Fatalf("show version = %q", out)
+	}
+	if att.Load() != 2 {
+		t.Errorf("Attempts = %d, quería 2", att.Load())
+	}
+	for _, n := range []string{"WILL 1", "WILL 3", "DO 31", "DO 24"} {
+		if !slices.Contains(k.neg, n) {
+			t.Errorf("falta %s en la negociación: %v", n, k.neg)
+		}
+	}
+	// Un 0xFF de la salida llega duplicado (IAC IAC) y el cliente lo lee como un solo byte; un CR suelto va como CR NUL.
+	k.linea("show ff")
+	if out := k.hasta(t, "SW1>"); !strings.Contains(out, "a\xffb\r\x00c") {
+		t.Errorf("0xFF en la salida = %q", out)
+	}
+	// NAWS (RFC 1073) con 255 columnas (el 255 va como IAC IAC dentro del SB), TTYPE y una opción desconocida.
+	k.c.Write([]byte{255, 250, 31, 0, 255, 255, 0, 24, 255, 240})
+	k.c.Write([]byte{255, 251, 24})  // WILL TTYPE: el equipo pide el tipo (SB TTYPE SEND)
+	k.c.Write([]byte{255, 253, 200}) // DO 200: el equipo lo rechaza con WONT 200
+	k.linea("")
+	k.hasta(t, "SW1>")
+	k.c.Write([]byte{255, 250, 24, 0, 'X', 'T', 'E', 'R', 'M', 255, 240})
+	k.linea("")
+	k.hasta(t, "SW1>")
+	if !slices.Contains(k.neg, "SB 24 1") || !slices.Contains(k.neg, "WONT 200") {
+		t.Errorf("respuestas del equipo = %v", k.neg)
+	}
+	for _, l := range []string{"!naws 255x24", "!neg WILL 24", "!neg DO 200", "!ttype XTERM"} {
+		if !slices.Contains(rec.Lines(), l) {
+			t.Errorf("falta %q en el Recorder: %v", l, rec.Lines())
+		}
+	}
+}
+
+// Password de línea (sin usuario), banner con «Password:» a media línea y un equipo que no ofrece WILL ECHO (ni repite
+// lo tecleado: el eco queda del lado del cliente).
+func TestTelnetPasswordDeLineaBannerYSinEco(t *testing.T) {
+	addr := StartTelnet(t, Config{Hostname: "SW1", Password: "pw", TelnetLinePassword: true, TelnetNoEcho: true,
+		TelnetBanner: "Authorized access only. Password: changes are logged\n"})
+	k := dialTelnet(t, addr)
+	if out := k.hasta(t, "logged\r\nPassword: "); !strings.Contains(out, "Authorized access only. Password: changes are logged") {
+		t.Fatalf("banner = %q", out)
+	}
+	k.linea("mala")
+	k.hasta(t, "% Bad passwords\r\n\r\nPassword: ")
+	k.linea("pw")
+	k.hasta(t, "SW1>")
+	k.linea("terminal length 0")
+	if out := k.hasta(t, "SW1>"); strings.Contains(out, "terminal") {
+		t.Errorf("sin WILL ECHO repitió lo tecleado: %q", out)
+	}
+	if slices.Contains(k.neg, "WILL 1") {
+		t.Errorf("ofreció WILL ECHO con TelnetNoEcho: %v", k.neg)
+	}
+}
+
+// Un equipo que tarda en preguntar (TelnetLoginDelay) no pregunta antes y sigue registrado en Hangup mientras espera;
+// una opción desconocida del equipo llega al conectar.
+func TestTelnetPromptLentoYHangup(t *testing.T) {
+	h := &Hangup{}
+	addr := StartTelnet(t, Config{Hostname: "SW1", Username: "admin", Password: "pw", Hangup: h, TelnetLoginDelay: time.Hour, TelnetUnknownOption: true})
+	k := dialTelnet(t, addr)
+	k.c.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	var got []byte
+	for {
+		c, err := k.r.ReadByte()
+		if err != nil {
+			break
+		}
+		got = append(got, c)
+	}
+	if strings.Contains(string(got), "Username") || !strings.Contains(string(got), "\xff\xfb\xc8") {
+		t.Fatalf("antes del retraso llegó %q", got)
+	}
+	if n := h.Now(); n != 1 {
+		t.Fatalf("Hangup cortó %d sesiones durante el login, quería 1", n)
+	}
+}
+
+// Un SB sin IAC SE se anota y, pasado el tope, lo que sigue vuelve a ser datos: la sesión no se traga.
+func TestTelnetSBSinCerrar(t *testing.T) {
+	rec := &Recorder{}
+	addr := StartTelnet(t, Config{Hostname: "SW1", Username: "admin", Password: "pw", Recorder: rec})
+	k := dialTelnet(t, addr)
+	k.hasta(t, "Username: ")
+	k.c.Write(append([]byte{255, 250, 31}, make([]byte, 100)...))
+	k.linea("")
+	k.hasta(t, "Password: ")
+	if !slices.Contains(rec.Lines(), "!sb-sin-cerrar") {
+		t.Errorf("Recorder = %v", rec.Lines())
 	}
 }

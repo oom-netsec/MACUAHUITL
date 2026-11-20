@@ -50,6 +50,13 @@ type Config struct {
 	WriteMemoryOutput                    string        // si no está vacío, es la respuesta de write memory
 	IdleTimeout                          time.Duration // cierra la sesión si pasa este tiempo sin recibir una línea (exec-timeout)
 	Hangup                               *Hangup       // si no es nil, la prueba corta a mano los shells abiertos (un exec-timeout sin depender del reloj)
+	// Fase 48 (StartTelnet): login por texto. TelnetLinePassword pide solo «Password:» (password de línea, contra
+	// Password); TelnetNoEcho no ofrece WILL ECHO y no hace eco de nada (el cliente lo hace local); TelnetBanner se
+	// escribe antes de la primera pregunta; TelnetLoginDelay espera antes de ella (más que el tope del cliente = nunca
+	// pregunta); TelnetUnknownOption ofrece al conectar una opción que nadie conoce (WILL 200).
+	TelnetLinePassword, TelnetNoEcho, TelnetUnknownOption bool
+	TelnetBanner                                          string
+	TelnetLoginDelay                                      time.Duration
 	// Modo configuración (fase 16a). Interfaces da el cuerpo inicial de cada interfaz y hace que
 	// "show running-config interface X" refleje lo aplicado; ConfigErrors responde con ese texto
 	// a la línea de configuración indicada (sin aplicarla); Commands suma salidas estáticas;
@@ -151,18 +158,10 @@ func (d *device) setUser(name, pass, typ string) {
 
 const pageLines = 24
 
-// Start levanta el servidor y lo cierra con t.Cleanup.
-func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
+// prepare carga las salidas y arma el equipo que comparten el servidor SSH y el Telnet.
+func prepare(t testing.TB, c Config) (map[string]string, *device) {
 	t.Helper()
 	outputs, err := load(c.Transcripts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := ssh.NewSignerFromKey(priv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +172,27 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 	dev.setUser(c.Username, c.Password, "9")
 	for u, p := range c.Users {
 		dev.setUser(u, p, "9")
+	}
+	for _, v := range c.Vlans {
+		dev.vlans[v] = vlanName(c.VlanNames, v)
+	}
+	for k, v := range c.Interfaces {
+		dev.ifaces[k] = append([]string(nil), v...)
+	}
+	return outputs, dev
+}
+
+// Start levanta el servidor y lo cierra con t.Cleanup.
+func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
+	t.Helper()
+	outputs, dev := prepare(t, c)
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(priv)
+	if err != nil {
+		t.Fatal(err)
 	}
 	var logMu sync.Mutex
 	cfg := &ssh.ServerConfig{}
@@ -236,12 +256,6 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 		}
 	}
 	cfg.AddHostKey(signer)
-	for _, v := range c.Vlans {
-		dev.vlans[v] = vlanName(c.VlanNames, v)
-	}
-	for k, v := range c.Interfaces {
-		dev.ifaces[k] = append([]string(nil), v...)
-	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -366,24 +380,24 @@ func serve(conn net.Conn, cfg *ssh.ServerConfig, c Config, outputs map[string]st
 // que, en un runner cargado, también vence la sesión nueva que abre la reconexión.
 type Hangup struct {
 	mu   sync.Mutex
-	open map[ssh.Channel]chan struct{}
+	open map[io.ReadWriteCloser]chan struct{}
 }
 
-func (h *Hangup) add(ch ssh.Channel) chan struct{} {
+func (h *Hangup) add(ch io.ReadWriteCloser) chan struct{} {
 	if h == nil {
 		return nil
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.open == nil {
-		h.open = map[ssh.Channel]chan struct{}{}
+		h.open = map[io.ReadWriteCloser]chan struct{}{}
 	}
 	ended := make(chan struct{})
 	h.open[ch] = ended
 	return ended
 }
 
-func (h *Hangup) done(ch ssh.Channel, ended chan struct{}) {
+func (h *Hangup) done(ch io.ReadWriteCloser, ended chan struct{}) {
 	if h == nil {
 		return
 	}
@@ -410,7 +424,7 @@ func (h *Hangup) Now() int {
 }
 
 type session struct {
-	ch      ssh.Channel
+	ch      io.ReadWriteCloser // el canal SSH o la conexión Telnet
 	c       Config
 	outputs map[string]string
 	dev     *device
@@ -422,6 +436,7 @@ type session struct {
 	rctx    []string // contexto del running-config completo (Config.Running)
 	actx    string   // ASA multicontexto: contexto actual; "" = espacio del sistema
 	asaInit bool
+	noEcho  bool // Telnet sin WILL ECHO: el equipo no repite nada
 }
 
 func (s *session) write(str string) error {
@@ -508,7 +523,7 @@ func (s *session) readLine(echo bool) (string, error) {
 			return b.String(), nil
 		default:
 			b.WriteByte(buf[0])
-			if echo {
+			if echo && !s.noEcho {
 				s.ch.Write(buf)
 			}
 		}
