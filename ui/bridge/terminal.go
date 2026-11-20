@@ -25,13 +25,13 @@ type TerminalDTO struct {
 	ExpectedStartupCommand string `json:"expectedStartupCommand"`
 	// Username es del modo tecleado: viaja con dirección sin credencial o con hostId (el núcleo rechaza si el host tiene credencial); vacío = «login as:».
 	Username string `json:"username"`
-	// Protocol: "telnet" o vacío/"ssh". Con telnet viajan solo dirección y puerto: usuario, credencial, host guardado y huellas no aplican.
+	// Protocol: "telnet" o vacío/"ssh". Con telnet viajan dirección, puerto y credencial: usuario, host guardado y huellas no aplican.
 	Protocol string `json:"protocol"`
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
 	if d.Protocol == "telnet" { // el puente es el límite de confianza: lo que no aplica a Telnet no pasa aunque llegue
-		return &v1.TerminalOpen{Name: d.Name, Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET, Address: d.Address, Port: d.Port, Rows: d.Rows, Cols: d.Cols}
+		return &v1.TerminalOpen{Name: d.Name, Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET, Address: d.Address, Port: d.Port, CredentialId: d.CredentialID, Rows: d.Rows, Cols: d.Cols}
 	}
 	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
 	if d.HostID != "" {

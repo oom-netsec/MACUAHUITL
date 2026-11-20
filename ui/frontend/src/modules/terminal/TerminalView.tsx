@@ -65,7 +65,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [creds, setCreds] = useState<Credential[]>([]);
   const [cred, setCred] = useState("");
-  const [proto, setProto] = useState<"ssh" | "telnet">("ssh"); // Telnet: sin credencial, usuario, huellas ni libreta; el login se teclea en la terminal
+  const [proto, setProto] = useState<"ssh" | "telnet">("ssh"); // Telnet: credencial de contraseña o login tecleado en la terminal; sin usuario, huellas ni libreta
   const [typed, setTyped] = useState(false); // sin credencial: el equipo pregunta usuario y contraseña en la propia terminal
   const [user, setUser] = useState(""); // usuario opcional en modo tecleado; vacío = «login as:»
   const [device, setDevice] = useState("");
@@ -195,7 +195,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const label = dev.trim();
       const tg = parseTarget(parseTargets(dev)[0] ?? "");
       const base = { name: label, accept: parseFingerprints(accepted), ...(keys.length ? { acceptedKeys: keys } : {}), rows: size.current.rows, cols: size.current.cols };
-      const runId = await core.terminalOpen(pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, protocol: "telnet", address: tg.address, port: tg.port } : hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
+      const runId = await core.terminalOpen(pr === "telnet" ? { name: label, accept: [], rows: size.current.rows, cols: size.current.cols, protocol: "telnet", address: tg.address, port: tg.port, credentialId: credId } : hostId ? { ...base, hostId, expectedStartupCommand: startup, ...(usr.trim() ? { username: usr.trim() } : {}) } : { ...base, address: tg.address, port: tg.port, credentialId: credId, ...(credId ? {} : { username: usr.trim() }) });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
       const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, user: usr, hostId, startup, proto: pr, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
@@ -340,12 +340,12 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {proto === "ssh" && <HostPicker core={core} disabled={busy} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser, [], "ssh"); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />}
       <div className="field-row">
         <Select label={t("ssh.proto")} value={proto} onChange={(v) => { setProto(v); setOpenHk(null); }} w="sm" options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
-        {proto === "ssh" && <Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />}
+        {<Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />}
         {proto === "ssh" && (typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
         <Field label={t("ssh.device")} hint={t("ssh.portDefault", { port: proto === "telnet" ? "23" : "22" })} value={device} onChange={setDevice} w="lg" mono />
         {proto === "ssh" && <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />}
       </div>
-      {proto === "telnet" && <Notice kind="warn">{t("ssh.telnetWarn")}</Notice>}
+      {proto === "telnet" && <Notice kind="warn">{t("ssh.telnetWarn")}{!typed && credOk ? " " + t("ssh.telnetCredWarn") : ""}</Notice>}
       <div className="field ssh-logpick" data-w="lg">
         <label htmlFor={logId}>{t("ssh.logTo")}</label>
         <div className="path">
