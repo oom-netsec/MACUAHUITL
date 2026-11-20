@@ -1436,7 +1436,8 @@ Solo el núcleo y el proto: el puente y la vista son de Front. Todo es aditivo; 
 Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `protocol` todo sigue siendo SSH.
 
 - **`TerminalOpen.protocol`** (campo 12, enum `TerminalProtocol`): `TERMINAL_PROTOCOL_UNSPECIFIED` (0) y
-  `TERMINAL_PROTOCOL_SSH` (1) son SSH; `TERMINAL_PROTOCOL_TELNET` (2) abre por Telnet.
+  `TERMINAL_PROTOCOL_SSH` (1) son SSH; `TERMINAL_PROTOCOL_TELNET` (2) abre por Telnet. Un valor que el núcleo no conoce
+  da `InvalidArgument` `terminal.err.protocol`.
 - **Puerto:** el que venga en `port`; con 0, el 23.
 - **Login:** el equipo pregunta como texto («Username:», «Password:») y se teclea en la terminal, como en la consola
   serie. No hay `auth_prompt` ni «login as:». Lo tecleado en «Password:» no se graba. No hay eco local: lo que se ve es

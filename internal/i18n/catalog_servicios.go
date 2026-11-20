@@ -32,6 +32,7 @@ func init() {
 		"terminal.err.auth_answer":              e("respuesta de autenticación inválida: otro seq o distinto número de respuestas", "invalid authentication answer: wrong seq or number of answers"),
 		"terminal.auth.login":                   e("usuario: ", "login as: "),
 		"terminal.err.telnet_field":             e("con Telnet no van usuario, huellas, credencial guardada ni host de la libreta", "username, host key fingerprints, a stored credential and a saved host do not apply to Telnet"),
+		"terminal.err.protocol":                 e("protocolo de terminal desconocido", "unknown terminal protocol"),
 		"terminal.telnet.cleartext":             e("Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del equipo.", "Telnet: everything travels in clear text, password included, and the device identity is not verified."),
 		"terminal.auth.denied":                  e("Acceso denegado", "Access denied"),
 		"terminal.err.lost":                     e("conexión perdida: {error}", "connection lost: {error}", "error"),

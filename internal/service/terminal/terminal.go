@@ -181,9 +181,12 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		generic                  bool   // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
 		telnet                   = o.Protocol == v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET
 	)
+	if o.Protocol > v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET { // de un cliente más nuevo: no se abre por SSH sin avisar
+		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.protocol", nil), "unknown protocol")
+	}
 	// Fase 48: Telnet no tiene usuario, huellas ni (todavía) credencial guardada u host de la libreta.
-	if telnet && (o.HostId != "" || o.CredentialId != "" || o.Username != "" || len(o.AcceptedHostKeyFingerprints) > 0 || len(o.AcceptedHostKeys) > 0) {
-		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.telnet_field", nil), "field not valid with telnet")
+	if f := telnetField(o); telnet && f != "" {
+		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.telnet_field", nil), "field not valid with telnet: "+f)
 	}
 	if o.HostId != "" {
 		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
@@ -503,7 +506,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	askMu.Unlock()
 	askWG.Wait() // ninguna ask sigue enviando por el stream ni tocando szRows
 	if err != nil {
-		if typed {
+		if typed && !telnet {
 			if te, ok := failTyped(err); ok {
 				return te
 			}
@@ -646,6 +649,21 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		return status.Error(codes.Unavailable, reason)
 	}
 	return nil
+}
+
+// telnetField dice el primer campo del pedido que no aplica a Telnet; vacío si ninguno.
+func telnetField(o *v1.TerminalOpen) string {
+	switch {
+	case o.HostId != "":
+		return "host_id"
+	case o.CredentialId != "":
+		return "credential_id"
+	case o.Username != "":
+		return "username"
+	case len(o.AcceptedHostKeyFingerprints) > 0 || len(o.AcceptedHostKeys) > 0:
+		return "accepted_host_keys"
+	}
+	return ""
 }
 
 // shellConn es lo que la terminal usa de una sesión SSH o Telnet.

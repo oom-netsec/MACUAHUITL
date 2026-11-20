@@ -1,12 +1,14 @@
 package terminal
 
 import (
+	"google.golang.org/protobuf/proto"
 	"net/netip"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -79,8 +81,9 @@ func TestTelnetPuertoPorOmision(t *testing.T) {
 	o := r.typedTelnet()
 	o.Name, o.Port = "", 0
 	o.Address = "127.0.0.1" // nadie escucha en el 23 de loopback en CI: falla al marcar, pero la etiqueta ya dice el puerto
-	_, done, cancel := r.session(o)
+	st, done, cancel := r.session(o)
 	defer cancel()
+	close(st.in) // si algo escucha en el 23 la sesión se cierra igual: la prueba no se cuelga
 	wait(t, done)
 	if a := r.d.AuditText(); !strings.Contains(a, `127.0.0.1:23`) {
 		t.Fatalf("no marcó al 23:\n%s", a)
@@ -93,7 +96,8 @@ func (r *rig) typedTelnet() *v1.TerminalOpen {
 
 // Con Telnet no aplican username, huellas, credencial guardada (hasta 48-3) ni host_id (hasta 48-4): se rechazan sin marcar.
 func TestTelnetCamposQueNoAplican(t *testing.T) {
-	r := newTelnetRig(t, simulator.Config{})
+	var conns atomic.Int32
+	r := newTelnetRig(t, simulator.Config{Conns: &conns})
 	for name, mod := range map[string]func(*v1.TerminalOpen){
 		"username": func(o *v1.TerminalOpen) { o.Username = "admin" },
 		"huella":   func(o *v1.TerminalOpen) { o.AcceptedHostKeyFingerprints = []string{"SHA256:x"} },
@@ -107,15 +111,50 @@ func TestTelnetCamposQueNoAplican(t *testing.T) {
 		_, done, cancel := r.session(o)
 		err := wait(t, done)
 		cancel()
-		if status.Code(err) != codes.InvalidArgument {
+		if status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.telnet_field" {
 			t.Errorf("%s: err = %v", name, err)
 		}
+	}
+	if !strings.Contains(r.d.AuditText(), `field not valid with telnet: credential_id`) {
+		t.Errorf("la auditoría no dice qué campo:\n%s", r.d.AuditText())
 	}
 	o := &v1.TerminalOpen{HostId: "h1", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET}
 	_, done, cancel := r.session(o)
 	defer cancel()
 	if err := wait(t, done); status.Code(err) != codes.InvalidArgument {
 		t.Errorf("host_id: err = %v", err)
+	}
+	if conns.Load() != 0 {
+		t.Errorf("marcó al equipo %d veces", conns.Load())
+	}
+}
+
+// Un protocolo que este núcleo no conoce (un cliente más nuevo) se rechaza: no se abre por SSH sin avisar.
+func TestTelnetProtocoloDesconocido(t *testing.T) {
+	r := newTelnetRig(t, simulator.Config{})
+	o := r.typedTelnet()
+	o.Protocol = 7
+	_, done, cancel := r.session(o)
+	defer cancel()
+	if err := wait(t, done); status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.protocol" {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// TERMINAL_PROTOCOL_SSH explícito abre por SSH como siempre.
+func TestSSHExplicito(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	o := proto.Clone(r.open).(*v1.TerminalOpen)
+	o.Protocol = v1.TerminalProtocol_TERMINAL_PROTOCOL_SSH
+	st, done, cancel := r.session(o)
+	defer cancel()
+	if first := <-st.out; first.Opened != "admin@"+r.host+":"+strconv.Itoa(int(r.port)) {
+		t.Fatalf("primer evento = %+v", first)
+	}
+	st.waitFor(t, "SW1>")
+	close(st.in)
+	if err := wait(t, done); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -132,6 +171,7 @@ func TestTelnetSinEcoNoMuestraLaContrasena(t *testing.T) {
 	}
 	close(st.in)
 	wait(t, done)
+	buscaMarca(t, r, marca, "")
 }
 
 func newTelnetRigPass(t *testing.T, pass string) *rig {
