@@ -105,3 +105,13 @@ test("reintentar una huella de una pestaña SSH sigue siendo SSH aunque el formu
   expect(calls(core)[1][0]).not.toHaveProperty("protocol");
   expect(calls(core)[1][0]).toMatchObject({ address: "sw1", credentialId: cred.id });
 });
+
+test("pasar a Telnet quita el aviso de huella de un intento SSH anterior", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), terminalOpen: vi.fn().mockRejectedValueOnce(new Error("x", { cause: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "10.0.0.1", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } })) });
+  render(<TerminalView core={core} />);
+  await userEvent.type(await screen.findByLabelText(/^Equipo/), "10.0.0.1");
+  await userEvent.click(screen.getByRole("button", { name: /Abrir/ }));
+  expect(await screen.findByRole("button", { name: "Confiar y reintentar" })).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).toBeNull();
+});
