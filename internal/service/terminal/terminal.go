@@ -29,6 +29,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
@@ -84,11 +85,15 @@ type termSvc struct {
 	wg       sync.WaitGroup
 	live     atomic.Int32
 	authWait time.Duration // espera máxima de la respuesta a cada pregunta tecleada
+	// Login automático de Telnet (fase 48-3): silencio que da por estable un prompt, tope para la primera pregunta y
+	// entre una pregunta y la siguiente.
+	loginQuiet, loginFirst, loginNext time.Duration
 }
 
 func newSvc(d service.Deps) *termSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &termSvc{d: d, ctx: ctx, cancel: cancel, authWait: 2 * time.Minute}
+	return &termSvc{d: d, ctx: ctx, cancel: cancel, authWait: 2 * time.Minute,
+		loginQuiet: 300 * time.Millisecond, loginFirst: 15 * time.Second, loginNext: 10 * time.Second}
 }
 
 // close cierra las sesiones vivas y espera a que cada una cierre SSH, revoque el guard y audite.
@@ -296,16 +301,19 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
 	// revoca el guard y audita. Es lo que garantiza que no quede una autorización abierta.
 	var (
-		sess       shellConn
-		f          *os.File
-		rec        *terminal.Recorder
-		opened     bool
-		reason     = "no se pudo abrir"
-		reasonEN   = "could not open" // lo mismo que reason, en inglés, para la auditoría
-		rx, tx     atomic.Int64
-		recordPath string
-		user       = username // en modo tecleado, el de la petición o el de «login as:»
+		sess        shellConn
+		f           *os.File
+		rec         *terminal.Recorder
+		opened      bool
+		reason      = "no se pudo abrir"
+		reasonEN    = "could not open" // lo mismo que reason, en inglés, para la auditoría
+		rx, tx      atomic.Int64
+		recordPath  string
+		user        = username   // en modo tecleado, el de la petición o el de «login as:»
+		loginMode   atomic.Value // Telnet con credencial: "auto" o "manual" (lo deja la goroutine de salida)
+		loginActive atomic.Bool  // el núcleo está contestando el login de Telnet: el teclado no sale
 	)
+	loginMode.Store("manual")
 	defer func() {
 		if sess != nil {
 			sess.Close()
@@ -323,8 +331,10 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			action = "terminal.failed"
 		}
 		who := ""
-		if telnet {
+		if telnet && typed {
 			who = " protocol=telnet cleartext=true"
+		} else if telnet {
+			who = fmt.Sprintf(" credential=%s user=%q protocol=telnet cleartext=true login=%s", credID, user, loginMode.Load())
 		} else if typed {
 			who = fmt.Sprintf(" credential=typed user=%q", user)
 		}
@@ -463,7 +473,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 
 	var cred vault.Credential
 	opts := transport.SSHOptions{GenericHost: generic}
-	if telnet { // el login es texto del equipo: se teclea en la terminal
+	if telnet && typed { // el login es texto del equipo: se teclea en la terminal
 	} else if typed {
 		if user == "" { // «login as:» antes de marcar: x/crypto no cambia el usuario a mitad del handshake
 			ans, err := ask(ctx, transport.Prompt{Attempt: 1, Questions: []transport.Question{{Text: i18n.T(st.Context(), "terminal.auth.login", nil), Echo: true}}})
@@ -487,6 +497,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			return service.VaultErr(ctx, err)
 		}
 		user = cred.Username
+		if telnet {
+			defer cred.Password.Destroy() // el login automático la destruye al usarla; esto cubre los caminos de error
+		}
 	}
 	var ssh *transport.Session
 	if telnet {
@@ -541,8 +554,10 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	rec.Mark("abierto " + summary)
 	detail := fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath)
-	if telnet {
+	if telnet && typed {
 		detail = fmt.Sprintf("session=%s protocol=telnet cleartext=true recording=%s manual=true", id, recordPath)
+	} else if telnet {
+		detail = fmt.Sprintf("session=%s credential=%s user=%q protocol=telnet cleartext=true recording=%s manual=true", id, credID, user, recordPath)
 	} else if typed {
 		detail = fmt.Sprintf("session=%s credential=typed user=%q recording=%s manual=true", id, user, recordPath)
 	}
@@ -562,7 +577,11 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	if telnet { // antes que nada del equipo: todo viaja en claro y no hay identidad del equipo
 		rec.Mark("telnet: texto claro, sin identidad del equipo")
-		if err := st.Send(&v1.OpenTerminalResponse{Data: []byte(i18n.T(st.Context(), "terminal.telnet.cleartext", nil) + "\r\n")}); err != nil {
+		aviso := i18n.T(st.Context(), "terminal.telnet.cleartext", nil) + "\r\n"
+		if !typed {
+			aviso += i18n.T(st.Context(), "terminal.telnet.cleartext_cred", nil) + "\r\n"
+		}
+		if err := st.Send(&v1.OpenTerminalResponse{Data: []byte(aviso)}); err != nil {
 			reason, reasonEN = err.Error(), i18n.English(err)
 			return err
 		}
@@ -570,22 +589,77 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 
 	devDone := make(chan error, 1)
 	readerExit := make(chan struct{})
-	go func() { // equipo → pantalla y grabación; solo este goroutine envía por el stream desde aquí
-		defer close(readerExit)
+	chunks := make(chan []byte, 16)
+	var readErr error
+	go func() { // equipo → chunks; readErr queda escrito antes de cerrar el canal
+		defer close(chunks)
 		buf := make([]byte, 4096)
 		for {
 			n, err := r.Read(buf)
 			if n > 0 {
-				rx.Add(int64(n))
-				rec.Output(buf[:n])
-				if serr := st.Send(&v1.OpenTerminalResponse{Data: append([]byte(nil), buf[:n]...)}); serr != nil {
-					devDone <- serr
+				select {
+				case chunks <- append([]byte(nil), buf[:n]...):
+				case <-readerExit: // el repartidor ya salió (cliente ido): no quedarse bloqueado en el canal
 					return
 				}
 			}
 			if err != nil {
-				devDone <- err
+				readErr = err
 				return
+			}
+		}
+	}()
+	var lg *telnetLogin
+	var pass *secret.Secret // del login automático: lo destruye la goroutine que lo usa, al salir
+	if telnet && !typed {
+		pass, cred.Password = cred.Password, nil
+		lg = newTelnetLogin(cred.Username, pass, w, s.loginQuiet, s.loginFirst, s.loginNext)
+		loginActive.Store(true)
+	}
+	go func() { // chunks → pantalla y grabación (y el login automático); solo este goroutine envía por el stream desde aquí
+		defer close(readerExit)
+		defer pass.Destroy()
+		for {
+			var quiet, limit <-chan time.Time
+			if lg != nil {
+				quiet, limit = lg.timers()
+			}
+			select {
+			case c, ok := <-chunks:
+				if !ok {
+					devDone <- readErr
+					return
+				}
+				rx.Add(int64(len(c)))
+				rec.Output(c)
+				if serr := st.Send(&v1.OpenTerminalResponse{Data: c}); serr != nil {
+					devDone <- serr
+					return
+				}
+				if lg != nil {
+					lg.output(c)
+				}
+			case <-quiet:
+				lg.stable()
+			case <-limit:
+				lg.expired()
+			}
+			if lg != nil && lg.state == loginAfterPass && loginActive.Load() { // la contraseña ya salió: lo tecleado vuelve a pasar
+				pass.Destroy()
+				loginActive.Store(false)
+				loginMode.Store("sent") // el veredicto del equipo lo cambia a auto o manual
+			}
+			if lg != nil && lg.finished {
+				loginMode.Store(lg.result)
+				rec.Mark("login automático: " + lg.result)
+				if lg.notice != "" {
+					if serr := st.Send(&v1.OpenTerminalResponse{Data: []byte("\r\n" + i18n.T(st.Context(), lg.notice, nil) + "\r\n")}); serr != nil {
+						devDone <- serr
+						return
+					}
+				}
+				lg = nil
+				loginActive.Store(false)
 			}
 		}
 	}()
@@ -603,6 +677,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 				sess.Resize(clamp(sz.Rows, 24, 1, 200), clamp(sz.Cols, 200, 20, 500))
 			case m.GetAuthAnswer() != nil: // llegó tarde: no es de nadie
 				wipeMsg(m)
+			case len(m.GetData()) > 0 && loginActive.Load(): // el núcleo contesta el login: lo tecleado no sale
+				clear(m.GetData())
 			case len(m.GetData()) > 0:
 				rec.Input(m.GetData())
 				if n, err := w.Write(m.GetData()); err != nil {
@@ -656,8 +732,6 @@ func telnetField(o *v1.TerminalOpen) string {
 	switch {
 	case o.HostId != "":
 		return "host_id"
-	case o.CredentialId != "":
-		return "credential_id"
 	case o.Username != "":
 		return "username"
 	case len(o.AcceptedHostKeyFingerprints) > 0 || len(o.AcceptedHostKeys) > 0:

@@ -101,6 +101,9 @@ func (s *session) telnetLogin() bool {
 		if s.c.Attempts != nil {
 			s.c.Attempts.Add(1)
 		}
+		if s.c.TelnetVerdictDelay > 0 { // como un AAA lento: el equipo tarda en aceptar o rechazar
+			time.Sleep(s.c.TelnetVerdictDelay)
+		}
 		if s.c.TelnetLinePassword && pw == s.c.Password || !s.c.TelnetLinePassword && s.dev.checkLogin(user, pw) {
 			return true
 		}

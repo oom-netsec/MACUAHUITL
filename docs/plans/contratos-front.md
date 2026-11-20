@@ -1443,7 +1443,7 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
   serie. No hay `auth_prompt` ni «login as:». Lo tecleado en «Password:» no se graba. No hay eco local: lo que se ve es
   lo que manda el equipo.
 - **No aplican** (y se rechazan con `InvalidArgument` `terminal.err.telnet_field`, sin marcar): `username`, las huellas
-  (`accepted_host_key_fingerprints`, `accepted_host_keys`), `credential_id` (llega en 48-3) y `host_id` (llega en 48-4).
+  (`accepted_host_key_fingerprints`, `accepted_host_keys`) y `host_id` (llega en 48-4).
   Telnet no tiene llave de host: no hay «Confiar y reintentar».
 - **Aviso:** después de `opened` y antes de cualquier salida del equipo llega un `data` con la línea localizada
   `terminal.telnet.cleartext` («Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del
@@ -1451,3 +1451,18 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
 - **`opened`:** `dirección:puerto` (sin usuario: no se conoce hasta que el equipo lo pregunta).
 - **Auditoría:** `terminal.open` y `terminal.close` llevan `protocol=telnet cleartext=true`.
 - **Resize:** igual que en SSH; llega al equipo por NAWS si lo aceptó.
+
+### Telnet con credencial guardada (fase 48-3)
+
+- **`credential_id` con Telnet:** el núcleo contesta el login solo (usuario y contraseña de la credencial). Exige la
+  bóveda abierta, como SSH (`terminal.err.vault_closed`). Una credencial de solo llave da `FailedPrecondition`
+  `terminal.err.key_credential`, sin marcar.
+- **Avisos** (`data`, ya localizados): tras la línea de texto claro llega `terminal.telnet.cleartext_cred` («La credencial
+  guardada también viaja en texto claro.»). Si el equipo no pregunta a tiempo, `terminal.telnet.manual_login`; si
+  rechaza la credencial, `terminal.telnet.login_rejected`. En los dos casos la sesión sigue y se teclea a mano; la
+  contraseña nunca se reintenta.
+- **Lo tecleado** antes de que el núcleo mande la contraseña se descarta (el aviso de la credencial lo dice); después
+  pasa normal. Una credencial sin contraseña no se usa: aviso `manual_login`, sin mandar nada.
+- **Auditoría:** `credential=<id> user="…" protocol=telnet cleartext=true` y, al cerrar, `login=auto` (el equipo mostró
+  su prompt), `login=manual` (rechazó o no preguntó: se siguió a mano) o `login=sent` (la contraseña salió y el equipo no
+  dio veredicto antes de cerrar o en 10 s).

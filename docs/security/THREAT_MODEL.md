@@ -36,6 +36,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 | Secret in a log by accident | `Secret` type with redaction in every formatter; no-leak test with a marker password; typed answers: no-leak test with a marker |
 | Connection to an unauthorized destination | `noegress` in CI, `EgressGuard` at runtime, no telemetry or update checks |
 | SSH spoofing | Trust on first use with confirmation; a changed key blocks by default |
+| Telnet (phase 48): sniffing or spoofing on the path | Only in the interactive terminal, never in Patrol, backups or other automatic tasks; a line on every connection says it is clear text with no device identity (and that a stored credential also travels in clear text); `terminal.open`/`terminal.close` audited with `protocol=telnet cleartext=true` |
 | External tool used to exfiltrate | Validated arguments, no shell, no options that read destinations from files or scripts; everything in the audit log |
 | Compromised dependency | `govulncheck` in CI, SBOM, versions pinned in `go.sum`, reproducible build |
 | Configuration command in a collection | Per-platform denylist in `internal/playbook` |
@@ -64,6 +65,8 @@ These are the things MACUAHUITL does **not** guarantee. They are declared so tha
     - **Bypassed triggers.** `audit_log_no_update` and `audit_log_no_delete` stop mistakes and SQL typed by hand, but anyone with write access to the SQLite file can `DROP TRIGGER` and edit. The chain still catches a partial edit (previous points), not a rewrite.
 
     What would mitigate these is exporting the audit log regularly and keeping the last head outside the machine. MACUAHUITL does not automate that, and there is no external anchor yet.
+
+18. **Telnet is clear text.** Everything a Telnet terminal sends and receives, password included, crosses the network unencrypted, and the device is not authenticated (no host key). With a stored credential, the core answers the login itself: it recognizes only `Username:`, `User Name:`, `login:` and `Password:` on a stable last line, sends the password once and never retries; that answer is not recorded or audited, but it does travel in clear text, and the copy queued for the socket lives in normal memory until the garbage collector frees it (as in limit 1). Use Telnet only where SSH is not available.
 
 ## Windows
 

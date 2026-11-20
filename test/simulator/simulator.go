@@ -57,6 +57,7 @@ type Config struct {
 	TelnetLinePassword, TelnetNoEcho, TelnetUnknownOption bool
 	TelnetBanner                                          string
 	TelnetLoginDelay                                      time.Duration
+	TelnetVerdictDelay                                    time.Duration // tras la contraseña, antes de aceptar o rechazar (TACACS lento)
 	// Modo configuración (fase 16a). Interfaces da el cuerpo inicial de cada interfaz y hace que
 	// "show running-config interface X" refleje lo aplicado; ConfigErrors responde con ese texto
 	// a la línea de configuración indicada (sin aplicarla); Commands suma salidas estáticas;

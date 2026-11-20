@@ -94,7 +94,7 @@ func (r *rig) typedTelnet() *v1.TerminalOpen {
 	return &v1.TerminalOpen{Name: r.open.Name, Address: r.open.Address, Port: r.open.Port, Protocol: r.open.Protocol}
 }
 
-// Con Telnet no aplican username, huellas, credencial guardada (hasta 48-3) ni host_id (hasta 48-4): se rechazan sin marcar.
+// Con Telnet no aplican username, huellas ni host_id (hasta 48-4): se rechazan sin marcar.
 func TestTelnetCamposQueNoAplican(t *testing.T) {
 	var conns atomic.Int32
 	r := newTelnetRig(t, simulator.Config{Conns: &conns})
@@ -104,7 +104,6 @@ func TestTelnetCamposQueNoAplican(t *testing.T) {
 		"huella par": func(o *v1.TerminalOpen) {
 			o.AcceptedHostKeys = []*v1.AcceptedHostKey{{Host: r.host, Fingerprint: "SHA256:x"}}
 		},
-		"credencial": func(o *v1.TerminalOpen) { o.CredentialId = "c1" },
 	} {
 		o := r.typedTelnet()
 		mod(o)
@@ -115,7 +114,7 @@ func TestTelnetCamposQueNoAplican(t *testing.T) {
 			t.Errorf("%s: err = %v", name, err)
 		}
 	}
-	if !strings.Contains(r.d.AuditText(), `field not valid with telnet: credential_id`) {
+	if !strings.Contains(r.d.AuditText(), `field not valid with telnet: username`) {
 		t.Errorf("la auditoría no dice qué campo:\n%s", r.d.AuditText())
 	}
 	o := &v1.TerminalOpen{HostId: "h1", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET}
@@ -182,4 +181,21 @@ func newTelnetRigPass(t *testing.T, pass string) *rig {
 	r.svc = newSvc(r.d)
 	t.Cleanup(r.svc.close)
 	return r
+}
+
+// Revisión de 48-3: si el cliente se va a media salida larga, no quedan goroutines. La carrera exacta (el canal hacia el
+// repartidor lleno justo cuando éste sale) no se reproduce de forma determinista; esto cubre el camino de cierre.
+func TestClienteSeVaAMediaSalidaNoDejaGoroutines(t *testing.T) {
+	r := newRig(t, simulator.Config{StreamCommand: "show tech", StreamLines: 5000})
+	base := runtime.NumGoroutine()
+	st, done, cancel := r.session(r.open)
+	st.waitFor(t, "SW1>")
+	st.data("show tech\r")
+	st.waitFor(t, "linea 1 de")
+	cancel() // el cliente se va: Send falla con la salida todavía llegando
+	wait(t, done)
+	if !goroutinesAt(base) {
+		buf := make([]byte, 1<<16)
+		t.Fatalf("goroutines %d > base %d\n%s", runtime.NumGoroutine(), base, buf[:runtime.Stack(buf, true)])
+	}
 }
