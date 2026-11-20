@@ -303,10 +303,10 @@ export function TerminalView({ core }: { core: CoreAPI }) {
 
   // Huella nueva o cambiada: el aviso compartido (HostKeyTrust) la muestra con la orden para compararla y entrega el par {host, huella}
   // del destino, nunca lo del campo de huellas ni respuestas. Con un host guardado la UI no conoce la dirección: sirve la que informó el
-  // núcleo; sin host el botón queda deshabilitado (falla cerrado) y la huella se pega a mano en «Huellas aceptadas».
+  // núcleo; sin host el botón queda deshabilitado (falla cerrado). Dividida, el aviso no toma el foco: se teclea en el otro panel.
   const hostKeyNotice = (hk: HostKeyInfo, dev: string, hostId: string | undefined, retry: (keys: AcceptedKey[]) => void) => {
     const host = hostId ? hk.host : hostOfTarget(parseTarget(parseTargets(dev)[0] ?? ""));
-    return <HostKeyTrust key={hk.fp} items={[{ ...hk, host }]} busy={busy} onTrust={retry} />;
+    return <HostKeyTrust key={hk.fp} items={[{ ...hk, host }]} busy={busy} onTrust={retry} autoFocus={!second} />;
   };
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {

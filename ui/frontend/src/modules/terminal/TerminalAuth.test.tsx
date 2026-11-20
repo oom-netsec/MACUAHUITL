@@ -368,3 +368,19 @@ test("Ctrl+Enter con el foco fuera del panel de preguntas no lo envía; con el f
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
   await waitFor(() => expect(core.terminalAnswer).toHaveBeenCalled());
 });
+
+test("vista dividida: una huella nueva en el panel derecho NO le roba el foco a lo que se teclea en el izquierdo", async () => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const core = await sessionWithPrompt();
+  (core.terminalOpen as ReturnType<typeof vi.fn>).mockResolvedValueOnce("t2");
+  await userEvent.click(screen.getByText("Nueva sesión"));
+  await abrir("192.0.2.2");
+  await userEvent.click(screen.getAllByRole("tab")[0]);
+  await userEvent.click(screen.getByLabelText("Dividir"));
+  const search = screen.getByRole("searchbox");
+  search.focus();
+  act(() => core.emitTerminal({ runId: "t2", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.2", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }));
+  await screen.findByRole("button", { name: "Confiar y reintentar" });
+  await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); });
+  expect(search).toHaveFocus();
+});
