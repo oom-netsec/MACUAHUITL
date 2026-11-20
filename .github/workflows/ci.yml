@@ -10,15 +10,16 @@ permissions:
 
 jobs:
   # Agregador: conserva el nombre «go» (check requerido de la protección de main).
+  # Sin continue-on-error en los jobs que agrega: con él, needs.<job>.result vale success aunque falle.
   # if: always() + comprobación explícita, porque un job saltado cuenta como éxito.
   go:
-    needs: [go-race-core, go-race-rest, go-race-mask, go-checks, windows]
+    needs: [go-race-core, go-race-rest, go-race-mask, go-checks, windows, ui-windows, windows-e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: todos los jobs de Go en verde
+      - name: todos los jobs agregados en verde
         run: |
-          [[ "${{ needs.go-race-core.result }}" == success && "${{ needs.go-race-rest.result }}" == success && "${{ needs.go-race-mask.result }}" == success && "${{ needs.go-checks.result }}" == success && "${{ needs.windows.result }}" == success ]]
+          for r in ${{ join(needs.*.result, ' ') }}; do [[ $r == success ]] || exit 1; done
 
   go-race-core:
     runs-on: ubuntu-latest
@@ -177,11 +178,9 @@ jobs:
         run: go build ./cmd/... ./internal/...
 
   # La app en Windows (ADR 0012, «Instalador», 43b): vitest y el build de la interfaz en windows-latest, y el main de
-  # Wails sin purego (en Windows WebView2 es Go puro). continue-on-error y fuera de la protección de main hasta que lo sea
-  # el job windows; el vet es informativo hasta que ipc y sys compilen en Windows (43a2, 43a4).
+  # Wails sin purego (en Windows WebView2 es Go puro). Obligatorio a través del agregador «go».
   ui-windows:
     runs-on: windows-latest
-    continue-on-error: true
     defaults:
       run:
         shell: bash
@@ -222,11 +221,10 @@ jobs:
         run: deploy/windows/test-installer.ps1 -Installer dist-win/MACUAHUITL-setup.exe -DeleteDataInstaller dist-win/prueba-borrado.exe -Version 0.0.0
 
   # Prueba de punta a punta en Windows (fase 43, ADR 0012): el núcleo y mctl corren como usuarios estándar creados en el job
-  # (el runner es administrador y el núcleo se niega a correr elevado). Informativo, como el job windows.
+  # (el runner es administrador y el núcleo se niega a correr elevado). Obligatorio a través del agregador «go».
   windows-e2e:
     runs-on: windows-latest
     timeout-minutes: 30
-    continue-on-error: true
     env:
       CGO_ENABLED: "0"
     defaults:
