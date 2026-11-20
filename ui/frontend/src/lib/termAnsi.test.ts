@@ -170,3 +170,11 @@ test("rendimiento: un show tech de 20 000 líneas se resalta en pocos segundos y
   expect(ms).toBeLessThan(5000);
   expect(plain(out)).toBe(big);
 });
+
+test("con una paleta de ANSI propio (Tokyo Night) el resaltado pinta en RGB con los colores de rol, no por ranura", () => {
+  const tn = PALETTES.find((x) => x.id === "tokyonight")!;
+  const rgb = (h: string) => `38;2;${parseInt(h.slice(1, 3), 16)};${parseInt(h.slice(3, 5), 16)};${parseInt(h.slice(5, 7), 16)}`;
+  const out = ansiHighlight("Vlan10 is up, line protocol is up\r\n0 input errors\r\n", tn);
+  expect(out).toContain(`${sgr(rgb(tn.ok))}up${RST}`);
+  expect(out).not.toMatch(/\x1b\[(3[0-7]|9[0-7])m/);
+});

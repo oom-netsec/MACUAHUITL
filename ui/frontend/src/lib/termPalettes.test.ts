@@ -39,6 +39,10 @@ describe.each(PALETTES.map((p) => [p.id, p] as const))("paleta %s", (_id, p) => 
   });
 
   test("todos los colores se leen sobre el fondo (≥ 4.5:1)", () => {
-    for (const k of Object.keys(c)) if (/^#[0-9a-f]{6}$/i.test(c[k]) && k !== "bg") expect(ratio(c[k], c.bg), k).toBeGreaterThanOrEqual(4.5);
+    for (const k of Object.keys(c)) if (/^#[0-9a-f]{6}$/i.test(c[k]) && k !== "bg" && k !== "selection") expect(ratio(c[k], c.bg), k).toBeGreaterThanOrEqual(4.5);
   });
+});
+
+test("una paleta con ANSI propio trae exactamente 16 colores #rrggbb", () => {
+  for (const p of PALETTES.filter((x) => x.ansi)) expect(p.ansi!.every((h) => /^#[0-9a-f]{6}$/i.test(h)) && p.ansi!.length === 16, p.id).toBe(true);
 });

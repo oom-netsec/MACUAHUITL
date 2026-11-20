@@ -61,6 +61,7 @@ Todos los pares texto/fondo pasan AA (≥ 4.5:1) en ambos temas; la tabla calcul
 - **Inter** para la interfaz y **JetBrains Mono** para todo lo que sale de un equipo o se teclea en él: salidas, comandos, IP, MAC, interfaces, hashes y puertos.
 - Ambas tienen licencia OFL-1.1, por la **excepción para fuentes** que autorizó el dueño (2026-11-06). Esa excepción aplica solo a fuentes; el resto de dependencias sigue la lista permisiva.
 - Se empaquetan subconjuntos latinos (latín básico, latín-1 y signos de puntuación) en woff2, con `font-display: swap`. Cada una lleva su OFL.txt y su nota en NOTICE.
+- La terminal añade **Symbols Nerd Font Mono** (v3.4.0, MIT) como respaldo tras JetBrains Mono, solo para los glifos de iconos (`unicode-range`). Se empaqueta un subconjunto en woff2 sin Codicons (CC-BY-4.0) ni Powerline Symbols; el resto es MIT, OFL, Apache 2.0 o Unlicense. El dueño autorizó (2026-11-20), solo como excepción para fuentes y junto a la de OFL, **Font Awesome** (OFL 1.1 como fuente, CC BY 4.0 como SVG/JS; atribución en NOTICE) y **Font Logos** (Unlicense), porque su prompt y su banner usan esos iconos. Licencias por conjunto en `SymbolsNerdFontMono-LICENSE.txt` y nota en NOTICE.
 
 | Rol | Tamaño / interlínea | Peso | Uso |
 |---|---|---|---|
@@ -187,7 +188,7 @@ Se lee como un checklist de cambio de TAC:
 - Cada cambio visual se revisa con capturas en claro y oscuro, español e inglés, a 1280×800 y 1920×1080.
 
 ## 8. Terminal: paletas y palabras clave (enmienda del 2026-11-06, a pedido del dueño)
-- El ingeniero elige la paleta una vez, en Ajustes (se abre también con "Idioma, tema y terminal" de la barra de estado; la terminal SSH tiene además su menú «Cambiar tema»), y aplica a todas las salidas. Hay dieciocho paletas: Clásica (la predeterminada, fondo negro multicolor), Consola oscura, Consola clara, Fósforo verde, Ámbar, Azul IBM, Solarizado, Claro, Medianoche, Grafito, Océano, Bosque, Brasa, Ciruela, Arena (clara), Papel (clara), Niebla y Alto contraste. El menú «Cambiar tema» de la terminal SSH las lista con una muestra. Todas pasan AA en cada color.
+- El ingeniero elige la paleta una vez, en Ajustes (se abre también con "Idioma, tema y terminal" de la barra de estado; la terminal SSH tiene además su menú «Cambiar tema»), y aplica a todas las salidas. Hay diecinueve paletas: Tokyo Night (la predeterminada desde 2026-11-20, como el Ghostty del dueño), Clásica (fondo negro multicolor), Consola oscura, Consola clara, Fósforo verde, Ámbar, Azul IBM, Solarizado, Claro, Medianoche, Grafito, Océano, Bosque, Brasa, Ciruela, Arena (clara), Papel (clara), Niebla y Alto contraste. El menú «Cambiar tema» de la terminal SSH las lista con una muestra. Todas pasan AA en cada color de rol. Tokyo Night trae además sus 16 colores ANSI tal cual (los de Ghostty) para lo que pinta el propio equipo; sus negros ANSI 0 y 8 no pasan AA, como en Ghostty, y el resaltado de la app no los usa: pinta con los colores de rol.
 - Las reglas de resaltado son las de `internal/termcolor/rules.json`, compartidas con `mctl`, y se prueban con `cases.json` en Go y en TypeScript. Cubren:
   - estados;
   - direcciones e interfaces;

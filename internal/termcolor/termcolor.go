@@ -54,17 +54,18 @@ func init() {
 	if re.NumSubexp() != len(rules) {
 		panic("termcolor: las reglas no deben tener grupos de captura propios")
 	}
-	var raw []map[string]string
+	var raw []map[string]any // "ansi" (lista) y "selection" son solo de la UI: aquí se ignoran
 	if err := json.Unmarshal(palettesJSON, &raw); err != nil {
 		panic(err)
 	}
 	for _, m := range raw {
-		p := Palette{ID: m["id"], Name: m["name"], Fg: m["fg"], Bg: m["bg"], Cats: map[string]string{}}
+		str := func(k string) string { v, _ := m[k].(string); return v }
+		p := Palette{ID: str("id"), Name: str("name"), Fg: str("fg"), Bg: str("bg"), Cats: map[string]string{}}
 		for k, v := range m {
 			switch k {
-			case "id", "name", "fg", "bg":
+			case "id", "name", "fg", "bg", "ansi", "selection":
 			default:
-				p.Cats[k] = v
+				p.Cats[k], _ = v.(string)
 			}
 		}
 		palettes = append(palettes, p)
@@ -72,7 +73,7 @@ func init() {
 }
 
 // DefaultPalette es la paleta de la UI cuando no hay preferencia.
-const DefaultPalette = "classic"
+const DefaultPalette = "tokyonight"
 
 // legacyIDs: ids con que se guardaron algunas paletas antes de renombrarlas; la preferencia vieja sigue valiendo.
 var legacyIDs = map[string]string{"securecrt-dark": "consola-oscura", "securecrt-light": "consola-clara"}

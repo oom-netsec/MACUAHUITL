@@ -1708,6 +1708,7 @@ export const es = {
   "paste.yes": "Pegar",
   "paste.no": "Cancelar",
   "term.palette.medianoche": "Medianoche",
+  "term.palette.tokyonight": "Tokyo Night",
   "term.palette.grafito": "Grafito",
   "term.palette.oceano": "Océano",
   "term.palette.bosque": "Bosque",
