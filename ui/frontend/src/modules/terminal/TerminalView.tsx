@@ -339,7 +339,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       {proto === "ssh" && <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser, [], "ssh"); }} />}
       {proto === "ssh" && <HostPicker core={core} disabled={busy} onPick={(h) => { if (!passwordCreds(creds).some((c) => c.id === h.credentialId)) { void open("", h.name, "", h.id, h.startCommand, h.credentialId ? "" : shownUser, [], "ssh"); return; } setDevice(targetOf(h)); setCred(h.credentialId); setTyped(false); }} />}
       <div className="field-row">
-        <Select label={t("ssh.proto")} value={proto} onChange={(v) => { setProto(v); setOpenHk(null); }} w="sm" options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
+        <Select label={t("ssh.proto")} value={proto} onChange={(v) => { setProto(v); setOpenHk(null); if (v === "telnet") setTyped(true); }} w="sm" options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
         {<Select label={t("ssh.cred")} value={typed || !credOk ? TYPED : credOk} onChange={(v) => { setTyped(v === TYPED); if (v !== TYPED) setCred(v); }} w="md" options={[...passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string]), [TYPED, t("ssh.credTyped")] as [string, string]]} />}
         {proto === "ssh" && (typed || !credOk) && <Field label={t("ssh.user")} hint={t("ssh.userHint")} value={user} onChange={setUser} w="md" mono />}
         <Field label={t("ssh.device")} hint={t("ssh.portDefault", { port: proto === "telnet" ? "23" : "22" })} value={device} onChange={setDevice} w="lg" mono />

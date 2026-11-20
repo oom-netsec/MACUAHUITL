@@ -41,7 +41,11 @@ test("Telnet con credencial elegida manda credentialId y nada más de SSH; con :
   const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
   render(<TerminalView core={core} />);
   await screen.findByRole("option", { name: /admin lab/ });
-  await openTelnet(core, "sw1:2323");
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id); // con Telnet la credencial es opt-in
+  await userEvent.type(screen.getByLabelText(/^Equipo/), "sw1:2323");
+  await userEvent.click(screen.getByRole("button", { name: /Abrir/ }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
   const r = calls(core)[0][0];
   expect(r).toMatchObject({ protocol: "telnet", address: "sw1", port: 2323 });
   expect(r.credentialId).toBe(cred.id);
@@ -143,6 +147,8 @@ test("el aviso de credencial en texto claro sale solo con credencial elegida", a
   await screen.findByRole("option", { name: /admin lab/ });
   expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull();
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull(); // Telnet arranca en «Escribir al conectar»
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
   expect(screen.getByText(/credencial guardada también viaja/)).toBeInTheDocument();
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
   expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull();
@@ -155,4 +161,14 @@ test("una credencial de llave no se ofrece con Telnet", async () => {
   await screen.findByRole("option", { name: /admin lab/ });
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
   expect(screen.queryByRole("option", { name: /solo llave/ })).toBeNull();
+});
+
+test("pasar a Telnet deja el selector en «Escribir al conectar»: una credencial elegida en SSH no viaja en claro sin volver a elegirla", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  const sel = await screen.findByLabelText("Credencial");
+  await waitFor(() => expect(sel).toHaveValue(cred.id)); // SSH: preelegida (única)
+  await openTelnet(core, "10.0.0.1");
+  expect(calls(core)[0][0]).toMatchObject({ protocol: "telnet", credentialId: "" });
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Escribir usuario y contraseña al conectar");
 });
