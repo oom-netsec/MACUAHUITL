@@ -3,7 +3,9 @@
 package store
 
 import (
+	"context"
 	"database/sql"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -218,5 +220,60 @@ func TestVigiaEsperaCortaYTxLargaNoDispara(t *testing.T) {
 	case <-ch:
 		t.Fatal("disparó sin nadie esperando")
 	default:
+	}
+}
+
+// Idea pospuesta de #289: el marco real del driver. Otra conexión (otro proceso, en la vida real) tiene el bloqueo de
+// escritura; la dueña de la única conexión espera en el busy handler de SQLite, dentro de modernc.org/sqlite, y otra
+// goroutine espera la conexión. Con el marco real no es un interbloqueo; con un marco que no aparece, sí dispararía.
+func TestVigiaMarcoRealDeModernc(t *testing.T) {
+	orig := driverFrame
+	for _, c := range []struct {
+		nombre  string
+		frame   string
+		dispara bool
+	}{{"marco real", orig, false}, {"marco ausente (control)", "no.existe.este.marco(", true}} {
+		t.Run(c.nombre, func(t *testing.T) {
+			ch := vigilar(t)
+			driverFrame = c.frame
+			path := filepath.Join(t.TempDir(), "m.db")
+			db, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { db.Close() })
+			otro, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { otro.Close() })
+			conn, err := otro.Conn(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := conn.ExecContext(context.Background(), "BEGIN IMMEDIATE"); err != nil {
+				t.Fatal(err)
+			}
+			var wg sync.WaitGroup
+			for range 2 { // la primera queda en el busy handler con la conexión; la segunda espera la conexión
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					db.Exec(`CREATE TABLE IF NOT EXISTS x(a)`)
+				}()
+			}
+			var disparo bool
+			select {
+			case <-ch:
+				disparo = true
+			case <-time.After(time.Second): // más de tres veces watchLimit, lejos de watchSlow
+			}
+			conn.ExecContext(context.Background(), "ROLLBACK")
+			conn.Close()
+			wg.Wait()
+			if disparo != c.dispara {
+				t.Fatalf("disparó = %v, quería %v", disparo, c.dispara)
+			}
+		})
 	}
 }
