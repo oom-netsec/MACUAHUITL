@@ -139,7 +139,7 @@ func TestTelnetDecodificaBytesPartidos(t *testing.T) {
 		a.Close()
 	}()
 	out, _ := io.ReadAll(r)
-	if !bytes.HasPrefix(out, []byte("h\xffi\rx")) || !bytes.Contains(out, []byte("zzzz")) { // tras el tope del SB vuelven los datos
+	if !bytes.HasPrefix(out, []byte("h\xffi\rx")) || bytes.Contains(out, []byte("z")) { // un SB largo se descarta entero, no se muestra
 		t.Fatalf("salida = %q", out)
 	}
 	if _, err := w.Write([]byte("\xff\r")); err == nil {
@@ -162,5 +162,139 @@ func TestTelnetEscribeIACYCR(t *testing.T) {
 	got := make([]byte, len(want))
 	if _, err := io.ReadFull(a, got); err != nil || !bytes.Equal(got, want) {
 		t.Fatalf("enviado = %q (%v), quería %q", got, err, want)
+	}
+}
+
+// equipoFalso es el lado del equipo sobre net.Pipe: lo que el cliente manda se junta en got (lo lee una goroutine,
+// el pipe no tiene búfer) y la salida del cliente se descarta.
+type equipoFalso struct {
+	a   net.Conn
+	got chan byte
+}
+
+func nuevoEquipoFalso(t *testing.T) (*equipoFalso, *TelnetSession, io.Reader) {
+	t.Helper()
+	a, b := net.Pipe()
+	t.Cleanup(func() { a.Close() })
+	s := newTelnetSession(b)
+	t.Cleanup(func() { s.Close() })
+	r, _, err := s.ShellSize("vt100", 24, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &equipoFalso{a: a, got: make(chan byte, 1024)}
+	go func() {
+		buf := make([]byte, 256)
+		for {
+			n, err := a.Read(buf)
+			for _, c := range buf[:n] {
+				e.got <- c
+			}
+			if err != nil {
+				close(e.got)
+				return
+			}
+		}
+	}()
+	return e, s, r
+}
+
+// espera exige que el cliente mande exactamente want como lo siguiente.
+func (e *equipoFalso) espera(t *testing.T, want []byte) {
+	t.Helper()
+	for i, w := range want {
+		select {
+		case c := <-e.got:
+			if c != w {
+				t.Fatalf("byte %d = %d, quería %v", i, c, want)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatalf("no llegó %v (faltó desde el byte %d)", want, i)
+		}
+	}
+}
+
+// nada exige que el cliente no mande nada durante un rato.
+func (e *equipoFalso) nada(t *testing.T) {
+	t.Helper()
+	select {
+	case c := <-e.got:
+		t.Fatalf("mandó %d sin que hiciera falta", c)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+// Revisión de 48-1: el estado de cada opción se sigue (RFC 854/1143). Un WONT/DONT sobre una opción activa se
+// acusa, la opción se puede volver a pedir y un pedido que no cambia nada no se contesta (sin bucles).
+func TestTelnetEstadoDeOpciones(t *testing.T) {
+	e, s, r := nuevoEquipoFalso(t)
+	go io.Copy(io.Discard, r)
+	e.a.Write([]byte{255, 251, 1})
+	e.espera(t, []byte{255, 253, 1}) // WILL ECHO → DO ECHO
+	e.a.Write([]byte{255, 251, 1})
+	e.nada(t) // ya activa: no se contesta
+	e.a.Write([]byte{255, 252, 1})
+	e.espera(t, []byte{255, 254, 1}) // WONT ECHO → DONT ECHO
+	e.a.Write([]byte{255, 251, 1})
+	e.espera(t, []byte{255, 253, 1}) // y se puede volver a activar
+	e.a.Write([]byte{255, 253, 31})
+	e.espera(t, []byte{255, 251, 31, 255, 250, 31, 0, 80, 0, 24, 255, 240}) // DO NAWS → WILL NAWS y el tamaño
+	e.a.Write([]byte{255, 254, 31})
+	e.espera(t, []byte{255, 252, 31}) // DONT NAWS → WONT NAWS
+	if err := s.Resize(30, 100); err != nil {
+		t.Fatal(err)
+	}
+	e.nada(t) // NAWS apagado: Resize no avisa
+	e.a.Write([]byte{255, 253, 31})
+	e.espera(t, []byte{255, 251, 31, 255, 250, 31, 0, 100, 0, 30, 255, 240})
+}
+
+// Lo ya leído no espera a una IAC que llega partida: «Password: » se entrega aunque la negociación siga a medias.
+func TestTelnetNoRetieneDatosAntesDeUnaIAC(t *testing.T) {
+	e, _, r := nuevoEquipoFalso(t)
+	go e.a.Write([]byte("Password: \xff"))
+	got := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 64)
+		n, _ := r.Read(buf)
+		got <- string(buf[:n])
+	}()
+	select {
+	case s := <-got:
+		if s != "Password: " {
+			t.Fatalf("leyó %q", s)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("retuvo «Password: » esperando el resto de la IAC")
+	}
+}
+
+// Revisión de 48-1: con el teclado trabado (el equipo no lee mientras devuelve un pegado grande), una negociación a
+// media sesión no traba al lector: su respuesta se encola y la salida sigue llegando.
+func TestTelnetNegociacionConTecladoTrabado(t *testing.T) {
+	a, b := net.Pipe()
+	defer a.Close()
+	s := newTelnetSession(b)
+	defer s.Close()
+	r, w, err := s.ShellSize("vt100", 24, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go w.Write([]byte("pegado grande\r")) // nadie lo lee todavía: el escritor queda bloqueado en el pipe
+	go a.Write([]byte{255, 251, 1, 'x'})  // WILL ECHO y un dato
+	got := make(chan byte, 1)
+	go func() {
+		buf := make([]byte, 1)
+		if _, err := r.Read(buf); err == nil {
+			got <- buf[0]
+		}
+	}()
+	select {
+	case c := <-got:
+		if c != 'x' {
+			t.Fatalf("leyó %q", c)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("la negociación trabó al lector detrás del teclado")
 	}
 }

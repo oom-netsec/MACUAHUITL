@@ -23,26 +23,34 @@ const (
 	telEcho, telSGA, telTType        = 1, 3, 24
 	telNAWS                          = 31
 	telTTypeIs, telTTypeSend         = 0, 1
-	telSBMax                         = 64 // una subnegociación más larga es un equipo roto: se descarta y se vuelve a datos
+	telSBMax                         = 64 // lo que se guarda de una subnegociación; el resto se lee y se descarta
 )
 
 // TelnetOptions configura OpenTelnet.
 type TelnetOptions struct {
-	Timeout time.Duration // marcado; 0 = 15 s
+	Timeout time.Duration // marcado; 0 = 15 s (el Guard corta antes, a los 10 s, igual que en SSH)
 }
 
 // TelnetSession es una conexión Telnet con la misma forma que Session para la terminal (ShellSize, Resize, Close).
 type TelnetSession struct {
-	conn     net.Conn
-	r        *bufio.Reader
-	mu       sync.Mutex // escrituras: el teclado y las respuestas de negociación comparten la conexión
-	term     string
-	rows     int
-	cols     int
-	naws     bool         // el equipo pidió NAWS y se aceptó: Resize lo avisa
-	answered map[int]bool // cada pedido se contesta una vez (RFC 854: sin bucles de negociación)
-	started  bool
-	inCR     bool
+	conn    net.Conn
+	r       *bufio.Reader
+	out     chan telnetOut // una sola goroutine escribe: el lector nunca espera al teclado (ni al revés)
+	quit    chan struct{}
+	closing sync.Once
+	mu      sync.Mutex // estado de las opciones y del tamaño
+	term    string
+	rows    int
+	cols    int
+	remote  map[byte]bool // opciones activas del lado del equipo (WILL ECHO, WILL SGA)
+	local   map[byte]bool // opciones activas de este lado (NAWS, TTYPE, SGA)
+	started bool
+	inCR    bool // solo la goroutine lectora
+}
+
+type telnetOut struct {
+	b    []byte
+	done chan error // nil = respuesta de negociación: no se espera
 }
 
 // OpenTelnet marca host:port por el EgressGuard (jobID debe estar autorizado, como en OpenSSH).
@@ -64,7 +72,46 @@ func OpenTelnet(ctx context.Context, g *Guard, jobID, host string, port uint16, 
 }
 
 func newTelnetSession(conn net.Conn) *TelnetSession {
-	return &TelnetSession{conn: conn, r: bufio.NewReader(conn), answered: map[int]bool{}}
+	s := &TelnetSession{conn: conn, r: bufio.NewReader(conn), out: make(chan telnetOut, 64), quit: make(chan struct{}),
+		remote: map[byte]bool{}, local: map[byte]bool{}}
+	go s.writer()
+	return s
+}
+
+func (s *TelnetSession) writer() {
+	for {
+		select {
+		case o := <-s.out:
+			_, err := s.conn.Write(o.b)
+			if o.done != nil {
+				o.done <- err
+			}
+		case <-s.quit:
+			return
+		}
+	}
+}
+
+// send encola b; con wait espera a que salga y devuelve el error de la escritura.
+func (s *TelnetSession) send(b []byte, wait bool) error {
+	o := telnetOut{b: b}
+	if wait {
+		o.done = make(chan error, 1)
+	}
+	select {
+	case s.out <- o:
+	case <-s.quit:
+		return net.ErrClosed
+	}
+	if !wait {
+		return nil
+	}
+	select {
+	case err := <-o.done:
+		return err
+	case <-s.quit:
+		return net.ErrClosed
+	}
 }
 
 // ShellSize empieza a leer y escribir con el tipo de terminal y el tamaño dados (los que se mandan si el equipo pide
@@ -79,25 +126,28 @@ func (s *TelnetSession) ShellSize(term string, rows, cols int) (io.Reader, io.Wr
 	return telnetReader{s}, telnetWriter{s}, nil
 }
 
-// Resize avisa el tamaño nuevo por NAWS si el equipo lo aceptó; si no, solo lo guarda.
+// Resize avisa el tamaño nuevo por NAWS si el equipo lo tiene activo; si no, solo lo guarda.
 func (s *TelnetSession) Resize(rows, cols int) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if !s.started {
+		s.mu.Unlock()
 		return i18n.New("transport.err.no_shell", nil)
 	}
 	s.rows, s.cols = rows, cols
-	if !s.naws {
+	var b []byte
+	if s.local[telNAWS] {
+		b = s.nawsLocked()
+	}
+	s.mu.Unlock()
+	if b == nil {
 		return nil
 	}
-	return s.writeLocked(s.nawsLocked())
+	return s.send(b, true)
 }
 
-func (s *TelnetSession) Close() error { return s.conn.Close() }
-
-func (s *TelnetSession) writeLocked(b []byte) error {
-	_, err := s.conn.Write(b)
-	return err
+func (s *TelnetSession) Close() error {
+	s.closing.Do(func() { close(s.quit) })
+	return s.conn.Close()
 }
 
 // nawsLocked arma IAC SB NAWS ancho alto IAC SE, con 0xFF duplicado dentro del SB.
@@ -114,37 +164,57 @@ func (s *TelnetSession) nawsLocked() []byte {
 	return append(b, telIAC, telSE)
 }
 
-// negotiate contesta un WILL/WONT/DO/DONT del equipo.
+// negotiate contesta un WILL/WONT/DO/DONT del equipo siguiendo el estado de cada opción (RFC 854/1143): un pedido que
+// no cambia nada no se contesta (sin bucles), un WONT/DONT sobre una opción activa se acusa y la apaga, y una opción
+// apagada se puede volver a pedir. Las respuestas se encolan: el lector no espera a que salgan.
 func (s *TelnetSession) negotiate(cmd, opt byte) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := int(cmd)<<8 | int(opt)
-	if cmd == telDONT && opt == telNAWS {
-		s.naws = false
+	var reply []byte
+	switch cmd {
+	case telWILL:
+		switch {
+		case s.remote[opt]:
+		case opt == telEcho || opt == telSGA:
+			s.remote[opt] = true
+			reply = []byte{telIAC, telDO, opt}
+		default:
+			reply = []byte{telIAC, telDONT, opt}
+		}
+	case telWONT:
+		if s.remote[opt] {
+			s.remote[opt] = false
+			reply = []byte{telIAC, telDONT, opt}
+		}
+	case telDO:
+		switch {
+		case s.local[opt]:
+		case opt == telNAWS:
+			s.local[opt] = true
+			reply = append([]byte{telIAC, telWILL, telNAWS}, s.nawsLocked()...)
+		case opt == telTType || opt == telSGA:
+			s.local[opt] = true
+			reply = []byte{telIAC, telWILL, opt}
+		default:
+			reply = []byte{telIAC, telWONT, opt}
+		}
+	case telDONT:
+		if s.local[opt] {
+			s.local[opt] = false
+			reply = []byte{telIAC, telWONT, opt}
+		}
 	}
-	if cmd == telWONT || cmd == telDONT || s.answered[key] {
+	s.mu.Unlock()
+	if reply == nil {
 		return nil
 	}
-	s.answered[key] = true
-	switch {
-	case cmd == telWILL && (opt == telEcho || opt == telSGA):
-		return s.writeLocked([]byte{telIAC, telDO, opt})
-	case cmd == telWILL:
-		return s.writeLocked([]byte{telIAC, telDONT, opt})
-	case opt == telNAWS:
-		s.naws = true
-		return s.writeLocked(append([]byte{telIAC, telWILL, telNAWS}, s.nawsLocked()...))
-	case opt == telTType || opt == telSGA:
-		return s.writeLocked([]byte{telIAC, telWILL, opt})
-	default:
-		return s.writeLocked([]byte{telIAC, telWONT, opt})
-	}
+	return s.send(reply, false)
 }
 
-// sub lee una subnegociación hasta IAC SE y contesta TTYPE SEND con el tipo de terminal en mayúsculas.
+// sub lee una subnegociación hasta IAC SE y contesta TTYPE SEND con el tipo de terminal en mayúsculas. Pasado el tope
+// sigue leyendo sin guardar: un SB largo de un equipo roto se descarta entero y no aparece en la terminal.
 func (s *TelnetSession) sub() error {
 	var b []byte
-	for len(b) <= telSBMax {
+	for {
 		c, err := s.r.ReadByte()
 		if err != nil {
 			return err
@@ -154,18 +224,20 @@ func (s *TelnetSession) sub() error {
 				return err
 			}
 			if c == telSE {
-				if len(b) == 2 && b[0] == telTType && b[1] == telTTypeSend {
-					s.mu.Lock()
-					defer s.mu.Unlock()
-					reply := append([]byte{telIAC, telSB, telTType, telTTypeIs}, strings.ToUpper(s.term)...)
-					return s.writeLocked(append(reply, telIAC, telSE))
-				}
-				return nil
+				break
 			}
 		}
-		b = append(b, c)
+		if len(b) < telSBMax {
+			b = append(b, c)
+		}
 	}
-	return nil
+	if len(b) != 2 || b[0] != telTType || b[1] != telTTypeSend {
+		return nil
+	}
+	s.mu.Lock()
+	reply := append([]byte{telIAC, telSB, telTType, telTTypeIs}, strings.ToUpper(s.term)...)
+	s.mu.Unlock()
+	return s.send(append(reply, telIAC, telSE), false)
 }
 
 type telnetReader struct{ s *TelnetSession }
@@ -187,6 +259,10 @@ func (r telnetReader) Read(p []byte) (int, error) {
 			p[n] = c
 			n++
 			continue
+		}
+		if n > 0 { // lo ya leído sale ahora: la IAC (quizá partida) se atiende en la siguiente llamada
+			s.r.UnreadByte()
+			return n, nil
 		}
 		cmd, err := s.r.ReadByte()
 		if err != nil {
@@ -228,9 +304,8 @@ func (w telnetWriter) Write(p []byte) (int, error) {
 			out = append(out, c)
 		}
 	}
-	w.s.mu.Lock()
-	defer w.s.mu.Unlock()
-	if err := w.s.writeLocked(out); err != nil {
+	// shortcut: un Enter partido entre dos Write («\r» y luego «\n») sale como CR NUL LF; xterm.js manda «\r» solo.
+	if err := w.s.send(out, true); err != nil {
 		return 0, err
 	}
 	return len(p), nil
