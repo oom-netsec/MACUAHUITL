@@ -25,22 +25,25 @@ type TerminalDTO struct {
 	ExpectedStartupCommand string `json:"expectedStartupCommand"`
 	// Username es del modo tecleado: viaja con dirección sin credencial o con hostId (el núcleo rechaza si el host tiene credencial); vacío = «login as:».
 	Username string `json:"username"`
-	// Protocol: "telnet" o vacío/"ssh". Con telnet viajan dirección, puerto y credencial: usuario, host guardado y huellas no aplican.
+	// Protocol: "telnet" o vacío/"ssh". Con telnet y dirección viajan dirección, puerto y credencial; con hostId nunca viaja (lo pone el host).
 	Protocol string `json:"protocol"`
 }
 
 func (d TerminalDTO) open() *v1.TerminalOpen {
-	if d.Protocol == "telnet" { // el puente es el límite de confianza: lo que no aplica a Telnet no pasa aunque llegue
+	tn := d.Protocol == "telnet"
+	if d.HostID != "" { // el protocolo y el puerto los pone el host: con hostId nunca viaja Protocol (el núcleo lo rechaza)
+		o := &v1.TerminalOpen{Name: d.Name, HostId: d.HostID, Rows: d.Rows, Cols: d.Cols}
+		if !tn { // el puente es el límite de confianza: usuario, huellas y orden de inicio no aplican si el DTO dice Telnet
+			o.Username, o.AcceptedHostKeyFingerprints, o.AcceptedHostKeys, o.ExpectedStartupCommand = d.Username, d.Accept, protoKeys(d.AcceptedKeys), d.ExpectedStartupCommand
+		}
+		return o // con credencial en el host el núcleo responde username_with_credential
+	}
+	if tn {
 		return &v1.TerminalOpen{Name: d.Name, Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET, Address: d.Address, Port: d.Port, CredentialId: d.CredentialID, Rows: d.Rows, Cols: d.Cols}
 	}
-	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
-	if d.HostID != "" {
-		o.HostId, o.Username = d.HostID, d.Username // el núcleo decide: con credencial en el host responde username_with_credential
-	} else {
-		o.Address, o.Port, o.CredentialId = d.Address, d.Port, d.CredentialID
-		if d.CredentialID == "" {
-			o.Username = d.Username
-		}
+	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, AcceptedHostKeys: protoKeys(d.AcceptedKeys), Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand, Address: d.Address, Port: d.Port, CredentialId: d.CredentialID}
+	if d.CredentialID == "" {
+		o.Username = d.Username
 	}
 	return o
 }

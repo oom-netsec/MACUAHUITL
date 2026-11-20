@@ -28,6 +28,8 @@ export interface KnownDevices { devices: KnownDevice[]; warnings: string[] }
 
 export type HostPlatform = "" | "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "ise" | "iosxr" | "wlc" | "linux" | "windows"; // vacío = sin definir
 
+export type HostProtocol = "ssh" | "telnet";
+
 export interface Host {
   id: string; // 32 hex; vacío al crear
   name: string; // 1 a 64, sin espacios en los extremos; único sin importar mayúsculas
@@ -42,6 +44,8 @@ export interface Host {
   // Una línea (sin saltos ni caracteres de control, hasta 256) que la terminal ejecuta en el equipo al conectar; sin modo asistido.
   // Solo tiene sentido con linux o windows; vacío = ninguna.
   startCommand: string;
+  // ssh (puerto 22 por omisión) o telnet (23); el núcleo devuelve «ssh» si no se eligió. Telnet no admite orden de inicio ni credencial de llave.
+  protocol: HostProtocol;
 }
 // Lo que se envía al guardar: sin id se crea; con el id de un host de la libreta se edita.
 export type HostDraft = Omit<Host, "id" | "credentialLabel"> & { id?: string };

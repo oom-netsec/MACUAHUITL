@@ -3127,6 +3127,14 @@ export const es = {
   "ssh.portDefault": "Puerto por omisión: {port}.",
   "ssh.connectedTelnet": "Telnet · conectado a {port}; grabando en {path}",
   "ssh.telnetCredWarn": "Además, la credencial guardada también viaja en texto claro: la ve cualquiera que pueda mirar la red.",
+  "hosts.f.protocol": "Protocolo",
+  "hosts.f.protocol.hint": "Telnet no cifra nada y no admite orden de inicio ni credencial de llave.",
+  "hosts.f.port.hint": "Vacío = {port}",
+  "hosts.telnet.title": "Se conecta por Telnet",
+  "hosts.err.protocol": "El núcleo no reconoce ese protocolo: elige SSH o Telnet.",
+  "hosts.err.startTelnet": "Telnet no admite orden de inicio.",
+  "ssh.saved.telnetCred": "Telnet · credencial en claro",
+  "hosts.telnetCred": "Telnet: la credencial guardada viaja en texto claro; la ve cualquiera que pueda mirar la red.",
 };
 
 export type Key = keyof typeof es;

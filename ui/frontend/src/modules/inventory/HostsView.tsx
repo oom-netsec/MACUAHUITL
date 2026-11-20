@@ -8,7 +8,7 @@ import type { Key } from "../../lib/i18n/es";
 import { Advanced } from "../../components/Advanced";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import type { Host, KnownDevice } from "./api";
-import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
+import { PLATFORMS, hasStartCommand, validFolderName, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, withProtocol, defaultPort, type HostField, type HostForm } from "./hostForm";
 import { hostsChanged, useHostsVersion } from "./signal";
 import { addrPort } from "../../lib/targets";
 import "./hosts.css";
@@ -168,7 +168,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   };
   const f = editing?.form;
   // Con la bóveda cerrada la credencial guardada no está en la lista: se conserva como opción para no perderla al guardar.
-  const credList = creds.filter((c) => c.kind !== "key" || hasStartCommand(f?.platform ?? "") || c.id === f?.credentialId);
+  const credList = creds.filter((c) => c.kind !== "key" || (f?.protocol !== "telnet" && hasStartCommand(f?.platform ?? "")) || c.id === f?.credentialId);
   const missing = () => t(vaultOpen ? "hosts.cred.gone" : "hosts.cred.hidden"); // abierta y sin esa credencial = borrada; cerrada = solo no se puede ver
   const credExtra: [string, string] | undefined = f && f.credentialId && !creds.some((c) => c.id === f.credentialId) ? [f.credentialId, missing()] : undefined;
 
@@ -186,17 +186,21 @@ export function HostsView({ core }: { core: CoreAPI }) {
             options={[["", t("hosts.folder.none")], ...folders.map((x) => [x, x] as [string, string])]} />
         </div>
         <div className="field-row">
+          <Select label={t("hosts.f.protocol")} hint={t("hosts.f.protocol.hint")} error={errs.protocol} value={f.protocol} w="sm"
+            onChange={(v) => { const n = withProtocol(f, v); setEditing({ ...editing, form: v === "telnet" && creds.some((c) => c.kind === "key" && c.id === n.credentialId) ? { ...n, credentialId: "" } : n }); }}
+            options={[["ssh", "SSH"], ["telnet", "Telnet"]]} />
           <CredentialSelect creds={credList} vault={vault} notice={!editing.hiddenCred} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
             hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} optional extra={credExtra} />
         </div>
-        {hasStartCommand(f.platform) && (
+        {f.protocol === "telnet" && f.credentialId && <Notice kind="warn">{t("hosts.telnetCred")}</Notice>}
+        {f.protocol !== "telnet" && hasStartCommand(f.platform) && (
           <Field label={t("hosts.f.start")} hint={t("hosts.f.start.hint")} error={errs.startCommand} value={f.startCommand} onChange={(v) => set("startCommand", v)} w="full" mono />
         )}
-        {hasStartCommand(f.platform) && <Notice kind="info">{t("hosts.f.start.audit")}</Notice>}
-        {!hasStartCommand(f.platform) && creds.some((c) => c.kind === "key") && <p className="hint">{t("hosts.cred.keyOnlyGeneric")}</p>}
-        <Advanced forceOpen={advTry} changed={Number((f.port || "22") !== (editing.base.port || "22")) + Number(f.tags !== editing.base.tags) + Number(f.notes !== editing.base.notes)}>
+        {f.protocol !== "telnet" && hasStartCommand(f.platform) && <Notice kind="info">{t("hosts.f.start.audit")}</Notice>}
+        {(f.protocol === "telnet" || !hasStartCommand(f.platform)) && creds.some((c) => c.kind === "key") && <p className="hint">{t("hosts.cred.keyOnlyGeneric")}</p>}
+        <Advanced forceOpen={advTry} changed={Number((f.port || String(defaultPort(f.protocol))) !== (editing.base.port || String(defaultPort(editing.base.protocol)))) + Number(f.tags !== editing.base.tags) + Number(f.notes !== editing.base.notes)}>
           <div className="field-row">
-            <Field label={t("hosts.f.port")} error={errs.port} value={f.port} onChange={(v) => set("port", v)} w="xs" mono inputMode="numeric" />
+            <Field label={t("hosts.f.port")} placeholder={String(defaultPort(f.protocol))} hint={t("hosts.f.port.hint", { port: String(defaultPort(f.protocol)) })} error={errs.port} value={f.port} onChange={(v) => set("port", v)} w="xs" mono inputMode="numeric" />
             <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />
           </div>
           <TextArea label={t("hosts.f.notes")} value={f.notes} onChange={(v) => set("notes", v)} rows={3} error={errs.notes} />
@@ -218,6 +222,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
           onDragStart={(e) => { drag.current = h.id; e.dataTransfer.setData("text/plain", h.id); e.dataTransfer.effectAllowed = "move"; const tr = e.currentTarget.closest("tr"); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}
           onDragEnd={() => { drag.current = ""; setOver(null); }}>⠿</button>
         {h.name}
+        {h.protocol === "telnet" && <span className="badge hosts-start" title={t("hosts.telnet.title")}>Telnet</span>}
         {h.startCommand && <span className="badge hosts-start" title={h.startCommand} aria-label={t("hosts.start.aria", { cmd: h.startCommand })}>{t("hosts.start.badge")}</span>}
       </td>
       <td className="mono">{addrPort(h)}</td>

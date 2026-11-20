@@ -8,7 +8,8 @@ import { hasStartCommand } from "./hostForm";
 import { HostPicker, useHosts } from "./HostPicker";
 
 // Los equipos con orden de inicio (linux/windows) no son de red: Patrol y los asistentes los rechazan, así que no se ofrecen.
-const managed = (h: Host) => !hasStartCommand(h.platform);
+// Tampoco los de Telnet: esas tareas conectan siempre por SSH (marcarían al puerto 23 y fallarían).
+const managed = (h: Host) => !hasStartCommand(h.platform) && h.protocol !== "telnet";
 
 // «Elegir de la libreta» abre el HostPicker bajo el campo; sin hosts utilizables no se ofrece. Queda abierto al elegir (con flechas el primer change no es la decisión): «Listo» lo cierra y devuelve el foco al botón. Va aquí y no en components/ porque usa el módulo inventory (ADR 0008).
 function Pick({ core, onPick }: { core: CoreAPI; onPick: (h: Host) => void }) {

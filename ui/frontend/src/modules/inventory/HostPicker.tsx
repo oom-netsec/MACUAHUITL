@@ -52,7 +52,7 @@ function HostList({ hosts: all, filter, onPick, disabled }: { hosts: Host[]; fil
           <option value="">{t("hosts.pick.none")}</option>
           {groups.map(([folder, list]) => (
             <optgroup key={folder || "\0"} label={folder || t("hosts.folder.none")}>
-              {list.map((h) => <option key={h.id} value={h.id}>{h.name} · {addrPort(h)}</option>)}
+              {list.map((h) => <option key={h.id} value={h.id}>{h.name} · {addrPort(h)}{h.protocol === "telnet" ? " · Telnet" : ""}</option>)}
             </optgroup>
           ))}
         </select>

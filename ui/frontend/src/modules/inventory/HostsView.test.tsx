@@ -53,7 +53,7 @@ test("crear: valida en línea sin llamar al núcleo y luego guarda con puerto 22
   await userEvent.type(screen.getByLabelText("Etiquetas"), "core, dc-1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
-  expect(inv.saveHost).toHaveBeenCalledWith({ name: "NUEVO", address: "10.0.0.9", port: 22, platform: "", folder: "", tags: ["core", "dc-1"], credentialId: cred.id, notes: "", startCommand: "" });
+  expect(inv.saveHost).toHaveBeenCalledWith({ name: "NUEVO", address: "10.0.0.9", port: 22, platform: "", folder: "", tags: ["core", "dc-1"], credentialId: cred.id, notes: "", startCommand: "", protocol: "ssh" });
   expect(await screen.findByText("Host «NUEVO» guardado.")).toBeVisible();
   expect(await screen.findByText("10.0.0.9:22")).toBeVisible(); // la lista se pone al día
 });
@@ -64,7 +64,7 @@ test("editar manda el id del host y conserva lo que no se tocó", async () => {
   expect(screen.getByLabelText("Puerto")).toHaveValue("2222");
   await userEvent.selectOptions(screen.getAllByRole("combobox", { name: "Carpeta" })[0], "Oficina"); // el primero es el del formulario
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
-  expect(inv.saveHost).toHaveBeenCalledWith({ id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Oficina", tags: [], credentialId: "", notes: "", startCommand: "" });
+  expect(inv.saveHost).toHaveBeenCalledWith({ id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Oficina", tags: [], credentialId: "", notes: "", startCommand: "", protocol: "ssh" });
   expect(await screen.findByText("Oficina (2)")).toBeVisible();
 });
 
@@ -466,4 +466,73 @@ test("una credencial de llave importada se ofrece al registrar un host linux", a
   await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
   expect(within(screen.getByLabelText("Credencial")).getAllByRole("option").some((o) => /llave importada/.test(o.textContent ?? ""))).toBe(true);
+});
+
+test("el selector de protocolo: telnet vacía el puerto de omisión, conserva uno elegido y oculta orden de inicio y llaves", async () => {
+  const key = { id: "k".repeat(32), label: "llave lab", username: "root", kind: "key" as const, hasEnable: false, hasSshKey: true };
+  const { inv } = setup({ listCredentials: vi.fn(async () => [cred, key]) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
+  expect(screen.getByLabelText("Orden de inicio")).toBeVisible();
+  expect(within(screen.getByLabelText("Credencial")).getByRole("option", { name: /llave lab/ })).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Orden de inicio"), "tmux attach");
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "telnet");
+  expect(screen.getByLabelText("Puerto")).toHaveValue("");
+  expect(screen.getByLabelText("Puerto")).toHaveAttribute("placeholder", "23");
+  expect(screen.queryByLabelText("Orden de inicio")).toBeNull();
+  expect(within(screen.getByLabelText("Credencial")).queryByRole("option", { name: /llave lab/ })).toBeNull();
+  await userEvent.type(screen.getByLabelText("Nombre"), "VIEJO");
+  await userEvent.type(screen.getByLabelText("Dirección (IP o nombre DNS)"), "10.0.0.7");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  expect(inv.saveHost).toHaveBeenCalledWith(expect.objectContaining({ protocol: "telnet", port: 23, startCommand: "" }));
+});
+
+test("al volver a SSH el puerto vacío toma 22 y uno elegido a mano se conserva", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Editar LAB-AP/ })); // puerto 2222
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "telnet");
+  expect(screen.getByLabelText("Puerto")).toHaveValue("2222");
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "ssh");
+  await userEvent.clear(screen.getByLabelText("Puerto"));
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "telnet");
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "ssh");
+  expect(screen.getByLabelText("Puerto")).toHaveValue("");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  expect(inv.saveHost).toHaveBeenCalledWith(expect.objectContaining({ protocol: "ssh", port: 22 }));
+});
+
+test("un host telnet lleva la marca «Telnet» en la tabla", async () => {
+  const hosts = [...sampleHosts, { ...sampleHosts[2], id: "9".repeat(32), name: "VIEJO", address: "10.8.0.9", port: 23, protocol: "telnet" as const }];
+  const inv = fakeInventory(hosts);
+  render(<I18nProvider><HostsView core={fakeCore({ ...inv, listCredentials: vi.fn(async () => []) })} /></I18nProvider>);
+  const table = await screen.findByRole("table", { name: "Hosts de la libreta" });
+  const row = within(table).getByText("10.8.0.9:23").closest("tr")!;
+  expect(within(row).getByText("Telnet")).toBeVisible();
+  expect(within(within(table).getByText("10.9.0.1:22").closest("tr")!).queryByText("Telnet")).toBeNull();
+});
+
+test("si el núcleo rechaza el protocolo, el texto sale junto al selector", async () => {
+  const err = Object.assign(new Error("x"), { cause: { code: "InvalidArgument", reason: "hosts.invalid_protocol", metadata: { field: "protocol" } } });
+  setup({ saveHost: vi.fn(async () => { throw err; }) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.type(screen.getByLabelText("Nombre"), "X");
+  await userEvent.type(screen.getByLabelText("Dirección (IP o nombre DNS)"), "10.0.0.7");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  expect(await screen.findByText("El núcleo no reconoce ese protocolo: elige SSH o Telnet.")).toBeVisible();
+  expect(screen.getByLabelText("Protocolo")).toBeInvalid();
+});
+
+test("telnet con credencial elegida avisa que viaja en texto claro; sin credencial o con ssh no", async () => {
+  setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
+  expect(screen.queryByText(/viaja en texto claro/)).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "telnet");
+  expect(screen.getByText(/credencial guardada viaja en texto claro/)).toBeVisible();
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "");
+  expect(screen.queryByText(/viaja en texto claro/)).toBeNull();
 });

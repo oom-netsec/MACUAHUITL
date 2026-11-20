@@ -26,8 +26,8 @@ describe("libreta de hosts", () => {
     const api = inventoryWails(call as never);
     await api.listHosts();
     await api.listHosts({ query: "co", folder: "Lab", tag: "core" });
-    await api.saveHost({ name: "N", address: "10.0.0.1", port: 0, platform: "", folder: "", tags: [], credentialId: "", notes: "", startCommand: "" });
-    await api.saveHost({ id: "x", name: "N", address: "10.0.0.1", port: 22, platform: "ios", folder: "", tags: ["a"], credentialId: "", notes: "", startCommand: "" });
+    await api.saveHost({ name: "N", address: "10.0.0.1", port: 0, platform: "", folder: "", tags: [], credentialId: "", notes: "", startCommand: "", protocol: "ssh" });
+    await api.saveHost({ id: "x", name: "N", address: "10.0.0.1", port: 22, platform: "ios", folder: "", tags: ["a"], credentialId: "", notes: "", startCommand: "", protocol: "ssh" });
     await api.deleteHost("x");
     await api.exportHosts(["a"], "/tmp/h.json", true);
     await api.exportHosts([], "/tmp/h.txt", true, "csv");
@@ -78,7 +78,7 @@ describe("libreta de hosts", () => {
     expect((await f.listHosts({ folder: "lab" })).map((h) => h.name)).toEqual(["LAB-AP", "LAB-CORE"]);
     expect((await f.listHosts({ tag: "core" })).map((h) => h.name)).toEqual(["LAB-CORE"]);
     expect((await f.listHosts({ query: "oficina" })).map((h) => h.name)).toEqual(["OFI-SW"]);
-    const nuevo = { name: "NUEVO", address: "10.1.1.1", port: 0, platform: "ios" as const, folder: "", tags: [], credentialId: "", notes: "", startCommand: "" };
+    const nuevo = { name: "NUEVO", address: "10.1.1.1", port: 0, platform: "ios" as const, folder: "", tags: [], credentialId: "", notes: "", startCommand: "", protocol: "ssh" as const };
     const { id } = await f.saveHost(nuevo);
     expect((await f.listHosts()).find((h) => h.id === id)?.port).toBe(22);
     await expect(f.saveHost({ ...nuevo, name: "nuevo" })).rejects.toThrow("ya hay un host");

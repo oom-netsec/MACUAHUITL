@@ -274,12 +274,22 @@ func TestTerminalAnswerPoneEnCerosLosBytes(t *testing.T) {
 
 // Telnet: el puente traduce el protocolo y deja pasar dirección, puerto y credencial, aunque el DTO traiga lo demás.
 func TestTerminalTelnetFiltra(t *testing.T) {
-	o := (TerminalDTO{Protocol: "telnet", Name: "n", Address: "a", Port: 2323, Username: "u", CredentialID: "c", HostID: "h", Accept: []string{"SHA256:x"}, AcceptedKeys: []AcceptedHostKeyDTO{{Host: "a"}}, ExpectedStartupCommand: "x", Rows: 24, Cols: 80}).open()
+	o := (TerminalDTO{Protocol: "telnet", Name: "n", Address: "a", Port: 2323, Username: "u", CredentialID: "c", Accept: []string{"SHA256:x"}, AcceptedKeys: []AcceptedHostKeyDTO{{Host: "a"}}, ExpectedStartupCommand: "x", Rows: 24, Cols: 80}).open()
 	if o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET || o.Address != "a" || o.Port != 2323 || o.CredentialId != "c" || o.Rows != 24 || o.Cols != 80 {
 		t.Fatalf("telnet: %v", o)
 	}
-	if o.Username != "" || o.HostId != "" || len(o.AcceptedHostKeyFingerprints) != 0 || len(o.AcceptedHostKeys) != 0 || o.ExpectedStartupCommand != "" {
+	if o.Username != "" || len(o.AcceptedHostKeyFingerprints) != 0 || len(o.AcceptedHostKeys) != 0 || o.ExpectedStartupCommand != "" {
 		t.Fatalf("telnet dejó pasar campos de SSH: %v", o)
+	}
+	// por hostId el protocolo lo pone el host: nunca viaja Protocol; con DTO telnet tampoco usuario ni huellas
+	for _, p := range []string{"", "ssh", "telnet"} {
+		o := (TerminalDTO{Protocol: p, HostID: "h", Name: "n", Address: "a", Port: 9, CredentialID: "c", Username: "u", Accept: []string{"SHA256:x"}, ExpectedStartupCommand: "x", Rows: 24, Cols: 80}).open()
+		if o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED || o.HostId != "h" || o.Rows != 24 || o.Address != "" || o.Port != 0 || o.CredentialId != "" {
+			t.Fatalf("hostId %q: %v", p, o)
+		}
+		if (p == "telnet") != (o.Username == "" && len(o.AcceptedHostKeyFingerprints) == 0 && o.ExpectedStartupCommand == "") {
+			t.Fatalf("hostId %q usuario/huellas: %v", p, o)
+		}
 	}
 	for _, p := range []string{"", "ssh"} {
 		if o := (TerminalDTO{Protocol: p, Address: "a", CredentialID: "c"}).open(); o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED || o.CredentialId != "c" {

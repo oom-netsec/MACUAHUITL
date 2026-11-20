@@ -71,6 +71,7 @@ type HostDTO struct {
 	CredentialLabel string   `json:"credentialLabel"`
 	Notes           string   `json:"notes"`
 	StartupCommand  string   `json:"startCommand"` // solo linux y windows; vacío = el shell de siempre
+	Protocol        string   `json:"protocol"`     // ssh o telnet; vacío = ssh
 }
 
 type SaveHostResultDTO struct {
@@ -145,7 +146,7 @@ type HostDecisionDTO struct {
 
 func hostDTO(d *v1.Device) HostDTO {
 	return HostDTO{ID: d.GetId(), Name: d.GetName(), Address: d.GetTarget().GetAddress(), Port: int(d.GetProfile().GetPort()), Platform: d.GetPlatform(), Folder: d.GetFolder(),
-		Tags: strs(d.GetTags()), CredentialID: d.GetCredentialId(), CredentialLabel: d.GetCredentialLabel(), Notes: d.GetNotes(), StartupCommand: d.GetStartupCommand()}
+		Tags: strs(d.GetTags()), CredentialID: d.GetCredentialId(), CredentialLabel: d.GetCredentialLabel(), Notes: d.GetNotes(), StartupCommand: d.GetStartupCommand(), Protocol: d.GetProtocol()}
 }
 
 // ListHosts devuelve solo los hosts de la libreta con SUS valores (sin fusionar con lo descubierto: es lo que se edita),
@@ -165,7 +166,7 @@ func (b *Bridge) ListHosts(query, folder, tag string) ([]HostDTO, error) {
 func (b *Bridge) SaveHost(h HostDTO) (SaveHostResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (SaveHostResultDTO, error) {
 		r, err := inventoryClient(c).PutDevice(ctx, &v1.PutDeviceRequest{Device: &v1.Device{Id: h.ID, Name: h.Name, Target: &v1.Target{Address: h.Address},
-			Profile: &v1.DeviceProfile{Port: uint32(h.Port)}, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialId: h.CredentialID, Notes: h.Notes, StartupCommand: h.StartupCommand}})
+			Profile: &v1.DeviceProfile{Port: uint32(h.Port)}, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialId: h.CredentialID, Notes: h.Notes, StartupCommand: h.StartupCommand, Protocol: h.Protocol}})
 		return SaveHostResultDTO{ID: r.GetId(), Warnings: strs(r.GetWarnings())}, err
 	})
 }
