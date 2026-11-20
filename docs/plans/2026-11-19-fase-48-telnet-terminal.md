@@ -57,7 +57,7 @@ Telnet (IAC, WILL/WONT/DO/DONT, eco del servidor). Login por texto con variantes
 **48-1 Transporte.** `internal/transport/telnet.go`:
 `OpenTelnet(ctx, g *Guard, jobID, host string, port uint16, o TelnetOptions) (*TelnetSession, error)`, con la conexión
 por `g.Dial` (EgressGuard, igual que SSH; noegress no cambia). Negociación mínima (RFC 854/855/857/858/1073/1091):
-acepta WILL ECHO y WILL SGA del equipo, ofrece DO SGA, responde TTYPE con el tipo de terminal y NAWS con el tamaño;
+acepta WILL ECHO y WILL SGA del equipo (SGA no se pide por iniciativa propia: IOS la ofrece), responde TTYPE con el tipo de terminal y NAWS con el tamaño;
 rechaza lo demás (WONT/DONT). Quita las secuencias IAC de la salida y duplica 0xFF en la entrada; CR del teclado como
 CR NUL. `ShellSize(term, rows, cols)` y `Resize(rows, cols)` con la misma forma que `transport.Session`, para que la
 terminal no distinga. Cancelación por ctx como 47t-0. Pruebas contra el simulador y de bytes (IAC partida entre
