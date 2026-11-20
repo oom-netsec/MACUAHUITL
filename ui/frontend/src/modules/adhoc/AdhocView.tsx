@@ -35,26 +35,29 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const [picked, setPicked] = useState("");
   const [view, setView] = useState<ViewName>("matrix");
   const r = useResult<AdhocResult | null>();
+  const gen = useRef(0); // generación: una respuesta de una llamada anterior a una edición no fija huellas ni trabajo
+  const clearHks = () => { gen.current++; setHks([]); setUnarmed(""); };
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
   // accept: pares (equipo, huella) aceptados con un clic en «Confiar y reintentar», solo para este reintento.
   const run = (accept: AcceptedKey[] = []) => {
-    setNote(""); setPicked(""); setHks([]);
+    setNote(""); setPicked("");
     const job = accept.length ? unarmed : "";
-    setUnarmed("");
+    clearHks();
+    const mine = gen.current;
     return r.run(async () => {
       let st: AdhocStart = { jobId: job, armed: true, detail: "" };
       if (job) {
         try { await core.armJob(job, [], accept, []); } // mismo trabajo (ya tiene sus equipos y comandos)
         catch (e) { // otro equipo sigue sin confiar: el panel vuelve con las huellas del error de ArmJob, y el error se muestra
-          setUnarmed(job);
-          setHks(hostKeysFromErr(e));
+          if (gen.current === mine) { setUnarmed(job); setHks(hostKeysFromErr(e)); }
           throw e;
         }
       }
       else st = await core.adhocStart(parseTargets(devices).map(parseTarget), cred, commands, [], accept);
       if (!st.armed) {
+        if (gen.current !== mine) return null; // se editó el pedido durante la llamada: esta respuesta ya no vale
         setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail }));
         setUnarmed(st.jobId);
         setHks(pendingToInfo(st.hostKeys)); // el núcleo ya trae las huellas: no hace falta un Login Test
@@ -87,9 +90,9 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
 
   return (
     <Page title={t("adhoc.title")} description={t("adhoc.hint")}>
-      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); setHks([]); setUnarmed(""); }} w="lg" />
-      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); setHks([]); setUnarmed(""); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); setHks([]); setUnarmed(""); } }} />
-      <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); setHks([]); setUnarmed(""); }} rows={5} />
+      <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); clearHks(); }} w="lg" />
+      <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); clearHks(); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); clearHks(); } }} />
+      <TextArea label={t("adhoc.commands")} value={commands} onChange={(v) => { setCommands(v); clearHks(); }} rows={5} />
       <div className="actions">
         <RunButton primary kbd busy={r.busy} onClick={() => run()} missing={[!cred && t("need.cred"), !devices.trim() && t("need.targets"), !commands.trim() && t("need.commands")]}>
           {t(r.busy ? "adhoc.running" : "adhoc.run")}

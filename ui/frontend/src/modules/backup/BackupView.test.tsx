@@ -295,6 +295,33 @@ test("si cambian los equipos tras el rechazo, el panel de confianza desaparece y
   expect(backupStart.mock.calls[1][0]).not.toHaveProperty("jobId");
 });
 
+test.each([
+  ["Guardar sin enmascarar secretos", "check"], ["Incluir también el startup-config", "check"],
+  [/Respaldos a conservar/, "type"], [/Programar cada/, "type"],
+])("cambiar %s tras el rechazo quita el aviso y el siguiente respaldo crea otro trabajo con las opciones nuevas", async (label, kind) => {
+  const backupStart = vi.fn().mockResolvedValue(unarmed([hk({ changed: false })]));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await screen.findByRole("button", { name: "Confiar y reintentar" });
+  if (kind === "check") await userEvent.click(screen.getByLabelText(label));
+  else await userEvent.type(screen.getByLabelText(label), "5");
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Respaldar ahora|Programar$/ }));
+  expect(backupStart.mock.calls[1][0]).not.toHaveProperty("jobId");
+});
+
+test("una respuesta que llega después de editar el pedido no deja huellas ni trabajo viejo", async () => {
+  let late!: (v: unknown) => void;
+  const backupStart = vi.fn(() => new Promise((r) => { late = r; }));
+  render(<BackupView core={withCreds({ backupStart })} pollMs={1} />);
+  await startBackup();
+  await userEvent.click(screen.getByLabelText("Guardar sin enmascarar secretos")); // edita con la llamada en vuelo
+  late(unarmed([hk()]));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Respaldar ahora" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  expect(screen.queryByText("SHA256:abc")).not.toBeInTheDocument();
+});
+
 test("las opciones avanzadas del respaldo van plegadas, cuentan los cambios y el aviso de secretos queda fuera", async () => {
   render(<BackupView core={withCreds()} />);
   const det = screen.getByText("Opciones avanzadas").closest("details")!;

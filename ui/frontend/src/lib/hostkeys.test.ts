@@ -107,3 +107,8 @@ test("hostKeysFromErr lee metadata.host_keys (protojson) y rechaza JSON roto o a
   expect(hostKeysFromErr(errWith(undefined))).toEqual([]);
   expect(hostKeysFromErr(new Error("sin cause"))).toEqual([]);
 });
+
+test("pendingToInfo trata un changed que no es booleano como cambiado y acota la lista", () => {
+  expect(pendingToInfo([{ host: "h", fingerprint: "f", changed: "no" }, { host: "h", fingerprint: "g" }, { host: "h", fingerprint: "i", changed: false }]).map((k) => k.changed)).toEqual([true, false, false]); // ausente = false (protojson omite el valor por omisión);
+  expect(pendingToInfo(Array.from({ length: 1000 }, (_, i) => ({ host: `h${i}`, fingerprint: "f" })))).toHaveLength(256);
+});

@@ -41,7 +41,8 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const [rounds, setRounds] = useState("2");
   const [hks, setHks] = useState<HostKeyInfo[]>([]); // huellas pendientes que devolvió el núcleo al no armar el respaldo
   const [unarmed, setUnarmed] = useState(""); // respaldo creado sin armar: «Confiar y reintentar» lo rearma, no crea otro
-  const clearHks = () => { setHks([]); setUnarmed(""); };
+  const gen = useRef(0); // generación: una respuesta de una llamada anterior a una edición no fija huellas ni trabajo
+  const clearHks = () => { gen.current++; setHks([]); setUnarmed(""); };
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [liveRestore, setLiveRestore] = useState(false);
@@ -70,6 +71,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const run = async (accept: AcceptedKey[] = []) => {
     const job = accept.length ? unarmed : "";
     setErr(""); setNote(null); clearHks(); setBusy(true);
+    const mine = gen.current;
     try {
       const req = {
         targets: parseTargets(devices).map(parseTarget), credentialId: cred, startup, keep: Number(keep) || 0,
@@ -81,9 +83,10 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         const why = job ? errInfo(e)?.reason : "";
         if (why === "backup.err.not_rearmable") st = await core.backupStart(req); // el núcleo se reinició: otro respaldo, una sola vez
         else if (why === "patrol.svc.job_state") { setNote({ kind: "info", text: t("backup.alreadyArmed", { job }) }); return; } // doble clic: ya está armado
-        else { if (job) setUnarmed(job); setHks(hostKeysFromErr(e)); throw e; }
+        else { if (job && gen.current === mine) { setUnarmed(job); setHks(hostKeysFromErr(e)); } throw e; }
       }
       if (!st.armed) {
+        if (gen.current !== mine) return; // se editó el pedido durante la llamada: esta respuesta ya no vale
         setNote({ kind: "warn", text: t("backup.notArmed", { job: st.jobId, detail: st.detail }) });
         setUnarmed(st.jobId);
         setHks(pendingToInfo(st.hostKeys)); // el núcleo ya trae las huellas: no hace falta un Login Test
@@ -131,13 +134,13 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         <CredentialSelect creds={creds} vault={vault} vaultError={vaultError} value={cred} onChange={(v) => { setCred(v); clearHks(); }} />
         <TargetsField core={core} value={devices} onChange={(v) => { setDevices(v); clearHks(); }} onPickCredential={(id) => { if (!cred && creds.some((c) => c.id === id)) { setCred(id); clearHks(); } }} />
         <div className="field-row end">
-          <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
-          {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
+          <Field label={t("backup.every")} type="number" value={every} onChange={(v) => { setEvery(v); clearHks(); }} w="md" />
+          {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={(v) => { setRounds(v); clearHks(); }} w="sm" />}
         </div>
         <Advanced changed={[startup, secrets, keep !== "30"].filter(Boolean).length}>
-          <Check label={t("backup.startup")} checked={startup} onChange={setStartup} />
-          <Check label={t("backup.secrets")} checked={secrets} onChange={setSecrets} />
-          <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
+          <Check label={t("backup.startup")} checked={startup} onChange={(v) => { setStartup(v); clearHks(); }} />
+          <Check label={t("backup.secrets")} checked={secrets} onChange={(v) => { setSecrets(v); clearHks(); }} />
+          <Field label={t("backup.keep")} type="number" value={keep} onChange={(v) => { setKeep(v); clearHks(); }} w="sm" />
         </Advanced>
         {secrets && <Notice kind="warn">{t("backup.secretsWarn")}</Notice>}
         <div className="actions">

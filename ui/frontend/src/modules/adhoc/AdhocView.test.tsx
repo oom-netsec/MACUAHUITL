@@ -1,5 +1,5 @@
 import type { PendingKey } from "../../lib/hostkeys";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AdhocView } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
@@ -167,6 +167,19 @@ test("si cambian los comandos tras el rechazo, ya no se arma el trabajo viejo: s
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar lote" }));
   expect(adhocStart).toHaveBeenCalledTimes(2);
   expect(core.armJob).not.toHaveBeenCalled();
+});
+
+test("una respuesta que llega después de editar los comandos no deja huellas ni trabajo viejo", async () => {
+  let late!: (v: unknown) => void;
+  const adhocStart = vi.fn(() => new Promise((r) => { late = r; }));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), adhocStart: adhocStart as never });
+  render(<AdhocView core={core} pollMs={1} />);
+  await typeHost();
+  await userEvent.type(screen.getByLabelText("Comandos (uno por línea)"), "x");
+  late(unarmed([hk()]));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Ejecutar lote" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).not.toBeInTheDocument();
+  expect(screen.queryByText("SHA256:abc")).not.toBeInTheDocument();
 });
 
 test("el rechazo del núcleo (comando que no es de lectura) se muestra como alerta", async () => {
