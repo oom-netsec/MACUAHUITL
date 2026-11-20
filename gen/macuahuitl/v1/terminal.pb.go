@@ -21,6 +21,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type TerminalProtocol int32
+
+const (
+	TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED TerminalProtocol = 0 // SSH, como antes de la fase 48
+	TerminalProtocol_TERMINAL_PROTOCOL_SSH         TerminalProtocol = 1
+	TerminalProtocol_TERMINAL_PROTOCOL_TELNET      TerminalProtocol = 2
+)
+
+// Enum value maps for TerminalProtocol.
+var (
+	TerminalProtocol_name = map[int32]string{
+		0: "TERMINAL_PROTOCOL_UNSPECIFIED",
+		1: "TERMINAL_PROTOCOL_SSH",
+		2: "TERMINAL_PROTOCOL_TELNET",
+	}
+	TerminalProtocol_value = map[string]int32{
+		"TERMINAL_PROTOCOL_UNSPECIFIED": 0,
+		"TERMINAL_PROTOCOL_SSH":         1,
+		"TERMINAL_PROTOCOL_TELNET":      2,
+	}
+)
+
+func (x TerminalProtocol) Enum() *TerminalProtocol {
+	p := new(TerminalProtocol)
+	*p = x
+	return p
+}
+
+func (x TerminalProtocol) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TerminalProtocol) Descriptor() protoreflect.EnumDescriptor {
+	return file_macuahuitl_v1_terminal_proto_enumTypes[0].Descriptor()
+}
+
+func (TerminalProtocol) Type() protoreflect.EnumType {
+	return &file_macuahuitl_v1_terminal_proto_enumTypes[0]
+}
+
+func (x TerminalProtocol) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TerminalProtocol.Descriptor instead.
+func (TerminalProtocol) EnumDescriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_terminal_proto_rawDescGZIP(), []int{0}
+}
+
 type TerminalOpen struct {
 	state                       protoimpl.MessageState `protogen:"open.v1"`
 	Name                        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // etiqueta de la pestaña; si va vacía, address:port
@@ -46,7 +95,11 @@ type TerminalOpen struct {
 	// Fase 47t: sin credential_id (o con un host_id cuyo host no tiene credencial) la terminal es de credencial tecleada: el núcleo no usa la bóveda y pide
 	// por el stream (AuthPrompt/AuthAnswer) lo que el equipo pregunte. username es opcional y solo va en ese modo; vacío =
 	// el núcleo pregunta «login as:» antes de marcar. Con credential_id, o con el host_id de un host con credencial, se rechaza (terminal.err.username_with_credential).
-	Username      string `protobuf:"bytes,11,opt,name=username,proto3" json:"username,omitempty"` // 10 es accepted_host_keys (huellas por host)
+	Username string `protobuf:"bytes,11,opt,name=username,proto3" json:"username,omitempty"` // 10 es accepted_host_keys (huellas por host)
+	// Fase 48: TELNET abre por Telnet (puerto 23 si port es 0). Todo viaja en texto claro y no hay identidad del equipo:
+	// al conectar llega una línea de aviso. El login es texto que el equipo pregunta y se teclea en la terminal; username
+	// y las huellas aceptadas no aplican (InvalidArgument terminal.err.telnet_field).
+	Protocol      TerminalProtocol `protobuf:"varint,12,opt,name=protocol,proto3,enum=macuahuitl.v1.TerminalProtocol" json:"protocol,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -156,6 +209,13 @@ func (x *TerminalOpen) GetUsername() string {
 		return x.Username
 	}
 	return ""
+}
+
+func (x *TerminalOpen) GetProtocol() TerminalProtocol {
+	if x != nil {
+		return x.Protocol
+	}
+	return TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED
 }
 
 type TerminalSize struct {
@@ -570,7 +630,7 @@ var File_macuahuitl_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\x9f\x03\n" +
+	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\x1a\x1amacuahuitl/v1/common.proto\"\xdc\x03\n" +
 	"\fTerminalOpen\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x12\n" +
@@ -583,7 +643,8 @@ const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\x04cols\x18\a \x01(\rR\x04cols\x12\x17\n" +
 	"\ahost_id\x18\b \x01(\tR\x06hostId\x128\n" +
 	"\x18expected_startup_command\x18\t \x01(\tR\x16expectedStartupCommand\x12\x1a\n" +
-	"\busername\x18\v \x01(\tR\busername\"6\n" +
+	"\busername\x18\v \x01(\tR\busername\x12;\n" +
+	"\bprotocol\x18\f \x01(\x0e2\x1f.macuahuitl.v1.TerminalProtocolR\bprotocol\"6\n" +
 	"\fTerminalSize\x12\x12\n" +
 	"\x04rows\x18\x01 \x01(\rR\x04rows\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\rR\x04cols\"\xda\x01\n" +
@@ -612,7 +673,11 @@ const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\n" +
 	"AuthAnswer\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\rR\x03seq\x12\x18\n" +
-	"\aanswers\x18\x02 \x03(\fR\aanswers2n\n" +
+	"\aanswers\x18\x02 \x03(\fR\aanswers*n\n" +
+	"\x10TerminalProtocol\x12!\n" +
+	"\x1dTERMINAL_PROTOCOL_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15TERMINAL_PROTOCOL_SSH\x10\x01\x12\x1c\n" +
+	"\x18TERMINAL_PROTOCOL_TELNET\x10\x022n\n" +
 	"\x0fTerminalService\x12[\n" +
 	"\fOpenTerminal\x12\".macuahuitl.v1.OpenTerminalRequest\x1a#.macuahuitl.v1.OpenTerminalResponse(\x010\x01BAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
@@ -628,31 +693,34 @@ func file_macuahuitl_v1_terminal_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_terminal_proto_rawDescData
 }
 
+var file_macuahuitl_v1_terminal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_macuahuitl_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_macuahuitl_v1_terminal_proto_goTypes = []any{
-	(*TerminalOpen)(nil),         // 0: macuahuitl.v1.TerminalOpen
-	(*TerminalSize)(nil),         // 1: macuahuitl.v1.TerminalSize
-	(*OpenTerminalRequest)(nil),  // 2: macuahuitl.v1.OpenTerminalRequest
-	(*OpenTerminalResponse)(nil), // 3: macuahuitl.v1.OpenTerminalResponse
-	(*AuthPrompt)(nil),           // 4: macuahuitl.v1.AuthPrompt
-	(*AuthQuestion)(nil),         // 5: macuahuitl.v1.AuthQuestion
-	(*AuthAnswer)(nil),           // 6: macuahuitl.v1.AuthAnswer
-	(*AcceptedHostKey)(nil),      // 7: macuahuitl.v1.AcceptedHostKey
+	(TerminalProtocol)(0),        // 0: macuahuitl.v1.TerminalProtocol
+	(*TerminalOpen)(nil),         // 1: macuahuitl.v1.TerminalOpen
+	(*TerminalSize)(nil),         // 2: macuahuitl.v1.TerminalSize
+	(*OpenTerminalRequest)(nil),  // 3: macuahuitl.v1.OpenTerminalRequest
+	(*OpenTerminalResponse)(nil), // 4: macuahuitl.v1.OpenTerminalResponse
+	(*AuthPrompt)(nil),           // 5: macuahuitl.v1.AuthPrompt
+	(*AuthQuestion)(nil),         // 6: macuahuitl.v1.AuthQuestion
+	(*AuthAnswer)(nil),           // 7: macuahuitl.v1.AuthAnswer
+	(*AcceptedHostKey)(nil),      // 8: macuahuitl.v1.AcceptedHostKey
 }
 var file_macuahuitl_v1_terminal_proto_depIdxs = []int32{
-	7, // 0: macuahuitl.v1.TerminalOpen.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
-	0, // 1: macuahuitl.v1.OpenTerminalRequest.open:type_name -> macuahuitl.v1.TerminalOpen
-	1, // 2: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
-	6, // 3: macuahuitl.v1.OpenTerminalRequest.auth_answer:type_name -> macuahuitl.v1.AuthAnswer
-	4, // 4: macuahuitl.v1.OpenTerminalResponse.auth_prompt:type_name -> macuahuitl.v1.AuthPrompt
-	5, // 5: macuahuitl.v1.AuthPrompt.prompts:type_name -> macuahuitl.v1.AuthQuestion
-	2, // 6: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
-	3, // 7: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	8, // 0: macuahuitl.v1.TerminalOpen.accepted_host_keys:type_name -> macuahuitl.v1.AcceptedHostKey
+	0, // 1: macuahuitl.v1.TerminalOpen.protocol:type_name -> macuahuitl.v1.TerminalProtocol
+	1, // 2: macuahuitl.v1.OpenTerminalRequest.open:type_name -> macuahuitl.v1.TerminalOpen
+	2, // 3: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
+	7, // 4: macuahuitl.v1.OpenTerminalRequest.auth_answer:type_name -> macuahuitl.v1.AuthAnswer
+	5, // 5: macuahuitl.v1.OpenTerminalResponse.auth_prompt:type_name -> macuahuitl.v1.AuthPrompt
+	6, // 6: macuahuitl.v1.AuthPrompt.prompts:type_name -> macuahuitl.v1.AuthQuestion
+	3, // 7: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
+	4, // 8: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
+	8, // [8:9] is the sub-list for method output_type
+	7, // [7:8] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_terminal_proto_init() }
@@ -672,13 +740,14 @@ func file_macuahuitl_v1_terminal_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_terminal_proto_rawDesc), len(file_macuahuitl_v1_terminal_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_macuahuitl_v1_terminal_proto_goTypes,
 		DependencyIndexes: file_macuahuitl_v1_terminal_proto_depIdxs,
+		EnumInfos:         file_macuahuitl_v1_terminal_proto_enumTypes,
 		MessageInfos:      file_macuahuitl_v1_terminal_proto_msgTypes,
 	}.Build()
 	File_macuahuitl_v1_terminal_proto = out.File

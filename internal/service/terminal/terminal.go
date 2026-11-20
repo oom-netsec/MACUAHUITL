@@ -5,6 +5,7 @@
 package terminal
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -178,7 +179,15 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		username                 string // modo tecleado: el de la petición, ya recortado y validado
 		typed                    bool   // fase 47t: credencial tecleada
 		generic                  bool   // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
+		telnet                   = o.Protocol == v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET
 	)
+	if o.Protocol > v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET { // de un cliente más nuevo: no se abre por SSH sin avisar
+		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.protocol", nil), "unknown protocol")
+	}
+	// Fase 48: Telnet no tiene usuario, huellas ni (todavía) credencial guardada u host de la libreta.
+	if f := telnetField(o); telnet && f != "" {
+		return s.refuse(cmp.Or(label, o.HostId, o.Address), service.Err(st.Context(), codes.InvalidArgument, "terminal.err.telnet_field", nil), "field not valid with telnet: "+f)
+	}
 	if o.HostId != "" {
 		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
 		if label == "" {
@@ -230,7 +239,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		typed = o.CredentialId == "" // sin credencial: las respuestas se piden por el stream y no se usa la bóveda
 		address, credID, port = o.Address, o.CredentialId, uint16(o.Port)
 	}
-	if port == 0 {
+	if port == 0 && telnet {
+		port = 23
+	} else if port == 0 {
 		port = 22
 	}
 	if label == "" {
@@ -285,7 +296,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
 	// revoca el guard y audita. Es lo que garantiza que no quede una autorización abierta.
 	var (
-		sess       *transport.Session
+		sess       shellConn
 		f          *os.File
 		rec        *terminal.Recorder
 		opened     bool
@@ -312,7 +323,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 			action = "terminal.failed"
 		}
 		who := ""
-		if typed {
+		if telnet {
+			who = " protocol=telnet cleartext=true"
+		} else if typed {
 			who = fmt.Sprintf(" credential=typed user=%q", user)
 		}
 		s.d.Audit(action, label, fmt.Sprintf("session=%s%s reason=%q received=%d sent=%d guard=revoked recording=%s", id, who, reasonEN, rx.Load(), tx.Load(), recordPath))
@@ -450,7 +463,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 
 	var cred vault.Credential
 	opts := transport.SSHOptions{GenericHost: generic}
-	if typed {
+	if telnet { // el login es texto del equipo: se teclea en la terminal
+	} else if typed {
 		if user == "" { // «login as:» antes de marcar: x/crypto no cambia el usuario a mitad del handshake
 			ans, err := ask(ctx, transport.Prompt{Attempt: 1, Questions: []transport.Question{{Text: i18n.T(st.Context(), "terminal.auth.login", nil), Echo: true}}})
 			if err != nil {
@@ -474,15 +488,25 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		}
 		user = cred.Username
 	}
-	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
-	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, opts)
+	var ssh *transport.Session
+	if telnet {
+		var tel *transport.TelnetSession
+		if tel, err = transport.OpenTelnet(ctx, s.d.Guard(), id, address, port, transport.TelnetOptions{}); err == nil {
+			sess = tel
+		}
+	} else {
+		hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
+		if ssh, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, opts); err == nil {
+			sess = ssh
+		}
+	}
 	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
 	askMu.Lock()
 	askClosed = true
 	askMu.Unlock()
 	askWG.Wait() // ninguna ask sigue enviando por el stream ni tocando szRows
 	if err != nil {
-		if typed {
+		if typed && !telnet {
 			if te, ok := failTyped(err); ok {
 				return te
 			}
@@ -497,7 +521,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	var r io.Reader
 	var w io.Writer
 	if generic && startup != "" { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
-		r, w, err = sess.CommandSize(term, rows, cols, startup)
+		r, w, err = ssh.CommandSize(term, rows, cols, startup)
 	} else {
 		r, w, err = sess.ShellSize(term, rows, cols)
 	}
@@ -512,9 +536,14 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	recordPath = f.Name()
 	rec = terminal.NewRecorder(f, s.d.Now)
 	summary := fmt.Sprintf("%s@%s:%d", user, address, port)
+	if telnet {
+		summary = fmt.Sprintf("%s:%d", address, port)
+	}
 	rec.Mark("abierto " + summary)
 	detail := fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath)
-	if typed {
+	if telnet {
+		detail = fmt.Sprintf("session=%s protocol=telnet cleartext=true recording=%s manual=true", id, recordPath)
+	} else if typed {
 		detail = fmt.Sprintf("session=%s credential=typed user=%q recording=%s manual=true", id, user, recordPath)
 	}
 	if o.HostId != "" {
@@ -530,6 +559,13 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath}); err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
+	}
+	if telnet { // antes que nada del equipo: todo viaja en claro y no hay identidad del equipo
+		rec.Mark("telnet: texto claro, sin identidad del equipo")
+		if err := st.Send(&v1.OpenTerminalResponse{Data: []byte(i18n.T(st.Context(), "terminal.telnet.cleartext", nil) + "\r\n")}); err != nil {
+			reason, reasonEN = err.Error(), i18n.English(err)
+			return err
+		}
 	}
 
 	devDone := make(chan error, 1)
@@ -613,6 +649,28 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		return status.Error(codes.Unavailable, reason)
 	}
 	return nil
+}
+
+// telnetField dice el primer campo del pedido que no aplica a Telnet; vacío si ninguno.
+func telnetField(o *v1.TerminalOpen) string {
+	switch {
+	case o.HostId != "":
+		return "host_id"
+	case o.CredentialId != "":
+		return "credential_id"
+	case o.Username != "":
+		return "username"
+	case len(o.AcceptedHostKeyFingerprints) > 0 || len(o.AcceptedHostKeys) > 0:
+		return "accepted_host_keys"
+	}
+	return ""
+}
+
+// shellConn es lo que la terminal usa de una sesión SSH o Telnet.
+type shellConn interface {
+	ShellSize(term string, rows, cols int) (io.Reader, io.Writer, error)
+	Resize(rows, cols int) error
+	Close() error
 }
 
 // Module registra el servicio Terminal y, al cerrarse el núcleo, cierra las sesiones vivas.

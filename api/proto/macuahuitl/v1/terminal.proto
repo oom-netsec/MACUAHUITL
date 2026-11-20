@@ -42,6 +42,16 @@ message TerminalOpen {
   // por el stream (AuthPrompt/AuthAnswer) lo que el equipo pregunte. username es opcional y solo va en ese modo; vacío =
   // el núcleo pregunta «login as:» antes de marcar. Con credential_id, o con el host_id de un host con credencial, se rechaza (terminal.err.username_with_credential).
   string username = 11; // 10 es accepted_host_keys (huellas por host)
+  // Fase 48: TELNET abre por Telnet (puerto 23 si port es 0). Todo viaja en texto claro y no hay identidad del equipo:
+  // al conectar llega una línea de aviso. El login es texto que el equipo pregunta y se teclea en la terminal; username
+  // y las huellas aceptadas no aplican (InvalidArgument terminal.err.telnet_field).
+  TerminalProtocol protocol = 12;
+}
+
+enum TerminalProtocol {
+  TERMINAL_PROTOCOL_UNSPECIFIED = 0; // SSH, como antes de la fase 48
+  TERMINAL_PROTOCOL_SSH = 1;
+  TERMINAL_PROTOCOL_TELNET = 2;
 }
 
 message TerminalSize {
