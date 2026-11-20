@@ -34,18 +34,23 @@ test("Telnet manda protocolo, dirección y puerto, sin usuario, credencial, host
   await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin");
   await userEvent.type(screen.getByLabelText(/Huellas aceptadas/), fp);
   await openTelnet(core, "192.0.2.1");
-  expect(calls(core)[0][0]).toEqual({ name: "192.0.2.1", protocol: "telnet", address: "192.0.2.1", port: 0, accept: [], rows: expect.any(Number), cols: expect.any(Number) });
+  expect(calls(core)[0][0]).toEqual({ name: "192.0.2.1", protocol: "telnet", address: "192.0.2.1", port: 0, credentialId: "", accept: [], rows: expect.any(Number), cols: expect.any(Number) });
 });
 
-test("Telnet con credencial elegida tampoco manda credentialId; con :2323 manda 2323; SSH sigue sin protocol", async () => {
+test("Telnet con credencial elegida manda credentialId y nada más de SSH; con :2323 manda 2323", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
   render(<TerminalView core={core} />);
   await screen.findByRole("option", { name: /admin lab/ });
-  await openTelnet(core, "sw1:2323");
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id); // con Telnet la credencial es opt-in
+  await userEvent.type(screen.getByLabelText(/^Equipo/), "sw1:2323");
+  await userEvent.click(screen.getByRole("button", { name: /Abrir/ }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
   const r = calls(core)[0][0];
   expect(r).toMatchObject({ protocol: "telnet", address: "sw1", port: 2323 });
-  expect(r).not.toHaveProperty("credentialId");
+  expect(r.credentialId).toBe(cred.id);
   expect(r).not.toHaveProperty("username");
+  expect(r.accept).toEqual([]);
   expect(r).not.toHaveProperty("hostId");
 });
 
@@ -60,14 +65,14 @@ test("SSH no cambia: sin protocol y con su credencial", async () => {
   expect(calls(core)[0][0]).not.toHaveProperty("protocol");
 });
 
-test("al elegir Telnet sale el aviso de texto claro y se ocultan credencial, usuario, huellas y libreta", async () => {
+test("al elegir Telnet sale el aviso de texto claro y se ocultan usuario, huellas y libreta; la credencial sigue", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
   render(<TerminalView core={core} />);
   expect(await screen.findByLabelText("Credencial")).toBeInTheDocument();
   expect(screen.queryByText(/texto claro/)).toBeNull();
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
   expect(screen.getByText(/todo viaja en texto claro/)).toBeInTheDocument();
-  expect(screen.queryByLabelText("Credencial")).toBeNull();
+  expect(screen.getByLabelText("Credencial")).toBeInTheDocument();
   expect(screen.queryByLabelText("Usuario (opcional)")).toBeNull();
   expect(screen.queryByLabelText(/Huellas aceptadas/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Conectar a LAB-CORE" })).toBeNull();
@@ -114,4 +119,56 @@ test("pasar a Telnet quita el aviso de huella de un intento SSH anterior", async
   expect(await screen.findByRole("button", { name: "Confiar y reintentar" })).toBeInTheDocument();
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
   expect(screen.queryByRole("button", { name: "Confiar y reintentar" })).toBeNull();
+});
+
+test("Telnet tecleado manda credentialId vacío y no muestra campo de usuario", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Protocolo"), "Telnet");
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  expect(screen.queryByLabelText("Usuario (opcional)")).toBeNull();
+  await userEvent.type(screen.getByLabelText(/^Equipo/), "sw1");
+  await userEvent.click(screen.getByRole("button", { name: /Abrir/ }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  expect(calls(core)[0][0]).toMatchObject({ protocol: "telnet", credentialId: "" });
+  expect(calls(core)[0][0]).not.toHaveProperty("username");
+});
+
+test("Telnet con bóveda cerrada no manda credencial", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => { throw new Error("closed"); }) });
+  render(<TerminalView core={core} />);
+  await openTelnet(core, "sw1");
+  expect(calls(core)[0][0].credentialId).toBe("");
+});
+
+test("el aviso de credencial en texto claro sale solo con credencial elegida", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  await screen.findByRole("option", { name: /admin lab/ });
+  expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull(); // Telnet arranca en «Escribir al conectar»
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
+  expect(screen.getByText(/credencial guardada también viaja/)).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
+  expect(screen.queryByText(/credencial guardada también viaja/)).toBeNull();
+});
+
+test("una credencial de llave no se ofrece con Telnet", async () => {
+  const key = { ...cred, id: "k".repeat(32), label: "solo llave", kind: "key" as const, hasSshKey: true };
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred, key]) });
+  render(<TerminalView core={core} />);
+  await screen.findByRole("option", { name: /admin lab/ });
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "Telnet");
+  expect(screen.queryByRole("option", { name: /solo llave/ })).toBeNull();
+});
+
+test("pasar a Telnet deja el selector en «Escribir al conectar»: una credencial elegida en SSH no viaja en claro sin volver a elegirla", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={core} />);
+  const sel = await screen.findByLabelText("Credencial");
+  await waitFor(() => expect(sel).toHaveValue(cred.id)); // SSH: preelegida (única)
+  await openTelnet(core, "10.0.0.1");
+  expect(calls(core)[0][0]).toMatchObject({ protocol: "telnet", credentialId: "" });
+  expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Escribir usuario y contraseña al conectar");
 });

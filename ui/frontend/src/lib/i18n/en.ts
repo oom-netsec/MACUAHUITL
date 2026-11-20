@@ -3127,4 +3127,5 @@ export const en: Record<Key, string> = {
   "ssh.telnetWarn": "Telnet: everything travels in clear text, password included, and the device identity is not verified. The username and password are typed in the terminal when the device asks for them.",
   "ssh.portDefault": "Default port: {port}.",
   "ssh.connectedTelnet": "Telnet · connected to {port}; recording to {path}",
+  "ssh.telnetCredWarn": "The saved credential also travels in clear text: anyone who can watch the network can see it.",
 };

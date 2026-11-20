@@ -3126,6 +3126,7 @@ export const es = {
   "ssh.telnetWarn": "Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del equipo. El usuario y la contraseña se teclean en la terminal cuando el equipo los pide.",
   "ssh.portDefault": "Puerto por omisión: {port}.",
   "ssh.connectedTelnet": "Telnet · conectado a {port}; grabando en {path}",
+  "ssh.telnetCredWarn": "Además, la credencial guardada también viaja en texto claro: la ve cualquiera que pueda mirar la red.",
 };
 
 export type Key = keyof typeof es;
