@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -62,7 +63,11 @@ func hostsList(c *cli.Env, args []string) error {
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, cli.T("mctl.hosts.head_list"))
 	for _, d := range ds {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", d.Id, d.Name, d.GetTarget().GetAddress(), d.GetProfile().GetPort(), d.Platform, d.Folder, strings.Join(d.Tags, ","), d.CredentialLabel)
+		port := strconv.Itoa(int(d.GetProfile().GetPort()))
+		if d.Protocol == "telnet" {
+			port += " telnet"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", d.Id, d.Name, d.GetTarget().GetAddress(), port, d.Platform, d.Folder, strings.Join(d.Tags, ","), d.CredentialLabel)
 	}
 	return tw.Flush()
 }
@@ -166,6 +171,10 @@ func hostsEdit(c *cli.Env, args []string) error {
 		cur.StartupCommand = f.startup
 	}
 	if set["protocol"] {
+		// Si el puerto era el de omisión del protocolo anterior (22 ssh, 23 telnet) y no se pasó --port, va el del nuevo.
+		if old := cur.GetProfile().GetPort(); !set["port"] && (old == 22 && cur.Protocol != "telnet" || old == 23 && cur.Protocol == "telnet") {
+			cur.Profile = &v1.DeviceProfile{}
+		}
 		cur.Protocol = f.protocol
 	}
 	r, err := client(c).PutDevice(context.Background(), &v1.PutDeviceRequest{Device: cur})

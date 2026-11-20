@@ -1,6 +1,7 @@
 package devices
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ func TestProtocoloDelHost(t *testing.T) {
 		{"telnet con puerto propio", "telnet", "", "", 2001, "telnet", 2001, ""},
 		{"ssh con puerto propio", "ssh", "", "", 2222, "ssh", 2222, ""},
 		{"protocolo desconocido", "rlogin", "", "", 0, "", 0, "protocol"},
-		{"mayúsculas no", "TELNET", "", "", 0, "", 0, "protocol"},
+		{"mayúsculas y espacios de un CSV", " Telnet ", "", "", 0, "telnet", 23, ""},
 		{"telnet sin orden de inicio", "telnet", "linux", "tmux", 0, "", 0, "startup_command"},
 	} {
 		h := base
@@ -65,5 +66,25 @@ func TestProtocoloEnElArchivo(t *testing.T) {
 		if err := checkHeader(hdr); err != nil {
 			t.Errorf("encabezado %s: %v", strings.Join(hdr, ","), err)
 		}
+	}
+}
+
+// Un host ssh exportado sale con los mismos bytes que antes de la fase 48 (sin el campo protocol), así que su suma no
+// cambia; un CSV telnet sin puerto entra en el 23.
+func TestProtocoloExportSshIgualYCSVTelnet(t *testing.T) {
+	b, err := json.Marshal(ToFile(Host{Name: "a", Address: "10.0.0.1", Port: 22, Protocol: "ssh", Tags: []string{}}, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `{"name":"a","address":"10.0.0.1","port":22,"platform":"","folder":"","tags":[],"credential_label":"","notes":""}`; string(b) != want {
+		t.Fatalf("export ssh = %s\nquería      %s", b, want)
+	}
+	got, err := ParseHostsCSV([]byte(strings.Join(HostsHeader(), ",") + "\nviejo,10.0.0.7,,ios,,,,,,telnet\n"))
+	if err != nil || len(got.Errors) != 0 || len(got.Hosts) != 1 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	h, err := Clean(got.Hosts[0].Host())
+	if err != nil || h.Protocol != "telnet" || h.Port != 23 || Key(h) != "10.0.0.7:23" {
+		t.Fatalf("csv telnet = %+v %v", h, err)
 	}
 }

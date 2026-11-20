@@ -1469,8 +1469,11 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
 
 ### Telnet en la libreta de hosts (fase 48-4)
 
-- **`Device.protocol`** (campo 15 de inventory.proto): `""`/`"ssh"` o `"telnet"`. `PutDevice` guarda `"ssh"` si viene
-  vacío; `ListDevices` lo devuelve siempre. Otro valor: `InvalidArgument` `hosts.invalid_protocol` (`field=protocol`).
+- **`Device.protocol`** (campo 15 de inventory.proto): `""`/`"ssh"` o `"telnet"` (sin distinguir mayúsculas ni
+  espacios). `PutDevice` guarda `"ssh"` si viene vacío; en `ListDevices` lo traen los hosts de la libreta, y vacío
+  (descubiertos) equivale a ssh. Otro valor: `InvalidArgument` `hosts.invalid_protocol` (`field=protocol`).
+- **Al cambiar el protocolo** de un host cuyo puerto es el de omisión del anterior (22 ssh, 23 telnet), la UI debe vaciar
+  el puerto para que tome el del nuevo (mctl `hosts edit --protocol` ya lo hace); un puerto elegido a mano se conserva.
 - **Puerto:** `profile.port` se elige igual que antes; vacío = 22 con ssh, 23 con telnet.
 - **Telnet no admite** orden de inicio (`hosts.invalid_startup_command`, `field=startup_command`) ni una credencial de solo
   llave (aunque el host sea linux o windows).

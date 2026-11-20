@@ -183,7 +183,7 @@ func Clean(h Host) (Host, error) {
 	if h.Address, err = canonAddr(h.Address); err != nil {
 		return h, &FieldError{Field: "address", Msg: err.Error(), Err: err}
 	}
-	if h.Protocol == "" {
+	if h.Protocol = strings.ToLower(strings.TrimSpace(h.Protocol)); h.Protocol == "" { // «Telnet » de un CSV hecho a mano vale
 		h.Protocol = "ssh"
 	}
 	if h.Protocol != "ssh" && h.Protocol != "telnet" {

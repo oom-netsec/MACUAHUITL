@@ -204,8 +204,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if err != nil {
 			return s.refuse(label, service.ErrFrom(st.Context(), codes.Internal, err), i18n.English(err))
 		}
-		label = h.Name                                                // el nombre de la libreta, no el que mande el cliente
-		if h.StartupCommand != "" && !devices.IsGeneric(h.Platform) { // Clean no lo permite: datos alterados o viejos
+		label = h.Name                                                                            // el nombre de la libreta, no el que mande el cliente
+		if h.StartupCommand != "" && (!devices.IsGeneric(h.Platform) || h.Protocol == "telnet") { // Clean no lo permite: datos alterados o viejos
 			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup on a non-generic host")
 		}
 		if o.Username != "" && h.CredentialID != "" {
@@ -534,7 +534,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	var r io.Reader
 	var w io.Writer
-	if generic && startup != "" { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
+	if generic && startup != "" && ssh != nil { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
 		r, w, err = ssh.CommandSize(term, rows, cols, startup)
 	} else {
 		r, w, err = sess.ShellSize(term, rows, cols)

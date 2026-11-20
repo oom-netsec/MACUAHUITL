@@ -224,11 +224,54 @@ func TestTelnetPorHostDeLaLibreta(t *testing.T) {
 // Con host_id el protocolo lo pone el host: un pedido que además trae protocolo se rechaza sin marcar.
 func TestHostConProtocoloEnElPedido(t *testing.T) {
 	r, _ := newTelnetCredRig(t, simulator.Config{Password: "pw"}, "pw")
-	r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at,protocol)
-		VALUES('h1','viejo',?,?,'ios','','[]','','','','t','t','telnet')`, r.host, r.port)
+	if _, err := r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at,protocol)
+		VALUES('h1','viejo',?,?,'ios','','[]','','','','t','t','telnet')`, r.host, r.port); err != nil {
+		t.Fatal(err)
+	}
 	_, done, cancel := r.session(&v1.TerminalOpen{HostId: "h1", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET})
 	defer cancel()
 	if err := wait(t, done); reason(t, err) != "terminal.err.host_and_address" {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Revisión de 48-4: datos de la libreta alterados o fuera de regla en un host telnet se rechazan sin marcar (y sin
+// tumbar el núcleo: con orden de inicio, el camino de SSH genérico no se toma con una sesión Telnet).
+func TestHostTelnetDatosQueNoAplican(t *testing.T) {
+	var conns atomic.Int32
+	r, _ := newTelnetCredRig(t, simulator.Config{Password: "pw", Conns: &conns}, "pw")
+	keyID, _, err := r.d.V.GenerateKey("k", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	ins := func(id, platform, cred, startup string) {
+		n++
+		if _, err := r.d.DB().Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,startup_command,created_at,updated_at,protocol)
+			VALUES(?,?,?,?,?,'','[]',?,'',?,'t','t','telnet')`, id, id, r.host, int(r.port)+n, platform, cred, startup); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ins("orden", "linux", "", "tmux")
+	ins("llave", "linux", keyID, "")
+	ins("sin", "ios", "", "")
+	for _, c := range []struct {
+		o      *v1.TerminalOpen
+		reason string
+	}{
+		{&v1.TerminalOpen{HostId: "orden", ExpectedStartupCommand: "tmux"}, "terminal.err.startup_changed"},
+		{&v1.TerminalOpen{HostId: "llave"}, "terminal.err.key_credential"},
+		{&v1.TerminalOpen{HostId: "sin", Username: "admin"}, "terminal.err.telnet_field"},
+		{&v1.TerminalOpen{HostId: "sin", AcceptedHostKeyFingerprints: []string{"SHA256:x"}}, "terminal.err.telnet_field"},
+	} {
+		_, done, cancel := r.session(c.o)
+		err := wait(t, done)
+		cancel()
+		if reason(t, err) != c.reason {
+			t.Errorf("%s: err = %v, quería %s", c.o.HostId, err, c.reason)
+		}
+	}
+	if conns.Load() != 0 {
+		t.Errorf("marcó al equipo %d veces", conns.Load())
 	}
 }

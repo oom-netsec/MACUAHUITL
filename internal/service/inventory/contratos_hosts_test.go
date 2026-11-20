@@ -87,5 +87,5 @@ func TestHostTelnet(t *testing.T) {
 	if err == nil {
 		t.Error("aceptó una credencial de llave en un host telnet")
 	}
-	_ = r
+	_ = r.Id
 }
