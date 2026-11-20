@@ -1,7 +1,7 @@
 import { plural } from "../../lib/plural";
 import { CredentialSelect, useCredentials } from "../../components/CredentialSelect";
 import { useEffect, useRef, useState } from "react";
-import type { AdhocResult, CoreAPI } from "../../lib/core";
+import type { AdhocResult, AdhocStart, CoreAPI } from "../../lib/core";
 import { Notice, TextArea } from "../../components/Field";
 import { RunButton } from "../../components/RunButton";
 import { ExportMenu } from "../../components/Files";
@@ -12,7 +12,7 @@ import { parseTarget, parseTargets } from "../../lib/targets";
 import { useT } from "../../lib/i18n";
 import { jobState } from "../../lib/vocab";
 import "./adhoc.css";
-import { type AcceptedKey, type HostKeyInfo, hostKeysFromLogin } from "../../lib/hostkeys";
+import { type AcceptedKey, type HostKeyInfo, hostKeysFromErr, pendingToInfo } from "../../lib/hostkeys";
 import { TargetsField } from "../inventory/TargetField";
 import { HostKeyTrust } from "../../components/HostKeyTrust";
 
@@ -29,7 +29,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const [cred, setCred] = useState("");
   const [devices, setDevices] = useState("");
   const [commands, setCommands] = useState(["show version", "show ip interface brief"].join("\n"));
-  const [hks, setHks] = useState<HostKeyInfo[]>([]); // llaves que rechazó el Login Test del lote sin armar
+  const [hks, setHks] = useState<HostKeyInfo[]>([]); // huellas pendientes que devolvió el núcleo al no armar el lote
   const [unarmed, setUnarmed] = useState(""); // trabajo creado sin armar: «Confiar y reintentar» lo arma, no crea otro
   const [note, setNote] = useState("");
   const [picked, setPicked] = useState("");
@@ -44,12 +44,12 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
     const job = accept.length ? unarmed : "";
     setUnarmed("");
     return r.run(async () => {
-      let st = { jobId: job, armed: true, detail: "" };
+      let st: AdhocStart = { jobId: job, armed: true, detail: "" };
       if (job) {
         try { await core.armJob(job, [], accept, []); } // mismo trabajo (ya tiene sus equipos y comandos)
-        catch (e) { // otro equipo sigue sin confiar: el panel vuelve con lo que el Login Test diga ahora, y el error se muestra
+        catch (e) { // otro equipo sigue sin confiar: el panel vuelve con las huellas del error de ArmJob, y el error se muestra
           setUnarmed(job);
-          setHks(hostKeysFromLogin(await core.loginTest(job).catch(() => [])));
+          setHks(hostKeysFromErr(e));
           throw e;
         }
       }
@@ -57,9 +57,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
       if (!st.armed) {
         setNote(t("adhoc.unarmed", { job: st.jobId, detail: st.detail }));
         setUnarmed(st.jobId);
-        // El lote quedó creado sin armar: el Login Test dice qué huella presentó cada equipo. La llamada se hace siempre:
-        // detail es solo texto del núcleo, sin reason que diga si la causa fue la llave de host.
-        try { setHks(hostKeysFromLogin(await core.loginTest(st.jobId))); } catch { setNote((n) => `${n} ${t("hostkey.noLogin")}`); }
+        setHks(pendingToInfo(st.hostKeys)); // el núcleo ya trae las huellas: no hace falta un Login Test
         return null;
       }
       const deadline = Date.now() + maxWaitMs;

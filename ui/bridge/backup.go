@@ -13,6 +13,9 @@ type BackupStartDTO struct {
 	JobID  string `json:"jobId"`
 	Armed  bool   `json:"armed"`
 	Detail string `json:"detail"`
+	// Reason y HostKeys: por qué no armó y las huellas por aceptar (HostKeys nunca es nulo).
+	Reason   string              `json:"reason"`
+	HostKeys []PendingHostKeyDTO `json:"hostKeys"`
 }
 
 type BackupCollectDTO struct {
@@ -28,15 +31,15 @@ type BackupGetDTO struct {
 	Text string `json:"text"`
 }
 
-// BackupStart crea y arma el respaldo; con intervalSeconds > 0 queda programado (rounds veces).
-func (b *Bridge) BackupStart(targets []AdhocTargetDTO, credentialID string, startup bool, keep, intervalSeconds, rounds uint32, secrets bool, accept []string, acceptedKeys []AcceptedHostKeyDTO) (BackupStartDTO, error) {
+// BackupStart crea y arma el respaldo (con jobID, rearma ese mismo, que quedó sin armar); con intervalSeconds > 0 queda programado (rounds veces).
+func (b *Bridge) BackupStart(targets []AdhocTargetDTO, credentialID string, startup bool, keep, intervalSeconds, rounds uint32, secrets bool, accept []string, acceptedKeys []AcceptedHostKeyDTO, jobID string) (BackupStartDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (BackupStartDTO, error) {
-		req := &v1.StartBackupRequest{CredentialId: credentialID, Startup: startup, Keep: keep, IntervalSeconds: intervalSeconds, Rounds: rounds, IncludeSecrets: secrets, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys)}
+		req := &v1.StartBackupRequest{CredentialId: credentialID, Startup: startup, Keep: keep, IntervalSeconds: intervalSeconds, Rounds: rounds, IncludeSecrets: secrets, AcceptedHostKeyFingerprints: accept, AcceptedHostKeys: protoKeys(acceptedKeys), JobId: jobID}
 		for _, t := range targets {
 			req.Targets = append(req.Targets, &v1.Target{Address: t.Address, Port: t.Port})
 		}
 		r, err := v1.NewBackupServiceClient(c).StartBackup(ctx, req)
-		return BackupStartDTO{JobID: r.GetJobId(), Armed: r.GetArmed(), Detail: r.GetDetail()}, err
+		return BackupStartDTO{JobID: r.GetJobId(), Armed: r.GetArmed(), Detail: r.GetDetail(), Reason: r.GetReason(), HostKeys: pendingKeys(r.GetHostKeys())}, err
 	})
 }
 

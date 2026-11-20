@@ -1,4 +1,4 @@
-import type { ErrInfo } from "./coreError";
+import { errInfo, type ErrInfo } from "./coreError";
 
 // Huellas SSH aceptadas a mano. El núcleo las compara como "SHA256:<base64>"; quien pega solo el base64
 // (lo que muestran muchos equipos y ssh-keygen -l) no debe quedar fuera sin aviso.
@@ -65,4 +65,23 @@ export function hostKeysFromLogin(rows: LoginRow[]): HostKeyInfo[] {
   return rows
     .filter((l) => !l.passed && l.fingerprint && (hk(l) || l.failedStep.endsWith("HOST_KEY")))
     .map((l) => ({ fp: l.fingerprint, changed: hk(l) ? hk(l)!.endsWith("changed") : true, host: l.target, keyType: l.args?.key_type || undefined }));
+}
+
+// Huella pendiente que devuelve el núcleo (PendingHostKey): host es el texto exacto que vuelve en acceptedKeys.
+export interface PendingKey { host: string; fingerprint: string; keyType?: string; changed?: boolean }
+
+// El puente y la metadata del error son datos externos: se descarta lo que no tenga host y huella.
+export function pendingToInfo(raw: unknown): HostKeyInfo[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((k: unknown) => {
+    const o = (k && typeof k === "object" ? k : {}) as Record<string, unknown>;
+    const { host, fingerprint, keyType, changed } = o;
+    return typeof host === "string" && host && typeof fingerprint === "string" && fingerprint
+      ? [{ host, fp: fingerprint, changed: changed === true, keyType: typeof keyType === "string" && keyType ? keyType : undefined }] : [];
+  });
+}
+
+// Las huellas que trae el error de ArmJob: metadata.host_keys es un arreglo JSON de PendingHostKey. JSON roto = ninguna.
+export function hostKeysFromErr(e: unknown): HostKeyInfo[] {
+  try { return pendingToInfo(JSON.parse(errInfo(e)?.metadata.host_keys ?? "")); } catch { return []; }
 }

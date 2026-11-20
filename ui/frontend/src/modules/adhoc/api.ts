@@ -1,9 +1,9 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
-import type { AcceptedKey } from "../../lib/hostkeys";
+import type { AcceptedKey, PendingKey } from "../../lib/hostkeys";
 // Ejecutor ad-hoc (Fase 16a): lote de solo lectura; JSON de internal/adhoc.
 export interface AdhocRow { device: string; address: string; command: string; ok: boolean; output: string; note?: string }
 export interface AdhocReport { commands: string[]; devices: number; rows: AdhocRow[] | null }
-export interface AdhocStart { jobId: string; armed: boolean; detail: string }
+export interface AdhocStart { jobId: string; armed: boolean; detail: string; reason?: string; hostKeys?: PendingKey[] }
 export interface AdhocResult { state: string; done: boolean; report: AdhocReport | null; text: string; csv: string; markdown: string; error?: string }
 interface AdhocDTO { state: string; done: boolean; json: string; text: string; csv: string; markdown: string; error?: string }
 

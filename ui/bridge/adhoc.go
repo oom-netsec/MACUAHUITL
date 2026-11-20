@@ -18,6 +18,9 @@ type AdhocStartDTO struct {
 	JobID  string `json:"jobId"`
 	Armed  bool   `json:"armed"`
 	Detail string `json:"detail"`
+	// Reason y HostKeys: por qué no armó y las huellas por aceptar (HostKeys nunca es nulo).
+	Reason   string              `json:"reason"`
+	HostKeys []PendingHostKeyDTO `json:"hostKeys"`
 }
 
 type AdhocResultDTO struct {
@@ -38,7 +41,7 @@ func (b *Bridge) AdhocStart(targets []AdhocTargetDTO, credentialID, commands str
 			req.Targets = append(req.Targets, &v1.Target{Address: t.Address, Port: t.Port})
 		}
 		r, err := v1.NewAdhocServiceClient(c).StartAdhoc(ctx, req)
-		return AdhocStartDTO{JobID: r.GetJobId(), Armed: r.GetArmed(), Detail: r.GetDetail()}, err
+		return AdhocStartDTO{JobID: r.GetJobId(), Armed: r.GetArmed(), Detail: r.GetDetail(), Reason: r.GetReason(), HostKeys: pendingKeys(r.GetHostKeys())}, err
 	})
 }
 

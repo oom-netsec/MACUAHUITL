@@ -18,3 +18,19 @@ func protoKeys(in []AcceptedHostKeyDTO) []*v1.AcceptedHostKey {
 	}
 	return out
 }
+
+// PendingHostKeyDTO es una huella que el núcleo pide aceptar (PendingHostKey); Host vuelve tal cual en AcceptedHostKeyDTO.
+type PendingHostKeyDTO struct {
+	Host        string `json:"host"`
+	Fingerprint string `json:"fingerprint"`
+	KeyType     string `json:"keyType"`
+	Changed     bool   `json:"changed"`
+}
+
+func pendingKeys(in []*v1.PendingHostKey) []PendingHostKeyDTO {
+	out := []PendingHostKeyDTO{}
+	for _, k := range in {
+		out = append(out, PendingHostKeyDTO{Host: k.GetHost(), Fingerprint: k.GetFingerprint(), KeyType: k.GetKeyType(), Changed: k.GetChanged()})
+	}
+	return out
+}
