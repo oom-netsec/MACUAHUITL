@@ -3134,4 +3134,6 @@ export const en: Record<Key, string> = {
   "hosts.telnet.title": "Connects over Telnet",
   "hosts.err.protocol": "The core does not recognise that protocol: pick SSH or Telnet.",
   "hosts.err.startTelnet": "Telnet does not support a start command.",
+  "ssh.saved.telnetCred": "Telnet · credential in clear text",
+  "hosts.telnetCred": "Telnet: the saved credential travels in clear text; anyone who can watch the network can see it.",
 };

@@ -63,7 +63,7 @@ export const draftOf = (f: HostForm, id?: string): HostDraft => ({
   startCommand: f.protocol !== "telnet" && hasStartCommand(f.platform) ? f.startCommand : "", protocol: f.protocol,
 });
 
-const FIELDS: HostField[] = ["protocol", "name", "address", "port", "platform", "folder", "tags", "notes", "credentialId", "startCommand", "protocol"];
+const FIELDS: HostField[] = ["protocol", "name", "address", "port", "platform", "folder", "tags", "notes", "credentialId", "startCommand"];
 
 // El campo y el duplicado salen de reason y metadata.field. El texto en español solo es respaldo de errores sin reason.
 // Las duplicadas van primero: el nombre del host puede contener cualquier palabra («credencial», «puerto»…).

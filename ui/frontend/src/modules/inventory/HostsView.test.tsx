@@ -524,3 +524,15 @@ test("si el núcleo rechaza el protocolo, el texto sale junto al selector", asyn
   expect(await screen.findByText("El núcleo no reconoce ese protocolo: elige SSH o Telnet.")).toBeVisible();
   expect(screen.getByLabelText("Protocolo")).toBeInvalid();
 });
+
+test("telnet con credencial elegida avisa que viaja en texto claro; sin credencial o con ssh no", async () => {
+  setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), cred.id);
+  expect(screen.queryByText(/viaja en texto claro/)).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "telnet");
+  expect(screen.getByText(/credencial guardada viaja en texto claro/)).toBeVisible();
+  await userEvent.selectOptions(screen.getByLabelText("Credencial"), "");
+  expect(screen.queryByText(/viaja en texto claro/)).toBeNull();
+});

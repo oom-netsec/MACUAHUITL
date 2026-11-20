@@ -3133,6 +3133,8 @@ export const es = {
   "hosts.telnet.title": "Se conecta por Telnet",
   "hosts.err.protocol": "El núcleo no reconoce ese protocolo: elige SSH o Telnet.",
   "hosts.err.startTelnet": "Telnet no admite orden de inicio.",
+  "ssh.saved.telnetCred": "Telnet · credencial en claro",
+  "hosts.telnetCred": "Telnet: la credencial guardada viaja en texto claro; la ve cualquiera que pueda mirar la red.",
 };
 
 export type Key = keyof typeof es;

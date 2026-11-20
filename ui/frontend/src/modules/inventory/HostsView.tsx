@@ -192,6 +192,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
           <CredentialSelect creds={credList} vault={vault} notice={!editing.hiddenCred} value={f.credentialId} onChange={(v) => set("credentialId", v)} w="lg" error={errs.credentialId}
             hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} optional extra={credExtra} />
         </div>
+        {f.protocol === "telnet" && f.credentialId && <Notice kind="warn">{t("hosts.telnetCred")}</Notice>}
         {f.protocol !== "telnet" && hasStartCommand(f.platform) && (
           <Field label={t("hosts.f.start")} hint={t("hosts.f.start.hint")} error={errs.startCommand} value={f.startCommand} onChange={(v) => set("startCommand", v)} w="full" mono />
         )}

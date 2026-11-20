@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TerminalView } from "./TerminalView";
 import { fakeCore } from "../../lib/fake";
@@ -211,4 +211,31 @@ test("con el formulario en Telnet la lista de hosts sigue y cada host abre con s
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
   const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
   expect(req).toEqual({ name: "LAB-AP", hostId: sampleHosts[1].id, expectedStartupCommand: "", accept: [], rows: expect.any(Number), cols: expect.any(Number) }); // ssh, sin usuario del campo oculto
+});
+
+test("elegir en la libreta un host SSH con credencial con el formulario en Telnet devuelve el selector a SSH y no manda protocol", async () => {
+  const core = telnetCore();
+  render(<TerminalView core={core} />);
+  await userEvent.selectOptions(await screen.findByLabelText("Protocolo"), "telnet");
+  await userEvent.selectOptions(await screen.findByLabelText("Host de la libreta"), sampleHosts[0].id); // LAB-CORE, con credencial de contraseña
+  expect(screen.getByLabelText("Protocolo")).toHaveValue("ssh");
+  await userEvent.click(screen.getByRole("button", { name: /Abrir pestaña/ }));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  const req = (core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[0][0];
+  expect(req).not.toHaveProperty("protocol");
+  expect(req).toMatchObject({ address: "10.9.0.1", credentialId: cred.id });
+});
+
+test("la marca de un host telnet con credencial avisa del texto claro; en la libreta las opciones dicen Telnet", async () => {
+  const core = telnetCore();
+  render(<TerminalView core={core} />);
+  const li = (await screen.findByRole("button", { name: "Conectar a OLD-SW" })).closest("li")!;
+  expect(li).toHaveTextContent("Telnet"); expect(li).not.toHaveTextContent("en claro");
+  expect(within(await screen.findByLabelText("Host de la libreta")).getByRole("option", { name: /OLD-SW · 10.8.0.9:23 · Telnet/ })).toBeInTheDocument();
+});
+
+test("un host telnet con credencial dice «Telnet · credencial en claro»", async () => {
+  const c2 = fakeCore({ ...fakeInventory([{ ...telnetHost, credentialId: cred.id }]), listCredentials: vi.fn(async () => [cred]) });
+  render(<TerminalView core={c2} />);
+  expect((await screen.findByRole("button", { name: "Conectar a OLD-SW" })).closest("li")).toHaveTextContent("Telnet · credencial en claro");
 });
