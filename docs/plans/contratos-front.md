@@ -1484,3 +1484,17 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
   suma); el CSV suma la columna `protocol` al final y sigue aceptando los archivos sin ella.
 - **Patrol, respaldos, ad hoc y cambios** usan SSH siempre: al elegir equipos de la libreta para esas tareas, la UI no
   debería ofrecer hosts telnet (marcarían SSH al puerto 23 y fallarían).
+
+## Huellas pendientes en ad hoc y respaldos (pedido de Front, 2026-11-20)
+
+- **`PendingHostKey`** (common.proto): `{host, fingerprint, key_type, changed}`. `host` es exactamente lo que va de vuelta
+  en `AcceptedHostKey.host` (dirección:puerto canónico, IPv6 entre corchetes); `changed` = la llave guardada era otra.
+- **`StartAdhocResponse` y `StartBackupResponse`** con `armed=false` traen `reason` (5, del catálogo: p. ej.
+  `patrol.svc.login_failed`, el de la bóveda o el de las huellas) y `host_keys` (6): una entrada por equipo que falló en
+  la llave. `job_id` viene siempre. Con eso «Confiar y reintentar» no necesita otro Login Test.
+- **Rearmar ad hoc:** `ArmJob` sobre ese `job_id` con `accepted_host_keys`. Si vuelve a fallar, su `ErrorInfo` trae
+  `reason` y la metadata `host_keys`: un arreglo JSON de `PendingHostKey` (nombres protojson: `host`, `fingerprint`,
+  `keyType`, `changed`), la misma forma que la respuesta.
+- **Rearmar un respaldo:** `StartBackup{job_id, accepted_host_keys}` (campo 11) arma ese mismo trabajo, sin crear otro,
+  y lo recoge al terminar. Si vuelve a fallar responde igual que la primera vez (`armed=false`, `reason`, `host_keys`).
+  Un `job_id` que no es un respaldo propio: `FailedPrecondition` `backup.err.not_rearmable`.

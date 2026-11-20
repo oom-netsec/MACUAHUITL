@@ -213,6 +213,76 @@ func (x *AcceptedHostKey) GetFingerprint() string {
 	return ""
 }
 
+// Una llave de host que el armado no aceptó (desconocida o cambiada). host es el que va de vuelta en
+// AcceptedHostKey.host, tal cual (dirección:puerto canónico; IPv6 entre corchetes).
+type PendingHostKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Fingerprint   string                 `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	KeyType       string                 `protobuf:"bytes,3,opt,name=key_type,json=keyType,proto3" json:"key_type,omitempty"`
+	Changed       bool                   `protobuf:"varint,4,opt,name=changed,proto3" json:"changed,omitempty"` // la llave guardada era otra
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PendingHostKey) Reset() {
+	*x = PendingHostKey{}
+	mi := &file_macuahuitl_v1_common_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingHostKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingHostKey) ProtoMessage() {}
+
+func (x *PendingHostKey) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_common_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingHostKey.ProtoReflect.Descriptor instead.
+func (*PendingHostKey) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_common_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PendingHostKey) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *PendingHostKey) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
+func (x *PendingHostKey) GetKeyType() string {
+	if x != nil {
+		return x.KeyType
+	}
+	return ""
+}
+
+func (x *PendingHostKey) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
 var File_macuahuitl_v1_common_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_common_proto_rawDesc = "" +
@@ -224,7 +294,12 @@ const file_macuahuitl_v1_common_proto_rawDesc = "" +
 	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\"G\n" +
 	"\x0fAcceptedHostKey\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12 \n" +
-	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint*\xc6\x02\n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"{\n" +
+	"\x0ePendingHostKey\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\x12\x19\n" +
+	"\bkey_type\x18\x03 \x01(\tR\akeyType\x12\x18\n" +
+	"\achanged\x18\x04 \x01(\bR\achanged*\xc6\x02\n" +
 	"\vDeviceState\x12\x1c\n" +
 	"\x18DEVICE_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13DEVICE_STATE_QUEUED\x10\x01\x12\x1b\n" +
@@ -252,11 +327,12 @@ func file_macuahuitl_v1_common_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_macuahuitl_v1_common_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_macuahuitl_v1_common_proto_goTypes = []any{
 	(DeviceState)(0),        // 0: macuahuitl.v1.DeviceState
 	(*Target)(nil),          // 1: macuahuitl.v1.Target
 	(*AcceptedHostKey)(nil), // 2: macuahuitl.v1.AcceptedHostKey
+	(*PendingHostKey)(nil),  // 3: macuahuitl.v1.PendingHostKey
 }
 var file_macuahuitl_v1_common_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -277,7 +353,7 @@ func file_macuahuitl_v1_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_common_proto_rawDesc), len(file_macuahuitl_v1_common_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
