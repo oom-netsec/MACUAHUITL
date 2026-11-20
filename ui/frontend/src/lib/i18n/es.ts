@@ -3122,6 +3122,10 @@ export const es = {
   "diag.stopTool": "Detener {tool}",
   "diag.cancelTool": "Cancelar {tool}",
   "diag.clearTool": "Limpiar {tool}",
+  "ssh.proto": "Protocolo",
+  "ssh.telnetWarn": "Telnet: todo viaja en texto claro, contraseña incluida, y no se verifica la identidad del equipo. El usuario y la contraseña se teclean en la terminal cuando el equipo los pide.",
+  "ssh.portDefault": "Puerto por omisión: {port}.",
+  "ssh.connectedTelnet": "Telnet · conectado a {port}; grabando en {path}",
 };
 
 export type Key = keyof typeof es;

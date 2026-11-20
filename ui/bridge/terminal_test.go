@@ -271,3 +271,28 @@ func TestTerminalAnswerPoneEnCerosLosBytes(t *testing.T) {
 		t.Fatal(err, called)
 	}
 }
+
+// Telnet: el puente traduce el protocolo y deja pasar solo dirección y puerto, aunque el DTO traiga lo demás.
+func TestTerminalTelnetFiltra(t *testing.T) {
+	o := (TerminalDTO{Protocol: "telnet", Name: "n", Address: "a", Port: 2323, Username: "u", CredentialID: "c", HostID: "h", Accept: []string{"SHA256:x"}, AcceptedKeys: []AcceptedHostKeyDTO{{Host: "a"}}, ExpectedStartupCommand: "x", Rows: 24, Cols: 80}).open()
+	if o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET || o.Address != "a" || o.Port != 2323 || o.Rows != 24 || o.Cols != 80 {
+		t.Fatalf("telnet: %v", o)
+	}
+	if o.Username != "" || o.CredentialId != "" || o.HostId != "" || len(o.AcceptedHostKeyFingerprints) != 0 || len(o.AcceptedHostKeys) != 0 || o.ExpectedStartupCommand != "" {
+		t.Fatalf("telnet dejó pasar campos de SSH: %v", o)
+	}
+	for _, p := range []string{"", "ssh"} {
+		if o := (TerminalDTO{Protocol: p, Address: "a", CredentialID: "c"}).open(); o.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED || o.CredentialId != "c" {
+			t.Fatalf("%q debe seguir igual: %v", p, o)
+		}
+	}
+}
+
+func TestTerminalProtocoloDesconocido(t *testing.T) {
+	dialed := false
+	b := New(func() (*ipc.ClientConn, error) { dialed = true; return nil, io.EOF }, (&recorder{}).emit)
+	_, err := b.TerminalOpen(TerminalDTO{Protocol: "rlogin", Address: "a"})
+	if err == nil || dialed || !strings.Contains(err.Error(), "rotocol") {
+		t.Fatalf("err=%v dialed=%v", err, dialed)
+	}
+}
