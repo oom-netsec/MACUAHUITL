@@ -11,7 +11,7 @@ const made: unknown[][] = [];
 vi.mock("uplot", () => ({
   default: class {
     constructor(_o: unknown, d: unknown[][]) { made.push(d); }
-    setSize() {} destroy() {} setData() {}
+    setSize() {} destroy() {} setData(d: unknown[][]) { made.push(d); } // los datos vigentes, sea al crear o al actualizar // los datos vigentes, sea al crear o al actualizar
     get ctx() { return { canvas: { toDataURL: () => "" } }; }
   },
 }));
@@ -312,6 +312,7 @@ test("traceroute: «Saltos máximos» va plegado, cuenta y se sigue enviando; de
 });
 
 test("el eje de tiempo del ping escala con el intervalo elegido", async () => {
+  made.length = 0; // sin restos de otra prueba: en un runner lento el gráfico de esta puede montarse después del figure
   const core = fakeCore({ diagRun: ids() });
   render(<PingTraceView core={core} />);
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
@@ -319,10 +320,11 @@ test("el eje de tiempo del ping escala con el intervalo elegido", async () => {
   await userEvent.type(screen.getByLabelText("Intervalo (0.2-60 s)"), "5");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
-  act(() => ["1", "2", "3"].forEach((q) => core.emitDiag({ runId: "r1", line: `64 bytes from 10.0.0.1: icmp_seq=${q} ttl=64 time=0.4 ms` })));
-  await screen.findByRole("figure", { name: "RTT por paquete" });
-  const times = made.at(-1)![0] as number[];
-  expect(times.map((x) => x - times[0])).toEqual([0, 5, 10]);
+  for (const q of ["1", "2", "3"]) { // por separado: la gráfica se crea con el primero y los demás llegan por setData
+    act(() => core.emitDiag({ runId: "r1", line: `64 bytes from 10.0.0.1: icmp_seq=${q} ttl=64 time=0.4 ms` }));
+    await screen.findByRole("figure", { name: "RTT por paquete" });
+  }
+  await waitFor(() => { const times = made.at(-1)?.[0] as number[] | undefined; expect(times?.map((x) => x - times[0])).toEqual([0, 5, 10]); });
 });
 
 test("un evento posterior al cambio de idioma se escribe en el idioma vigente", async () => {
