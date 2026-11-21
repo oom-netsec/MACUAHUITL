@@ -214,3 +214,38 @@ func TestTerceraRevisionNoSeTocan(t *testing.T) {
 		t.Fatalf("sin plataforma, la comunidad quedó a medias: %q", out)
 	}
 }
+
+// Fuzz nocturno (2026-11-21): con una sola barra por pasada, «\\"» perdía una barra en cada una («\\"» → «\"» → «"»).
+// Una corrida impar de barras antes de una comilla pierde una y una par queda igual, en Stream.quoted y en union.go: si
+// los dos textos no coinciden, el corte tapa de más o deja ver el resto de un valor; y quitarlas todas dejaría una
+// comilla suelta donde antes no la había, con el valor siguiente a la vista.
+func TestComillasEscapadasIdempotente(t *testing.T) {
+	for _, p := range fuzzPlatforms {
+		for _, in := range []string{`\"`, `\\"`, `a\\\"b`, `description "sitio \"B\""`, `% Invalid input "x\\"`,
+			`ERROR: \\"x\\" "snmp-server community AB\"CD ; x"`, `ERROR: "snmp-server community \\\"Esc5 Comm\\\" group x"`} {
+			out, _ := Apply(p, in+"\n")
+			if again, _ := Apply(p, out); again != out {
+				t.Errorf("%q no idempotente:\n1: %q\n2: %q", p, out, again)
+			}
+		}
+	}
+	// Lo que no es secreto no se tapa aunque traiga comillas escapadas.
+	for _, in := range []string{`ERROR: "interface \"Gi1\" shutdown" x`, `WARNING: "ip host \"foo\" 1.2.3.4"`, `ERROR: "hostname \\\"R1\\\""`} {
+		if out, n := Apply("ios-xe", in+"\n"); strings.Contains(out, "<MASKED") || len(n) > 0 {
+			t.Errorf("tapó de más: %q → %q", in, out)
+		}
+	}
+	// Una corrida de barras antes de una comilla no deja ver el resto del valor.
+	if out, _ := Apply("ios-xe", `ERROR: \\"x\\" "snmp-server community AB\"CD ; x"`+"\n"); strings.Contains(out, "CD") {
+		t.Errorf("fuga tras la comilla escapada: %q", out)
+	}
+	cfg := `%PARSER-5-CFGLOG_LOGGEDCMD: User:bob  logged command:webauth \\\" sntp RW 0 "two words" \\\" psk \\\" 9 Zq1` + "\n"
+	if out, _ := Apply("ftd", cfg); strings.Contains(out, "Zq1") {
+		t.Errorf("la corrida impar dejó una comilla suelta y el valor a la vista: %q", out)
+	}
+	st := Stream{Platform: "ios-xe"}
+	c := `"username bob password 0  SECRETO1 enable password \\"key`
+	if out, _ := CutCommand("", c, st.Typed(c)); strings.Contains(out, "SECRETO1") {
+		t.Errorf("Typed dejó ver el secreto: %q", out)
+	}
+}
