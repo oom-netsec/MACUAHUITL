@@ -92,10 +92,10 @@ function Found({ core, q, setQ }: { core: CoreAPI; q: string; setQ: (v: string) 
   );
 }
 
-function Trace({ core, initial }: { core: CoreAPI; initial: string }) {
+function Trace({ core, seed }: { core: CoreAPI; seed: { d: string; n: number } }) {
   const t = useT();
-  const [q, setQ] = useState(initial);
-  useEffect(() => { setQ(initial); }, [initial]); // la subvista sigue montada: toma la búsqueda del padre (la de Búsqueda o la que llega del menú de equipo), como antes al remontar
+  const [q, setQ] = useState(seed.d);
+  useEffect(() => { setQ(seed.d); }, [seed]); // la subvista sigue montada: cada entrega del menú de equipo, aunque repita el equipo, se toma
   const tr = useResult<TraceResult>();
   const r = tr.data;
   const hops = r?.hops ?? [];
@@ -131,7 +131,7 @@ function Trace({ core, initial }: { core: CoreAPI; initial: string }) {
   );
 }
 
-function Path({ core }: { core: CoreAPI }) {
+function Path({ core }: { core: CoreAPI; active?: boolean }) {
   const t = useT();
   const [src, setSrc] = useState("");
   const [dst, setDst] = useState("");
@@ -175,10 +175,10 @@ function Path({ core }: { core: CoreAPI }) {
   );
 }
 
-function Health({ core }: { core: CoreAPI }) {
+function Health({ core, active }: { core: CoreAPI; active: boolean }) {
   const t = useT();
   const q = useResult<HealthResult>();
-  useEffect(() => { void q.run(() => core.fleetHealth()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (active) void q.run(() => core.fleetHealth(), true); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps -- carga al montar y al volver a la pestaña, sin borrar lo anterior
   const issues = q.data?.issues ?? [];
   const cols: Column<(typeof issues)[number]>[] = [
     { id: "sev", header: t("fleet.col.severity"), value: (i) => cap(t(`fleet.sev.${i.severity}`)), width: W.sm },
@@ -216,10 +216,10 @@ function Health({ core }: { core: CoreAPI }) {
 
 const checks = ["cpu", "ntp", "reboot", "memory", "flash"] as const;
 
-function Summary({ core }: { core: CoreAPI }) {
+function Summary({ core, active }: { core: CoreAPI; active: boolean }) {
   const t = useT();
   const q = useResult<SummaryResult>();
-  useEffect(() => { void q.run(() => core.fleetSummary()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (active) void q.run(() => core.fleetSummary(), true); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps -- carga al montar y al volver a la pestaña, sin borrar lo anterior
   const rows = q.data?.rows ?? [];
   const cols: Column<(typeof rows)[number]>[] = [
     { id: "device", header: t("fleet.col.device"), value: (x) => x.device, width: W.md },
@@ -254,11 +254,12 @@ function Summary({ core }: { core: CoreAPI }) {
   );
 }
 
-function Capacity({ core }: { core: CoreAPI }) {
+function Capacity({ core, active }: { core: CoreAPI; active: boolean }) {
   const t = useT();
   const [need, setNeed] = useState("");
+  const [sent, setSent] = useState(""); // al volver se recarga con lo último enviado, no con lo que quedó a medio teclear
   const q = useResult<CapacityResult>();
-  useEffect(() => { void q.run(() => core.fleetCapacity("")); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (active) void q.run(() => core.fleetCapacity(sent), true); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps -- carga al montar y al volver a la pestaña, sin borrar lo anterior
   const flash = q.data?.flash ?? [];
   const dram = q.data?.dram ?? [];
   const flashCols: Column<(typeof flash)[number]>[] = [
@@ -281,7 +282,7 @@ function Capacity({ core }: { core: CoreAPI }) {
       <div className="field-row">
         <Field label={t("fleet.capacity.need")} value={need} onChange={setNeed} w="md" mono />
       </div>
-      <div className="actions"><button className="primary" disabled={q.busy} aria-busy={q.busy} onClick={() => q.run(() => core.fleetCapacity(need.trim()))}>{t("fleet.capacity.btn")}{runKbd}</button></div>
+      <div className="actions"><button className="primary" disabled={q.busy} aria-busy={q.busy} onClick={() => { setSent(need.trim()); void q.run(() => core.fleetCapacity(need.trim())); }}>{t("fleet.capacity.btn")}{runKbd}</button></div>
       {q.error && <Notice kind="error">{q.error}</Notice>}
       {q.data && (
         <>
@@ -298,10 +299,10 @@ function Capacity({ core }: { core: CoreAPI }) {
   );
 }
 
-function Inventory({ core }: { core: CoreAPI }) {
+function Inventory({ core, active }: { core: CoreAPI; active: boolean }) {
   const t = useT();
   const q = useResult<{ result: InventoryResult; csv: string; markdown: string }>();
-  useEffect(() => { void q.run(() => core.fleetInventory()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (active) void q.run(() => core.fleetInventory(), true); }, [active]); // eslint-disable-line react-hooks/exhaustive-deps -- carga al montar y al volver a la pestaña, sin borrar lo anterior
   const d = q.data;
   const rows = d?.result.rows ?? [];
   const cols: Column<(typeof rows)[number]>[] = [
@@ -337,16 +338,17 @@ function Inventory({ core }: { core: CoreAPI }) {
 export function FleetView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [sub, setSub] = useState<Sub>("result");
-  const [q, setQ] = useState(""); // lo buscado también precarga el rastreo L2
-  useInbox("fleet", (d) => { setQ(d); setSub("result"); }); // desde el menú de equipo
+  const [q, setQ] = useState("");
+  const [traceQ, setTraceQ] = useState({ d: "", n: 0 }); // el rastreo L2 solo se precarga con lo que llega del menú de equipo
+  useInbox("fleet", (d) => { setQ(d); setTraceQ((p) => ({ d, n: p.n + 1 })); setSub("result"); }); // desde el menú de equipo
   return (
     <Page title={t("fleet.title")} description={t("fleet.intro")}
       tabs={<Tabs label={t("fleet.nav")} value={sub} onChange={setSub} tabs={subs.map((s) => [s, t(`fleet.sub.${s}`)])} />}>
       <TabPanels value={sub} render={(s) => {
         if (s === "result") return <Found core={core} q={q} setQ={setQ} />;
-        if (s === "trace") return <Trace core={core} initial={q} />;
+        if (s === "trace") return <Trace core={core} seed={traceQ} />;
         const P = { path: Path, health: Health, summary: Summary, capacity: Capacity, inventory: Inventory }[s];
-        return <P core={core} />;
+        return <P core={core} active={s === sub} />;
       }} />
     </Page>
   );

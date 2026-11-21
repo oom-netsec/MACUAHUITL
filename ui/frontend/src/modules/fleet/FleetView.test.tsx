@@ -128,3 +128,60 @@ test("Rastreo L2 sigue montado: toma la búsqueda que llega del menú de equipo 
   await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
   expect(screen.getByRole("textbox", { name: /IP|MAC/ })).toHaveValue("10.20.3.11");
 });
+
+test("volver a Salud recarga sin borrar la tabla anterior, y no recarga si la pestaña no cambia", async () => {
+  let release: () => void = () => {};
+  const data = { devices: 1, warnings: [], issues: [{ device: "SW9", port: "Gi1/0/9", severity: "critica" as const, problems: [{ kind: "err-disabled", evidence: "Gi1/0/9 err-disabled" }], source: "show interfaces status", at }] };
+  const core = fakeCore({ fleetHealth: vi.fn(async () => data) });
+  render(<FleetView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Salud" }));
+  expect((await screen.findAllByText("SW9")).length).toBeGreaterThan(0);
+  expect(core.fleetHealth).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("tab", { name: "Salud" })); // misma pestaña
+  expect(core.fleetHealth).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("tab", { name: "Tablero" }));
+  vi.mocked(core.fleetHealth).mockImplementationOnce(() => new Promise<typeof data>((r) => { release = () => r(data); }));
+  await userEvent.click(screen.getByRole("tab", { name: "Salud" }));
+  expect(core.fleetHealth).toHaveBeenCalledTimes(2);
+  expect(screen.getAllByText("SW9").length).toBeGreaterThan(0); // sigue el dato anterior mientras recarga
+  release();
+  await waitFor(() => expect(screen.getByRole("button", { name: /Actualizar/, busy: false })).toBeInTheDocument());
+});
+
+test("lo tecleado en Búsqueda no llega al rastreo; lo del menú de equipo sí", async () => {
+  const core = fakeCore();
+  const ui = (n: number, data: string) => <NavContext.Provider value={{ go: () => {}, inbox: n ? { fleet: { data, n } } : {} }}><FleetView core={core} /></NavContext.Provider>;
+  const { rerender } = render(ui(0, ""));
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar IP, MAC o nombre" }), "SW1");
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  expect(screen.getByRole("textbox", { name: /IP|MAC/ })).toHaveValue("");
+  rerender(ui(1, "10.20.3.11"));
+  expect(screen.getByRole("searchbox", { name: "Buscar IP, MAC o nombre" })).toHaveValue("10.20.3.11");
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  expect(screen.getByRole("textbox", { name: /IP|MAC/ })).toHaveValue("10.20.3.11");
+});
+
+test("el mismo equipo otra vez desde el menú vuelve a precargar el rastreo aunque el usuario lo haya cambiado", async () => {
+  const core = fakeCore();
+  const ui = (n: number, data: string) => <NavContext.Provider value={{ go: () => {}, inbox: n ? { fleet: { data, n } } : {} }}><FleetView core={core} /></NavContext.Provider>;
+  const { rerender } = render(ui(1, "10.20.3.11"));
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  const box = () => screen.getByRole("textbox", { name: /IP|MAC/ });
+  await userEvent.clear(box());
+  await userEvent.type(box(), "10.20.3.12");
+  rerender(ui(2, "10.20.3.11"));
+  await userEvent.click(screen.getByRole("tab", { name: "Rastreo L2" }));
+  expect(box()).toHaveValue("10.20.3.11");
+});
+
+test("Capacidad recarga al volver con lo último enviado, no con lo que quedó a medio teclear", async () => {
+  const core = fakeCore();
+  const spy = vi.spyOn(core, "fleetCapacity");
+  render(<FleetView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Flash y DRAM" }));
+  const field = screen.getByRole("textbox", { name: /Tamaño que debe caber/ });
+  await userEvent.type(field, "abc");
+  await userEvent.click(screen.getByRole("tab", { name: "Salud" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Flash y DRAM" }));
+  expect(spy).toHaveBeenLastCalledWith("");
+});
