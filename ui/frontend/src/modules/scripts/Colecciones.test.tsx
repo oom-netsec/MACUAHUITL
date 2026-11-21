@@ -131,31 +131,36 @@ describe("colecciones: sus scripts, por referencia", () => {
     await cols();
     await crear("Redes");
     await userEvent.click(screen.getByRole("tab", { name: "Biblioteca" }));
-    await userEvent.click(await screen.findByRole("button", { name: `Agregar a colección: ${STP.name}` }));
-    const menu = screen.getByRole("menu", { name: `Colecciones de ${STP.name}` });
-    const [fav, redes] = within(menu).getAllByRole("menuitemcheckbox");
-    expect(fav).toHaveTextContent("Favoritos");
-    await userEvent.click(fav);
-    await waitFor(() => expect(core.setCollectionScripts).toHaveBeenLastCalledWith(FAVORITES_ID, [STP.id]));
+    await userEvent.click(await screen.findByRole("button", { name: `Más acciones de ${STP.name}` }));
+    const menu = screen.getByRole("menu", { name: `Acciones de ${STP.name}` });
+    const items = within(menu).getAllByRole("menuitemcheckbox"); // Fijar, Favorito y Redes: la colección Favoritos es el ítem «Favorito»
+    expect(items).toHaveLength(3);
+    const [, fav, redes] = items;
+    expect(within(menu).queryByText("Favoritos")).not.toBeInTheDocument();
+    expect(fav).toHaveTextContent("Favorito");
     await userEvent.click(redes);
     await waitFor(() => expect(core.setCollectionScripts).toHaveBeenLastCalledWith(expect.stringMatching(/^c/), [STP.id]));
-    await waitFor(() => expect(within(screen.getByRole("menu")).getAllByRole("menuitemcheckbox").map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "true"]));
-    await userEvent.click(fav); // quitar
-    await waitFor(() => expect(core.setCollectionScripts).toHaveBeenLastCalledWith(FAVORITES_ID, []));
+    await waitFor(() => expect(within(screen.getByRole("menu")).getAllByRole("menuitemcheckbox").map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "false", "true"]));
+    await userEvent.click(redes); // quitar
+    await waitFor(() => expect(core.setCollectionScripts).toHaveBeenLastCalledWith(expect.stringMatching(/^c/), []));
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: `Agregar a colección: ${STP.name}` })).toHaveFocus();
+    expect(screen.getByRole("button", { name: `Más acciones de ${STP.name}` })).toHaveFocus();
   });
 });
 
 describe("fijados", () => {
-  test("el botón fija y desfija con aria-pressed", async () => {
+  test("el menú fija y desfija, y la fila lo indica", async () => {
     const { core } = setup();
-    await userEvent.click(await screen.findByRole("button", { name: `Fijar en la terminal: ${STP.name}` }));
+    const pin = async () => { await userEvent.click(await screen.findByRole("button", { name: `Más acciones de ${STP.name}` })); return screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" }); };
+    await userEvent.click(await pin());
     expect(core.setScriptPinned).toHaveBeenCalledWith(STP.id, true);
-    await waitFor(() => expect(screen.getByRole("button", { name: `Fijar en la terminal: ${STP.name}` })).toHaveAttribute("aria-pressed", "true"));
-    await userEvent.click(screen.getByRole("button", { name: `Fijar en la terminal: ${STP.name}` }));
+    await waitFor(() => expect(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" })).toHaveAttribute("aria-checked", "true"));
+    const row = () => within(screen.getByRole("list", { name: "Scripts" })).getAllByRole("listitem").find((r) => within(r).queryByText(STP.name))!;
+    expect(within(row()).getByRole("img", { name: "Fijado" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" }));
     expect(core.setScriptPinned).toHaveBeenLastCalledWith(STP.id, false);
+    await waitFor(() => expect(within(row()).queryByRole("img", { name: "Fijado" })).not.toBeInTheDocument());
   });
 
   test("el sexto fijado muestra el motivo del núcleo y no queda fijado", async () => {
@@ -163,15 +168,16 @@ describe("fijados", () => {
     const many = [1, 2, 3, 4, 5, 6].map(lib);
     const { fakeScripts } = await import("./fake");
     setup(fakeScripts(many));
-    const sixth = await screen.findByRole("button", { name: "Fijar en la terminal: Lib 6" });
-    await userEvent.click(sixth);
+    await userEvent.click(await screen.findByRole("button", { name: "Más acciones de Lib 6" }));
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" }));
     expect(await screen.findByText("Ya hay 5 scripts fijados, el máximo. Desfija uno antes de fijar otro.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Fijar en la terminal: Lib 6" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" })).toHaveAttribute("aria-checked", "false");
   });
 
   test("otro error al fijar se muestra tal cual", async () => {
     setup({ setScriptPinned: vi.fn(async () => { throw new Error("rpc error: code = NotFound desc = no hay un script"); }) });
-    await userEvent.click(await screen.findByRole("button", { name: `Fijar en la terminal: ${STP.name}` }));
+    await userEvent.click(await screen.findByRole("button", { name: `Más acciones de ${STP.name}` }));
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" }));
     expect(await screen.findByText("no hay un script")).toBeInTheDocument();
   });
 });
@@ -316,13 +322,15 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
   test("el límite de fijados se reconoce por el código FailedPrecondition del mensaje crudo, sin depender de la palabra «fijados»", async () => {
     localStorage.setItem("macuahuitl.lang", "en");
     setup({ setScriptPinned: vi.fn(async () => { throw new Error("rpc error: code = FailedPrecondition desc = limit reached"); }) });
-    await userEvent.click(await screen.findByRole("button", { name: `Pin to the terminal: ${STP.name}` }));
+    await userEvent.click(await screen.findByRole("button", { name: `More actions for ${STP.name}` }));
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Pin to the terminal" }));
     expect(await screen.findByText("There are already 5 pinned scripts, the maximum. Unpin one before pinning another.")).toBeInTheDocument();
   });
 
   test("otro código gRPC cuyo texto menciona «fijados» no se confunde con el límite", async () => {
     setup({ setScriptPinned: vi.fn(async () => { throw new Error("rpc error: code = NotFound desc = no hay un script fijados"); }) });
-    await userEvent.click(await screen.findByRole("button", { name: `Fijar en la terminal: ${STP.name}` }));
+    await userEvent.click(await screen.findByRole("button", { name: `Más acciones de ${STP.name}` }));
+    await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Fijar en la terminal" }));
     expect(await screen.findByText("no hay un script fijados")).toBeInTheDocument();
   });
 

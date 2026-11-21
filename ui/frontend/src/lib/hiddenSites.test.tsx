@@ -67,7 +67,7 @@ test("Scripts: el nombre del script seleccionado en el título", async () => {
   const evil = { ...sampleScripts[1], name: `S${RAW}` };
   core.listScripts = vi.fn(async () => [evil as never]);
   render(<I18nProvider><NavContext.Provider value={{ go: vi.fn(), inbox: {} }}><ScriptsView core={core} /></NavContext.Provider></I18nProvider>);
-  await userEvent.click(await screen.findByRole("button", { name: new RegExp(`^S`) }));
+  await userEvent.click(within(await screen.findByRole("listitem")).getByRole("button", { name: new RegExp(`^S`) })); // los chips de filtro también empiezan con S
   const h = await screen.findByRole("heading", { name: `S${SHOWN}` });
   noRaw(h.textContent);
 });

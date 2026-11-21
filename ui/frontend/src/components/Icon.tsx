@@ -3,7 +3,7 @@
 import {
   Activity, ChevronRight, Download, Upload, List, Plus, Play, CircleAlert, CircleCheck, Command, Copy, Eye, Info, Keyboard, Layers, ListTree, LoaderCircle, Lock, LockOpen,
   Minus, PanelLeft, RefreshCw, Search, ShieldCheck, Shield, SlidersHorizontal, Square, SquareTerminal, SunMoon, TriangleAlert, Wrench, X,
-  Star, Settings, ArrowUp, ArrowDown, Pin, FolderPlus,
+  Star, Settings, ArrowUp, ArrowDown, Pin, FolderPlus, Ellipsis,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +45,7 @@ const icons = {
   up: ArrowUp,
   down: ArrowDown,
   pin: Pin,
+  more: Ellipsis,
   folderPlus: FolderPlus,
 } satisfies Record<string, LucideIcon>;
 
