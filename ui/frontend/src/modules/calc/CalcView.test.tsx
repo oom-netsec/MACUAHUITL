@@ -4,6 +4,13 @@ import { CalcView } from "./CalcView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
+const family: Record<string, string> = {"VLSM": "Direccionamiento", "Subred": "Direccionamiento", "Wildcard": "Direccionamiento", "IPv6": "Direccionamiento", "Sumarización": "Direccionamiento", "MTU/MSS": "Transporte y QoS", "TCP": "Transporte y QoS", "DSCP": "Transporte y QoS", "Óptica": "Capa física", "BGP": "Enrutamiento"};
+// Va a la subvista: primero su familia y luego su pestaña.
+async function openTab(name: string) {
+  await userEvent.click(screen.getByRole("tab", { name: family[name]! }));
+  await userEvent.click(screen.getByRole("tab", { name }));
+}
+
 const result = {
   text: "",
   tables: [{ title: "Subred 10.0.0.0/31", head: ["Campo", "Valor"], rows: [["Hosts usables", "2"]] }],
@@ -33,7 +40,7 @@ test("los errores del núcleo se leen sin el prefijo de gRPC", async () => {
 test("vlsm: convierte nombre=hosts en necesidades", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "VLSM" }));
+  await openTab("VLSM");
   await userEvent.type(screen.getByLabelText("Red"), "10.0.0.0/24");
   await userEvent.type(screen.getByLabelText(/^Necesidades/), "ventas=50, 20");
   await userEvent.click(screen.getByRole("button", { name: "Repartir" }));
@@ -43,7 +50,7 @@ test("vlsm: convierte nombre=hosts en necesidades", async () => {
 test("mtu: arma la pila de capas en orden y permite quitar", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "MTU/MSS" }));
+  await openTab("MTU/MSS");
   const add = screen.getByRole("button", { name: "Agregar capa" });
   await userEvent.selectOptions(screen.getByLabelText("Capa"), "nat-t");
   await userEvent.click(add);
@@ -64,7 +71,7 @@ test("mtu: arma la pila de capas en orden y permite quitar", async () => {
 test("bgp: manda solo los atributos escritos y las opciones", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "BGP" }));
+  await openTab("BGP");
   const a = screen.getByRole("group", { name: "Ruta 1" });
   await userEvent.type(within(a).getByLabelText("Local-pref"), "200");
   await userEvent.type(within(a).getByLabelText("AS_PATH"), "65001 65002");
@@ -87,7 +94,7 @@ test("bgp: manda solo los atributos escritos y las opciones", async () => {
 test("óptica: presupuesto y conversión", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "Óptica" }));
+  await openTab("Óptica");
   await userEvent.type(screen.getByLabelText("Tx mínima (dBm)"), "-8.2");
   await userEvent.type(screen.getByLabelText("Sensibilidad Rx (dBm)"), "-14.4");
   await userEvent.type(screen.getByLabelText("Distancia (km)"), "10");
@@ -102,24 +109,24 @@ test("óptica: presupuesto y conversión", async () => {
 test("dscp, tcp, wildcard, ipv6 y sumarización envían sus campos", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "DSCP" }));
+  await openTab("DSCP");
   await userEvent.click(screen.getByRole("button", { name: "Buscar" }));
   await waitFor(() => expect(core.calc).toHaveBeenLastCalledWith("dscp", { query: "", field: "" }));
-  await userEvent.click(screen.getByRole("tab", { name: "TCP" }));
+  await openTab("TCP");
   await userEvent.type(screen.getByLabelText(/^Ancho de banda/), "1g");
   await userEvent.type(screen.getByLabelText("RTT (ms)"), "50");
   await userEvent.click(screen.getByRole("button", { name: "Calcular rendimiento" }));
   await waitFor(() => expect(core.calc).toHaveBeenLastCalledWith("tcp", { bandwidth: "1g", rttMs: 50, window: "", lossPercent: 0, mss: 0 }));
-  await userEvent.click(screen.getByRole("tab", { name: "Wildcard" }));
+  await openTab("Wildcard");
   await userEvent.type(screen.getByLabelText(/^Dirección de la ACL/), "10.0.0.0");
   await userEvent.type(screen.getByLabelText(/^Prefijo, máscara o wildcard/), "0.0.254.255");
   await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
   await waitFor(() => expect(core.calc).toHaveBeenLastCalledWith("wildcard", { address: "10.0.0.0", value: "0.0.254.255" }));
-  await userEvent.click(screen.getByRole("tab", { name: "IPv6" }));
+  await openTab("IPv6");
   await userEvent.type(screen.getByLabelText(/^MAC/), "0050.56ab.cdef");
   await userEvent.click(screen.getByRole("button", { name: "Calcular" }));
   await waitFor(() => expect(core.calc).toHaveBeenLastCalledWith("ipv6", { address: "", mac: "0050.56ab.cdef" }));
-  await userEvent.click(screen.getByRole("tab", { name: "Sumarización" }));
+  await openTab("Sumarización");
   await userEvent.type(screen.getByLabelText(/^Prefijos/), "10.0.0.0/24, 10.0.1.0/24");
   await userEvent.click(screen.getByRole("button", { name: "Sumarizar" }));
   await waitFor(() => expect(core.calc).toHaveBeenLastCalledWith("summarize", { prefixes: ["10.0.0.0/24", "10.0.1.0/24"] }));
@@ -169,7 +176,7 @@ test("vlsm: franjas apiladas por subred con su proporción, y el espacio libre",
     head: ["Nombre", "Hosts", "Prefijo", "Máscara", "Primera", "Última", "Broadcast", "Capacidad", "Sobrante"],
     rows: [["ventas", "50", "10.0.0.0/26", "255.255.255.192", "10.0.0.1", "10.0.0.62", "10.0.0.63", "62", "12"], ["voz", "20", "10.0.0.64/27", "255.255.255.224", "10.0.0.65", "10.0.0.94", "10.0.0.95", "30", "10"]] }] })) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "VLSM" }));
+  await openTab("VLSM");
   await userEvent.type(screen.getByLabelText("Red"), "10.0.0.0/24");
   await userEvent.type(screen.getByLabelText(/^Necesidades/), "ventas=50, voz=20");
   await userEvent.click(screen.getByRole("button", { name: "Repartir" }));
@@ -189,14 +196,14 @@ test("vlsm: franjas apiladas por subred con su proporción, y el espacio libre",
 test("las subpestañas conservan lo escrito al cambiar y volver", async () => {
   render(<CalcView core={fakeCore()} />);
   await userEvent.type(screen.getByLabelText(/^Prefijo/), "10.0.0.1/31");
-  await userEvent.click(screen.getByRole("tab", { name: "VLSM" }));
-  await userEvent.click(screen.getByRole("tab", { name: "Subred" }));
+  await openTab("VLSM");
+  await openTab("Subred");
   expect(screen.getByLabelText(/^Prefijo/)).toHaveValue("10.0.0.1/31");
 });
 
 test("TCP, Wildcard, MTU, Óptica y VLSM nombran lo que falta y lo callan al completarlo", async () => {
   render(<CalcView core={fakeCore()} />);
-  const tab = (n: string) => userEvent.click(screen.getByRole("tab", { name: n }));
+  const tab = (n: string) => openTab(n);
   const btn = (n: string) => screen.getByRole("button", { name: n });
   await tab("VLSM");
   expect(btn("Repartir")).toHaveAccessibleDescription("Falta: indicar la red, indicar las necesidades de hosts.");
@@ -223,4 +230,41 @@ test("TCP, Wildcard, MTU, Óptica y VLSM nombran lo que falta y lo callan al com
   expect(btn("Analizar")).toHaveAccessibleDescription("Falta: indicar el prefijo, la máscara o el wildcard.");
   await userEvent.type(screen.getByLabelText(/^Prefijo, máscara/), "/24");
   expect(btn("Analizar")).toBeEnabled();
+});
+
+test("las calculadoras se agrupan por familia y cada subvista se alcanza", async () => {
+  render(<CalcView core={fakeCore()} />);
+  const groups = within(screen.getByRole("tablist", { name: "Familia de calculadoras" }));
+  expect(groups.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Direccionamiento", "Transporte y QoS", "Capa física", "Enrutamiento"]);
+  const names = async () => within(screen.getByRole("tablist", { name: "Calculadora" })).getAllByRole("tab").map((t) => t.textContent);
+  expect(await names()).toEqual(["Subred", "VLSM", "Sumarización", "Wildcard", "IPv6"]);
+  for (const [sub, fam, n] of [["MTU/MSS", "Transporte y QoS", 3], ["Óptica", "Capa física", 1], ["BGP", "Enrutamiento", 1], ["Subred", "Direccionamiento", 5]] as const) {
+    await openTab(sub);
+    expect(groups.getByRole("tab", { name: fam })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: sub })).toHaveAttribute("aria-selected", "true");
+    expect(await names()).toHaveLength(n);
+  }
+});
+
+test("las flechas mueven entre familias", async () => {
+  render(<CalcView core={fakeCore()} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Direccionamiento" }));
+  await userEvent.keyboard("{ArrowRight}");
+  expect(screen.getByRole("tab", { name: "Transporte y QoS" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tab", { name: "MTU/MSS" })).toHaveAttribute("aria-selected", "true");
+});
+
+test("óptica: la saturación Rx está junto a la Tx y la sensibilidad, sin abrir Avanzado, y viaja al núcleo", async () => {
+  const core = fakeCore({ calc: vi.fn(async () => result) });
+  render(<CalcView core={core} />);
+  await openTab("Óptica");
+  const ov = screen.getByLabelText("Saturación Rx (dBm, opcional)");
+  expect(ov.closest("details")).toBeNull();
+  expect(ov.closest(".field-row")).toContainElement(screen.getByLabelText("Sensibilidad Rx (dBm)"));
+  await userEvent.type(screen.getByLabelText("Tx mínima (dBm)"), "-8");
+  await userEvent.type(screen.getByLabelText("Sensibilidad Rx (dBm)"), "-14");
+  await userEvent.type(screen.getByLabelText("Distancia (km)"), "10");
+  await userEvent.type(ov, "-1");
+  await userEvent.click(screen.getByRole("button", { name: "Calcular presupuesto" }));
+  await waitFor(() => expect(core.calc).toHaveBeenCalledWith("optics", expect.objectContaining({ rxOverloadDbm: -1 })));
 });

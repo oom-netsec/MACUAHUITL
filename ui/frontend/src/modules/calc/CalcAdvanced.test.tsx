@@ -9,24 +9,29 @@ const det = (el: HTMLElement) => el.closest("details")!;
 test("BGP: los atributos extra de cada ruta van plegados, cuentan cambios y se siguen enviando", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "BGP" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Enrutamiento" }));
   const igp = screen.getAllByLabelText("Métrica IGP al next-hop")[0]!;
   const d = det(igp);
   expect(d.open).toBe(false);
   expect(d.querySelector("summary")).toHaveTextContent("Más atributos");
-  for (const l of ["Router-ID", "Originator-ID", "Dirección del vecino", "Edad (s)", "Longitud de CLUSTER_LIST", "Originada localmente", "eBGP", "Next-hop inaccesible"]) expect(d).toContainElement(screen.getAllByLabelText(l)[0]!);
+  for (const l of ["Router-ID", "Originator-ID", "Dirección del vecino", "Edad (s)", "Longitud de CLUSTER_LIST", "Next-hop inaccesible"]) expect(d).toContainElement(screen.getAllByLabelText(l)[0]!);
+  for (const l of ["Originada localmente", "eBGP"]) {
+    expect(screen.getAllByLabelText(l)[0]).toBeVisible();
+    expect(d).not.toContainElement(screen.getAllByLabelText(l)[0]!);
+  }
   for (const l of ["Weight (vacío = 0; 32768 si es local)", "Local-pref", "MED", "Origin", "AS_PATH"]) expect(d).not.toContainElement(screen.getAllByLabelText(l)[0]!);
   await userEvent.type(igp, "20");
   await userEvent.click(screen.getAllByLabelText("eBGP")[0]!);
-  expect(d.querySelector("summary")).toHaveTextContent("Más atributos · cambiadas: 2");
+  await userEvent.click(screen.getAllByLabelText("Originada localmente")[0]!);
+  expect(d.querySelector("summary")).toHaveTextContent("Más atributos · cambiadas: 1");
   await userEvent.click(screen.getByRole("button", { name: "Elegir mejor ruta" }));
-  expect(core.calc).toHaveBeenCalledWith("bgp", expect.objectContaining({ routes: [expect.objectContaining({ igpMetric: 20, ebgp: true }), expect.anything()] }));
+  expect(core.calc).toHaveBeenCalledWith("bgp", expect.objectContaining({ routes: [expect.objectContaining({ igpMetric: 20, ebgp: true, locallyOriginated: true }), expect.anything()] }));
 });
 
 test("BGP: las opciones de selección globales van plegadas y siguen viajando", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: "BGP" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Enrutamiento" }));
   const mp = screen.getByLabelText(/^maximum-paths/);
   const d = det(mp);
   expect(d.open).toBe(false);
@@ -40,15 +45,15 @@ test("BGP: las opciones de selección globales van plegadas y siguen viajando", 
   expect(core.calc).toHaveBeenCalledWith("bgp", expect.objectContaining({ maximumPaths: 4, deterministicMed: true }));
 });
 
-test("óptica: pérdidas y margen van plegados; Tx, Rx, distancia y fibra quedan fuera", async () => {
+test("óptica: pérdidas y margen van plegados; Tx, Rx, distancia y fibra quedan fuera (y la saturación Rx junto al transceptor)", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
-  await userEvent.click(screen.getByRole("tab", { name: /Óptica/ }));
+  await userEvent.click(screen.getByRole("tab", { name: "Capa física" }));
   const margin = screen.getByLabelText(/^Margen exigido/);
   const d = det(margin);
   expect(d.open).toBe(false);
-  for (const l of [/^Saturación Rx/, /^Pérdida por km/, /^Conectores/, /^Pérdida por conector/, /^Empalmes/, /^Pérdida por empalme/]) expect(d).toContainElement(screen.getByLabelText(l));
-  for (const l of [/^Tx mínima/, /^Sensibilidad Rx/, /^Distancia/, "Fibra"]) expect(d).not.toContainElement(screen.getByLabelText(l));
+  for (const l of [/^Pérdida por km/, /^Conectores/, /^Pérdida por conector/, /^Empalmes/, /^Pérdida por empalme/]) expect(d).toContainElement(screen.getByLabelText(l));
+  for (const l of [/^Tx mínima/, /^Sensibilidad Rx/, /^Saturación Rx/, /^Distancia/, "Fibra"]) expect(d).not.toContainElement(screen.getByLabelText(l));
   await userEvent.type(screen.getByLabelText(/^Tx mínima/), "-3");
   await userEvent.type(screen.getByLabelText(/^Sensibilidad Rx/), "-14");
   await userEvent.type(screen.getByLabelText(/^Distancia/), "10");
@@ -62,6 +67,7 @@ test("óptica: pérdidas y margen van plegados; Tx, Rx, distancia y fibra quedan
 test("TCP: ventana, pérdida y MSS van plegados y se envían", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Transporte y QoS" }));
   await userEvent.click(screen.getByRole("tab", { name: "TCP" }));
   const mss = screen.getByLabelText(/^MSS/);
   const d = det(mss);
@@ -81,6 +87,7 @@ test("TCP: ventana, pérdida y MSS van plegados y se envían", async () => {
 test("DSCP: «Campo» va plegado y se envía", async () => {
   const core = fakeCore({ calc: vi.fn(async () => result) });
   render(<CalcView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Transporte y QoS" }));
   await userEvent.click(screen.getByRole("tab", { name: "DSCP" }));
   const f = screen.getByLabelText("Campo");
   const d = det(f);

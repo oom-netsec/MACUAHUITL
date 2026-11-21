@@ -34,6 +34,7 @@ export function OpticsPanel({ core }: { core: CoreAPI }) {
         <div className="field-row end">
           <Field label={t("calc.optics.tx")} type="number" value={tx} onChange={set("tx")} w="md" mono />
           <Field label={t("calc.optics.rx")} type="number" value={rx} onChange={set("rx")} w="md" mono />
+          <Field label={t("calc.optics.overload")} type="number" value={ov} onChange={set("ov")} w="md" mono />
         </div>
       </Section>
       <Section title={t("calc.optics.secLink")}>
@@ -41,9 +42,8 @@ export function OpticsPanel({ core }: { core: CoreAPI }) {
           <Field label={t("calc.optics.km")} type="number" value={km} onChange={set("km")} w="sm" mono />
           <Select label={t("calc.optics.fiber")} value={fiber} onChange={set("fiber")} options={fibers(t)} w="lg" />
         </div>
-        <Advanced changed={(["ov", "lpk", "conn", "connLoss", "splices", "spliceLoss", "margin"] as const).filter((k) => f[k] !== initial[k]).length}>
+        <Advanced changed={(["lpk", "conn", "connLoss", "splices", "spliceLoss", "margin"] as const).filter((k) => f[k] !== initial[k]).length}>
         <div className="field-row end">
-          <Field label={t("calc.optics.overload")} type="number" value={ov} onChange={set("ov")} w="md" mono />
           <Field label={t("calc.optics.lossKm")} type="number" value={lpk} onChange={set("lpk")} w="md" mono />
         </div>
         <div className="field-row end">

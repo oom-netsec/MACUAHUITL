@@ -26,7 +26,7 @@ const toRoute = (r: RouteForm) => Object.fromEntries(Object.entries({
 }).filter(([, v]) => v !== undefined && v !== "" && v !== false));
 
 const blankRoute = newRoute(0);
-const moreKeys: (keyof RouteForm)[] = ["igp", "cluster", "age", "rid", "originator", "nbr", "local", "ebgp", "unreachable"];
+const moreKeys: (keyof RouteForm)[] = ["igp", "cluster", "age", "rid", "originator", "nbr", "unreachable"];
 
 interface BgpForm { routes: RouteForm[]; acm: boolean; dmed: boolean; relax: boolean; maxPaths: string }
 const initial: BgpForm = { routes: [newRoute(0), newRoute(1)], acm: false, dmed: false, relax: false, maxPaths: "" };
@@ -54,6 +54,10 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
             <div className="field-row end">
               <Field label="AS_PATH" value={r.asPath} onChange={set(i, "asPath")} w="md" mono />
             </div>
+            <div className="route-flags">
+              <Check label={t("calc.bgp.local")} checked={r.local} onChange={set(i, "local")} />
+              <Check label="eBGP" checked={r.ebgp} onChange={set(i, "ebgp")} />
+            </div>
             <Advanced label={t("calc.bgp.more")} changed={moreKeys.filter((k) => r[k] !== blankRoute[k]).length}>
             <div className="field-row end">
               <Field label={t("calc.bgp.igp")} type="number" value={r.igp} onChange={set(i, "igp")} w="sm" mono />
@@ -66,8 +70,6 @@ export function BgpPanel({ core }: { core: CoreAPI }) {
               <Field label={t("calc.bgp.neighbor")} value={r.nbr} onChange={set(i, "nbr")} w="md" mono />
             </div>
             <div className="route-flags">
-              <Check label={t("calc.bgp.local")} checked={r.local} onChange={set(i, "local")} />
-              <Check label="eBGP" checked={r.ebgp} onChange={set(i, "ebgp")} />
               <Check label={t("calc.bgp.unreachable")} checked={r.unreachable} onChange={set(i, "unreachable")} />
             </div>
             </Advanced>
