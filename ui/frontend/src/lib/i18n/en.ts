@@ -170,6 +170,8 @@ export const en: Record<Key, string> = {
   "acl.title": "ACL",
   "acl.from": "Source platform",
   "acl.to": "Target platform",
+  "acl.route": "From and to",
+  "acl.detected": "(detected)",
   "acl.input": "ACL to import",
   "acl.import": "Import and analyze",
   "acl.col.action": "Action",
@@ -185,7 +187,7 @@ export const en: Record<Key, string> = {
   "acl.findings.none": "No findings",
   "acl.findings": "{n} findings",
   "acl.findings.one": "1 finding",
-  "acl.generate": "Generate",
+  "acl.generate": "Generate for {platform}",
   "acl.result": "Result",
   "acl.result.hint": "Text for review; it is never applied to a device.",
 

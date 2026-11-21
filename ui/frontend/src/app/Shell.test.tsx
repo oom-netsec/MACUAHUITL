@@ -148,7 +148,7 @@ test("Ctrl+Enter pulsa el primario de la sección donde está el foco", async ()
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
   const dest = await screen.findByLabelText("Plataforma de destino");
   await userEvent.selectOptions(dest, "nx-os");
-  dest.focus();
+  screen.getByRole("button", { name: "Generar para Cisco NX-OS" }).focus(); // el destino se elige arriba; Generar es su propia sección
   await userEvent.keyboard("{Control>}{Enter}{/Control}");
   await waitFor(() => expect(core.aclGenerate).toHaveBeenCalled());
   expect(core.aclImport).toHaveBeenCalledTimes(1);

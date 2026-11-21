@@ -1,6 +1,6 @@
 import { CoreContext } from "../../app/activity";
 import type { CoreAPI } from "../../lib/core";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AclView } from "./AclView";
 import { fakeCore } from "../../lib/fake";
@@ -23,8 +23,8 @@ test("importar, analizar y generar", async () => {
   expect(await screen.findByText(/Sombreada/)).toBeInTheDocument();
   expect(screen.getByText("1 hallazgo")).toBeInTheDocument();
   expect(core.aclImport).toHaveBeenCalledWith("asa", expect.stringContaining("access-list EDGE"));
-  await userEvent.selectOptions(screen.getByLabelText("Plataforma de destino"), "nx-os");
-  await userEvent.click(screen.getByRole("button", { name: "Generar" }));
+  await userEvent.selectOptions(within(screen.getByRole("group", { name: "Origen y destino" })).getByLabelText("Plataforma de destino"), "nx-os");
+  await userEvent.click(screen.getByRole("button", { name: "Generar para Cisco NX-OS" }));
   expect(await screen.findByRole("log", { name: "Resultado" })).toHaveTextContent("ip access-list NEW");
   expect(core.aclGenerate).toHaveBeenCalledWith("nx-os", acl);
   await userEvent.click(screen.getByRole("button", { name: "Copiar Resultado" }));
@@ -35,7 +35,7 @@ test("importar, analizar y generar", async () => {
 test("antes de importar explica qué hacer y no ofrece generar", () => {
   render(<AclView core={fakeCore()} />);
   expect(screen.getByText("Sin ACL importada")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Generar" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Generar/ })).not.toBeInTheDocument();
 });
 
 test("un error de importación muestra la línea", async () => {
@@ -61,4 +61,37 @@ test("Importar y analizar nombra la ACL que falta y deja de hacerlo al pegarla",
   await userEvent.type(screen.getByLabelText("ACL a importar"), "x");
   expect(btn).toBeEnabled();
   expect(btn).not.toHaveAccessibleDescription();
+});
+
+test("autodetecta el origen, lo marca y la elección manual no se pisa", async () => {
+  const core = fakeCore({ aclImport: vi.fn(async () => acl) });
+  render(<AclView core={core} />);
+  const from = screen.getByLabelText("Plataforma de origen");
+  expect(from).toHaveValue("ios-xe");
+  await userEvent.type(screen.getByLabelText("ACL a importar"), "access-list E extended permit ip any any");
+  expect(from).toHaveValue("asa");
+  expect(screen.getByRole("option", { name: "Cisco ASA (detectada)" })).toBeInTheDocument();
+  await userEvent.selectOptions(from, "nx-os");
+  expect(screen.queryByRole("option", { name: /detectada/ })).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("ACL a importar"), "\nip access-list extended Z");
+  expect(from).toHaveValue("nx-os");
+  await userEvent.click(screen.getByRole("button", { name: "Importar y analizar" }));
+  expect(core.aclImport).toHaveBeenCalledWith("nx-os", expect.any(String));
+});
+
+test("texto ambiguo deja el origen como está", async () => {
+  render(<AclView core={fakeCore()} />);
+  await userEvent.type(screen.getByLabelText("ACL a importar"), "permit ip any any");
+  expect(screen.getByLabelText("Plataforma de origen")).toHaveValue("ios-xe");
+  expect(screen.queryByRole("option", { name: /detectada/ })).not.toBeInTheDocument();
+});
+
+test("la marca «(detectada)» se quita si el texto deja de detectarse, pero el origen se queda", async () => {
+  render(<AclView core={fakeCore()} />);
+  const box = screen.getByLabelText("ACL a importar");
+  await userEvent.type(box, "access-list E extended permit ip any any");
+  expect(screen.getByRole("option", { name: "Cisco ASA (detectada)" })).toBeInTheDocument();
+  await userEvent.clear(box);
+  expect(screen.getByLabelText("Plataforma de origen")).toHaveValue("asa");
+  expect(screen.queryByRole("option", { name: /detectada/ })).not.toBeInTheDocument();
 });

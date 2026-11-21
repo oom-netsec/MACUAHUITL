@@ -168,6 +168,8 @@ export const es = {
   "acl.title": "ACL",
   "acl.from": "Plataforma de origen",
   "acl.to": "Plataforma de destino",
+  "acl.route": "Origen y destino",
+  "acl.detected": "(detectada)",
   "acl.input": "ACL a importar",
   "acl.import": "Importar y analizar",
   "acl.col.action": "Acción",
@@ -183,7 +185,7 @@ export const es = {
   "acl.findings.none": "Sin hallazgos",
   "acl.findings": "{n} hallazgos",
   "acl.findings.one": "1 hallazgo",
-  "acl.generate": "Generar",
+  "acl.generate": "Generar para {platform}",
   "acl.result": "Resultado",
   "acl.result.hint": "Texto para revisión; nunca se aplica a un equipo.",
 
