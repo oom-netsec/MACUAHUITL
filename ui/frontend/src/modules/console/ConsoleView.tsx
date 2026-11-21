@@ -88,8 +88,8 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
         <p className="hint defaults">{t("console.defaults")}</p>{/* a la vista: trae el remedio de permisos (dialout) para cuando abrir falla */}
         <div className="actions">
           <button className="primary" disabled={!!runId || starting || !port} onClick={open}>{t("console.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
-          <button disabled={!runId} onClick={() => send("\x03")}>Ctrl-C</button>
-          <button disabled={!runId} onClick={() => act(() => core.consoleBreak(runId))}>BREAK</button>
+          <button disabled={!runId} aria-label={t("console.ctrlc")} onClick={() => send("\x03")}>Ctrl-C</button>
+          <button disabled={!runId} aria-label={t("console.break")} onClick={() => act(() => core.consoleBreak(runId))}>BREAK</button>
           <button disabled={!runId} onClick={() => act(() => core.consoleClose(runId))}>{t("console.close")}</button>
         </div>
       </Section>
