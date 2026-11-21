@@ -70,9 +70,9 @@ export function TabPanels<T extends string>({ value, render }: { value: T; rende
 export function useResult<T>() {
   const [s, setS] = useState<{ busy: boolean; data: T | null; error: string }>({ busy: false, data: null, error: "" });
   const seq = useRef(0);
-  const run = useCallback(async (f: () => Promise<T>) => {
+  const run = useCallback(async (f: () => Promise<T>, keep = false) => { // keep: recarga sin borrar el dato anterior
     const n = ++seq.current; // solo cuenta la última ejecución
-    setS({ busy: true, data: null, error: "" });
+    setS((p) => ({ busy: true, data: keep ? p.data : null, error: "" }));
     try {
       const data = await f();
       if (n === seq.current) setS({ busy: false, data, error: "" });
