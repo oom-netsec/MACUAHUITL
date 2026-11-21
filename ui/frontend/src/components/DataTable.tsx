@@ -32,6 +32,8 @@ interface Props<T> {
 }
 
 const ROW = 32;
+// Con tantas filas o menos (caben sin desplazarse) la barra se reduce a lo que sirve siempre: exportar.
+const COMPACT_ROWS = 8;
 // Redimensionada a mano: ancho exacto. Con minWidth el ancho es un máximo que cede al faltar espacio.
 export const trackOf = (c: { width?: number; minWidth?: number }, manual?: number) =>
   manual ? `${manual}px` : c.width ? (c.minWidth ? `minmax(${c.minWidth}px, ${c.width}px)` : `${c.width}px`) : `minmax(${c.minWidth ?? 96}px, 1fr)`;
@@ -48,10 +50,13 @@ export function DataTable<T>({ label, columns, rows, rowKey, selectable, actions
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [colsMenu, setColsMenu] = useState(false);
   const [sort, setSort] = useState<{ id: string; dir: 1 | -1 } | null>(null);
+  const [touched, setTouched] = useState(false); // usó la barra completa: no se desmonta bajo su foco
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [widths, setWidths] = useState<Record<string, number>>({});
   const scroll = useRef<HTMLDivElement>(null);
 
+  // Con búsqueda, filtros o columnas ocultas la barra completa se queda: el usuario debe poder deshacerlos.
+  const compact = rows.length <= COMPACT_ROWS && !touched && !q && !showFilters && hidden.size === 0 && !columns.some((c) => filters[c.id]);
   const visible = columns.filter((c) => !hidden.has(c.id));
   const shown = useMemo(() => {
     const words = norm(q).split(/\s+/).filter(Boolean);
@@ -99,12 +104,15 @@ export function DataTable<T>({ label, columns, rows, rowKey, selectable, actions
 
   return (
     <div className="data-table">
-      <div className="dt-toolbar">
+      {(!compact || exportName) && <div className="dt-toolbar" onClick={compact ? undefined : () => setTouched(true)} onInput={compact ? undefined : () => setTouched(true)}>
+        {!compact && <>
         <span className="dt-search"><Icon name="search" size={14} />
           <input aria-label={t("dt.search")} placeholder={t("dt.searchPh")} value={q} onChange={(e) => setQ(e.target.value)} spellCheck={false} />
         </span>
         <span className="meta">{shown.length === rows.length ? t("dt.rows", { n: rows.length }) : t("dt.count", { n: shown.length, total: rows.length })}</span>
+        </>}
         <span className="dt-tools">
+          {!compact && <>
           <button className="quiet sm" aria-pressed={showFilters} onClick={() => setShowFilters((f) => !f)}>{t("dt.filters")}</button>
           <span className="dt-menu">
             <button className="quiet sm" aria-expanded={colsMenu} onClick={() => setColsMenu((m) => !m)}>{t("dt.columns")}</button>
@@ -118,13 +126,14 @@ export function DataTable<T>({ label, columns, rows, rowKey, selectable, actions
               </fieldset>
             )}
           </span>
+          </>}
           {exportName && <button className="quiet sm" onClick={exportCSV}>{t("dt.csv")}</button>}
-          <label className="dt-goto-l">{t("dt.goto")}
+          {!compact && <label className="dt-goto-l">{t("dt.goto")}
             <input className="dt-goto mono" type="number" min={1} placeholder="#"
               onKeyDown={(e) => { if (e.key === "Enter") goTo(Number((e.target as HTMLInputElement).value)); }} />
-          </label>
+          </label>}
         </span>
-      </div>
+      </div>}
       {selectable && sel.size > 0 && (
         <div className="dt-selection" role="toolbar" aria-label={t("dt.actions")}>
           <strong>{t("dt.selected", { n: sel.size })}</strong>

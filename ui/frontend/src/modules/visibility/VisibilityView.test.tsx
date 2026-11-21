@@ -153,6 +153,8 @@ test("traps: la bitácora es una tabla con severidad en texto y se puede filtrar
     core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.2:5000", Name: "linkDown", Summary: "linkDown Gi1/0/7 oper down" }) });
     core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.3:5001", Name: "linkUp", Summary: "linkUp Gi1/0/9 oper up" }) });
     core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.4:5002", Name: "coldStart", Summary: "coldStart" }) });
+    // Relleno: con pocas filas la tabla oculta la búsqueda.
+    for (let i = 0; i < 6; i++) core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: `10.0.1.${i}:5000`, Name: "authenticationFailure", Summary: `relleno ${i}` }) });
   });
   const table = await screen.findByRole("table", { name: "Eventos" });
   expect(await within(table).findByText("3 · Error")).toBeInTheDocument(); // los traps se vuelcan cada ~100 ms

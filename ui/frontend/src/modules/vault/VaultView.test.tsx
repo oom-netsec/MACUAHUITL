@@ -103,11 +103,13 @@ test("las credenciales van en una tabla con búsqueda por etiqueta, usuario o de
       { id: "c1", label: "Core DC", username: "netops", kind: "password" as const, hasEnable: true, hasSshKey: false },
       { id: "c2", label: "Sucursales", username: "tac", kind: "password" as const, hasEnable: false, hasSshKey: true },
       { id: "c3", label: "Laboratorio", username: "lab", kind: "password" as const, hasEnable: false, hasSshKey: false },
+      // Relleno: con pocas filas la tabla oculta la búsqueda.
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, label: `Relleno ${i}`, username: `u${i}`, kind: "password" as const, hasEnable: false, hasSshKey: false })),
     ]),
   });
   render(<VaultView core={core} />);
   const table = await screen.findByRole("table", { name: "Credenciales" });
-  expect(within(table).getAllByRole("row")).toHaveLength(4);
+  expect(within(table).getAllByRole("row")).toHaveLength(10);
   await userEvent.type(screen.getByRole("textbox", { name: "Buscar en la tabla" }), "tac");
   expect(within(table).getAllByRole("row")).toHaveLength(2);
   expect(within(table).getByRole("cell", { name: "Sucursales" })).toBeInTheDocument();
