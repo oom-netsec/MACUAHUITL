@@ -386,10 +386,11 @@ func (*OpenTerminalRequest_AuthAnswer) isOpenTerminalRequest_Msg() {}
 
 type OpenTerminalResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Opened        string                 `protobuf:"bytes,1,opt,name=opened,proto3" json:"opened,omitempty"`                           // primer evento: "usuario@host:puerto"
-	Recording     string                 `protobuf:"bytes,2,opt,name=recording,proto3" json:"recording,omitempty"`                     // archivo de la grabación
-	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`                               // lo que devuelve el equipo
-	AuthPrompt    *AuthPrompt            `protobuf:"bytes,4,opt,name=auth_prompt,json=authPrompt,proto3" json:"auth_prompt,omitempty"` // fase 47t: ronda de preguntas de la autenticación tecleada
+	Opened        string                 `protobuf:"bytes,1,opt,name=opened,proto3" json:"opened,omitempty"`                                          // primer evento: "usuario@host:puerto"
+	Recording     string                 `protobuf:"bytes,2,opt,name=recording,proto3" json:"recording,omitempty"`                                    // archivo de la grabación
+	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`                                              // lo que devuelve el equipo
+	AuthPrompt    *AuthPrompt            `protobuf:"bytes,4,opt,name=auth_prompt,json=authPrompt,proto3" json:"auth_prompt,omitempty"`                // fase 47t: ronda de preguntas de la autenticación tecleada
+	Protocol      TerminalProtocol       `protobuf:"varint,5,opt,name=protocol,proto3,enum=macuahuitl.v1.TerminalProtocol" json:"protocol,omitempty"` // protocolo real de la sesión; llega con `opened`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -450,6 +451,13 @@ func (x *OpenTerminalResponse) GetAuthPrompt() *AuthPrompt {
 		return x.AuthPrompt
 	}
 	return nil
+}
+
+func (x *OpenTerminalResponse) GetProtocol() TerminalProtocol {
+	if x != nil {
+		return x.Protocol
+	}
+	return TerminalProtocol_TERMINAL_PROTOCOL_UNSPECIFIED
 }
 
 // Una ronda de preguntas del equipo (keyboard-interactive) o la contraseña como una sola pregunta, o «login as:».
@@ -654,13 +662,14 @@ const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\x06resize\x18\x03 \x01(\v2\x1b.macuahuitl.v1.TerminalSizeH\x00R\x06resize\x12<\n" +
 	"\vauth_answer\x18\x04 \x01(\v2\x19.macuahuitl.v1.AuthAnswerH\x00R\n" +
 	"authAnswerB\x05\n" +
-	"\x03msg\"\x9c\x01\n" +
+	"\x03msg\"\xd9\x01\n" +
 	"\x14OpenTerminalResponse\x12\x16\n" +
 	"\x06opened\x18\x01 \x01(\tR\x06opened\x12\x1c\n" +
 	"\trecording\x18\x02 \x01(\tR\trecording\x12\x12\n" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12:\n" +
 	"\vauth_prompt\x18\x04 \x01(\v2\x19.macuahuitl.v1.AuthPromptR\n" +
-	"authPrompt\"\x8b\x01\n" +
+	"authPrompt\x12;\n" +
+	"\bprotocol\x18\x05 \x01(\x0e2\x1f.macuahuitl.v1.TerminalProtocolR\bprotocol\"\x8b\x01\n" +
 	"\n" +
 	"AuthPrompt\x12\x10\n" +
 	"\x03seq\x18\x01 \x01(\rR\x03seq\x12\x12\n" +
@@ -713,14 +722,15 @@ var file_macuahuitl_v1_terminal_proto_depIdxs = []int32{
 	2, // 3: macuahuitl.v1.OpenTerminalRequest.resize:type_name -> macuahuitl.v1.TerminalSize
 	7, // 4: macuahuitl.v1.OpenTerminalRequest.auth_answer:type_name -> macuahuitl.v1.AuthAnswer
 	5, // 5: macuahuitl.v1.OpenTerminalResponse.auth_prompt:type_name -> macuahuitl.v1.AuthPrompt
-	6, // 6: macuahuitl.v1.AuthPrompt.prompts:type_name -> macuahuitl.v1.AuthQuestion
-	3, // 7: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
-	4, // 8: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
-	8, // [8:9] is the sub-list for method output_type
-	7, // [7:8] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	0, // 6: macuahuitl.v1.OpenTerminalResponse.protocol:type_name -> macuahuitl.v1.TerminalProtocol
+	6, // 7: macuahuitl.v1.AuthPrompt.prompts:type_name -> macuahuitl.v1.AuthQuestion
+	3, // 8: macuahuitl.v1.TerminalService.OpenTerminal:input_type -> macuahuitl.v1.OpenTerminalRequest
+	4, // 9: macuahuitl.v1.TerminalService.OpenTerminal:output_type -> macuahuitl.v1.OpenTerminalResponse
+	9, // [9:10] is the sub-list for method output_type
+	8, // [8:9] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_terminal_proto_init() }

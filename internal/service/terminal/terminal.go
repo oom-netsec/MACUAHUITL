@@ -570,9 +570,13 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		}
 		detail += " host=" + o.HostId + " startup=" + start
 	}
+	proto := v1.TerminalProtocol_TERMINAL_PROTOCOL_SSH
+	if telnet {
+		proto = v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET
+	}
 	opened, reason, reasonEN = true, "cerrada por el usuario", "closed by the user"
 	s.d.Audit("terminal.open", label, detail)
-	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath}); err != nil {
+	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath, Protocol: proto}); err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
 	}

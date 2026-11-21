@@ -168,7 +168,7 @@ func TestElClienteCierraLaPestana(t *testing.T) {
 	st, done, cancel := r.session(r.open)
 	defer cancel()
 	first := <-st.out
-	if first.Opened != "admin@"+r.host+":"+strconv.Itoa(int(r.port)) || first.Recording == "" {
+	if first.Opened != "admin@"+r.host+":"+strconv.Itoa(int(r.port)) || first.Recording == "" || first.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_SSH {
 		t.Fatalf("primer evento = %+v", first)
 	}
 	st.waitFor(t, "SW1>")

@@ -197,7 +197,7 @@ func TestTelnetPorHostDeLaLibreta(t *testing.T) {
 			t.Fatal(err)
 		}
 		st, done, cancel := r.session(&v1.TerminalOpen{HostId: "h1"})
-		if first := <-st.out; first.Opened != r.host+":"+strconv.Itoa(int(r.port)) {
+		if first := <-st.out; first.Opened != r.host+":"+strconv.Itoa(int(r.port)) || first.Protocol != v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET {
 			t.Fatalf("primer evento = %+v", first)
 		}
 		if !conCred {

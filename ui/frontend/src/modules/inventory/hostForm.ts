@@ -34,10 +34,10 @@ const TAG = /^[a-z0-9-]{1,24}$/;
 const FOLDER = /^[A-Za-z0-9 _.-]{1,48}$/;
 export const hasStartCommand = (p: HostPlatform) => p === "linux" || p === "windows"; // en equipos de red no aplica
 export const defaultPort = (p: HostProtocol) => (p === "telnet" ? 23 : 22);
-// Cambiar el protocolo: un puerto vacío o el de omisión del anterior se vacía (toma el del nuevo); uno elegido a mano se conserva. Telnet no admite orden de inicio.
+// Cambiar el protocolo: un puerto vacío o el de omisión del anterior se vacía (toma el del nuevo); uno elegido a mano se conserva. Telnet no admite orden de inicio: se oculta, pero no se borra (reaparece al volver a SSH).
 export function withProtocol(f: HostForm, protocol: HostProtocol): HostForm {
   const p = f.port.trim();
-  return { ...f, protocol, port: p === "" || p === String(defaultPort(f.protocol)) ? "" : f.port, startCommand: protocol === "telnet" ? "" : f.startCommand };
+  return { ...f, protocol, port: p === "" || p === String(defaultPort(f.protocol)) ? "" : f.port };
 }
 // Nombre de carpeta nuevo o renombrado (sin espacios en los extremos).
 export const validFolderName = (s: string) => FOLDER.test(s) && s === s.trim();
