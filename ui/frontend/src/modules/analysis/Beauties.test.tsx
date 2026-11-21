@@ -42,6 +42,8 @@ test("la línea de tiempo es una tabla con búsqueda, hora exacta y hora relativ
   const tl: TimelineReport = { dir: "/o/lab", warnings: [], events: [
     { at: "2026-11-04T10:09:18.64Z", source: "log-equipo", device: "RTR2", severity: "baja", text: "%BGP-5-ADJCHANGE: neighbor Down" },
     { at: "2026-11-04T10:09:19Z", source: "syslog", device: "RTR2", text: "otro evento" },
+    // Relleno: con pocas filas la tabla oculta la búsqueda.
+    ...Array.from({ length: 8 }, (_, i) => ({ at: `2026-11-04T10:10:0${i}Z`, source: "syslog", device: "RTR3", text: `relleno ${i}` })),
   ] };
   const core = fakeCore({ analysisTimeline: vi.fn(async () => tl) });
   withCore(core);
@@ -50,7 +52,7 @@ test("la línea de tiempo es una tabla con búsqueda, hora exacta y hora relativ
   await userEvent.click(screen.getByRole("button", { name: "Ver línea de tiempo" }));
   const table = await screen.findByRole("table", { name: "Línea de tiempo" });
   const rows = within(table).getAllByRole("row");
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(11);
   expect(within(rows[1]).getAllByRole("cell")[0]).toHaveTextContent(/2026-11-04T10:09:18\.64Z.*hace/);
   await userEvent.type(screen.getByRole("textbox", { name: "Buscar en la tabla" }), "otro");
   expect(within(table).getAllByRole("row")).toHaveLength(2);

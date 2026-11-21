@@ -43,7 +43,9 @@ test("memoria: cada proceso trae su curva de crecimiento con descripción en tex
 });
 
 test("las tablas de Forense usan la tabla compartida con búsqueda", async () => {
-  const core = fakeCore({ forensicLeaks: vi.fn(async () => leakRep) });
+  // Con pocas filas la tabla oculta la búsqueda: se rellena por encima del umbral.
+  const many = { ...leakRep, leaks: Array.from({ length: 9 }, (_, i) => ({ ...leakRep.leaks[0], pid: 300 + i })) };
+  const core = fakeCore({ forensicLeaks: vi.fn(async () => many) });
   render(<ForensicView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "Memoria" }));
   await userEvent.type(screen.getByLabelText("Trabajo o carpeta"), "j1");

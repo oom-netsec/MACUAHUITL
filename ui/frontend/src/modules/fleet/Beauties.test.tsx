@@ -54,9 +54,10 @@ test("salud: mapa de calor equipo × problema con el texto en cada celda y leyen
   const dist = within(heat).getByRole("rowheader", { name: "DIST1" }).closest<HTMLElement>("tr")!;
   expect(within(dist).getAllByRole("cell").map((c) => c.textContent)).toEqual(["1 puerto · alta", "—"]);
   expect(screen.getByRole("list", { name: "Leyenda" })).toHaveTextContent("sin hallazgo");
-  // El detalle sigue en la tabla de datos, con búsqueda y exportación.
+  // El detalle sigue en la tabla de datos; con tan pocas filas queda el modo compacto: exportar sí, buscar no.
   expect(screen.getByRole("table", { name: "Salud" })).toBeInTheDocument();
-  expect(screen.getByRole("textbox", { name: "Buscar en la tabla" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Exportar CSV" })).toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "Buscar en la tabla" })).not.toBeInTheDocument();
 });
 
 test("tablero: mapa de calor equipo × revisión con el valor de la alerta", async () => {
