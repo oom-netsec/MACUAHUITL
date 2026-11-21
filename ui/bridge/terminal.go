@@ -105,7 +105,11 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 				continue
 			}
 			if r.Opened != "" {
-				b.emit("terminal:opened", map[string]any{"runId": id, "opened": r.Opened, "recording": r.Recording})
+				ev := map[string]any{"runId": id, "opened": r.Opened, "recording": r.Recording}
+				if p := protoName(r.Protocol); p != "" {
+					ev["protocol"] = p
+				}
+				b.emit("terminal:opened", ev)
 				continue
 			}
 			b.emit("terminal:data", map[string]any{"runId": id, "data": string(r.Data)})
@@ -166,4 +170,16 @@ func (b *Bridge) TerminalResize(id string, rows, cols uint32) error {
 // TerminalClose cierra el envío: el núcleo cierra SSH, revoca el guard, lo audita y termina el stream.
 func (b *Bridge) TerminalClose(id string) error {
 	return b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error { return st.CloseSend() })
+}
+
+// protoName es el protocolo real de la sesión para la UI. Sin dato (núcleo viejo) o con un valor desconocido devuelve ""
+// y el evento no lleva la clave: la UI conserva el protocolo de la pestaña en vez de dar por hecho SSH.
+func protoName(p v1.TerminalProtocol) string {
+	switch p {
+	case v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET:
+		return "telnet"
+	case v1.TerminalProtocol_TERMINAL_PROTOCOL_SSH:
+		return "ssh"
+	}
+	return ""
 }

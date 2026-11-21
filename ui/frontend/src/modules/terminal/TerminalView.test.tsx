@@ -348,6 +348,16 @@ test("elegir un host de la libreta rellena equipo, puerto y credencial; sin cred
   for (const k of ["credentialId", "address", "username"]) expect(req).not.toHaveProperty(k); // el campo de usuario no se veía
 });
 
+test("opened trae el protocolo real: un host abierto como SSH que el núcleo abre en Telnet muestra Telnet", async () => {
+  const core = setup();
+  const pick = await screen.findByLabelText("Host de la libreta");
+  await userEvent.selectOptions(pick, "b".repeat(32));
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(1));
+  await term();
+  act(() => { core.emitTerminal({ runId: "t1", opened: "sw1:23", protocol: "telnet", recording: "/o/terminal/x.log" }); });
+  expect(document.querySelector(".ssh-status")).toHaveTextContent(/Telnet · conectado a sw1:23/);
+});
+
 test("un host con credencial que no está en la bóveda abre por hostId sin usuario: decide el núcleo, nunca modo tecleado por dirección", async () => {
   const core = setup({ listCredentials: vi.fn(async () => { throw new Error("bóveda cerrada"); }), listHosts: vi.fn(async () => [{ id: "e".repeat(32), name: "HUERFANO", address: "10.1.1.1", port: 22, platform: "", folder: "", tags: [], credentialId: "f".repeat(32), credentialLabel: "", notes: "" }]) });
   await userEvent.type(screen.getByLabelText("Usuario (opcional)"), "admin"); // visible: sin credenciales

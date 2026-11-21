@@ -73,6 +73,7 @@ message OpenTerminalResponse {
   string recording = 2;  // archivo de la grabación
   bytes data = 3;        // lo que devuelve el equipo
   AuthPrompt auth_prompt = 4; // fase 47t: ronda de preguntas de la autenticación tecleada
+  TerminalProtocol protocol = 5; // protocolo real de la sesión; llega con `opened`
 }
 
 // Una ronda de preguntas del equipo (keyboard-interactive) o la contraseña como una sola pregunta, o «login as:».

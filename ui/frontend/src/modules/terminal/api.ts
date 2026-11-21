@@ -9,7 +9,7 @@ export interface TerminalOpenRequest { name: string; hostId?: string; address?: 
 // Pregunta de autenticación del equipo (terminal:auth): name, instruction y una pregunta por campo; echo=false es secreto.
 export interface AuthQuestion { text: string; echo: boolean }
 export interface AuthPrompt { seq: number; name: string; instruction: string; prompts: AuthQuestion[] }
-export interface TerminalEvent extends Partial<AuthPrompt> { runId: string; opened?: string; recording?: string; data?: string; error?: string; errorInfo?: { code?: string; reason?: string; metadata?: Record<string, string> }; done?: boolean }
+export interface TerminalEvent extends Partial<AuthPrompt> { runId: string; opened?: string; protocol?: "ssh" | "telnet"; recording?: string; data?: string; error?: string; errorInfo?: { code?: string; reason?: string; metadata?: Record<string, string> }; done?: boolean }
 
 export interface TerminalAPI {
   // Devuelve el id de la sesión; el núcleo rechaza una llave de host nueva con su huella en el error.

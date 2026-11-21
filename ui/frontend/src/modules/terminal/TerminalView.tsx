@@ -127,7 +127,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const ask = { seq: e.seq ?? 0, name: e.name ?? "", instruction: e.instruction ?? "", prompts: e.prompts };
       patch(e.runId, (t) => ({ ...t, ask }));
     } else if (e.opened) {
-      patch(e.runId, (t) => ({ ...t, ask: undefined, status: { k: t.proto === "telnet" ? "ssh.connectedTelnet" : "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
+      patch(e.runId, (t) => { const proto = e.protocol ?? t.proto; return { ...t, proto, ask: undefined, status: { k: proto === "telnet" ? "ssh.connectedTelnet" : "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }; });
     } else if (e.data) {
       const d = e.data;
       texts.current.set(e.runId, cleanTerminal(texts.current.get(e.runId) ?? "", d, logs.current.has(e.runId) ? LOG_MAX : undefined));

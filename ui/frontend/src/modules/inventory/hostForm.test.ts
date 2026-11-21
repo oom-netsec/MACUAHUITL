@@ -136,6 +136,15 @@ test("cambiar de protocolo vacía el puerto de omisión del anterior y conserva 
   expect(withProtocol({ ...ok, port: "23" }, "telnet").port).toBe("23"); // 23 no es el de omisión de ssh: se conserva
 });
 
+test("la orden de inicio sobrevive a ir a Telnet y volver a SSH, y en Telnet no viaja", () => {
+  const f = { ...ok, platform: "linux" as const, startCommand: "tmux attach" };
+  const tel = withProtocol(f, "telnet");
+  expect(tel.startCommand).toBe("tmux attach");
+  expect(draftOf(tel).startCommand).toBe("");
+  expect(withProtocol(tel, "ssh").startCommand).toBe("tmux attach");
+  expect(draftOf(withProtocol(tel, "ssh")).startCommand).toBe("tmux attach");
+});
+
 test("con telnet no se envía orden de inicio y el puerto vacío es 23", () => {
   const f = { ...ok, platform: "linux" as const, startCommand: "tmux", port: "" };
   expect(draftOf(f)).toMatchObject({ port: 22, startCommand: "tmux", protocol: "ssh" });

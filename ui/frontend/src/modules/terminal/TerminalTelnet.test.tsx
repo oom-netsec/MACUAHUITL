@@ -172,3 +172,13 @@ test("pasar a Telnet deja el selector en «Escribir al conectar»: una credencia
   expect(calls(core)[0][0]).toMatchObject({ protocol: "telnet", credentialId: "" });
   expect(screen.getByLabelText("Credencial")).toHaveDisplayValue("Escribir usuario y contraseña al conectar");
 });
+
+test("opened sin protocolo (núcleo viejo) conserva Telnet en la línea de estado; con protocolo manda el del núcleo", async () => {
+  const core = fakeCore();
+  render(<TerminalView core={core} />);
+  await openTelnet(core, "sw1");
+  act(() => { core.emitTerminal({ runId: "t1", opened: "sw1:23", recording: "/o/terminal/x.log" }); });
+  expect(document.querySelector(".ssh-status")).toHaveTextContent(/Telnet · conectado a sw1:23/);
+  act(() => { core.emitTerminal({ runId: "t1", opened: "admin@sw1:22", protocol: "ssh", recording: "/o/terminal/x.log" }); });
+  expect(document.querySelector(".ssh-status")).not.toHaveTextContent(/Telnet/);
+});

@@ -24,7 +24,7 @@ func (f fakeTerminal) OpenTerminal(st v1.TerminalService_OpenTerminalServer) err
 	m, _ := st.Recv()
 	o := m.GetOpen()
 	f.got <- "open " + o.Address + " " + o.CredentialId + " " + o.AcceptedHostKeyFingerprints[0]
-	st.Send(&v1.OpenTerminalResponse{Opened: "admin@" + o.Address, Recording: "/o/t.log"})
+	st.Send(&v1.OpenTerminalResponse{Opened: "admin@" + o.Address, Recording: "/o/t.log", Protocol: v1.TerminalProtocol_TERMINAL_PROTOCOL_TELNET})
 	for {
 		m, err := st.Recv()
 		if err == io.EOF {
@@ -61,7 +61,7 @@ func TestTerminalBridge(t *testing.T) {
 	if g := <-ft.got; g != "open 192.0.2.1 c1 SHA256:x" {
 		t.Fatalf("open = %q", g)
 	}
-	rec.waitFor(t, `terminal:opened {"opened":"admin@192.0.2.1","recording":"/o/t.log","runId":"`+id+`"}`)
+	rec.waitFor(t, `terminal:opened {"opened":"admin@192.0.2.1","protocol":"telnet","recording":"/o/t.log","runId":"`+id+`"}`)
 	if err := b.TerminalSend(id, "show ver\r"); err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestTerminalVariasRondasSinSecretoEnEventos(t *testing.T) {
 	if g := <-ft.got; g != `answer 2 "`+secreto+`2"` {
 		t.Fatalf("ronda 2: %q", g)
 	}
-	rec.waitFor(t, `terminal:opened {"opened":"ok","recording":"","runId":"`+id+`"}`)
+	rec.waitFor(t, `terminal:opened {"opened":"ok","recording":"","runId":"`+id+`"}`) // sin protocolo (núcleo viejo): la clave no viaja
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	for _, e := range rec.evs {
