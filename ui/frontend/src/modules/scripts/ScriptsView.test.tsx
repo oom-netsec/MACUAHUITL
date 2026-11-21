@@ -39,27 +39,46 @@ test("filtra por tecnología, plataforma, favoritos y busca también en los coma
   expect(core.listScripts).toHaveBeenLastCalledWith(expect.objectContaining({ text: "vlan 10" }));
   expect(screen.getByText("Config · VLAN y puerto de acceso")).toBeInTheDocument();
   await userEvent.clear(screen.getByLabelText("Buscar"));
-  await userEvent.selectOptions(screen.getByLabelText("Tecnología"), "l3");
+  const chip = (group: string, name: string) => within(screen.getByRole("group", { name: group })).getByRole("button", { name });
+  expect(screen.queryByRole("button", { name: "Quitar filtros" })).not.toBeInTheDocument();
+  await userEvent.click(chip("Tecnología", "Capa 3"));
+  expect(chip("Tecnología", "Capa 3")).toHaveAttribute("aria-pressed", "true");
   expect(await screen.findByText(/Ningún script coincide/)).toBeInTheDocument(); // la biblioteca de ejemplo no tiene l3
-  await userEvent.selectOptions(screen.getByLabelText("Tecnología"), "");
-  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "nx-os");
+  await userEvent.click(chip("Tecnología", "Capa 3")); // el mismo chip lo quita
+  expect(core.listScripts).toHaveBeenLastCalledWith(expect.objectContaining({ tech: "" }));
+  await userEvent.click(chip("Plataforma", "NX-OS"));
   expect(core.listScripts).toHaveBeenLastCalledWith(expect.objectContaining({ platform: "nx-os" }));
-  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "");
-  await userEvent.click(screen.getByRole("checkbox", { name: "Solo favoritos" }));
+  await userEvent.click(chip("Plataforma", "NX-OS"));
+  await userEvent.click(chip("Favoritos", "Solo favoritos"));
   expect(core.listScripts).toHaveBeenLastCalledWith(expect.objectContaining({ onlyFavorites: true }));
   expect(await screen.findByText(/Ningún script coincide/)).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Buscar"), "x");
+  await userEvent.click(screen.getByRole("button", { name: "Quitar filtros" }));
+  expect(core.listScripts).toHaveBeenLastCalledWith({ tech: "", platform: "", text: "", onlyFavorites: false });
+  expect(screen.getByLabelText("Buscar")).toHaveValue("");
+  expect(screen.getByLabelText("Buscar")).toHaveFocus();
+  expect(chip("Favoritos", "Solo favoritos")).toHaveAttribute("aria-pressed", "false");
+  await waitFor(() => expect(rows()).toHaveLength(2));
+  expect(screen.queryByRole("button", { name: "Quitar filtros" })).not.toBeInTheDocument();
 });
 
-test("la estrella marca y desmarca el favorito, con aria-pressed", async () => {
+test("el menú de la fila marca y desmarca el favorito y la fila lo indica sin abrir el menú; Escape cierra y devuelve el foco", async () => {
   const { core } = setup();
   await mine();
-  const star = await screen.findByRole("button", { name: "Favorito: Mi OSPF" });
-  expect(star).toHaveAttribute("aria-pressed", "false");
-  await userEvent.click(star);
+  const more = await screen.findByRole("button", { name: "Más acciones de Mi OSPF" });
+  expect(within(rows()[0]).queryByRole("img", { name: "Favorito" })).not.toBeInTheDocument();
+  await userEvent.click(more);
+  const fav = within(screen.getByRole("menu", { name: "Acciones de Mi OSPF" })).getByRole("menuitemcheckbox", { name: "Favorito" });
+  expect(fav).toHaveAttribute("aria-checked", "false");
+  await userEvent.click(fav);
   expect(core.setScriptFavorite).toHaveBeenCalledWith(OSPF.id, true);
-  await waitFor(() => expect(screen.getByRole("button", { name: "Favorito: Mi OSPF" })).toHaveAttribute("aria-pressed", "true"));
-  await userEvent.click(screen.getByRole("button", { name: "Favorito: Mi OSPF" }));
+  await waitFor(() => expect(screen.getByRole("menuitemcheckbox", { name: "Favorito" })).toHaveAttribute("aria-checked", "true"));
+  expect(within(rows()[0]).getByRole("img", { name: "Favorito" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("menuitemcheckbox", { name: "Favorito" }));
   expect(core.setScriptFavorite).toHaveBeenLastCalledWith(OSPF.id, false);
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Más acciones de Mi OSPF" })).toHaveFocus();
 });
 
 test("un script de la biblioteca se ve con sus comandos, sin editar ni borrar, pero se duplica", async () => {

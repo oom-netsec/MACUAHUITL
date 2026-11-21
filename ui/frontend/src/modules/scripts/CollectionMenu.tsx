@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "../../components/Icon";
 import { useT } from "../../lib/i18n";
-import type { Collection, ScriptItem } from "./api";
+import { FAVORITES_ID, type Collection, type ScriptItem } from "./api";
 import { colName } from "./text";
 
-// «Agregar a colección»: menú de selección múltiple (patrón de ThemeMenu). Cada opción agrega o quita el script de esa
-// colección y el menú sigue abierto para marcar varias; Escape lo cierra y devuelve el foco al botón.
-export function CollectionMenu({ script, cols, onToggle }: { script: ScriptItem; cols: Collection[]; onToggle: (c: Collection, on: boolean) => void }) {
+// Acciones de la fila: fijar, favorito y colecciones en un menú de selección múltiple (patrón de ViewMenu). Cada opción
+// aplica su cambio y el menú sigue abierto para marcar varias; Escape lo cierra y devuelve el foco al botón.
+export function CollectionMenu({ script, cols, onToggle, onPin, onFav }: { script: ScriptItem; cols: Collection[]; onToggle: (c: Collection, on: boolean) => void; onPin: () => void; onFav: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -35,10 +35,19 @@ export function CollectionMenu({ script, cols, onToggle }: { script: ScriptItem;
   return (
     <span className="col-menu" ref={box} onKeyDown={onKey}>
       <button ref={btn} type="button" className="quiet icon sm" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
-        aria-label={t("scripts.col.addTo", { name: script.name })} onClick={() => setOpen((o) => !o)}><Icon name="folderPlus" /></button>
+        aria-label={t("scripts.col.addTo", { name: script.name })} onClick={() => setOpen((o) => !o)}><Icon name="more" /></button>
       {open && (
         <div className="popover menu col-list" role="menu" id={id} aria-label={t("scripts.col.menu", { name: script.name })}>
-          {cols.map((c) => {
+          <button role="menuitemcheckbox" aria-checked={script.pinned} className="quiet" onClick={onPin}>
+            <span className="col-check" aria-hidden="true">{script.pinned ? "✓" : ""}</span>
+            <span className="col-name">{t("scripts.pin")}</span>
+          </button>
+          <button role="menuitemcheckbox" aria-checked={script.favorite} className="quiet" onClick={onFav}>
+            <span className="col-check" aria-hidden="true">{script.favorite ? "✓" : ""}</span>
+            <span className="col-name">{t("scripts.fav")}</span>
+          </button>
+          <div role="separator" className="col-sep" />
+          {cols.filter((c) => c.id !== FAVORITES_ID).map((c) => {
             const on = script.collections.includes(c.id);
             return (
               <button key={c.id} role="menuitemcheckbox" aria-checked={on} className="quiet" onClick={() => onToggle(c, !on)}>

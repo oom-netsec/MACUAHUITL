@@ -3,7 +3,7 @@ import { RunButton } from "../../components/RunButton";
 import { showHidden } from "../../lib/safeText";
 import type { CoreAPI } from "../../lib/core";
 import { cleanOnFail } from "../../lib/cleanOnFail";
-import { Check, ConfirmButton, Field, Notice, Select, errorText } from "../../components/Field";
+import { ConfirmButton, Field, Notice, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { Icon } from "../../components/Icon";
 import { Badge, EmptyState, Page, ResultPanel, Tabs } from "../../components/Page";
@@ -35,6 +35,8 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
   const [items, setItems] = useState<ScriptItem[] | null>(null);
   const [ver, setVer] = useState(0);
   const [selId, setSelId] = useState("");
+  const searchBox = useRef<HTMLDivElement>(null);
+  const focusSearch = () => searchBox.current?.querySelector("input")?.focus(); // para no dejar el foco en body si el control que lo tenía desaparece
   const detail = useRef<HTMLDivElement>(null);
   // En una sola columna (ventana angosta, ver scripts.css) el detalle queda debajo de la lista: se lleva a la vista al elegir.
   useEffect(() => { if (selId && window.matchMedia?.("(max-width: 1150px)").matches) detail.current?.scrollIntoView?.({ block: "start" }); }, [selId]);
@@ -83,7 +85,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
     await core.setCollectionScripts(c.id, on ? [...cur.filter((x) => x !== s.id), s.id] : cur.filter((x) => x !== s.id));
     scriptsChanged(); reload();
   });
-  const toggleFav = (s: ScriptItem) => run(async () => { await core.setScriptFavorite(s.id, !s.favorite); scriptsChanged(); reload(); });
+  const toggleFav = (s: ScriptItem) => run(async () => { await core.setScriptFavorite(s.id, !s.favorite); if (onlyFav && s.favorite) focusSearch(); scriptsChanged(); reload(); });
   const duplicate = (s: ScriptItem) => run(async () => { const c = await core.duplicateScript(s.id); scriptsChanged(); setOrigin("usuario"); setSelId(c.id); reload(); });
   const remove = (s: ScriptItem) => run(async () => { await core.deleteScript(s.id); scriptsChanged(); setSelId(""); setPicked((p) => p.filter((x) => x !== s.id)); reload(); });
   const save = async (d: ScriptDraft) => {
@@ -121,11 +123,20 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
       {msg && <Notice kind="ok">{msg}</Notice>}
       {imp.node}
       <div className="field-row">
-        <Field label={t("scripts.search")} hint={t("scripts.searchHint")} value={text} onChange={setText} w="lg" />
-        <Select<ScriptTech | ""> label={t("scripts.tech")} value={tech} onChange={setTech} w="md" options={[["", t("scripts.any")], ...TECHS.map((x) => [x, t(`scripts.tech.${x}` as Key)] as [ScriptTech, string])]} />
-        <Select<ScriptPlatform | ""> label={t("scripts.platform")} value={platform} onChange={setPlatform} w="md" options={[["", t("scripts.any")], ...PLATFORMS.map((x) => [x, t(`scripts.plat.${x}` as Key)] as [ScriptPlatform, string])]} />
+        <div ref={searchBox}><Field label={t("scripts.search")} hint={t("scripts.searchHint")} value={text} onChange={setText} w="lg" /></div>
       </div>
-      <Check label={t("scripts.onlyFav")} checked={onlyFav} onChange={setOnlyFav} />
+      <div className="scr-chips">
+        <div role="group" aria-label={t("scripts.tech")}>
+          {TECHS.map((x) => <button key={x} type="button" className="scr-chip" aria-pressed={tech === x} onClick={() => setTech(tech === x ? "" : x)}>{techName(x)}</button>)}
+        </div>
+        <div role="group" aria-label={t("scripts.platform")}>
+          {PLATFORMS.map((x) => <button key={x} type="button" className="scr-chip" aria-pressed={platform === x} onClick={() => setPlatform(platform === x ? "" : x)}>{platName(x)}</button>)}
+        </div>
+        <div role="group" aria-label={t("scripts.favFilter")}>
+          <button type="button" className="scr-chip" aria-pressed={onlyFav} onClick={() => setOnlyFav(!onlyFav)}>{t("scripts.onlyFav")}</button>
+        </div>
+        {filtered && <button type="button" className="quiet sm" onClick={() => { setText(""); setTech(""); setPlatform(""); setOnlyFav(false); focusSearch(); }}>{t("scripts.clear")}</button>}
+      </div>
       <div className="scr-layout">
         <div>
           {items && shown.length === 0 && <EmptyState icon="list" title={t("scripts.empty.title")}>{t(origin === "usuario" && !filtered ? "scripts.empty.mine" : "scripts.empty.filter")}</EmptyState>}
@@ -142,9 +153,9 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
                     {s.readOnly && <Badge tone="ok">{t("scripts.readOnly")}</Badge>}
                   </span>
                   <span className="scr-acts">
-                    <button type="button" className="quiet icon sm scr-pin" aria-pressed={s.pinned} aria-label={t("scripts.pin", { name: s.name })} onClick={() => togglePin(s)}><Icon name="pin" /></button>
-                    <CollectionMenu script={s} cols={cols} onToggle={(c, on) => void toggleCol(s, c, on)} />
-                    <button type="button" className="quiet icon sm scr-star" aria-pressed={s.favorite} aria-label={t("scripts.fav", { name: s.name })} onClick={() => toggleFav(s)}><Icon name="star" /></button>
+                    {s.pinned && <span className="scr-ind scr-pin" role="img" aria-label={t("scripts.pinned")}><Icon name="pin" /></span>}
+                    {s.favorite && <span className="scr-ind scr-star" role="img" aria-label={t("scripts.fav")}><Icon name="star" /></span>}
+                    <CollectionMenu script={s} cols={cols} onToggle={(c, on) => void toggleCol(s, c, on)} onPin={() => void togglePin(s)} onFav={() => void toggleFav(s)} />
                   </span>
                 </li>
               ))}
