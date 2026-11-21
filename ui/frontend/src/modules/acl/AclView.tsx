@@ -9,6 +9,7 @@ import { tableCsv, tableMarkdown } from "../../lib/tableExport";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
+import { detectAclPlatform } from "./detect";
 import "./acl.css";
 
 const vendors: [string, string][] = [["ios-xe", "Cisco IOS / IOS-XE"], ["nx-os", "Cisco NX-OS"], ["asa", "Cisco ASA"]];
@@ -23,9 +24,15 @@ const Addr = ({ v }: { v: string }) => <>{v}{v && v !== "any" && <CopyButton val
 // La salida es texto para copiar: nunca se aplica a un equipo (spec §13).
 export function AclView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const [from, setFrom] = useState("ios-xe");
+  // La detección propone el origen; si el usuario lo elige (pick), su elección manda aunque se siga escribiendo.
+  const [pick, setPick] = useState<string | null>(null);
+  const [auto, setAuto] = useState<string | null>(null);
+  const [live, setLive] = useState<string | null>(null); // lo que detecta el texto actual: la marca «(detectada)» no queda vieja
+  const from = pick ?? auto ?? "ios-xe";
   const [to, setTo] = useState("nx-os");
   const [text, setText] = useState("");
+  const onText = (v: string) => { setText(v); const d = detectAclPlatform(v); setLive(d); if (d) setAuto(d); };
+  const fromOpts: [string, string][] = vendors.map(([v, l]) => [v, pick === null && v === live ? `${l} ${t("acl.detected")}` : l]);
   const imp = useResult<{ acl: Acl; findings: AclFinding[] }>();
   const gen = useResult<string>();
   const busy = imp.busy || gen.busy;
@@ -50,8 +57,12 @@ export function AclView({ core }: { core: CoreAPI }) {
   return (
     <Page title={t("acl.title")} description={t("acl.desc")}>
       <Section title={t("acl.section.import")}>
-        <Select label={t("acl.from")} value={from} onChange={setFrom} options={vendors} w="md" />
-        <TextArea label={t("acl.input")} rows={10} value={text} onChange={setText} />
+        <div className="field-row end" role="group" aria-label={t("acl.route")}>
+          <Select label={t("acl.from")} value={from} onChange={setPick} options={fromOpts} w="md" />
+          <span aria-hidden="true" className="acl-arrow">→</span>
+          <Select label={t("acl.to")} value={to} onChange={setTo} options={vendors} w="md" />
+        </div>
+        <TextArea label={t("acl.input")} rows={10} value={text} onChange={onText} />
         <div className="actions">
           <RunButton primary kbd onClick={importAndAnalyze} disabled={busy} busy={imp.busy} missing={[!text.trim() && t("need.aclText")]}>{t("acl.import")}</RunButton>
         </div>
@@ -85,9 +96,8 @@ export function AclView({ core }: { core: CoreAPI }) {
             </div>
           </ResultPanel>
           <Section title={t("acl.section.generate")} description={t("acl.result.hint")}>
-            <Select label={t("acl.to")} value={to} onChange={setTo} options={vendors} w="md" />
             <div className="actions">
-              <button className="primary" onClick={() => gen.run(() => core.aclGenerate(to, acl))} disabled={busy} aria-busy={gen.busy}>{t("acl.generate")}</button>
+              <button className="primary" onClick={() => gen.run(() => core.aclGenerate(to, acl))} disabled={busy} aria-busy={gen.busy}>{t("acl.generate", { platform: vendors.find(([v]) => v === to)?.[1] ?? to })}</button>
             </div>
           </Section>
           {(gen.data || gen.error) && (
