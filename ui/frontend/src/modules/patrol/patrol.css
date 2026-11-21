@@ -27,7 +27,7 @@
 /* Formulario del trabajo nuevo */
 .newjob > h3 { margin-bottom: var(--s-1); }
 .newjob > .desc { margin: 0 0 var(--s-6); color: var(--text-2); }
-.newjob .hint.count { margin: calc(-1 * var(--s-3)) 0 var(--s-4); }
+.newjob .hint.count { margin: var(--s-1) 0 var(--s-4); } /* sin margen negativo: debajo del campo va «Elegir de la libreta» */
 
 /* Línea de fases */
 .timeline { list-style: none; margin: var(--s-2) 0 0; padding: 0 0 0 4px; }
