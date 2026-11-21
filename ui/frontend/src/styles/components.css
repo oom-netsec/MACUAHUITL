@@ -286,7 +286,7 @@ th.num, td.num { text-align: right; }
 .adv[open] > summary { margin-bottom: var(--s-4); }
 .seg-row { display: flex; flex-wrap: wrap; gap: var(--s-3); margin: 0 0 var(--s-4); }
 
-/* Muestra de paleta de terminal (components/Terminal.tsx PaletteSwatch): menú «Cambiar tema» y Ajustes. */
+/* Muestra de paleta de terminal (components/Terminal.tsx PaletteSwatch): menú «Vista» de la terminal y Ajustes. */
 .theme-swatch { display: inline-flex; align-items: center; gap: 3px; padding: 4px 6px; border-radius: var(--r-1); border: 1px solid var(--line); }
 .theme-swatch i { width: 8px; height: 8px; border-radius: 50%; display: block; }
 

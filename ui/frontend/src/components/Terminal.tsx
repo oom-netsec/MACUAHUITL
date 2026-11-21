@@ -54,7 +54,7 @@ export function Terminal({ as = "pre", text, children, ...rest }: Props) {
 
 const SWATCH = ["prompt", "ok", "bad", "iface", "addr"] as const;
 
-/** Muestra de una paleta: fondo, texto y cinco colores de categoría (la usan el menú «Cambiar tema» de la terminal y Ajustes). */
+/** Muestra de una paleta: fondo, texto y cinco colores de categoría (la usan el menú «Vista» de la terminal y Ajustes). */
 export function PaletteSwatch({ p }: { p: (typeof PALETTES)[number] }) {
   return (
     <span className="theme-swatch" aria-hidden="true" style={{ background: p.bg, color: p.fg } as CSSProperties}>

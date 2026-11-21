@@ -6,6 +6,7 @@ import { setTermPrefs, resetTermPrefs } from "../../lib/termPrefs";
 import { PALETTES } from "../../lib/termHighlight";
 import { paletteName } from "../../components/Terminal";
 import { tr } from "../../lib/i18n";
+import { xtermTheme } from "./termTheme";
 import { FakeSearch, FakeTerm } from "./xtermMock";
 
 vi.mock("@xterm/xterm", async () => ({ Terminal: (await import("./xtermMock")).FakeTerm }));
@@ -60,9 +61,11 @@ describe("resaltado", () => {
     const { core } = setup();
     await abrir("sw1");
     const x = await term();
-    const box = screen.getByRole("checkbox", { name: "Resaltar palabras clave" });
-    expect(box).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+    const box = screen.getByRole("menuitemcheckbox", { name: "Resaltar palabras clave" });
+    expect(box).toHaveAttribute("aria-checked", "true");
     await userEvent.click(box);
+    expect(box).toHaveAttribute("aria-checked", "false");
     expect(JSON.parse(localStorage.getItem("macuahuitl.terminal")!)).toMatchObject({ hl: false });
     act(() => { core.emitTerminal({ runId: "t1", data: "Vlan10 is up\r\n" }); });
     expect(x.write).toHaveBeenCalledWith("Vlan10 is up\r\n");
@@ -197,13 +200,35 @@ describe("registro en archivo", () => {
   });
 });
 
+const vista = async (name: string) => { // abre «Vista», activa/desactiva la opción y cierra el menú
+  await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+  await userEvent.click(screen.getByRole("menuitemcheckbox", { name }));
+  await userEvent.keyboard("{Escape}");
+};
+
 describe("pantalla dividida", () => {
   test("«Dividir» solo aparece con dos pestañas o más", async () => {
     setup();
     await abrir("sw1");
-    expect(screen.queryByRole("checkbox", { name: "Dividir" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Dividir" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     await abrir("sw2");
-    expect(await screen.findByRole("checkbox", { name: "Dividir" })).toBeInTheDocument(); // la segunda pestaña llega tras la llamada al núcleo
+    await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Dividir" })).toHaveAttribute("aria-checked", "false"); // la segunda pestaña llega tras la llamada al núcleo
+  });
+
+  test("al quedar una sola pestaña se apaga «Dividir»: la próxima sesión no se divide sola", async () => {
+    setup();
+    await abrir("sw1"); await abrir("sw2");
+    await term(0); await term(1);
+    await vista("Dividir");
+    expect(screen.getByRole("group", { name: /Panel derecho/ })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Cerrar pestaña sw2" }));
+    await abrir("sw3");
+    expect(screen.queryByRole("group", { name: /Panel derecho/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Dividir" })).toHaveAttribute("aria-checked", "false");
   });
 
   test("muestra la activa a la izquierda y la elegida a la derecha, cada una con su emulador (sin recrearlos)", async () => {
@@ -211,7 +236,7 @@ describe("pantalla dividida", () => {
     await abrir("sw1"); await abrir("sw2"); await abrir("sw3");
     const [, b, c] = [await term(0), await term(1), await term(2)];
     await userEvent.click(screen.getByRole("tab", { name: "sw1" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Dividir" }));
+    await vista("Dividir");
     expect(FakeTerm.all).toHaveLength(3); // dividir no crea emuladores nuevos
     expect(screen.getByRole("group", { name: "Panel izquierdo: sw1" })).toBeVisible();
     expect(screen.getByRole("group", { name: "Panel derecho: sw2" })).toBeVisible();
@@ -231,7 +256,7 @@ describe("pantalla dividida", () => {
     await abrir("sw1"); await abrir("sw2");
     await term(0); await term(1);
     await userEvent.click(screen.getByRole("tab", { name: "sw1" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Dividir" }));
+    await vista("Dividir");
     await waitFor(() => { expect(core.terminalResize).toHaveBeenCalledWith("t1", 24, 80); expect(core.terminalResize).toHaveBeenCalledWith("t2", 24, 80); });
     const rapido = screen.getByRole("button", { name: "show version" });
     await userEvent.click(rapido);
@@ -245,8 +270,8 @@ describe("pantalla dividida", () => {
     setup();
     await abrir("sw1"); await abrir("sw2");
     const a = await term(0); await term(1);
-    await userEvent.click(screen.getByRole("checkbox", { name: "Dividir" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Dividir" }));
+    await vista("Dividir");
+    await vista("Dividir");
     expect(screen.queryByLabelText("Segundo panel")).not.toBeInTheDocument();
     expect(a.dispose).not.toHaveBeenCalled();
     expect(FakeTerm.all).toHaveLength(2);
@@ -276,7 +301,7 @@ describe("búsqueda y comandos rápidos con varias pestañas", () => {
     await abrir("sw1"); await abrir("sw2");
     const [a, b] = [await term(0), await term(1)];
     await userEvent.click(screen.getByRole("tab", { name: "sw1" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "Dividir" }));
+    await vista("Dividir");
     await waitFor(() => expect(FakeSearch.all).toHaveLength(2));
     const der = screen.getByRole("group", { name: "Panel derecho: sw2" });
     await userEvent.click(der.closest(".ssh-pane") as HTMLElement); // el foco pasa al panel derecho
@@ -307,21 +332,21 @@ describe("búsqueda y comandos rápidos con varias pestañas", () => {
   });
 });
 
-describe("cambiar tema", () => {
+describe("menú Vista: cambiar tema", () => {
   const abrirMenu = async () => {
     setup();
     await abrir("sw1");
     await term();
-    const btn = screen.getByRole("button", { name: "Cambiar tema" });
+    const btn = screen.getByRole("button", { name: "Vista" });
     await userEvent.click(btn);
-    return { btn, menu: screen.getByRole("menu", { name: "Cambiar tema" }) };
+    return { btn, menu: screen.getByRole("menu", { name: "Vista" }) };
   };
 
   test("el botón abre un menú con todas las paletas y marca la actual", async () => {
     const { btn, menu } = await abrirMenu();
     expect(btn).toHaveAttribute("aria-haspopup", "menu");
     expect(btn).toHaveAttribute("aria-expanded", "true");
-    const items = within(menu).getAllByRole("menuitemradio");
+    const items = within(within(menu).getByRole("group", { name: "Tema" })).getAllByRole("menuitemradio");
     expect(items).toHaveLength(PALETTES.length);
     PALETTES.forEach((p, i) => expect(items[i]).toHaveAccessibleName(paletteName(tr, p)));
     expect(items.filter((i) => i.getAttribute("aria-checked") === "true").map((i) => i.querySelector(".theme-name")?.textContent)).toEqual(["Clásica"]);
@@ -336,9 +361,18 @@ describe("cambiar tema", () => {
     expect(btn).toHaveAttribute("aria-expanded", "false");
   });
 
+  test("la paleta elegida en el menú Vista llega al tema del emulador", async () => {
+    const { menu } = await abrirMenu();
+    await userEvent.click(within(menu).getByRole("menuitemradio", { name: "Medianoche" }));
+    const x = await term();
+    await waitFor(() => expect(x.options.theme).toMatchObject(xtermTheme(PALETTES.find((p) => p.id === "medianoche")!)));
+  });
+
   test("flechas, Inicio y Fin mueven el foco; Escape cierra y devuelve el foco al botón; clic fuera cierra", async () => {
     const { btn, menu } = await abrirMenu();
-    const items = within(menu).getAllByRole("menuitemradio");
+    const items = [...menu.querySelectorAll<HTMLElement>("[role^=menuitem]")]; // resaltar, paletas y (con una sola pestaña) nada más
+    expect(items[1]).toHaveFocus(); // abre sobre la paleta marcada
+    await userEvent.keyboard("{ArrowUp}");
     expect(items[0]).toHaveFocus();
     await userEvent.keyboard("{ArrowDown}");
     expect(items[1]).toHaveFocus();

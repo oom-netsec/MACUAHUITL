@@ -1,19 +1,19 @@
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
-import { Check, Field, Notice, Select, errorText } from "../../components/Field";
+import { Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, Section } from "../../components/Page";
 import { Icon } from "../../components/Icon";
 import { DownloadButton } from "../../components/Files";
 import { useInbox } from "../../app/activity";
 import { SessionSearch } from "./SessionSearch";
-import { ThemeMenu } from "./ThemeMenu";
+import { ViewMenu } from "./ViewMenu";
 import { ScriptsMenu } from "./ScriptsMenu";
 import { parseTarget, parseTargets } from "../../lib/targets";
 import { cleanTerminal } from "../../lib/stream";
 import { useLang, useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { PALETTES } from "../../lib/termHighlight";
-import { setTermPrefs, useTermPrefs } from "../../lib/termPrefs";
+import { useTermPrefs } from "../../lib/termPrefs";
 import { createLiveWriter } from "../../lib/termAnsi";
 import type { AuthPrompt, TerminalEvent } from "./api";
 import { AuthPanel } from "./AuthPanel";
@@ -244,6 +244,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     texts.current.delete(t.runId); waiting.current.delete(t.runId);
     if (t.runId && !t.done) core.terminalClose(t.runId).catch(() => {});
     setTabs((ts) => ts.filter((_, j) => j !== i));
+    if (tabs.length <= 2) setSplit(false); // con una sola pestaña no hay división: la próxima sesión no se divide sola
     setActive((a) => Math.max(0, i < a || a >= tabs.length - 1 ? a - 1 : a));
   };
 
@@ -378,9 +379,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
           <div className="ssh-tools">
             <SessionSearch q={find.q} onQ={(q) => { setFind((f) => ({ q, dir: 1, n: f.n + 1 })); if (!q) setHits({ index: -1, count: 0 }); }} onStep={(dir) => setFind((f) => ({ ...f, dir, n: f.n + 1 }))} index={hits.index} count={hits.count} />
             <div className="ssh-opts">
-              <Check label={t("ssh.hl")} checked={hl} onChange={(v) => setTermPrefs({ hl: v })} />
-              <ThemeMenu />
-              {tabs.length > 1 && <Check label={t("ssh.split")} checked={!!second} onChange={setSplit} />}
+              <ViewMenu split={tabs.length > 1 ? { checked: !!second, onChange: setSplit } : undefined} />
               {second && <Select label={t("ssh.splitSecond")} value={String(second.key)} onChange={(v) => setSecondKey(Number(v))} w="md" options={others.map((x) => [String(x.key), x.label] as [string, string])} />}
               <DownloadButton label={t("ssh.download")} name={`${fileBase(tool.label)}-${new Date().toISOString().slice(0, 10)}.txt`} data={() => texts.current.get(tool.runId) ?? ""} />
             </div>

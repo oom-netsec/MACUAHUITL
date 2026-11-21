@@ -21,9 +21,11 @@ test("la consola abre el puerto detectado, muestra su salida y envía comandos",
   await userEvent.type(screen.getByLabelText("Comando"), "show version{Enter}");
   expect(core.consoleSend).toHaveBeenCalledWith("c1", "show version\r");
   expect(screen.getByLabelText("Comando")).toHaveValue("");
-  await userEvent.click(screen.getByRole("button", { name: "Ctrl-C" }));
+  expect(screen.getByText("Ctrl-C")).toBeInTheDocument(); // el texto visible no cambia
+  expect(screen.getByText("BREAK")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Enviar Ctrl-C (interrumpir)" }));
   expect(core.consoleSend).toHaveBeenCalledWith("c1", "\x03");
-  await userEvent.click(screen.getByRole("button", { name: "BREAK" }));
+  await userEvent.click(screen.getByRole("button", { name: "Enviar BREAK (señal de interrupción serie)" }));
   expect(core.consoleBreak).toHaveBeenCalledWith("c1");
   await userEvent.click(screen.getByRole("button", { name: "Cerrar" }));
   expect(core.consoleClose).toHaveBeenCalledWith("c1");

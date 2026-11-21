@@ -8,7 +8,7 @@ import { needsCopy, colName, scriptText } from "../scripts/text";
 const haystack = (s: ScriptItem) => [s.name, s.description, ...s.tags, ...s.commands].join("\n").toLowerCase();
 
 // «Scripts ▾» de la terminal: menú con búsqueda agrupado por colección (favoritos primero), pensado para el teclado
-// (patrón de ThemeMenu). Escribir filtra, las flechas recorren, Enter elige y Escape cierra devolviendo el foco al botón.
+// (patrón de ViewMenu). Escribir filtra, las flechas recorren, Enter elige y Escape cierra devolviendo el foco al botón.
 // Elegir un script no lo ejecuta aquí: lo entrega a `onPick`, que usa la misma ruta segura de inserción que el resto.
 export function ScriptsMenu({ core, version, onPick }: { core: CoreAPI; version: number; onPick: (s: ScriptItem) => Promise<boolean> }) {
   const t = useT();

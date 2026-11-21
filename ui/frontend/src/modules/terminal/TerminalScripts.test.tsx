@@ -42,6 +42,11 @@ const setup = (over = {}, inbox: Record<string, Delivery> = {}) => {
     view.rerender(tree(core, { "terminal-insert": { data: encodeInsert({ name, text, readOnly }), n } }));
   return { core, send };
 };
+const vista = async (name: string) => { // abre «Vista», activa/desactiva la opción y cierra el menú
+  await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+  await userEvent.click(screen.getByRole("menuitemcheckbox", { name }));
+  await userEvent.keyboard("{Escape}");
+};
 const abrir = async (host = "sw1") => {
   await userEvent.clear(screen.getByLabelText(/Equipo/));
   await userEvent.type(screen.getByLabelText(/Equipo/), host);
@@ -203,7 +208,7 @@ describe("enviar a la terminal desde Scripts (canal terminal-insert)", () => {
     const { core, send } = setup();
     await abrir("sw1"); await term();
     await abrir("sw2"); await term(1);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Dividir" })); // activa sw2; sw1 es el segundo panel
+    await screen.findByRole("button", { name: "Vista" }); await vista("Dividir"); // activa sw2; sw1 es el segundo panel
     const panes = [...document.querySelectorAll<HTMLElement>(".ssh-pane")]; // en el orden de las pestañas: sw1, sw2
     expect(panes).toHaveLength(2);
     // jsdom no monta xterm de verdad: cada panel recibe su textarea de ayuda.

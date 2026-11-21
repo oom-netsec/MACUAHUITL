@@ -27,6 +27,11 @@ const typedSetup = async (over = {}) => {
   await userEvent.selectOptions(await screen.findByLabelText("Credencial"), "Escribir usuario y contraseña al conectar");
   return core;
 };
+const vista = async (name: string) => { // abre «Vista», activa/desactiva la opción y cierra el menú
+  await userEvent.click(screen.getByRole("button", { name: "Vista" }));
+  await userEvent.click(screen.getByRole("menuitemcheckbox", { name }));
+  await userEvent.keyboard("{Escape}");
+};
 const abrir = async (host: string) => {
   await userEvent.clear(screen.getByLabelText(/Equipo/));
   await userEvent.type(screen.getByLabelText(/Equipo/), host);
@@ -218,7 +223,7 @@ test("en vista dividida, con el foco en un input del panel izquierdo, una pregun
   await userEvent.click(screen.getByText("Nueva sesión"));
   await abrir("192.0.2.2");
   await userEvent.click(screen.getAllByRole("tab")[0]);
-  await userEvent.click(screen.getByLabelText("Dividir"));
+  await vista("Dividir");
   const search = screen.getByRole("searchbox");
   search.focus();
   act(() => core.emitTerminal({ ...prompt, runId: "t2" }));
@@ -306,7 +311,7 @@ const splitWithPrompts = async () => {
   await userEvent.click(screen.getByText("Nueva sesión"));
   await abrir("192.0.2.2");
   await userEvent.click(screen.getAllByRole("tab")[0]);
-  await userEvent.click(screen.getByLabelText("Dividir"));
+  await vista("Dividir");
   await waitFor(() => expect(FakeTerm.all.length).toBe(2));
   act(() => { core.emitTerminal(prompt); core.emitTerminal({ ...prompt, runId: "t2" }); });
   await screen.findAllByRole("form");
@@ -376,7 +381,7 @@ test("vista dividida: una huella nueva en el panel derecho NO le roba el foco a 
   await userEvent.click(screen.getByText("Nueva sesión"));
   await abrir("192.0.2.2");
   await userEvent.click(screen.getAllByRole("tab")[0]);
-  await userEvent.click(screen.getByLabelText("Dividir"));
+  await vista("Dividir");
   const search = screen.getByRole("searchbox");
   search.focus();
   act(() => core.emitTerminal({ runId: "t2", done: true, error: "x", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.2", fingerprint: `SHA256:${fp}`, key_type: "ssh-ed25519" } } }));
