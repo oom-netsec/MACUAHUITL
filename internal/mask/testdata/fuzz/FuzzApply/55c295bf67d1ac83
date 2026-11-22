@@ -1,0 +1,3 @@
+go test fuzz v1
+byte('\x00')
+string("username bob password 0 \"abc\"Zq1\n")
