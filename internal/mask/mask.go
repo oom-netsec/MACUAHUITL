@@ -21,8 +21,9 @@ type rule struct {
 
 const (
 	typ = `(?:[0-9] )?` // tipo de cifrado opcional («0 », «7 »…)
-	// El valor es una palabra o una cadena entre comillas (NX-OS: "ab cd"); sigue el resto de la línea.
-	val = `("[^"]*"|\S+)(.*)$`
+	// El valor es una palabra o una cadena entre comillas (NX-OS: "ab cd"); sigue el resto de la línea. Lo pegado tras
+	// la comilla de cierre también es del valor («"ab"cd»): la 1.ª alternativa es quotedValue.
+	val = `("[^"]*"\S*|\S+)(.*)$`
 )
 
 // R arma una regla: el prefijo (hasta el valor) es el grupo 1, el valor el 2 y el resto el 3.
@@ -195,8 +196,8 @@ var iosRules = []rule{
 	// Otras salidas de show que imprimen secretos.
 	// NX-OS en JSON/XML (en cualquier parte de la línea): ver maskStructured.
 	full("psk", `^(\s*Pre-[Ss]hared [Kk]ey(?: \(\w+\))?\s*[:=]\s*)(\S.*?)(\s*)$`),
-	full("key-string", `^(\s*[Kk]ey \d+ -- text (?:\d+ )?)("[^"]*"|\S+)(.*)$`), // show key chain
-	full("fhrp-key", `^(\s*Authentication text, string )("[^"]*"|\S+)(.*)$`),   // show standby / show glbp
+	full("key-string", `^(\s*[Kk]ey \d+ -- text (?:\d+ )?)("[^"]*"\S*|\S+)(.*)$`), // show key chain
+	full("fhrp-key", `^(\s*Authentication text, string )("[^"]*"\S*|\S+)(.*)$`),   // show standby / show glbp
 	full("vtp-password", `^(\s*VTP Password:\s*)(\S+)(.*)$`),
 	full("cts-pac", `^(\s*PAC-Opaque\s*[:=]\s*)(\S+)(.*)$`),
 	full("user-secret", `^(\s*Mgmt (?:Password|Secret)\s*[:=]\s*)(\S.*?)(\s*)$`),
@@ -488,17 +489,31 @@ func (s *Stream) quoted(line string) string {
 	odd := strings.Count(line, `"`)%2 == 1 // con un total impar, la paridad no dice qué va dentro: maskCited en todos
 	var b strings.Builder
 	b.WriteString(line[:first+1])
+	glued := false
 	for k, rest := 0, line[first+1:]; ; k++ {
 		seg, next, more := rest, "", false
 		if j := strings.IndexByte(rest, '"'); j >= 0 {
 			seg, next, more = rest[:j], rest[j+1:], true
 		}
-		b.WriteString(s.maskQuoted(seg, odd || k%2 == 0))
+		m := s.maskQuoted(seg, odd || k%2 == 0)
+		if glued {
+			if n := wordLen(m); n > 0 && !maskedStart.MatchString(m) {
+				m = "<MASKED:secret>" + m[n:]
+			}
+		}
+		b.WriteString(m)
 		if !more {
 			break
 		}
-		b.WriteByte('"')
 		rest = next
+		// Un valor tapado que llega a la comilla sigue tras ella («password a"bc»: la palabra es «a"bc»): lo pegado
+		// hasta el espacio también se tapa. La comilla queda (la 2.ª pasada ve la misma paridad) y el tramo siguiente se
+		// analiza igual (puede traer otra palabra clave con su valor); solo su primera palabra pasa a ser un marcador.
+		whole := glued && wordLen(seg) == len(seg) // todo el tramo era de la palabra pegada: sigue tras la comilla
+		// Una puntuación suelta tras la comilla («"…",», «"…".») cierra la cita: no es parte del valor.
+		glued = strings.Trim(rest[:wordLen(rest)], ",;:.)]}") != "" && (whole || seg != "" && seg[len(seg)-1] != ' ' && seg[len(seg)-1] != '\t' &&
+			maskedEnd.MatchString(m) && !maskedEnd.MatchString(seg))
+		b.WriteByte('"')
 	}
 	out := b.String()
 	if tail := out[first+1:]; tail != "" {
@@ -508,6 +523,11 @@ func (s *Stream) quoted(line string) string {
 	}
 	return out
 }
+
+var (
+	maskedEnd   = regexp.MustCompile(`<MASKED:[^<>]*>$`)
+	maskedStart = regexp.MustCompile(`^<MASKED:[^<>]*>`)
+)
 
 // unescapeQuotes: «\"» es una comilla interna de la cita. En cada corrida de barras antes de una comilla, una impar
 // pierde una barra y una par queda igual («\\"» es una barra escapada y una comilla de verdad). Así el resultado ya no
@@ -842,16 +862,20 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 			if m == nil || strings.HasPrefix(m[2], "<MASKED:") || m[2] == "*****" || r.guard && isGuard(m[2]) {
 				continue
 			}
-			// En tipo 0 la clave puede llevar espacios: llega hasta el fin de línea o una palabra clave del comando.
-			if typeZero.MatchString(m[1]) && m[2][0] != '"' {
+			// En tipo 0 la clave puede llevar espacios: llega hasta el fin de línea o una palabra clave del comando (salvo
+			// una cadena entre comillas sola, que ya dice dónde termina).
+			v := m[2]
+			if typeZero.MatchString(m[1]) && !onlyQuoted(m[2]) {
+				old := m[3]
 				if r.stop != nil {
 					m[3] = m[3][r.stopIndex(m[3]):]
 				} else {
 					_, m[3] = tail(m[3])
 				}
+				v += old[:len(old)-len(m[3])] // lo que se suma al valor también cuenta para la paridad
 			}
 			counts[r.kind]++
-			line, changed = m[1]+"<MASKED:"+r.kind+">"+m[3], true
+			line, changed = m[1]+"<MASKED:"+r.kind+">"+keepParity(v)+m[3], true
 		}
 	}
 	// Una descripción o un comentario de ACL es texto libre: no se toca.
@@ -908,6 +932,31 @@ func wordLen(s string) int {
 	return len(s)
 }
 
+// valueLen: largo del valor al principio de s, con la forma de val: una cadena entre comillas con lo pegado tras la de
+// cierre; si no, la palabra.
+func valueLen(s string) int {
+	if loc := quotedValue.FindStringIndex(s); loc != nil {
+		return loc[1]
+	}
+	return wordLen(s)
+}
+
+var quotedValue = regexp.MustCompile(`^"[^"]*"\S*`)
+
+// onlyQuoted: el valor es una cadena entre comillas sin nada pegado.
+func onlyQuoted(v string) bool {
+	return len(v) >= 2 && v[0] == '"' && strings.IndexByte(v[1:], '"') == len(v)-2
+}
+
+// keepParity: lo pegado tras la comilla de cierre puede llevar otra comilla («"a"b"»); si el valor tapado se lleva un
+// número impar, el marcador deja una para que Stream.quoted vea en el resto de la línea la misma paridad que antes.
+func keepParity(v string) string {
+	if v != "" && v[0] == '"' && strings.Count(v, `"`)%2 == 1 {
+		return `"`
+	}
+	return ""
+}
+
 func isGuard(v string) bool {
 	if v == "" || v[0] == '"' {
 		return false
@@ -950,15 +999,9 @@ func maskGeneric(line string, counts map[string]int) string {
 		end := 0
 		switch {
 		case rest == "" || rest[0] == ' ' || rest[0] == '\t':
-		case rest[0] == '"':
-			if i := strings.Index(rest[1:], `"`); i >= 0 {
-				end = i + 2
-			} else {
-				end = wordLen(rest)
-			}
 		default:
-			end = wordLen(rest)
-			if line[vs-2] == '0' {
+			end = valueLen(rest)
+			if line[vs-2] == '0' && !onlyQuoted(rest[:end]) {
 				more, _ := tail(rest[end:])
 				end += len(more)
 			}
@@ -970,7 +1013,7 @@ func maskGeneric(line string, counts map[string]int) string {
 			out.WriteString(v)
 		default:
 			counts["secret"]++
-			out.WriteString("<MASKED:secret>")
+			out.WriteString("<MASKED:secret>" + keepParity(v))
 		}
 		pos = vs + end
 	}

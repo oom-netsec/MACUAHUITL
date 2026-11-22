@@ -431,7 +431,24 @@ func twinSpans(orig string, chain func(string) string) [][2]int {
 	}
 	sp := diffSpans(n, chain(n))
 	for i := range sp {
-		sp[i] = [2]int{idx[sp[i][0]], idx[sp[i][1]]}
+		// Hasta los bordes de la palabra: el desescape de «\"» en la cadena también cuenta como cambio, y un tramo a
+		// media palabra dejaba que la 2.ª pasada tapara la palabra entera (fuzz). Así se tapa de más, nunca de menos.
+		a, b := idx[sp[i][0]], idx[sp[i][1]]
+		for a > 0 {
+			r, n := utf8.DecodeLastRuneInString(orig[:a])
+			if unicode.IsSpace(r) {
+				break
+			}
+			a -= n
+		}
+		for b < len(orig) {
+			r, n := utf8.DecodeRuneInString(orig[b:])
+			if unicode.IsSpace(r) {
+				break
+			}
+			b += n
+		}
+		sp[i] = [2]int{a, b}
 	}
 	return sp
 }
