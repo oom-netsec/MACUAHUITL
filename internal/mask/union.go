@@ -230,7 +230,7 @@ func quotedSpansQ(line string, q byte) (spans [][2]int) {
 // tramos de comando que contiene.
 func lineSpans(line, platform string) (string, [][2]int) {
 	if strings.Contains(line, `\"`) {
-		line = strings.ReplaceAll(line, `\"`, `"`)
+		line = unescapeQuotes(line)
 	}
 	// Los tramos salen del original y de la copia con los espacios Unicode normalizados (mismos índices): IOS toma el NBSP
 	// como parte del token, así que un valor puede llevarlo adentro. Se juntan; el corte es sobre el original.
@@ -271,7 +271,7 @@ var hostCmd = regexp.MustCompile(`(?i)^\s*(?:do\s+)?(?:(?:no|default)\s+)*snmp-s
 // CutCommandV es CutCommand con las marcas de cada valor (SecretValue).
 func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 	if strings.Contains(orig, `\"`) {
-		orig = strings.ReplaceAll(orig, `\"`, `"`)
+		orig = unescapeQuotes(orig)
 	}
 	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de los dos textos
 	spans := append(commandSpans(block, orig), quotedSpans(orig)...)
@@ -341,7 +341,7 @@ func endsInKeyword(seg string) bool {
 // SecretStart devuelve dónde empieza, en cmd (tecleado, con el bloque del prompt), lo que Command tapa; -1 si no tapa nada.
 // Sirve para saber qué parte de un eco partido por un syslog cae dentro del secreto.
 func SecretStart(block, cmd string) int {
-	cmd = strings.ReplaceAll(cmd, `\"`, `"`)
+	cmd = unescapeQuotes(cmd)
 	spans := append(commandSpans(block, cmd), quotedSpans(cmd)...)
 	if n := normSpaces(cmd); n != cmd {
 		spans = append(spans, quotedSpans(n)...)

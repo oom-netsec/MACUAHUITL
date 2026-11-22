@@ -283,10 +283,17 @@ func readStream(r *bufio.Reader, from string, emit emitFunc) {
 		line, err := r.ReadSlice('\n')
 		truncated := false
 		if errors.Is(err, bufio.ErrBufferFull) {
-			line, truncated = append([]byte(nil), line[:MaxMessage]...), true
+			// Línea cortada: el fin de línea queda en lo descartado, así que los \r del trozo son contenido y el
+			// mensaje va tal cual, con el tope justo (como el de conteo de octetos).
+			msg := append([]byte(nil), line[:MaxMessage]...)
 			for errors.Is(err, bufio.ErrBufferFull) { // descarta hasta el fin de línea
 				_, err = r.ReadSlice('\n')
 			}
+			emit(from, msg, true)
+			if err != nil {
+				return
+			}
+			continue
 		}
 		if msg := strings.TrimRight(string(line), "\r\n"); msg != "" {
 			if len(msg) > MaxMessage { // el búfer es MaxMessage+16: una línea un poco más larga cabe entera

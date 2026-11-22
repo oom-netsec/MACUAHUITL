@@ -479,7 +479,7 @@ var notQuotedCfg = regexp.MustCompile(`(?i)^\s*(?:(?:\d+\s+)?(?:description|rema
 // última línea citada sin sangría, como en la configuración de verdad.
 func (s *Stream) quoted(line string) string {
 	if strings.Contains(line, `\"`) { // comillas escapadas: son comillas internas de la cita
-		line = strings.ReplaceAll(line, `\"`, `"`)
+		line = unescapeQuotes(line)
 	}
 	first := strings.IndexByte(line, '"')
 	if first < 0 || notQuotedCfg.MatchString(line) {
@@ -508,6 +508,22 @@ func (s *Stream) quoted(line string) string {
 	}
 	return out
 }
+
+// unescapeQuotes: «\"» es una comilla interna de la cita. En cada corrida de barras antes de una comilla, una impar
+// pierde una barra y una par queda igual («\\"» es una barra escapada y una comilla de verdad). Así el resultado ya no
+// cambia en la 2.ª pasada (con «quitar una siempre», «\\"» perdía una barra en cada una: fuzz nocturno 2026-11-21), y
+// las comillas quedan donde las dejaba ese reemplazo. Stream.quoted y union.go (lineSpans, CutCommandV, SecretStart)
+// desescapan con esta misma función: comparan los dos textos.
+func unescapeQuotes(s string) string {
+	return escapedQuote.ReplaceAllStringFunc(s, func(m string) string {
+		if (len(m)-1)%2 == 1 {
+			return m[1:]
+		}
+		return m
+	})
+}
+
+var escapedQuote = regexp.MustCompile(`\\+"`)
 
 // maskQuoted aplica las reglas a un tramo; inside: el tramo va entre comillas (fija el bloque y admite maskCited si
 // parece configuración: empieza en minúscula o con sangría; «Press any key to continue» no cambia).
