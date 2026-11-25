@@ -20,7 +20,9 @@ func TestImportTelnetNoAtaCredencial(t *testing.T) {
 		"SW-SSH,203.0.113.67,,ios-xe,,,admin lab,,,ssh\n" +
 		"SW-TEL,203.0.113.68,,ios-xe,,,,,,telnet\n"
 	ruta := filepath.Join(t.TempDir(), "h.csv")
-	os.WriteFile(ruta, []byte(csv), 0o600)
+	if err := os.WriteFile(ruta, []byte(csv), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	p, err := s.PreviewImportHosts(bg, &v1.PreviewImportHostsRequest{Path: ruta})
 	if err != nil || len(p.Items) != 3 {
 		t.Fatalf("preview: %v %v", p, err)
