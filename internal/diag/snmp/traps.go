@@ -15,6 +15,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd"
 )
 
 // MaxRawTrap es lo que se conserva (en hex) de un paquete que no se pudo decodificar.
@@ -171,6 +172,9 @@ func decodeTrap(x *gosnmp.GoSNMP, b []byte) (t Trap, p *gosnmp.SnmpPacket) {
 	}
 	for _, v := range p.Variables {
 		vv := toVar(v)
+		if s, ok := vv.Value.(string); ok && v.Type == gosnmp.OctetString {
+			vv.Value = string(syslogd.MaskRaw([]byte(s))) // el texto de un syslog (clogHistMsgText) puede traer secretos
+		}
 		if v.Name == oidSnmpTrapOID {
 			t.TrapOID = fmt.Sprint(vv.Value)
 		}
