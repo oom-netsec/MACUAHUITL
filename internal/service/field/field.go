@@ -105,6 +105,9 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		return err
 	}
 	var rx, tx, breaks atomic.Int64
+	// Hasta que el equipo devuelve algo no se sabe en qué está (al reabrir, quizá en «Password:»): lo tecleado a ciegas
+	// no va al grabador (no se graba como tecleado; su eco, si llega, pasa por el enmascarado de la salida).
+	var seen, done atomic.Bool // done: la sesión ya se cierra; lo que llegue después no va al grabador
 	portErr := make(chan error, 1)
 	go func() { // equipo → cliente; solo este goroutine envía por el stream desde aquí
 		buf := make([]byte, 4096)
@@ -113,6 +116,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 			if n > 0 {
 				rx.Add(int64(n))
 				rec.Output(buf[:n])
+				seen.Store(true)
 				st.Send(&v1.ConsoleResponse{Data: append([]byte(nil), buf[:n]...)})
 			}
 			if err != nil {
@@ -136,7 +140,9 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 					rec.Mark("BREAK")
 				}
 			case len(m.GetData()) > 0:
-				rec.Input(m.GetData())
+				if seen.Load() && !done.Load() {
+					rec.Input(m.GetData())
+				}
 				n, err := p.Write(m.GetData())
 				tx.Add(int64(n))
 				if err != nil && !errors.Is(err, os.ErrClosed) { // escritura corta o fallida: que quede en el registro
@@ -159,6 +165,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		lostErr = i18n.Wrap("field.err.port_lost", lost, nil)
 		reason, reasonEN = lostErr.Error(), i18n.English(lostErr)
 	}
+	done.Store(true)
 	rec.Close() // lo que quedó a medias, antes de la marca de cierre
 	rec.Mark("cerrado: " + reason)
 	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))

@@ -1001,7 +1001,7 @@ export const en: Record<Key, string> = {
   "console.output": "Console output",
   "console.cmd": "Command",
   "console.send": "Send",
-  "console.note": "Keystrokes are not recorded (they may be a password); only what the device returns is recorded. BREAK is used to enter ROMMON during boot.",
+  "console.note": "What the device returns and what you type are recorded with secrets masked; anything typed at a password prompt is not recorded. BREAK is used to enter ROMMON during boot.",
   "console.closed": "console closed",
   "console.connected": "connected to {port}; recording to {path}",
   "ssh.title": "SSH terminal",

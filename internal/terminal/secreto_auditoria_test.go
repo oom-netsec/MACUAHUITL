@@ -1,0 +1,149 @@
+package terminal
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+	"time"
+)
+
+func audRec() (*Recorder, *bytes.Buffer) {
+	var b bytes.Buffer
+	return NewRecorder(&b, func() time.Time { return time.Unix(0, 0).UTC() }), &b
+}
+
+// A: la primera tecla de la contraseña sale antes de que llegue «Password:» (latencia): se graba entera.
+func TestSecretoAuditoriaTypeAhead(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nSW1>"))
+	r.Input([]byte("enable\r"))
+	r.Input([]byte("S"))                     // el usuario sigue tecleando sin esperar el eco
+	r.Output([]byte("enable\r\nPassword: ")) // llega el eco y el prompt
+	r.Input([]byte("3cretEnable9\r"))
+	r.Output([]byte("\r\nSW1#"))
+	r.Close()
+	t.Logf("\n%s", b.String())
+	if strings.Contains(b.String(), "S3cretEnable9") {
+		t.Errorf("FUGA: la contraseña de enable quedó en la grabación")
+	}
+}
+
+// B: prompts de secreto reales que secretPrompt no reconoce (más de 30 caracteres o «:» en medio).
+func TestSecretoAuditoriaPrompts(t *testing.T) {
+	for _, p := range []string{
+		"Enter passphrase for key '/home/operador/.ssh/id_ed25519': ",
+		"Password for 'https://operador@git.example.com': ",
+		"Enter password for sa@db-prod-01.example.internal.corp: ",
+		"operador@jump01.dc1.example.internal.corp's password: ",
+		"[sudo] password for operador: ",
+		"Enter passphrase for /home/operador/.ssh/id_ed25519_produccion: ",
+	} {
+		r, b := audRec()
+		r.Output([]byte("\r\njump01> "))
+		r.Input([]byte("ssh core1\r"))
+		r.Output([]byte("ssh core1\r\n" + p))
+		r.Input([]byte("Fr4seSecreta9\r"))
+		r.Output([]byte("\r\ncore1#"))
+		r.Close()
+		if strings.Contains(b.String(), "Fr4seSecreta9") {
+			t.Errorf("FUGA con el prompt %q:\n%s", p, b.String())
+		}
+	}
+}
+
+// C: login automático de Telnet: la contraseña no pasa por Input; si el equipo la devuelve (eco), se graba.
+func TestSecretoAuditoriaTelnetEco(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nUser Access Verification\r\n\r\nUsername: "))
+	r.Output([]byte("admin\r\nPassword: ")) // eco del usuario que mandó el núcleo
+	r.Output([]byte("Cl4veBoveda7\r\n"))    // el equipo devuelve la contraseña que mandó el núcleo
+	r.Output([]byte("SW1>"))
+	r.Close()
+	t.Logf("\n%s", b.String())
+	if strings.Contains(b.String(), "Cl4veBoveda7") {
+		t.Errorf("FUGA: la contraseña de la bóveda quedó en la grabación")
+	}
+}
+
+// A2: el eco rezagado de «enable» marca salida nueva; la contraseña entera se teclea antes de que llegue «Password:».
+func TestSecretoAuditoriaTypeAheadEcoRezagado(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nSW1>"))
+	r.Input([]byte("enabl"))
+	r.Output([]byte("enab"))
+	r.Input([]byte("e\r"))
+	r.Output([]byte("le")) // eco rezagado: llega después del Enter
+	r.Input([]byte("S3cretEnable9\r"))
+	r.Output([]byte("\r\nPassword: "))
+	r.Output([]byte("\r\nSW1#"))
+	r.Close()
+	t.Logf("\n%s", b.String())
+	if strings.Contains(b.String(), "S3cretEnable9") {
+		t.Errorf("FUGA: la contraseña de enable quedó en la grabación")
+	}
+}
+
+// D: un prompt de secreto con eco (diálogo setup de IOS): lo tecleado se oculta, pero el eco del equipo se graba.
+func TestSecretoAuditoriaPromptConEco(t *testing.T) {
+	for _, p := range []string{"  Enter enable secret: ", "  Enter enable password: ", "  Enter virtual terminal password: ", "    Community string [public]: "} {
+		r, b := audRec()
+		r.Output([]byte("\r\n" + p))
+		for _, c := range "Cl4veSetup77" {
+			r.Input([]byte(string(c)))
+			r.Output([]byte(string(c))) // IOS devuelve cada tecla en el diálogo setup
+		}
+		r.Input([]byte("\r"))
+		r.Output([]byte("\r\n  Next: "))
+		r.Close()
+		if strings.Contains(b.String(), "Cl4veSetup77") {
+			t.Errorf("FUGA con %q:\n%s", p, b.String())
+		}
+	}
+}
+
+// Consola: el eco del Enter llega aparte y la primera tecla de la contraseña sale antes de «Password:».
+func TestSecretoAuditoriaPromptTardioConsola(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nUsername: "))
+	r.Input([]byte("admin\r"))
+	r.Output([]byte("admin"))
+	r.Output([]byte("\r\n"))
+	r.Input([]byte("C"))
+	r.Output([]byte("Password: "))
+	r.Input([]byte("isco12345\r"))
+	r.Output([]byte("\r\nSW1>"))
+	r.Close()
+	if s := b.String(); strings.Contains(s, "Cisco12345") || !strings.Contains(s, ">>> admin") {
+		t.Errorf("FUGA o falta el usuario:\n%s", s)
+	}
+}
+
+// Se cae la sesión a mitad de la contraseña: lo tecleado en el prompt de secreto no se graba al cerrar.
+func TestSecretoAuditoriaCierreAMitad(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nSW1>"))
+	r.Input([]byte("enable\r"))
+	r.Output([]byte("enable\r\n"))
+	r.Input([]byte("H"))
+	r.Output([]byte("Password: "))
+	r.Input([]byte("alf3Pass"))
+	r.Close()
+	if strings.Contains(b.String(), "Half3Pass") || strings.Contains(b.String(), "alf3Pass") {
+		t.Errorf("FUGA:\n%s", b.String())
+	}
+}
+
+// Sin tapar de más: un comando normal y su salida siguen igual, y una línea «Key: valor» que no responde a nada
+// tecleado no se toca.
+func TestSecretoAuditoriaSinTaparDeMas(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nSW1#"))
+	r.Input([]byte("show version\r"))
+	r.Output([]byte("show version\r\nCisco IOS Software, Version 15.2\r\nConfiguration register is 0xF\r\nSW1#"))
+	r.Close()
+	for _, want := range []string{">>> show version", "Cisco IOS Software, Version 15.2", "register is 0xF"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("falta %q:\n%s", want, b.String())
+		}
+	}
+}

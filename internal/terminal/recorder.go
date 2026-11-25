@@ -31,7 +31,9 @@ const stamp = "2006-01-02T15:04:05.000Z07:00"
 // secret, psk, token, pin o community string poco antes («New key:», «Enter TACACS+ key:», «PIN:»…). «Press any key
 // to continue:» no cuenta (anyKey).
 var (
-	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^:\r\n]{0,30}:\s*$`)
+	// Lo que sigue a la palabra puede ser largo y traer «:» («Password for 'https://u@git.example.com':», «Enter
+	// passphrase for key '/home/u/.ssh/id_ed25519':»): hasta 120 caracteres.
+	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^\r\n]{0,120}:\s*$`)
 	anyKey       = regexp.MustCompile(`(?i)\bany key\b`)
 )
 
@@ -87,6 +89,7 @@ type Recorder struct {
 	cfg      bool            // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
 	cfgOK    bool            // hay prompt conocido para lo que se teclea; si no, se tapa como en config
 	hidden   bool            // lo tecleado es una contraseña: no se graba
+	echoPr   string          // la línea en curso empezó como un prompt de secreto: lo que el equipo devuelva tras él es el secreto
 	line     []byte          // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
@@ -116,6 +119,13 @@ func (r *Recorder) emit(s string) {
 func (r *Recorder) Output(p []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// La línea a medias es un prompt de secreto («Password: », «Enter enable secret: »): lo que siga en ella es el eco del
+	// secreto (diálogo setup de IOS, el que manda el login automático de Telnet). outLine lo tapa.
+	if r.echoPr == "" && len(r.pend) > 0 && len(r.pend) <= 256 {
+		if l := cleanLine(string(r.pend)); secretPrompt.MatchString(l) && !anyKey.MatchString(l) {
+			r.echoPr = l
+		}
+	}
 	for _, c := range p {
 		if r.pendAt.IsZero() {
 			r.pendAt = r.now()
@@ -136,16 +146,24 @@ func (r *Recorder) Output(p []byte) {
 	if len(r.tail) > tailMax {
 		r.tail = r.tail[len(r.tail)-tailMax:]
 	}
-	r.fresh = true
+	// Solo cuenta como salida nueva si trae un salto de línea: el resto del eco de lo ya tecleado (rezagado tras el
+	// Enter) no es la respuesta del equipo, y la línea siguiente podría ser la contraseña que todavía no se pidió.
+	if strings.ContainsAny(string(p), "\r\n") {
+		r.fresh = true
+	}
 	r.settle()
 }
 
 // outLine enmascara y escribe una línea de salida. El prompt (SW1(config)#) se conserva y se
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
-	// Se borra la secuencia de borrado de --More-- antes de quitar los retornos de carro: no deja sangría falsa.
-	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
-	l = applyBackspaces(strings.ReplaceAll(l, "\r", "")) // el log se lee mejor sin retornos de carro
+	l = cleanLine(l)
+	if pr := r.echoPr; pr != "" {
+		r.echoPr = ""
+		if strings.HasPrefix(l, pr) && strings.TrimSpace(l[len(pr):]) != "" {
+			l = pr + "<MASKED:secret>"
+		}
+	}
 	if r.win > 0 {
 		if r.win--; r.win == 0 {
 			r.secrets = nil
@@ -282,6 +300,13 @@ func (r *Recorder) outLine(l string) {
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+// cleanLine quita escapes, la secuencia de borrado de --More-- (antes de los retornos de carro: no deja sangría falsa),
+// los retornos de carro (el log se lee mejor sin ellos) y aplica los retrocesos.
+func cleanLine(l string) string {
+	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
+	return applyBackspaces(strings.ReplaceAll(l, "\r", ""))
 }
 
 // echoMatch: x es (el comienzo de) alguna línea enviada o de la que se teclea, o, con el eco desplazado, un trozo de ella;
@@ -686,6 +711,11 @@ func (r *Recorder) Input(p []byte) {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
+	// La contraseña empezó a teclearse antes de que llegara el prompt (se revisa en la primera tecla): si al Enter la
+	// salida ya la pide, es la contraseña.
+	if !hidden && line != "" && r.asksSecret() {
+		hidden = true
+	}
 	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
 	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
 	r.cfgOK = false
@@ -741,7 +771,7 @@ func (r *Recorder) Close() {
 		r.pend = nil
 	}
 	r.commitHeld(true)
-	if !r.hidden && len(r.line) > 0 {
+	if !r.hidden && len(r.line) > 0 && !r.asksSecret() { // a mitad de una contraseña: no se graba
 		r.input(r.typedLine(string(r.line), true))
 	}
 	r.hidden, r.line = false, nil
