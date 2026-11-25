@@ -379,14 +379,10 @@ func (r *Recorder) matchEcho(raw, out string) string {
 		e.got, e.seen = "", "" // la línea no continúa el eco: lo recibido no era su comienzo
 	}
 	for i, e := range r.eco {
-		lead, vis := t[:max(len(t)-len(e.text), 0)], out
-		if d := shiftedEcho(t, e.text); d >= 0 {
-			// Lo que IOS cortó al desplazar no se grabó pero tampoco se tapó: cuenta como visible.
-			lead = t[:d]
-			if cut := e.text[:len(e.text)-(len(t)-d-1)]; strings.HasPrefix(out, t[:d+1]) {
-				vis = t[:d] + r.scrub2(r.scrub(cut, false), false) + out[d+1:]
-			}
-		} else if !strings.HasSuffix(t, e.text) || !echoLead(lead) {
+		// El eco desplazado de IOS («R1(config)#$p RM …», una línea larga) no cuenta: sale [hidden] y el eco queda en la
+		// salida. Reconocerlo metió fugas en cada revisión (lo cortado no se ve, pero se grababa en >>>).
+		lead := t[:max(len(t)-len(e.text), 0)]
+		if !strings.HasSuffix(t, e.text) || !echoLead(lead) {
 			continue // «barfoo» no es el eco de «foo», ni «hostname cisco» el de «cisco»
 		}
 		for range r.eco[:i] {
@@ -397,7 +393,7 @@ func (r *Recorder) matchEcho(raw, out string) string {
 			r.input("[hidden]")
 			return tapaFinal(out, e.text)
 		}
-		r.input(visibleOnly(e.out, vis))
+		r.input(visibleOnly(e.out, out))
 		return out
 	}
 	e := &r.eco[0]
@@ -416,20 +412,6 @@ func (r *Recorder) matchEcho(raw, out string) string {
 		}
 	}
 	return out
-}
-
-// shiftedEcho: t es el eco desplazado de IOS de text («R1(config)#$p RM permit 10 …»: la línea no cabe y se ve su
-// final); devuelve dónde está el «$», o -1. El final tiene que ser largo y traer un espacio: uno corto, o uno de una sola
-// palabra (un PIN largo adelantado), podría ser el final de una contraseña.
-func shiftedEcho(t, text string) int {
-	pr := promptRe.FindString(t)
-	if pr == "" || !strings.HasPrefix(t[len(pr):], "$") {
-		return -1
-	}
-	if x := t[len(pr)+1:]; len(x) >= 20 && strings.ContainsAny(x, " \t") && len(x) < len(text) && strings.HasSuffix(text, x) {
-		return len(pr)
-	}
-	return -1
 }
 
 func asksSecretLine(l string) bool { return secretPrompt.MatchString(l) && !anyKey.MatchString(l) }

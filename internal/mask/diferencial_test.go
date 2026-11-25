@@ -365,7 +365,8 @@ func TestIdempotencia(t *testing.T) {
 // igualTerminal: dos grabaciones de terminal con la misma salida, en el mismo orden, y las mismas líneas >>> en el mismo
 // orden entre sí. Desde 2026-11-25 una línea >>> se escribe cuando llega su eco (después de la línea de salida que lo
 // trae, no antes) y puede tapar de más una palabra que la salida tapó (la línea >>> no muestra lo que la salida tapó).
-func igualTerminal(n, o string) bool {
+// Con hiddenOK, una línea >>> puede ser [hidden]: el eco desplazado de IOS no cuenta como eco.
+func igualTerminal(n, o string, hiddenOK bool) bool {
 	sal := func(s string) (out, in []string) {
 		for _, l := range strings.Split(s, "\n") {
 			if _, l, _ = strings.Cut(l, " "); strings.HasPrefix(l, ">>> ") {
@@ -383,6 +384,9 @@ func igualTerminal(n, o string) bool {
 	}
 	salida := strings.Join(no, "\n")
 	for i := range ni {
+		if hiddenOK && ni[i] == "[hidden]" {
+			continue
+		}
 		nw, ow := strings.Fields(ni[i]), strings.Fields(oi[i])
 		if len(nw) != len(ow) {
 			return false
@@ -415,7 +419,7 @@ func TestNegativosIgualAV065(t *testing.T) {
 	var malos []string
 	for _, c := range negativos {
 		for _, v := range vias {
-			if n, o := v.f(nuevo, "ios-xe", c), v.f(viejo, "ios-xe", c); n != o && !(strings.HasPrefix(v.nombre, "terminal") && igualTerminal(n, o)) {
+			if n, o := v.f(nuevo, "ios-xe", c), v.f(viejo, "ios-xe", c); n != o && !(strings.HasPrefix(v.nombre, "terminal") && igualTerminal(n, o, v.nombre == "terminal eco desplazado")) {
 				malos = append(malos, fmt.Sprintf("[%s] %q\n  nueva:  %q\n  v0.6.5: %q", v.nombre, c, n, o))
 			}
 		}

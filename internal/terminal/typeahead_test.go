@@ -228,26 +228,32 @@ func TestEcoTrasPromptDeSecretoYTrozosTapados(t *testing.T) {
 	}
 }
 
-// Eco desplazado de IOS en una línea larga («R1(config)#$p RM permit 10 …»): es el eco de lo tecleado; lo cortado no
-// se tapa, lo que la salida tapó sí. Un trozo corto tras «$» no basta (podría coincidir con una contraseña).
-func TestEcoDesplazado(t *testing.T) {
-	s := sesionTA([]paso{eq("\r\nR1(config)#"), tec("route-map RM permit 10 ; set community 65000:100\r"), eq("$p RM permit 10 ; set community 65000:100\r\nR1(config)#")})
-	if !strings.Contains(s, ">>> route-map RM permit 10 ; set community <MASKED:secret>\n") {
-		t.Errorf("desplazado:\n%s", s)
-	}
-	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Xy9secret\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1#"), eq("\r\nR1#$y9secret\r\nR1#")})
-	if strings.Contains(s, "Xy9secret") || strings.Contains(s, ">>> y9secret") {
-		t.Errorf("trozo corto:\n%s", s)
+// Eco desplazado de IOS en una línea larga («R1(config)#$p RM permit 10 …»): no se toma por eco y lo tecleado sale
+// [hidden] (el eco sigue en la salida). Reconocerlo metió fugas en cada revisión: un secreto conocido partido en el
+// corte, una frase secreta adelantada que el equipo toma como comando, un PIN largo.
+func TestEcoDesplazadoSaleHidden(t *testing.T) {
+	cfg := []paso{eq("\r\nR1(config)#"), tec("snmp-server community Zq7commXYZ RO\r"), eq("snmp-server community Zq7commXYZ RO\r\nR1(config)#"), tec("interface Gi0/11\r"), eq("interface Gi0/11\r\nR1(config-if)#")}
+	for nombre, c := range map[string]struct {
+		pasos []paso
+		nunca string
+	}{
+		"base":                {[]paso{eq("\r\nR1(config)#"), tec("route-map RM permit 10 ; set community 65000:100\r"), eq("$p RM permit 10 ; set community 65000:100\r\nR1(config)#")}, "65000:100"},
+		"secreto en el corte": {append(cfg, tec("description Zq7commXYZ link to the distribution switch\r"), eq("$Z link to the distribution switch\r\nR1(config-if)#")), "Zq7commXY"},
+		"frase adelantada":    {[]paso{eq("\r\nR1#"), tec("enable\r"), tec("correct horse battery staple is my enable pass\r"), eq("enable\r\nR1#"), eq("$e battery staple is my enable pass\r\n  ^\r\n% Invalid input detected at '^' marker.\r\n\r\nR1#")}, "correct hors"},
+		"pin largo":           {[]paso{eq("\r\nR1>"), tec("token\r"), tec("Xy9secretVeryLongPassword2026abc\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1#"), eq("\r\nR1#$secretVeryLongPassword2026abc\r\nR1#")}, "Xy9"},
+	} {
+		if s := sesionTA(c.pasos); strings.Contains(s, c.nunca) || !strings.Contains(s, ">>> [hidden]") {
+			t.Errorf("%s:\n%s", nombre, s)
+		}
 	}
 }
 
-// Revisión 3: lo cortado del eco desplazado pasa por la red de secretos conocidos; un final sin espacios (un PIN largo
-// adelantado) no es eco desplazado; el resto de un secreto partido tras un espacio se tapa; y los trozos de un eco
+// Revisión 3: lo cortado del eco desplazado no deja ver un secreto conocido ni un PIN largo adelantado; el resto de un secreto partido tras un espacio se tapa; y los trozos de un eco
 // partido a media palabra se unen sin espacio para comparar con lo que la salida tapó.
 func TestEcoRevision3(t *testing.T) {
 	cfg := []paso{eq("\r\nR1(config)#"), tec("snmp-server community Zq7comm RO\r"), eq("snmp-server community Zq7comm RO\r\nR1(config)#"), tec("interface Gi0/11\r"), eq("interface Gi0/11\r\nR1(config-if)#")}
 	s := sesionTA(append(cfg, tec("description Zq7comm link to the distribution switch number twelve\r"), eq("$ link to the distribution switch number twelve\r\nR1(config-if)#")))
-	if strings.Contains(s, "Zq7comm") || !strings.Contains(s, ">>> description <MASKED:secret> link to") {
+	if strings.Contains(s, "Zq7comm") {
 		t.Errorf("secreto conocido en lo cortado:\n%s", s)
 	}
 	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Xy9secretVeryLongPassword2026abc\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1#"), eq("\r\nR1#$secretVeryLongPassword2026abc\r\nR1#")})
