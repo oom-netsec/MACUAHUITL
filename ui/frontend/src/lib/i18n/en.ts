@@ -3154,4 +3154,5 @@ export const en: Record<Key, string> = {
   "vault.backup.master": "Current master password",
   "vault.backup.masterHint": "Confirms it is you: the backup gives access to all your credentials.",
   "vault.backup.err.master": "Enter the current master password.",
+  "transfer.log.repeated": "repeated",
 };

@@ -698,3 +698,17 @@ test("servidor: por omisión no se escucha en «Todas»; hay que elegir una IP l
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   expect(core.transferServe).toHaveBeenLastCalledWith(expect.objectContaining({ listen: expect.stringMatching(/^192\.0\.2\.10:/), allowAny: false }));
 });
+
+test("una petición repetida (Cause repeat) sale como «repetida», neutra, y no como rechazada", async () => {
+  const core = await openServer(setup());
+  act(() => {
+    core.emitTransfer({ runId: "r1", ready: ready({ recvDir: "", fromDir: "", files: [] }) });
+    core.emitTransfer({ runId: "r1", line: { Proto: "http", Client: "192.0.2.5", File: "a.bin", Bytes: 0, Duration: 0, Result: "ok", Rejected: true, Cause: "repeat", Error: "repetida" } });
+  });
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  await waitFor(() => expect(within(card).getByRole("table")).toBeInTheDocument());
+  const row = within(within(card).getByRole("table")).getAllByRole("row")[1];
+  expect(row.textContent?.match(/repetida/g)).toHaveLength(1); // la insignia ya lo dice: el texto del núcleo no se repite
+  expect(row).not.toHaveTextContent("rechazada");
+  expect(row.querySelector(".badge")).not.toHaveAttribute("data-tone");
+});
