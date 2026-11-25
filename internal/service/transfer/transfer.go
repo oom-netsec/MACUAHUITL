@@ -169,6 +169,9 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	loc := i18n.Locale(ctx)
 	cfg.OnStart = srv.reg.Start
 	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t, loc) }
+	cfg.OnRepeats = func(x fileserve.Repeats) {
+		s.d.Audit("transfer.serve.repeats", x.Client, fmt.Sprintf("server=%s proto=http file=%q repeats=%d", id, x.File, x.N))
+	}
 	cfg.OnReady = func(rd fileserve.Ready) {
 		from, recv := fileserve.Folders(cfg)
 		s.mu.Lock()

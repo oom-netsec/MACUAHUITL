@@ -69,7 +69,18 @@ func (l *limiter) fail(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.blockedLocked(ip) // si el bloqueo ya venció, vuelve a contar desde cero
-	f := l.fails[ip]
+	f, ok := l.fails[ip]
+	if !ok && len(l.fails) >= maxSeenIPs {
+		now := l.now()
+		for k, v := range l.fails { // poda los vencidos
+			if now.Sub(v.last) >= lockoutFor {
+				delete(l.fails, k)
+			}
+		}
+		if len(l.fails) >= maxSeenIPs {
+			return // lleno: no se cuenta (no se pierde nada de lo ya bloqueado)
+		}
+	}
 	l.fails[ip] = failState{f.n + 1, l.now()}
 }
 
@@ -149,60 +160,84 @@ func (c *idleConn) Write(p []byte) (int, error) {
 // Cupo de auditoría de HTTP: por IP y ventana, auditPerWindow respuestas se auditan (la primera siempre); el resto
 // solo se cuenta como rechazo, salvo cuerpos de bigBody o más, que siempre se auditan.
 const (
-	auditPerWindow = 5
-	auditWindow    = time.Minute
-	bigBody        = 1 << 20
-	maxSeenIPs     = 4096
+	auditWindow = time.Minute
+	maxSeenIPs  = 4096
 )
 
-// auditQuota lleva el cupo de auditoría por IP y ventana. El mapa se acota a maxSeenIPs: lleno y sin ventanas
-// vencidas que podar, una IP nueva no entra y se cuenta como rechazo (solo las grandes se auditan).
+// Repeats resume las repeticiones de un archivo desde una IP dentro de una ventana.
+type Repeats struct {
+	Client, File string
+	N            int
+}
+
+// auditQuota agrupa las repeticiones del mismo archivo desde la misma IP: la primera de cada ventana se audita
+// normal y las siguientes solo se cuentan; al cerrar la ventana (o al detener el servidor, flush) sale el resumen.
+// El mapa se acota a maxSeenIPs: lleno y sin ventanas vencidas que podar, una clave nueva no se guarda y se
+// audita (más seguro auditar de más que perder la primera).
 type auditQuota struct {
 	mu    sync.Mutex
-	m     map[string]*auditWin
+	m     map[auditKey]*auditWin
 	now   func() time.Time
 	prune time.Time // última poda de ventanas vencidas (a lo más una por ventana)
 }
 
+type auditKey struct{ ip, file string }
+
 type auditWin struct {
 	start time.Time
-	n     int
+	reps  int
 }
 
 func newAuditQuota(now func() time.Time) *auditQuota {
-	return &auditQuota{m: map[string]*auditWin{}, now: now}
+	return &auditQuota{m: map[auditKey]*auditWin{}, now: now}
 }
 
-// take dice si esta respuesta de ip entra al cupo de auditoría.
-func (q *auditQuota) take(ip string) bool {
+// take dice si esta respuesta se audita normal; closed trae los resúmenes de las ventanas que cerró.
+func (q *auditQuota) take(ip, file string) (allowed bool, closed []Repeats) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	now := q.now()
-	w := q.m[ip]
+	k := auditKey{ip, file}
+	w := q.m[k]
 	if w == nil {
 		if len(q.m) >= maxSeenIPs && now.Sub(q.prune) >= auditWindow {
 			q.prune = now
-			for k, v := range q.m {
+			for kk, v := range q.m {
 				if now.Sub(v.start) >= auditWindow {
-					delete(q.m, k)
+					if v.reps > 0 {
+						closed = append(closed, Repeats{kk.ip, kk.file, v.reps})
+					}
+					delete(q.m, kk)
 				}
 			}
 		}
-		if len(q.m) >= maxSeenIPs {
-			return false
+		if len(q.m) < maxSeenIPs {
+			q.m[k] = &auditWin{start: now}
 		}
-		q.m[ip] = &auditWin{start: now, n: 1}
-		return true
+		return true, closed
 	}
 	if now.Sub(w.start) >= auditWindow {
-		w.start, w.n = now, 1
-		return true
+		if w.reps > 0 {
+			closed = append(closed, Repeats{ip, file, w.reps})
+		}
+		w.start, w.reps = now, 0
+		return true, closed
 	}
-	if w.n < auditPerWindow {
-		w.n++
-		return true
+	w.reps++
+	return false, nil
+}
+
+// flush devuelve los resúmenes pendientes y vacía el cupo.
+func (q *auditQuota) flush() (out []Repeats) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for k, v := range q.m {
+		if v.reps > 0 {
+			out = append(out, Repeats{k.ip, k.file, v.reps})
+		}
 	}
-	return false
+	q.m = map[auditKey]*auditWin{}
+	return out
 }
 
 // ipBusy dice si ip llegó a su tope de conexiones simultáneas (y no solo el global).

@@ -62,6 +62,7 @@ const (
 	CauseReadDisabled  = "read_disabled"
 	CauseMethod        = "method"
 	CauseBusy          = "busy"
+	CauseRepeat        = "repeat"
 	CauseOther         = "other"
 )
 
@@ -101,8 +102,18 @@ type Config struct {
 	// OnStart (opcional) avisa que una transferencia empezó; su Live avanza hasta que llega
 	// OnTransfer con la misma Transfer.Live. Los rechazos no la llaman.
 	OnStart func(*Live)
+	// OnRepeats (HTTP, opcional) recibe el resumen de las repeticiones de un archivo desde una IP al cerrar su
+	// ventana o al detener el servidor.
+	OnRepeats func(Repeats)
 	// Now (opcional) es el reloj del núcleo para los plazos de bloqueo; nil = time.Now.
 	Now func() time.Time
+}
+
+// repeats entrega un resumen de repeticiones, si alguien lo escucha.
+func (c Config) repeats(r Repeats) {
+	if c.OnRepeats != nil {
+		c.OnRepeats(r)
+	}
 }
 
 // clock da el reloj inyectado o el del sistema.

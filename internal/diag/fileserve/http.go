@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // netAddr adapta r.RemoteAddr (texto) a net.Addr para hostOf.
@@ -29,6 +28,7 @@ type countingWriter struct {
 	status int
 	err    error
 	live   *Live
+	idle   time.Duration           // plazo de inactividad de escritura
 	begin  func(total int64) *Live // arranca la sesión en la primera cabecera 2xx de un GET
 }
 
@@ -43,7 +43,7 @@ func (w *countingWriter) WriteHeader(s int) {
 }
 func (w *countingWriter) Write(b []byte) (int, error) {
 	// Plazo de inactividad: se renueva en cada escritura (ErrNotSupported fuera de un servidor real: se ignora).
-	http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(httpWriteIdle))
+	http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(w.idle))
 	n, err := w.ResponseWriter.Write(b)
 	w.n += int64(n)
 	w.live.add(int64(n))
@@ -60,6 +60,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	}
 	lim := newLimiter(c.clock) // cupo global y por IP; aquí no hay contraseñas
 	quota := newAuditQuota(c.clock)
+	writeIdle := httpWriteIdle // se lee una vez: las pruebas lo cambian entre servidores
 	// srv.Close no espera a los handlers: Serve los espera para no volver antes de su OnTransfer (el que
 	// llama cierra su canal de eventos al volver y una transferencia tardía se perdería de la auditoría).
 	var (
@@ -120,11 +121,14 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		// con Range inválidos no desplaza la historia). El arranque es perezoso, en WriteHeader.
 		// El cupo se decide antes de servir: sin cupo no hay sesión (salvo cuerpos grandes), y lo que no abre
 		// sesión puede salir como contado; una sesión abierta nunca termina como rechazo.
-		allowed := quota.take(ip)
-		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK}
+		allowed, closed := quota.take(ip, name)
+		for _, x := range closed {
+			c.repeats(x)
+		}
+		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK, idle: writeIdle}
 		if r.Method == http.MethodGet {
 			cw.begin = func(total int64) *Live {
-				if !allowed && total < bigBody {
+				if !allowed {
 					return nil
 				}
 				return c.start(t, total)
@@ -140,13 +144,12 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		default:
 			t.Result = "ok"
 		}
-		// Sin cupo y sin sesión: se cuenta como rechazo (no es un fallo de la transferencia) y no se audita.
-		if !allowed && cw.live == nil && cw.err == nil {
-			t.Rejected, t.Cause = true, CauseOther
-			t.Error, t.ReasonT = "", i18n.Text{}
-			if cw.status >= 400 {
-				t.Result = "error"
-				t.Error = fmt.Sprintf("HTTP %d", cw.status)
+		// Repetición del mismo archivo desde la misma IP: se cuenta con motivo propio (sin sesión ni auditoría una
+		// por una); la interrumpida o con error conserva su texto.
+		if !allowed {
+			t.Rejected, t.Cause = true, CauseRepeat
+			if t.Result == "ok" {
+				t.Error, t.ReasonT = "repetida", lit("repetida")
 			}
 		}
 	})
@@ -169,6 +172,9 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	stopped = true
 	hmu.Unlock()
 	active.Wait()
+	for _, x := range quota.flush() {
+		c.repeats(x)
+	}
 	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
