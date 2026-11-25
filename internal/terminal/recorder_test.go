@@ -41,6 +41,9 @@ func TestNoGrabaLoTecleadoEnUnPromptDeContrasena(t *testing.T) {
 		r.Input([]byte("\r"))
 		r.Output([]byte("\r\nSW1#"))
 		r.Input([]byte("show clock\r"))
+		// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+		// equipo hace eco, como uno real.
+		r.Output([]byte("show clock\r\n"))
 		r.Close()
 		out := b.String()
 		if strings.Contains(out, "s3cr3t") {
@@ -59,6 +62,9 @@ func TestPromptPartidoYContrasenaPegada(t *testing.T) {
 	r.Output([]byte("word"))
 	r.Output([]byte(": "))
 	r.Input([]byte("s3cr3t-Y\rshow version\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("\r\nSW1#show version\r\n"))
 	r.Close()
 	out := b.String()
 	if strings.Contains(out, "s3cr3t") || !strings.Contains(out, ">>> show version") {
@@ -72,6 +78,9 @@ func TestSinPromptDeContrasenaSeGrabaLoTecleado(t *testing.T) {
 	r.Input([]byte("show run | include password\r")) // la palabra en un comando no es un prompt
 	r.Output([]byte("show run | include password\r\nSW1#"))
 	r.Input([]byte("clock\x7f\x7f\x7f\x7f\x7fexit\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("exit\r\n"))
 	r.Close()
 	out := b.String()
 	if !strings.Contains(out, ">>> show run | include password") || !strings.Contains(out, ">>> exit") || strings.Contains(out, "clock") {
@@ -85,6 +94,9 @@ func TestCtrlCCancelaElModoOculto(t *testing.T) {
 	r.Input([]byte("abc\x03"))
 	r.Output([]byte("\r\nSW1>"))
 	r.Input([]byte("show clock\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("show clock\r\n"))
 	r.Close()
 	if out := b.String(); strings.Contains(out, "abc") || !strings.Contains(out, ">>> show clock") {
 		t.Errorf("%s", out)
@@ -95,6 +107,9 @@ func TestCtrlCCancelaElModoOculto(t *testing.T) {
 func TestCierreConLineaAMedias(t *testing.T) {
 	r, b := newRec()
 	r.Input([]byte("show ver"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("SW1#show ver"))
 	r.Close()
 	if !strings.Contains(b.String(), ">>> show ver") {
 		t.Errorf("%s", b.String())
@@ -111,6 +126,9 @@ func TestCierreConLineaAMedias(t *testing.T) {
 func TestEnmascaraSecretosEnComandosTecleados(t *testing.T) {
 	r, b := newRec()
 	r.Input([]byte("username bob secret 0 Hunter2xyz\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("username bob secret 0 Hunter2xyz\r\n"))
 	r.Close()
 	if out := b.String(); strings.Contains(out, "Hunter2xyz") || !strings.Contains(out, "<MASKED:") {
 		t.Errorf("%s", out)
@@ -166,6 +184,9 @@ func TestContrasenaTecleadaAntesDelPrompt(t *testing.T) {
 		r.Output([]byte("Password: "))
 		r.Output([]byte("\r\nSW1#"))
 		r.Input([]byte("show clock\r"))
+		// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+		// equipo hace eco, como uno real.
+		r.Output([]byte("show clock\r\n"))
 		r.Close()
 		out := b.String()
 		if strings.Contains(out, "EnSecret9") || !strings.Contains(out, ">>> [hidden]") || !strings.Contains(out, ">>> enable") || !strings.Contains(out, ">>> show clock") {
@@ -181,6 +202,9 @@ func TestLoRetenidoSeGrabaSiNoEraContrasena(t *testing.T) {
 	r.Input([]byte("show clock\rshow version\r"))
 	r.Output([]byte("show clock\r\n10:00\r\nSW1#"))
 	r.Input([]byte("a\rb\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("show version\r\nCisco IOS\r\nSW1#a\r\n% Invalid input\r\nSW1#b\r\n"))
 	r.Close()
 	out := b.String()
 	for _, want := range []string{">>> show clock", ">>> show version", ">>> a", ">>> b"} {
@@ -278,6 +302,9 @@ func TestSalirDelBloqueQuitaElBloqueDelTeclado(t *testing.T) {
 	r.Input([]byte("exit\r"))
 	r.Output([]byte("exit\r\nciscoasa(config)# "))
 	r.Input([]byte("hostname FW1\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("hostname FW1\r\n"))
 	r.Close()
 	if out := b.String(); !strings.Contains(out, ">>> hostname FW1") {
 		t.Errorf("%s", out)
@@ -312,6 +339,9 @@ func TestPromptNuevoReiniciaElBloqueDeLoTecleado(t *testing.T) {
 	r.Input([]byte("exit\r"))
 	r.Output([]byte("exit\r\nciscoasa(config)# "))
 	r.Input([]byte("hostname FW1\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("hostname FW1\r\n"))
 	r.Close()
 	if out := b.String(); !strings.Contains(out, ">>> hostname FW1") {
 		t.Errorf("%s", out)
@@ -792,7 +822,9 @@ func TestAireOSPromptYRedPorContenido(t *testing.T) {
 	// Varias líneas pegadas sin salida entre ellas: se retienen y se graban al llegar el prompt.
 	r.Input([]byte("config snmp community create Comun1dad\r"))
 	r.Input([]byte("show ap summary\r"))
-	r.Output([]byte("(Cisco Controller) >"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	r.Output([]byte("config snmp community create Comun1dad\r\nshow ap summary\r\n\r\n(Cisco Controller) >"))
 	r.Close()
 	out := b.String()
 	for _, s := range []string{"Secreta1", "Rad1usK3y", "Comun1dad"} {
