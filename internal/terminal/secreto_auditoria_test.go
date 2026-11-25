@@ -155,3 +155,24 @@ func TestSecretoAuditoriaEcoPartidoConDosPuntos(t *testing.T) {
 		t.Errorf("FUGA:\n%s", b.String())
 	}
 }
+
+// «Password:» sin espacio y su eco tapado no parece un prompt: la red por contenido sigue viva para lo que repita después
+// el valor tecleado antes (revisión final).
+func TestSecretoAuditoriaEcoTapadoNoEsPrompt(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nR1(config)#"))
+	for _, c := range "username a secret Xyz12345" {
+		r.Input([]byte(string(c)))
+		r.Output([]byte(string(c)))
+	}
+	r.Input([]byte("\r"))
+	r.Output([]byte("\r\n"))
+	r.Output([]byte("Password:"))
+	r.Input([]byte("abcPw99"))
+	r.Output([]byte("abcPw99"))
+	r.Output([]byte("\r\nUser Xyz12345 rejected\r\nR1(config)#"))
+	r.Close()
+	if s := b.String(); strings.Contains(s, "abcPw99") || strings.Contains(s, "Xyz12345") {
+		t.Errorf("FUGA:\n%s", s)
+	}
+}

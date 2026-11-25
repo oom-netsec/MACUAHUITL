@@ -148,10 +148,11 @@ func (r *Recorder) Output(p []byte) {
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
 	l = cleanLine(l)
+	masked := ""
 	if pr := r.echoPr; pr != "" {
 		r.echoPr = ""
 		if strings.HasPrefix(l, pr) && strings.TrimSpace(l[len(pr):]) != "" {
-			l = pr + "<MASKED:secret>"
+			masked = pr + "<MASKED:secret>"
 		}
 	}
 	if r.win > 0 {
@@ -163,6 +164,10 @@ func (r *Recorder) outLine(l string) {
 		if r.win2--; r.win2 == 0 {
 			r.secrets2, r.multi2, r.prim2 = nil, nil, nil
 		}
+	}
+	if masked != "" { // el eco de un secreto contestado: se emite tapado y no pasa por el análisis (con «Password:» sin espacio parecería un prompt)
+		r.emit(r.pendAt.Format(stamp) + " " + masked + "\n")
+		return
 	}
 	out, keep := "", true
 	// Un eco partido por un syslog sigue en la línea siguiente aunque esta lleve «#» o «>» del secreto («Pa55#Xq7») y parezca
