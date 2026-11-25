@@ -132,7 +132,7 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	}
 	h.logMu.Unlock()
 	a := h.d.AuditText()
-	// La orden puede llevar un secreto en la línea de comandos («mysql -pX»): la auditoría y la grabación solo llevan su huella.
+	// La orden puede llevar un secreto en la línea de comandos («mysql -pX»): la auditoría y la grabación solo dicen que la hay.
 	if !strings.Contains(a, `host=h1 startup=set`) || strings.Contains(a, "macuahuitl-ok") {
 		t.Fatalf("auditoría: falta host=/startup=set o trae la orden:\n%s", a)
 	}

@@ -70,8 +70,9 @@ func hostFromPB(p *v1.Device) devices.Host {
 
 func portPB(h devices.Host) *v1.DeviceProfile { return &v1.DeviceProfile{Port: uint32(h.Port)} }
 
-// auditHost anota sin notas ni credencial: solo quién es y adónde apunta.
-func (s *svc) auditHost(action string, h devices.Host) {
+// auditHost anota sin notas ni credencial: solo quién es y adónde apunta. prevStart (solo al editar) es la orden de
+// inicio anterior: se anota si cambió, sin su texto.
+func (s *svc) auditHost(action string, h devices.Host, prevStart *string) {
 	d := fmt.Sprintf("%s %s:%s", h.Name, h.Address, strconv.Itoa(h.Port))
 	if h.Platform != "" {
 		d += " platform=" + h.Platform
@@ -81,6 +82,9 @@ func (s *svc) auditHost(action string, h devices.Host) {
 	}
 	if h.StartupCommand != "" { // solo que la hay: su texto puede llevar un secreto en la línea de comandos («mysql -pX»)
 		d += " startup=set"
+	}
+	if prevStart != nil && *prevStart != h.StartupCommand {
+		d += " startup_changed=true"
 	}
 	s.d.Audit(action, h.ID, d)
 }
@@ -123,6 +127,7 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 	}
 	now := s.clock().UTC().Truncate(time.Second)
 	action, fnew := "hosts.crear", ""
+	var prevStart *string
 	err = s.tx(func(tx *sql.Tx) error {
 		all, err := loadHosts(tx)
 		if err != nil {
@@ -143,6 +148,7 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 				return internal(err)
 			}
 			h.CreatedAt, action = old.CreatedAt, "hosts.editar"
+			prevStart = &old.StartupCommand
 		}
 		for _, o := range all {
 			switch {
@@ -165,7 +171,7 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 		return nil, err
 	}
 	s.auditNewFolders("put", fnew)
-	s.auditHost(action, h)
+	s.auditHost(action, h, prevStart)
 	out.Id = h.ID
 	return out, nil
 }
@@ -189,6 +195,6 @@ func (s *svc) DeleteDevice(ctx context.Context, r *v1.DeleteDeviceRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	s.auditHost("hosts.borrar", h)
+	s.auditHost("hosts.borrar", h, nil)
 	return &v1.DeleteDeviceResponse{}, nil
 }

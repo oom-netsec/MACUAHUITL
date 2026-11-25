@@ -83,6 +83,10 @@ Decisión del dueño (2026-11-16): la orden de inicio y las credenciales `key` v
   - La UI manda la orden que mostró (`expected_startup_command`) y, si no es igual a la guardada, no se conecta.
 - CheckDenied no aplica, porque es el terminal manual, como hoy. La UI lo dice junto a la orden.
 - La orden no es un secreto: queda en la auditoría y en la grabación, y la UI avisa que no lleve secretos (decisión de Release).
+  **Cambio (2026-11-25, auditoría de secretos):** la orden puede llevar un secreto en la línea de comandos que el
+  enmascarado no reconoce («mysql -pX»), así que su texto ya no va a la auditoría ni a la grabación: `terminal.open`,
+  `hosts.crear` y `hosts.editar` anotan `startup=set` (y `startup_changed=true` si una edición la cambió) y la grabación
+  una marca sin texto. Sigue en claro en la libreta y en sus exports, y la UI sigue avisando que no lleve secretos.
 - La orden viaja en el export/import de hosts. Un archivo ajeno puede traer una orden, pero no corre sin verse dos veces: la vista previa del import marca cada host que la trae (`has_startup_command`) y la muestra antes de aceptar, y el terminal no conecta si la orden guardada no es la que la UI mostró al conectar.
 
 ## Consecuencias

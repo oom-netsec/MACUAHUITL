@@ -238,3 +238,24 @@ func TestGenericHostAtYSavedHost(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// Al editar, la auditoría dice si la orden de inicio cambió, sin su texto.
+func TestEditarAuditaSiCambioLaOrden(t *testing.T) {
+	s, d := nuevoSvc(t)
+	r, err := s.PutDevice(bg, &v1.PutDeviceRequest{Device: &v1.Device{Name: "jump", Target: &v1.Target{Address: "10.0.0.9"}, Platform: "linux", StartupCommand: "mysql -pUno1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		orden, quiero string
+	}{{"mysql -pUno1", ""}, {"mysql -pDos2", "startup_changed=true"}} {
+		if _, err := s.PutDevice(bg, &v1.PutDeviceRequest{Device: &v1.Device{Id: r.Id, Name: "jump", Target: &v1.Target{Address: "10.0.0.9"}, Platform: "linux", StartupCommand: c.orden}}); err != nil {
+			t.Fatal(err)
+		}
+		a := d.AuditText()
+		ultima := a[strings.LastIndex(a, "hosts.editar"):]
+		if strings.Contains(ultima, "startup_changed") != (c.quiero != "") || strings.Contains(a, "Uno1") || strings.Contains(a, "Dos2") {
+			t.Fatalf("%q: %s", c.orden, ultima)
+		}
+	}
+}
