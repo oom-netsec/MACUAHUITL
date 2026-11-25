@@ -10,6 +10,26 @@ import (
 type ejemploRegla struct{ block, platform, line string }
 
 var ejemplosReglas = []ejemploRegla{
+	// Pasada de auditoría de noviembre (sin validar en laboratorio).
+	{"", "ios", " ip msdp vrf RED password peer 1.1.1.1 Cl4ve"},
+	{"", "ios", "aaa pod server server-key Cl4ve"},
+	{"", "ios", "ip rsvp authentication key Cl4ve"},
+	{"", "ios", " keyring aaa L name-mangler M password Cl4ve"},
+	{"", "ios", " authentication local eap mschapv2 username U password Cl4ve"},
+	{"", "ios", " credentials username 1 password Cl4ve realm r"},
+	{"", "ios", " web admin system name A password Cl4ve"},
+	{"", "ios", " xml user U password Cl4ve 15"},
+	{"", "ios", " ppp eap password Cl4ve"},
+	{"", "ios", " encryption key 1 size 128bit Cl4ve transmit-key"},
+	{"", "nx-os", "radius-server host 1.1.1.1 test username U password Cl4ve"},
+	{"", "nx-os", "cts sxp connection peer 1.1.1.1 password required Cl4ve mode speaker"},
+	{"", "asa", " http-proxy 1.1.1.1 80 username U password Cl4ve"},
+	{"", "asa", " rip authentication key Cl4ve key_id 1"},
+	{"vpnlb", "asa", " cluster key Cl4ve"},
+	{"mount", "asa", " password Cl4ve"},
+	{"radiuslocal", "ios", " nas 1.1.1.1 key Cl4ve"},
+	{"radiuslocal", "ios", " user U nthash Cl4ve"},
+	{"l2tp", "ios", " digest secret Cl4ve hash sha"},
 	{"", "ios", "enable secret 0 Cl4ve"},
 	{"", "ios", "username U secret 0 Cl4ve"},
 	{"", "ios", "snmp-server community Cl4ve RO"},
