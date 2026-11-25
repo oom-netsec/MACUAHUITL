@@ -35,6 +35,9 @@ var (
 	// passphrase for key '/home/u/.ssh/id_ed25519':»): hasta 120 caracteres.
 	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^\r\n]{0,120}:\s*$`)
 	anyKey       = regexp.MustCompile(`(?i)\bany key\b`)
+	// pwPrompt: una línea completa que pedía contraseña («Password:», «[sudo] password for bob:»). Más estrecho que
+	// secretPrompt, que también ve «Key Data:» en la salida de un show.
+	pwPrompt = regexp.MustCompile(`(?i)\bpass(?:word|phrase|code| phrase)\b[^:\r\n]{0,30}:\s*$`)
 )
 
 var (
@@ -72,6 +75,7 @@ type Recorder struct {
 	fresh    bool        // llegó salida desde el último Enter
 	eco      []ecoPend   // lo tecleado (sin las contraseñas en su prompt) que espera su eco para grabarse: ver matchEcho
 	lastOut  string      // la última línea de salida tal como se grabó (enmascarada)
+	answered bool        // flush grabó [hidden] la respuesta al prompt de contraseña que la salida aún no termina
 	lastBlk  string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed    mask.Stream // lleva el bloque entre las líneas tecleadas
 	sent     []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
@@ -171,6 +175,7 @@ func (r *Recorder) outLine(l string) {
 	}
 	if masked != "" { // el eco de un secreto contestado: se emite tapado y no pasa por el análisis (con «Password:» sin espacio parecería un prompt)
 		r.emit(r.pendAt.Format(stamp) + " " + masked + "\n")
+		r.answered = false // esta es la línea del prompt que ya tenía respuesta
 		return
 	}
 	out, keep := "", true
@@ -297,9 +302,10 @@ func (r *Recorder) outLine(l string) {
 		out = mask.CutFrom(l, out, cover)
 	}
 	if !keep {
-		out = ""
+		r.matchEcho(raw, "<MASKED:private-key>") // la salida no grabó esta línea: >>> tampoco muestra nada de ella
+	} else {
+		r.matchEcho(raw, out)
 	}
-	r.matchEcho(raw, out)
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 		r.lastOut = out
@@ -322,10 +328,23 @@ type ecoPend struct{ text, out, got string } // got: lo que ya llegó del eco cu
 // grabó: lo tecleado no muestra nada que ahí quedó tapado (visibleOnly). Requiere r.mu.
 func (r *Recorder) matchEcho(raw, out string) {
 	t := strings.TrimRight(raw, " \t")
-	if len(r.eco) > 0 && t != "" && !equipoMsg(strings.TrimSpace(t)) {
-		// Eco partido por un syslog: «R1#show cl», el mensaje, «ock». Se recuerda el comienzo y el resto lo completa.
-		e := &r.eco[0]
-		if rest := e.text[len(e.got):]; e.got != "" && (strings.HasPrefix(rest, t) || strings.HasPrefix(rest, strings.TrimLeft(t, " \t"))) {
+	answered := r.answered
+	r.answered = false
+	if len(r.eco) == 0 || t == "" || equipoMsg(strings.TrimSpace(t)) {
+		return
+	}
+	if !answered && pwPrompt.MatchString(raw) && promptRe.FindString(raw) == "" {
+		// La línea que pide la contraseña se completa con el Enter de su respuesta: si se tecleó antes de que llegara
+		// (flush no la vio), la primera pendiente es esa respuesta, que no hace eco. Si se quedara en la cola, una línea
+		// posterior que terminara igual se tomaría por su eco.
+		r.eco[0].got = ""
+		r.input("[hidden]")
+		r.eco = r.eco[1:]
+		return
+	}
+	// Eco partido por un syslog: «R1#show cl», el mensaje, «ock». Se recuerda el comienzo y el resto lo completa.
+	if e := &r.eco[0]; e.got != "" {
+		if rest := e.text[len(e.got):]; strings.HasPrefix(rest, t) || strings.HasPrefix(rest, strings.TrimLeft(t, " \t")) {
 			if strings.HasPrefix(rest, t) {
 				e.got += t
 			} else {
@@ -337,21 +356,11 @@ func (r *Recorder) matchEcho(raw, out string) {
 			}
 			return
 		}
-		for k := len(e.text) - 1; k > 0; k-- {
-			if strings.HasSuffix(t, e.text[:k]) {
-				if p := t[:len(t)-k]; p == "" || !isWordByte(p[len(p)-1]) {
-					e.got = e.text[:k]
-					return
-				}
-			}
-		}
+		e.got = "" // la línea no continúa el eco: lo recibido no era su comienzo
 	}
 	for i, e := range r.eco {
-		if !strings.HasSuffix(t, e.text) {
-			continue
-		}
-		if p := t[:len(t)-len(e.text)]; p != "" && isWordByte(p[len(p)-1]) {
-			continue // «barfoo» no es el eco de «foo»
+		if !strings.HasSuffix(t, e.text) || !echoLead(t[:len(t)-len(e.text)]) {
+			continue // «barfoo» no es el eco de «foo», ni «hostname cisco» el de «cisco»
 		}
 		for range r.eco[:i] {
 			r.input("[hidden]")
@@ -360,6 +369,20 @@ func (r *Recorder) matchEcho(raw, out string) {
 		r.eco = r.eco[i+1:]
 		return
 	}
+	e := &r.eco[0]
+	for k := len(e.text) - 1; k > 0; k-- {
+		if strings.HasSuffix(t, e.text[:k]) && echoLead(t[:len(t)-k]) {
+			e.got = e.text[:k]
+			return
+		}
+	}
+}
+
+// echoLead: lo que precede a un eco en su línea es nada, un prompt o una pregunta («R1#», «$ », «Username: »,
+// «[confirm]», «filename [x]? »); otro texto («hostname », «grep -c ») hace que la línea sea salida, no eco.
+func echoLead(p string) bool {
+	p = strings.TrimRight(p, " \t")
+	return p == "" || strings.ContainsRune("#>$%:?]", rune(p[len(p)-1]))
 }
 
 var token = regexp.MustCompile(`\S+`)
@@ -372,11 +395,27 @@ func visibleOnly(typed, out string) string {
 		return typed
 	}
 	return token.ReplaceAllStringFunc(typed, func(w string) string {
-		if strings.Contains(w, "<MASKED:") || strings.Contains(out, w) {
+		if strings.Contains(w, "<MASKED:") || shownWord(out, w) {
 			return w
 		}
 		return "<MASKED:secret>"
 	})
+}
+
+// shownWord: w aparece en out como palabra del eco: tras el inicio, un espacio o el prompt, y antes de un espacio o del
+// final. «cisco» dentro de «cisco-sw1(config)#» no cuenta.
+func shownWord(out, w string) bool {
+	for i := 0; ; {
+		j := strings.Index(out[i:], w)
+		if j < 0 {
+			return false
+		}
+		a, b := i+j, i+j+len(w)
+		if (a == 0 || strings.ContainsRune(" \t#>$%", rune(out[a-1]))) && (b == len(out) || out[b] == ' ' || out[b] == '\t') {
+			return true
+		}
+		i = a + 1
+	}
 }
 
 // echoMatch: x es (el comienzo de) alguna línea enviada o de la que se teclea, o, con el eco desplazado, un trozo de ella;
@@ -772,6 +811,7 @@ func (r *Recorder) flush() {
 	switch {
 	case hidden:
 		r.input("[hidden]")
+		r.answered = true // la línea del prompt, al completarse, ya tiene su respuesta
 	case line == "":
 	default:
 		// Se enmascara ya (con el bloque del prompt de ahora; sus valores entran a la red por contenido para tapar el

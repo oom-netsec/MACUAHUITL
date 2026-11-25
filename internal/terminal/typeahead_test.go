@@ -147,3 +147,58 @@ func TestEcoPartidoEnTrozosSeReconstruye(t *testing.T) {
 		t.Errorf("sin eco:\n%s", s)
 	}
 }
+
+// Revisión 1 de la opción A: una línea de salida que termina como la contraseña adelantada no es su eco, ni dos líneas
+// ajenas arman el eco; >>> no muestra lo que la salida no grabó ni una palabra que solo aparece dentro de otra.
+func TestEcoNoSeConfundeConLaSalida(t *testing.T) {
+	casos := []struct {
+		nombre, nunca, siempre string
+		pasos                  []paso
+	}{
+		{"comando que termina en la contraseña", ">>> cisco\n", ">>> show run | i cisco", []paso{eq("\r\nR1>"), tec("enable\r"), tec("cisco\r"), eq("enable\r\nPassword: "), eq("\r\nR1#"), tec("show run | i cisco\r"), eq("show run | i cisco\r\nhostname R1\r\nR1#")}},
+		{"su que falla y se reteclea", ">>> admin\n", "", []paso{eq("\r\nbob@srv:~$ "), tec("su admin\r"), tec("admin\r"), eq("su admin\r\nPassword: "), eq("\r\nsu: Authentication failure\r\nbob@srv:~$ "), tec("su admin\r"), eq("su admin\r\nPassword: "), tec("x\r"), eq("\r\nsu: Authentication failure\r\nbob@srv:~$ ")}},
+		{"banner que termina en la contraseña", ">>> Welcome", ">>> show clock", []paso{eq("\r\nUsername: "), tec("admin\rWelcome\r"), eq("admin\r\nPassword: "), eq("\r\nAuthorized users only. Welcome\r\nR1>"), tec("show clock\r"), eq("show clock\r\n*10:00\r\nR1>")}},
+		{"eco armado con salida ajena (linux)", "admin1", ">>> grep -c admin", []paso{eq("\r\nbob@srv:~$ "), tec("sudo -i\r"), tec("admin1\r"), eq("sudo -i\r\n[sudo] password for bob: "), eq("\r\nroot@srv:~# "), tec("grep -c admin\r"), eq("grep -c admin\r\n1\r\nroot@srv:~# ")}},
+		{"eco armado con salida ajena (ios)", "Cisco123", ">>> show users | i Cisco", []paso{eq("\r\nR1>"), tec("enable\r"), tec("Cisco123\r"), eq("enable\r\nPassword: "), eq("\r\nR1#"), tec("show users | i Cisco\r"), eq("show users | i Cisco\r\n123\r\nR1#")}},
+		{"línea que la salida descarta", "secretkeymaterial", "", []paso{eq("\r\nR1(config)#"), tec("crypto pki import TP pem terminal password Zz9\r"), eq("crypto pki import TP pem terminal password <x>\r\n% Enter PEM-formatted encrypted private key.\r\n"), tec("-----BEGIN RSA PRIVATE KEY-----\rMIIEpAIBAAKCAQEAsecretkeymaterialAAAA\r-----END RSA PRIVATE KEY-----\r\r"), eq("-----BEGIN RSA PRIVATE KEY-----\r\nMIIEpAIBAAKCAQEAsecretkeymaterialAAAA\r\n-----END RSA PRIVATE KEY-----\r\n\r\n% PEM files import succeeded.\r\nR1(config)#")}},
+		{"secreto dentro del nombre del equipo", ">>> do show run | i cisco", "", []paso{eq("\r\ncisco-sw1(config)#"), tec("username bob secret cisco\r"), eq("username bob secret cisco\r\ncisco-sw1(config)#"), tec("do show run | i cisco\r"), eq("do show run | i cisco\r\ncisco-sw1(config)#")}},
+	}
+	for _, c := range casos {
+		s := sesionTA(c.pasos)
+		if strings.Contains(s, c.nunca) || !strings.Contains(s, c.siempre) {
+			t.Errorf("%s:\n%s", c.nombre, s)
+		}
+	}
+}
+
+// Cada defensa por separado: el [hidden] de la contraseña adelantada sale en su lugar (antes del fallo), un prompt que
+// no es de contraseña («PIN:») no la vuelve eco de un comando posterior, y el comienzo de un eco se olvida si la línea
+// siguiente no lo continúa.
+func TestEcoDefensasPorSeparado(t *testing.T) {
+	s := sesionTA([]paso{eq("\r\nbob@srv:~$ "), tec("su admin\r"), tec("admin\r"), eq("su admin\r\nPassword: "), eq("\r\nsu: Authentication failure\r\nbob@srv:~$ "), tec("admin\r"), eq("admin\r\nadmin: command not found\r\nbob@srv:~$ ")})
+	if h, f := strings.Index(s, ">>> [hidden]"), strings.Index(s, "Authentication failure"); h < 0 || h > f {
+		t.Errorf("[hidden] fuera de lugar:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Cisco123\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1>"), tec("show users | i Cisco123\r"), eq("show users | i Cisco123\r\nR1>")})
+	if strings.Contains(s, ">>> Cisco123\n") || !strings.Contains(s, ">>> show users | i Cisco123") {
+		t.Errorf("PIN:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Cisco123\r"), eq("token\r\nEnter PIN: "), eq("\r\nUsername: Cisco\r\nLogin invalid\r\n123\r\nR1>")})
+	if strings.Contains(s, ">>> Cisco123") {
+		t.Errorf("eco armado tras una línea ajena:\n%s", s)
+	}
+}
+
+func TestVisibleOnlyPorPalabra(t *testing.T) {
+	for _, c := range []struct{ typed, out, want string }{
+		{"show clock", "R1#show clock", "show clock"},
+		{"do show run | i cisco", "cisco-sw1(config)#do show run | i <MASKED:secret>", "do show run | i <MASKED:secret>"},
+		{"do show run | i cisco", "R1(config)#do show run | i <MASKED:secret> xcisco", "do show run | i <MASKED:secret>"},
+		{"username bob secret Zq7", "R1(config)#username bob secret <MASKED:secret>", "username bob secret <MASKED:secret>"},
+		{"x secret", "R1#x <MASKED:secret>", "x <MASKED:secret>"},
+	} {
+		if got := visibleOnly(c.typed, c.out); got != c.want {
+			t.Errorf("visibleOnly(%q, %q) = %q, quiero %q", c.typed, c.out, got, c.want)
+		}
+	}
+}
