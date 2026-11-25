@@ -378,7 +378,10 @@ func hostsImport(c *cli.Env, args []string) error {
 		if it.CredentialMissing {
 			cr += cli.T("mctl.hosts.cred_missing")
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Key, it.Host.Name, cli.StateText(it.State), it.Reason, cr)
+		if it.TelnetTyped {
+			cr += cli.T("mctl.hosts.cred_telnet")
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", it.Key, it.Host.Name, it.Host.Protocol, cli.StateText(it.State), it.Reason, cr)
 		a, ok := dec[it.Key]
 		if !ok && it.State == "conflicto" {
 			if a = all; a == "" {

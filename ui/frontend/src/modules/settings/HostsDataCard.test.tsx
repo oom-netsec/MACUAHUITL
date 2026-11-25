@@ -1,7 +1,8 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HostsDataCard } from "./HostsDataCard";
-import { fakeInventory } from "../inventory/fake";
+import { fakeInventory, sampleHostsImport } from "../inventory/fake";
+import type { HostImportItem } from "../inventory/api";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider } from "../../lib/i18n";
 import { hostsChanged } from "../inventory/signal";
@@ -226,6 +227,20 @@ test("la vista previa del import muestra la orden de inicio de cada host", async
   const t = await screen.findByRole("table", { name: "Filas válidas del archivo" });
   expect(within(t).getByText("tmux attach")).toBeVisible();
   expect(within(t).getAllByText("Se ejecutará al conectar")).toHaveLength(1); // solo el host que trae orden lleva la marca
+});
+
+test("la vista previa del import muestra el protocolo de cada fila; una Telnet con etiqueta dice que se teclea", async () => {
+  const telnet: HostImportItem = { ...sampleHostsImport.items[0], host: { ...sampleHostsImport.items[0].host, name: "OLD-RTR", address: "10.7.0.23", port: 23, protocol: "telnet", credentialLabel: "admin lab", startCommand: "" },
+    key: "10.7.0.23:23", hasStartCommand: false, telnetTyped: true };
+  setup({ previewHostsImport: vi.fn(async () => ({ ...sampleHostsImport, items: [...sampleHostsImport.items, telnet] })) });
+  await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
+  const t = await screen.findByRole("table", { name: "Filas válidas del archivo" });
+  const row = (name: string) => within(t).getByText(name).closest("tr") as HTMLElement;
+  expect(within(row("OLD-RTR")).getByText("Telnet")).toBeVisible();
+  expect(within(row("OLD-RTR")).getByText("Telnet: se teclea")).toBeVisible();
+  expect(within(row("OLD-RTR")).queryByText("admin lab")).toBeNull(); // la etiqueta no se muestra como si se fuera a usar
+  expect(within(row("OTRO-NOMBRE")).getByText("SSH")).toBeVisible();
+  expect(within(row("OTRO-NOMBRE")).getByText("admin lab")).toBeVisible();
 });
 
 test("se ve el último error: un fallo al releer la libreta reemplaza al de la acción anterior", async () => {

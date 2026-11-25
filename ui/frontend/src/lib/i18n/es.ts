@@ -3148,6 +3148,8 @@ export const es = {
   "ssh.saved.telnetCred": "Telnet · credencial en claro",
   "hosts.telnetCred": "Telnet: la credencial guardada viaja en texto claro; la ve cualquiera que pueda mirar la red.",
   "backup.alreadyArmed": "El respaldo {job} ya estaba armado: sigue su curso, no hace falta reintentar.",
+  "hosts.data.import.col.proto": "Protocolo",
+  "hosts.data.import.telnetTyped": "Telnet: se teclea",
 };
 
 export type Key = keyof typeof es;

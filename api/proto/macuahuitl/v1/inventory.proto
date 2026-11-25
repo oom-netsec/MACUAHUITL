@@ -126,6 +126,7 @@ message ImportHostItem {
   string conflicts_with = 5;          // id del host guardado con el que choca o coincide
   bool credential_missing = 6;        // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
   bool has_startup_command = 7;       // fase 44: el host del archivo trae orden de inicio (va en host.startup_command); la UI la muestra antes de aplicar
+  bool telnet_typed = 8;              // fila Telnet con etiqueta de credencial: el import no la ata (Telnet va en claro) y el host queda con credencial tecleada
 }
 message PreviewImportHostsResponse {
   string token = 1;                   // vale 10 minutos y un solo uso

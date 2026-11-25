@@ -192,14 +192,15 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
               <h6>{t("hosts.data.import.states", { n: String(prev.items.length) })}</h6>
               <div className="hosts-table">
                 <table aria-label={t("hosts.data.import.states.table")}>
-                  <thead><tr>{(["host", "dest", "state", "cred", "start", "action"] as const).map((c) => <th key={c} scope="col">{t(`hosts.data.import.col.${c}`)}</th>)}</tr></thead>
+                  <thead><tr>{(["host", "dest", "proto", "state", "cred", "start", "action"] as const).map((c) => <th key={c} scope="col">{t(`hosts.data.import.col.${c}`)}</th>)}</tr></thead>
                   <tbody>
                     {prev.items.map((i) => (
                       <tr key={i.key}>
                         <td>{showHidden(i.host.name)}</td>
                         <td className="mono">{i.key}</td>
+                        <td>{i.host.protocol === "telnet" ? "Telnet" : "SSH"}</td>
                         <td><Badge tone={i.state === "conflicto" ? "warn" : i.state === "nuevo" ? "ok" : ""}>{stateOf(i)}</Badge></td>
-                        <td>{showHidden(i.host.credentialLabel) || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
+                        <td>{i.telnetTyped ? t("hosts.data.import.telnetTyped") : showHidden(i.host.credentialLabel) || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
                         <td>{i.hasStartCommand ? <><Badge tone="warn">{t("hosts.data.import.startMark")}</Badge> <code>{i.host.startCommand}</code></> : "—"}</td>
                         <td>
                           {i.state === "conflicto" ? (
