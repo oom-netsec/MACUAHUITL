@@ -2,6 +2,7 @@ package devices
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"net/netip"
@@ -243,4 +244,12 @@ func badStartupRune(s string) bool {
 		}
 	}
 	return false
+}
+
+// StartupPrint es la huella de una orden de inicio para la auditoría y la grabación: la orden puede llevar un secreto
+// en la línea de comandos («mysql -pX», «sshpass -p X») que el enmascarado de Cisco no reconoce, así que su texto no
+// se guarda. Quien la configuró la ve en la libreta y puede calcular la huella (SHA-256, 8 bytes) para cotejarla.
+func StartupPrint(cmd string) string {
+	h := sha256.Sum256([]byte(cmd))
+	return "sha256:" + hex.EncodeToString(h[:8])
 }

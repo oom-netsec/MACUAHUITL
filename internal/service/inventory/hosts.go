@@ -79,8 +79,8 @@ func (s *svc) auditHost(action string, h devices.Host) {
 	if h.Protocol == "telnet" {
 		d += " protocol=telnet"
 	}
-	if h.StartupCommand != "" { // no es un secreto (la UI avisa que no lleve): queda para saber qué corre el clic
-		d += fmt.Sprintf(" startup=%q", h.StartupCommand)
+	if h.StartupCommand != "" { // su huella, no el texto: puede llevar un secreto en la línea de comandos
+		d += " startup=" + devices.StartupPrint(h.StartupCommand)
 	}
 	s.d.Audit(action, h.ID, d)
 }

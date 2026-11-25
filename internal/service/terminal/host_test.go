@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -132,8 +133,10 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	}
 	h.logMu.Unlock()
 	a := h.d.AuditText()
-	if !strings.Contains(a, `host=h1`) || !strings.Contains(a, `startup=\"cmd /c echo macuahuitl-ok\"`) {
-		t.Fatalf("falta host=/startup= en la auditoría:\n%s", a)
+	// La orden puede llevar un secreto en la línea de comandos («mysql -pX»): la auditoría y la grabación solo llevan su huella.
+	huella := devices.StartupPrint(startup)
+	if !strings.Contains(a, `host=h1`) || !strings.Contains(a, `startup=`+huella) || strings.Contains(a, "macuahuitl-ok") {
+		t.Fatalf("auditoría: falta host=/startup=%s o trae la orden:\n%s", huella, a)
 	}
 	for _, s := range []string{"PRIVATE KEY", pwSecreto} {
 		if strings.Contains(a, s) {
@@ -142,8 +145,8 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	}
 	_, rec := h.cerrada("terminal.close", "the device closed the session")
 	b, err := os.ReadFile(rec)
-	if err != nil || !strings.Contains(string(b), "orden de inicio: "+strconv.Quote(startup)) {
-		t.Fatalf("la grabación no marca la orden (%v):\n%s", err, b)
+	if err != nil || !strings.Contains(string(b), "orden de inicio: "+huella) || strings.Contains(string(b), "orden de inicio: "+strconv.Quote(startup)) { // lo que devuelve el equipo sí se graba
+		t.Fatalf("la grabación no marca la huella de la orden o trae su texto (%v):\n%s", err, b)
 	}
 }
 

@@ -565,8 +565,8 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if o.HostId != "" {
 		start := "none"
 		if startup != "" {
-			rec.Mark("orden de inicio: " + strconv.Quote(startup))
-			start = strconv.Quote(startup)
+			start = devices.StartupPrint(startup)
+			rec.Mark("orden de inicio: " + start)
 		}
 		detail += " host=" + o.HostId + " startup=" + start
 	}
