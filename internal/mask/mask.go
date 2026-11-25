@@ -59,6 +59,10 @@ var snmpHostTyped = regexp.MustCompile(`(?i)version (?:1|2c|3 (?:auth|noauth|pri
 // snmpHostTail: en tipo 0 la comunidad llega hasta udp-port o el tipo de notificación que sigue.
 const snmpHostTail = `\s+(?:udp-port\b|(?:bgp|bfd|config|cpu|eigrp|entity|envmon|flash|hsrp|ipsla|isis|license|mpls|ospf|pim|snmp|syslog|tty|vrrp|vtp)\b)`
 
+// snmpHostDigitComm: tras el dígito viene un tipo de notificación o el fin de línea: el dígito es la comunidad (una
+// cadena tipo 7 real es hexadecimal y nunca es «bgp»). La regla con tipo no se aplica y la de sin tipo lo tapa.
+var snmpHostDigitComm = regexp.MustCompile(`(?i)version (?:1|2c|3 (?:auth|noauth|priv)) [067](?:` + snmpHostTail + `|\s*$)`)
+
 // HSRP/VRRP con key-chain o sin autenticación: no hay secreto en la línea.
 var fhrpNoKey = regexp.MustCompile(`authentication (?:md5 key-chain|none)\b`)
 
@@ -113,7 +117,7 @@ var iosRules = []rule{
 	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
 	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
 	R("snmp-community", "", `\s*snmp-server host-group \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
-	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) (?:[067] )?)?`).stopAt(snmpHostTail).guarded().unlessFn(isASASNMPHost),
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) (?:[067] )?)?`).stopAt(snmpHostTail).guarded().unlessFn(isASASNMPHost).unless(snmpHostDigitComm),
 	// La regla anterior, sin el tipo: «version 2c 7 udp-port 1162» es la comunidad «7» y la v0.6.5 la tapaba.
 	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost).unless(snmpHostTyped),
 	R("snmp-community", "", `\s*snmp mib community-map `),

@@ -123,6 +123,13 @@ func TestFormatosAuditoriaSnmpHostDigito(t *testing.T) {
 		{"snmp-server host 10.1.1.1 version 2c 6 vrf", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community> vrf"},
 		{"snmp-server host 10.1.1.1 version 2c 0 MYCOMM udp-port 1162 bgp", "snmp-server host 10.1.1.1 version 2c 0 <MASKED:snmp-community> udp-port 1162 bgp"},
 		{"snmp-server host 10.1.1.1 version 2c 0 MYCOMM bgp config", "snmp-server host 10.1.1.1 version 2c 0 <MASKED:snmp-community> bgp config"},
+		{"snmp-server host 10.1.1.1 version 2c 7 bgp", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community> bgp"},
+		{"snmp-server host 10.1.1.1 version 2c 6 config", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community> config"},
+		{"snmp-server host 10.1.1.1 traps version 2c 7 snmp", "snmp-server host 10.1.1.1 traps version 2c <MASKED:snmp-community> snmp"},
+		{"snmp-server host 10.1.1.1 vrf MGMT version 2c 7 bgp", "snmp-server host 10.1.1.1 vrf MGMT version 2c <MASKED:snmp-community> bgp"},
+		{"snmp-server host 10.1.1.1 version 3 priv 7 bgp", "snmp-server host 10.1.1.1 version 3 priv <MASKED:snmp-community> bgp"},
+		{"snmp-server host 10.1.1.1 version 2c 7", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community>"},
+		{"snmp-server host 10.1.1.1 version 2c 7 094F471A1A0A", "snmp-server host 10.1.1.1 version 2c 7 <MASKED:snmp-community>"},
 	} {
 		if out, _ := mask.Apply("ios-xe", c.in+"\n"); strings.TrimSpace(out) != c.want {
 			t.Errorf("%q -> %q, se esperaba %q", c.in, strings.TrimSpace(out), c.want)
