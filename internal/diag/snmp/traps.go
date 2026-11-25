@@ -1,6 +1,7 @@
 package snmp
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd"
 )
 
 // MaxRawTrap es lo que se conserva (en hex) de un paquete que no se pudo decodificar.
@@ -170,6 +172,13 @@ func decodeTrap(x *gosnmp.GoSNMP, b []byte) (t Trap, p *gosnmp.SnmpPacket) {
 		return bad, nil
 	}
 	for _, v := range p.Variables {
+		// El texto de un syslog (clogHistMsgText) puede traer secretos: se enmascaran los bytes antes de pasarlos a texto
+		// o a hex (con un byte que no es UTF-8 saldría en hex, legible al decodificarlo). Vale para todo valor en bytes.
+		if b, ok := v.Value.([]byte); ok {
+			if m, tapo := maskBytes(b); tapo {
+				v.Value = m // solo si tapó algo: el enmascarado normaliza espacios y dañaría un valor binario (una MAC)
+			}
+		}
 		vv := toVar(v)
 		if v.Name == oidSnmpTrapOID {
 			t.TrapOID = fmt.Sprint(vv.Value)
@@ -341,7 +350,10 @@ func readTraps(ctx context.Context, pc net.PacketConn, x *gosnmp.GoSNMP, c TrapC
 				t.Error = t.ErrorText.In(i18n.Es)
 			} else if b, ok := blindCommunity(pkt); ok {
 				// Solo si se pudo ubicar y cegar la comunidad: el crudo va a eventos y a disco.
-				t.Raw = hex.EncodeToString(b[:min(n, MaxRawTrap)])
+				// Con un secreto en los varbinds el crudo no se guarda (enmascarado ya no sería el paquete que llegó).
+				if raw := b[:min(n, MaxRawTrap)]; !containsSecret(raw) {
+					t.Raw = hex.EncodeToString(raw)
+				}
 			}
 		}
 		// Se responde al inform solo si el trap entró a la cola: si se descartó, el equipo lo reintenta.
@@ -356,3 +368,11 @@ func readTraps(ctx context.Context, pc net.PacketConn, x *gosnmp.GoSNMP, c TrapC
 		}
 	}
 }
+
+// maskBytes enmascara b como el receptor de syslog; tapo dice si tapó algún secreto.
+func maskBytes(b []byte) (m []byte, tapo bool) {
+	m = syslogd.MaskRaw(b)
+	return m, bytes.Contains(m, []byte("<MASKED:"))
+}
+
+func containsSecret(b []byte) bool { _, tapo := maskBytes(b); return tapo }
