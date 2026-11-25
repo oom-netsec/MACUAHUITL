@@ -8,7 +8,7 @@ import { pathProblem } from "../lib/paths";
 export type Width = "xs" | "sm" | "md" | "lg" | "full";
 
 // Etiqueta + control + ayuda opcional (anunciada como descripción del control).
-function Labeled({ label, hint, error, w, children }: { label: string; hint?: string; error?: ReactNode; w?: Width; children: (id: string, describedBy?: string) => ReactNode }) {
+export function Labeled({ label, hint, error, w, children }: { label: string; hint?: string; error?: ReactNode; w?: Width; children: (id: string, describedBy?: string) => ReactNode }) {
   const id = useId();
   const hintId = hint ? `${id}-h` : undefined;
   const errId = error ? `${id}-e` : undefined;

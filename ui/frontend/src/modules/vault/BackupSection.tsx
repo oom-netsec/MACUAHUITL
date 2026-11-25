@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RunButton } from "../../components/RunButton";
 import type { CoreAPI, VaultBackupAction, VaultBackupPreview, VaultBackupResult, VaultBackupState } from "../../lib/core";
-import { Check, Field, Notice, errorText } from "../../components/Field";
+import { Check, Field, Labeled, Notice, errorText } from "../../components/Field";
 import { Badge, ResultPanel, Section, type Tone } from "../../components/Page";
 import { Segmented } from "../../components/Segmented";
 import { Icon } from "../../components/Icon";
@@ -13,6 +13,7 @@ const MIN_PHRASE = 12;
 const tone: Record<VaultBackupState, Tone> = { nueva: "ok", igual: "", conflicto_etiqueta: "warn", reservada: "" };
 
 // Respaldo cifrado de la bóveda: exportar con una frase propia e importar en dos pasos. Las frases no se guardan: se vacían los campos al enviarlas.
+// La maestra que pide el export va en un campo NO controlado: vive solo en el DOM, se lee al enviar y se borra siempre.
 // onPreview avisa a la vista si hay una vista previa abierta; onClosed, que la bóveda se cerró y la vista previa se descartó.
 export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, onClosed }: {
   core: CoreAPI; sshKeys: number; setMsg: (m: Msg) => void; onImported: () => void; onPreview: (open: boolean) => void; onClosed: () => void;
@@ -24,20 +25,24 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
   const [sure, setSure] = useState(false);
   const [imp, setImp] = useState("");
   const [busy, setBusy] = useState(false);
+  const master = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<VaultBackupPreview | null>(null);
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   useEffect(() => onPreview(preview !== null), [preview, onPreview]);
 
   const exportBackup = async () => {
+    const mp = master.current?.value ?? "";
+    if (master.current) master.current.value = ""; // se vacía antes de cualquier salida: también si la frase no sirve
     if ([...f1].length < MIN_PHRASE) return setMsg({ kind: "error", text: t("vault.backup.err.short") });
     if (f1 !== f2) return setMsg({ kind: "error", text: t("vault.backup.err.mismatch") });
+    if (!mp) { master.current?.focus(); return setMsg({ kind: "error", text: t("vault.backup.err.master") }); }
     const phrase = f1;
     setBusy(true);
     let path = "";
     try {
       path = await core.pickSavePath(t("vault.backup.fileName")); // confirma el reemplazo y deja el archivo vacío
       if (!path) return;
-      const r = await core.exportVaultBackup(path, phrase, true, sure);
+      const r = await core.exportVaultBackup(path, phrase, mp, true, sure);
       setMsg({ kind: "ok", text: t("vault.backup.exported", { n: r.count, path }) + (r.noPermissions ? ` ${t("vault.backup.noPerms")}` : "") + (r.sshKeysIncluded > 0 ? ` ${t("vault.backup.keys.after", { n: String(r.sshKeysIncluded) })}` : "") });
       setSure(false);
     } catch (e) {
@@ -77,6 +82,11 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
       <Segmented legend={t("vault.backup.mode")} value={mode} onChange={(m) => { setMode(m); setF1(""); setF2(""); setImp(""); setSure(false); }} options={[["export", t("vault.backup.modeExport")], ["import", t("vault.backup.modeImport")]]} />
       {mode === "export" ? (
         <>
+      <div className="field-row">
+        <Labeled label={t("vault.backup.master")} hint={t("vault.backup.masterHint")} w="md">
+          {(id, hintId) => <input id={id} ref={master} type="password" autoComplete="off" spellCheck={false} aria-describedby={hintId} />}
+        </Labeled>
+      </div>
       <div className="field-row">
         <Field label={t("vault.backup.phrase")} hint={t("vault.backup.phraseHint")} type="password" value={f1} onChange={setF1} autoComplete="new-password" w="md" />
         <Field label={t("vault.backup.phrase2")} type="password" value={f2} onChange={setF2} autoComplete="new-password" w="md" />

@@ -48,9 +48,13 @@ type VaultBackupExportDTO struct {
 }
 
 // ExportVaultBackup escribe el respaldo cifrado y devuelve cuántas credenciales guardó; confirm es la confirmación explícita.
-func (b *Bridge) ExportVaultBackup(path, passphrase string, overwrite, confirm bool) (VaultBackupExportDTO, error) {
+// masterPassword es la maestra actual: el núcleo la exige para sacar todas las credenciales.
+func (b *Bridge) ExportVaultBackup(path, passphrase, masterPassword string, overwrite, confirm bool) (VaultBackupExportDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (VaultBackupExportDTO, error) {
-		r, err := v1.NewVaultServiceClient(c).ExportBackup(ctx, &v1.ExportBackupRequest{Path: path, Passphrase: []byte(passphrase), Overwrite: overwrite, Confirm: confirm})
+		phrase, master := []byte(passphrase), []byte(masterPassword)
+		defer clear(phrase)
+		defer clear(master)
+		r, err := v1.NewVaultServiceClient(c).ExportBackup(ctx, &v1.ExportBackupRequest{Path: path, Passphrase: phrase, MasterPassword: master, Overwrite: overwrite, Confirm: confirm})
 		return VaultBackupExportDTO{Count: int(r.GetCount()), NoPermissions: r.GetNoPermissions(), SSHKeysIncluded: int(r.GetSshKeysIncluded())}, err
 	})
 }

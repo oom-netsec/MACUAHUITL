@@ -3151,4 +3151,7 @@ export const en: Record<Key, string> = {
   "backup.alreadyArmed": "Backup {job} was already armed: it is running, no need to retry.",
   "hosts.data.import.col.proto": "Protocol",
   "hosts.data.import.telnetTyped": "Telnet: typed at login",
+  "vault.backup.master": "Current master password",
+  "vault.backup.masterHint": "Confirms it is you: the backup gives access to all your credentials.",
+  "vault.backup.err.master": "Enter the current master password.",
 };

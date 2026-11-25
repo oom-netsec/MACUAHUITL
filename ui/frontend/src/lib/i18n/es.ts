@@ -3150,6 +3150,9 @@ export const es = {
   "backup.alreadyArmed": "El respaldo {job} ya estaba armado: sigue su curso, no hace falta reintentar.",
   "hosts.data.import.col.proto": "Protocolo",
   "hosts.data.import.telnetTyped": "Telnet: se teclea",
+  "vault.backup.master": "Contraseña maestra actual",
+  "vault.backup.masterHint": "Confirma que eres tú: sacar el respaldo da acceso a todas tus credenciales.",
+  "vault.backup.err.master": "Escribe la contraseña maestra actual.",
 };
 
 export type Key = keyof typeof es;

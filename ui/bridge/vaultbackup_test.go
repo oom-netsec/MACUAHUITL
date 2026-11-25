@@ -43,11 +43,11 @@ func TestVaultBackupBridge(t *testing.T) {
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	Start(ctx, b)
 
-	n, err := b.ExportVaultBackup("/tmp/r.mcvault", "la-frase-12345", true, true)
-	if err != nil || n != (VaultBackupExportDTO{Count: 3, NoPermissions: true}) || f.exp.Path != "/tmp/r.mcvault" || string(f.exp.Passphrase) != "la-frase-12345" || !f.exp.Overwrite || !f.exp.Confirm {
+	n, err := b.ExportVaultBackup("/tmp/r.mcvault", "la-frase-12345", "maestra-actual", true, true)
+	if err != nil || n != (VaultBackupExportDTO{Count: 3, NoPermissions: true}) || f.exp.Path != "/tmp/r.mcvault" || string(f.exp.Passphrase) != "la-frase-12345" || string(f.exp.MasterPassword) != "maestra-actual" || !f.exp.Overwrite || !f.exp.Confirm {
 		t.Fatalf("export: %+v %v %+v", n, err, f.exp)
 	}
-	if n, err = b.ExportVaultBackup("/tmp/r.mcvault", "x", false, false); err != nil || n != (VaultBackupExportDTO{Count: 3}) || f.exp.Confirm || f.exp.Overwrite {
+	if n, err = b.ExportVaultBackup("/tmp/r.mcvault", "x", "", false, false); err != nil || n != (VaultBackupExportDTO{Count: 3}) || f.exp.Confirm || f.exp.Overwrite || len(f.exp.MasterPassword) != 0 {
 		t.Fatalf("export sin banderas: %+v %v %+v", n, err, f.exp)
 	}
 	p, err := b.PreviewVaultBackupImport("/tmp/r.mcvault", "la-frase-12345")

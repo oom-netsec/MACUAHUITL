@@ -124,6 +124,7 @@ const impMode = async () => { await userEvent.click(await screen.findByRole("rad
 
 describe("respaldo cifrado", () => {
   const frase = "frase-del-respaldo-1";
+  const maestra = "la-maestra-de-hoy";
 
   test("exportar pide frase de 12 o más caracteres repetida y la confirmación explícita, y limpia los campos", async () => {
     const core = fakeCore();
@@ -141,18 +142,42 @@ describe("respaldo cifrado", () => {
     await userEvent.clear(f1); await userEvent.clear(f2);
     await userEvent.type(f1, frase);
     await userEvent.type(f2, "otra-frase-distinta");
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
     await userEvent.click(btn);
     expect(await screen.findByRole("alert")).toHaveTextContent(/no coinciden/);
+    expect(screen.getByLabelText("Contraseña maestra actual")).toHaveValue(""); // también se vacía si la frase no sirve
     expect(core.exportVaultBackup).not.toHaveBeenCalled();
     await userEvent.clear(f2);
     await userEvent.type(f2, frase);
     await userEvent.click(btn);
-    await waitFor(() => expect(core.exportVaultBackup).toHaveBeenCalledWith("/home/u/Descargas/respaldo-boveda.mcvault", frase, true, true));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Escribe la contraseña maestra actual.");
+    expect(screen.getByLabelText("Contraseña maestra actual")).toHaveFocus();
+    expect(core.pickSavePath).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
+    await userEvent.click(btn);
+    await waitFor(() => expect(core.exportVaultBackup).toHaveBeenCalledWith("/home/u/Descargas/respaldo-boveda.mcvault", frase, maestra, true, true));
     expect(core.removeEmptyFile).not.toHaveBeenCalled();
     expect(await screen.findByRole("status")).toHaveTextContent("Respaldo de 3 credenciales guardado");
     expect(f1).toHaveValue("");
     expect(f2).toHaveValue("");
+    expect(screen.getByLabelText("Contraseña maestra actual")).toHaveValue("");
     expect(document.body.textContent).not.toContain(frase);
+    expect(document.body.innerHTML).not.toContain(maestra);
+  });
+
+  test("con la maestra errada el núcleo no escribe: se borra el archivo vacío, se vacía la maestra y el error no la repite", async () => {
+    const core = fakeCore({ exportVaultBackup: vi.fn(async () => { throw new Error("rpc error: code = PermissionDenied desc = contraseña maestra incorrecta"); }) });
+    render(<VaultView core={core} />);
+    await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
+    await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
+    await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("contraseña maestra incorrecta");
+    expect(core.removeEmptyFile).toHaveBeenCalledWith("/home/u/Descargas/respaldo-boveda.mcvault");
+    expect(screen.getByLabelText("Contraseña maestra actual")).toHaveValue("");
+    expect(document.body.innerHTML).not.toContain(maestra);
   });
 
   test("si se cancela el diálogo de guardar no se exporta", async () => {
@@ -160,6 +185,7 @@ describe("respaldo cifrado", () => {
     render(<VaultView core={core} />);
     await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
     await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
     await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
     await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
     await waitFor(() => expect(core.pickSavePath).toHaveBeenCalled());
@@ -171,6 +197,7 @@ describe("respaldo cifrado", () => {
     render(<VaultView core={core} />);
     await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
     await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
     await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
     await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
     const alert = await screen.findByRole("alert");
@@ -185,6 +212,7 @@ describe("respaldo cifrado", () => {
     render(<VaultView core={core} />);
     await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
     await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
+    await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), maestra);
     await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
     await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
     const st = await screen.findByRole("status");
@@ -461,6 +489,7 @@ test("exportar avisa antes cuántas credenciales llevan llave privada y después
   expect(await screen.findByText(/el archivo llevará la llave privada de 1 credenciales/)).toBeInTheDocument();
   await userEvent.type(screen.getByLabelText("Frase del respaldo"), "una-frase-larga-1");
   await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), "una-frase-larga-1");
+  await userEvent.type(screen.getByLabelText("Contraseña maestra actual"), "la-maestra-de-hoy");
   await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
   await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
   expect(await screen.findByText(/El archivo lleva la llave privada de 1 credenciales\./)).toBeInTheDocument();

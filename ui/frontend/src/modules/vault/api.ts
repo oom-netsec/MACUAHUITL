@@ -34,7 +34,7 @@ export interface VaultAPI {
   // authorized_keys, así que va en true solo tras preguntar. Solo credenciales de tipo llave.
   regenerateKeyCredential(id: string, confirm: boolean): Promise<{ publicKey: string; previousOrigin: "generated" | "imported" | "" }>;
   // Devuelve cuántas credenciales guardó. La frase tiene 12 caracteres o más y es distinta de la maestra; confirm es la confirmación explícita.
-  exportVaultBackup(path: string, passphrase: string, overwrite: boolean, confirm: boolean): Promise<VaultBackupExport>;
+  exportVaultBackup(path: string, passphrase: string, masterPassword: string, overwrite: boolean, confirm: boolean): Promise<VaultBackupExport>;
   // Borra el archivo vacío que dejó pickSavePath si el export falló: solo un archivo regular de 0 bytes en esa ruta exacta.
   removeEmptyFile(path: string): Promise<void>;
   previewVaultBackupImport(path: string, passphrase: string): Promise<VaultBackupPreview>;
@@ -55,7 +55,7 @@ export const vaultWails = (call: Call): VaultAPI => ({
   vaultImportKey: (i) => call("ImportKeyCredential", i),
   credentialPublicKey: (id) => call("CredentialPublicKey", id),
   regenerateKeyCredential: (id, confirm) => call("RegenerateKeyCredential", id, confirm),
-  exportVaultBackup: (p, f, o, c) => call("ExportVaultBackup", p, f, o, c),
+  exportVaultBackup: (p, f, m, o, c) => call("ExportVaultBackup", p, f, m, o, c),
   removeEmptyFile: (p) => call("RemoveEmptyFile", p),
   previewVaultBackupImport: (p, f) => call("PreviewVaultBackupImport", p, f),
   applyVaultBackupImport: (t, d) => call("ApplyVaultBackupImport", t, d),
