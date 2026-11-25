@@ -107,8 +107,9 @@ func TestTecleadaTresIntentos(t *testing.T) {
 		seqs = append(seqs, p.Seq)
 		st.answer(p.Seq, "pw", "000000")
 	}
-	if seqs[0] >= seqs[1] || seqs[1] >= seqs[2] {
-		t.Errorf("seq no crece: %v", seqs)
+	// El seq es al azar (una respuesta que no vio su pregunta no lo adivina): distinto de 0 y del de la pregunta anterior.
+	if seqs[0] == 0 || seqs[1] == 0 || seqs[2] == 0 || seqs[0] == seqs[1] || seqs[1] == seqs[2] {
+		t.Errorf("seq repetido o en 0: %v", seqs)
 	}
 	err := wait(t, done)
 	if status.Code(err) != codes.PermissionDenied || reason(t, err) != "terminal.err.auth_attempts" {
@@ -393,26 +394,30 @@ func TestTecleadaNoFiltraOtrosCaminos(t *testing.T) {
 	})
 }
 
-// Una respuesta que llega antes de su pregunta no se acepta aunque traiga el seq esperado.
+// Una respuesta que llega antes de su pregunta nunca autentica: se descarta en el vaciado o se rechaza por seq.
 func TestTecleadaRespuestaAdelantada(t *testing.T) {
 	r := newRig(t, simulator.Config{OTP: otp})
 	st, done, cancel := r.session(r.typed("admin"))
 	defer cancel()
 	p, _ := st.prompt(t)
 	st.answer(p.Seq, "pw", "000000") // mala: el equipo la rechaza y vuelve a preguntar
-	st.answer(p.Seq+1, "pw", otp)    // buena, pero adelantada: la siguiente pregunta aún no existe
+	st.answer(p.Seq+1, "pw", otp)    // buena, pero adelantada: la siguiente pregunta aún no existe (ni su seq, al azar)
 	for len(st.in) > 0 {             // el Recv ya la tiene en la mano
 		time.Sleep(time.Millisecond)
 	}
 	p2, _ := st.prompt(t)
-	if p2.Seq != p.Seq+1 {
-		t.Fatalf("seq = %d", p2.Seq)
+	if p2.Seq == p.Seq {
+		t.Fatalf("seq repetido = %d", p2.Seq)
 	}
 	select {
 	case m := <-st.out:
 		t.Fatalf("aceptó la respuesta adelantada: %+v", m)
 	case err := <-done:
-		t.Fatalf("terminó: %v", err)
+		// Si el Recv la entregó después de la pregunta, su seq (adivinado) no es el de la pregunta: se rechaza y se cierra.
+		if status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.auth_answer" {
+			t.Fatalf("terminó: %v", err)
+		}
+		return
 	case <-time.After(300 * time.Millisecond):
 	}
 	st.answer(p2.Seq, "pw", otp)
@@ -432,6 +437,30 @@ func ceros(b []byte) bool {
 
 func rawAnswer(seq uint32, ans ...[]byte) *v1.OpenTerminalRequest {
 	return &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_AuthAnswer{AuthAnswer: &v1.AuthAnswer{Seq: seq, Answers: ans}}}
+}
+
+// La carrera de la respuesta adelantada, sin depender del planificador: la respuesta con el seq que sigue (adivinado, sin
+// ver la pregunta) llega justo después de que sale la pregunta. Nunca autentica: el seq de cada pregunta es al azar.
+func TestTecleadaSeqAdivinadoNoAutentica(t *testing.T) {
+	r := newRig(t, simulator.Config{OTP: otp})
+	st, done, cancel := r.session(r.typed("admin"))
+	defer cancel()
+	p, _ := st.prompt(t)
+	st.answer(p.Seq, "pw", "000000") // mala: el equipo vuelve a preguntar
+	if p2, _ := st.prompt(t); p2.Seq == p.Seq {
+		t.Fatalf("el seq se repitió: %d", p2.Seq)
+	}
+	st.answer(p.Seq+1, "pw", otp)
+	select {
+	case m := <-st.out:
+		t.Fatalf("autenticó con un seq adivinado: %+v", m)
+	case err := <-done:
+		if status.Code(err) != codes.InvalidArgument || reason(t, err) != "terminal.err.auth_answer" {
+			t.Fatalf("terminó con %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ni rechazó ni autenticó")
+	}
 }
 
 // Toda respuesta ignorada se pone en ceros: la rechazada, la que llega tarde y la que queda en la mano del Recv al cancelar.
@@ -463,6 +492,27 @@ func TestTecleadaIgnoradasEnCeros(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		close(st.in)
 		wait(t, done)
+		if !ceros(b) {
+			t.Errorf("sin borrar: %q", b)
+		}
+	})
+	t.Run("adelantada", func(t *testing.T) { // descartada en el vaciado o rechazada por seq: en los dos casos, en ceros
+		r := newRig(t, simulator.Config{OTP: otp})
+		st, done, cancel := r.session(r.typed("admin"))
+		defer cancel()
+		p, _ := st.prompt(t)
+		st.answer(p.Seq, "pw", "000000")
+		b := []byte("secreto-adelantado")
+		st.in <- rawAnswer(p.Seq+1, b, b)
+		for len(st.in) > 0 {
+			time.Sleep(time.Millisecond)
+		}
+		select {
+		case <-done:
+		case <-time.After(300 * time.Millisecond):
+			close(st.in)
+			wait(t, done)
+		}
 		if !ceros(b) {
 			t.Errorf("sin borrar: %q", b)
 		}

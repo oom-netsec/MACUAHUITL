@@ -7,7 +7,9 @@ package terminal
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -402,7 +404,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 				return nil, errClientGone
 			}
 		}
-		seq++
+		seq = nextSeq(seq)
 		ap := &v1.AuthPrompt{Seq: seq, Name: p.Name, Instruction: p.Instruction}
 		for _, q := range p.Questions {
 			ap.Prompts = append(ap.Prompts, &v1.AuthQuestion{Text: q.Text, Echo: q.Echo})
@@ -758,4 +760,18 @@ func (Module) Register(r ipc.Registrar, d service.Deps) {
 	s := newSvc(d)
 	d.OnClose(s.close)
 	v1.RegisterTerminalServiceServer(r, s)
+}
+
+// nextSeq: el seq de la siguiente pregunta, al azar (distinto de 0 y del anterior). Uno predecible (1, 2, 3…) dejaba que una
+// respuesta mandada antes de su pregunta acertara si el Recv la entregaba después de que la pregunta salía: el vaciado de
+// ask depende del planificador. Al azar, una respuesta que no vio su pregunta nunca acierta y se rechaza como cualquier
+// otro seq equivocado.
+func nextSeq(prev uint32) uint32 {
+	for {
+		var b [4]byte
+		rand.Read(b[:])
+		if v := binary.LittleEndian.Uint32(b[:]); v != 0 && v != prev {
+			return v
+		}
+	}
 }
