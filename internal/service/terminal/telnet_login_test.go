@@ -275,3 +275,22 @@ func TestHostTelnetDatosQueNoAplican(t *testing.T) {
 		t.Errorf("marcó al equipo %d veces", conns.Load())
 	}
 }
+
+// El login avisa (onSecret) justo antes de mandar la contraseña, para que la grabación tape su eco si el equipo la
+// devuelve; nunca antes de que se pida.
+func TestTelnetLoginAvisaAntesDeLaContraseña(t *testing.T) {
+	var w strings.Builder
+	l := newTelnetLogin("admin", secret.New([]byte("Cl4ve")), &w, time.Hour, time.Hour, time.Hour)
+	enviado := ""
+	l.onSecret = func() { enviado = w.String() }
+	l.output([]byte("Username: "))
+	l.stable()
+	if enviado != "" {
+		t.Fatalf("avisó al mandar el usuario: %q", enviado)
+	}
+	l.output([]byte("admin\r\nPassword: "))
+	l.stable()
+	if enviado != "admin\r" || !strings.HasSuffix(w.String(), "Cl4ve\r") {
+		t.Fatalf("aviso con %q enviado; total %q", enviado, w.String())
+	}
+}

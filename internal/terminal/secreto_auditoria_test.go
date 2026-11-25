@@ -56,6 +56,7 @@ func TestSecretoAuditoriaTelnetEco(t *testing.T) {
 	r, b := audRec()
 	r.Output([]byte("\r\nUser Access Verification\r\n\r\nUsername: "))
 	r.Output([]byte("admin\r\nPassword: ")) // eco del usuario que mandó el núcleo
+	r.SecretSent()                          // el login automático avisa antes de mandar la contraseña
 	r.Output([]byte("Cl4veBoveda7\r\n"))    // el equipo devuelve la contraseña que mandó el núcleo
 	r.Output([]byte("SW1>"))
 	r.Close()
@@ -145,5 +146,56 @@ func TestSecretoAuditoriaSinTaparDeMas(t *testing.T) {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("falta %q:\n%s", want, b.String())
 		}
+	}
+}
+
+// Una salida que llega byte a byte (consola serie) y pasa por un «:» tras key/password no se tapa: nadie contestó un prompt.
+func TestSecretoAuditoriaSinTaparPorDosPuntos(t *testing.T) {
+	r, b := audRec()
+	r.Output([]byte("\r\nSW1#"))
+	r.Input([]byte("show ip ssh\r"))
+	for _, c := range []byte("show ip ssh\r\nMinimum expected Diffie Hellman key size : 2048 bits\r\nKey name: SW1.lab\r\n% Key pair was generated at: 10:00:00 UTC Nov 25 2026\r\nSW1#") {
+		r.Output([]byte{c})
+	}
+	r.Close()
+	for _, want := range []string{"key size : 2048 bits", "Key name: SW1.lab", "generated at: 10:00:00 UTC"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("tapó de más, falta %q:\n%s", want, b.String())
+		}
+	}
+}
+
+// SkipTyped (consola): lo tecleado no se graba, ni la contraseña adelantada ni los comandos; el eco sí, tapado.
+func TestSecretoAuditoriaSkipTyped(t *testing.T) {
+	r, b := audRec()
+	r.SkipTyped()
+	r.Output([]byte("\r\nUsername: "))
+	r.Input([]byte("\radmin\rS3cretLog9\r"))
+	r.Output([]byte("\r\nUsername: admin\r\nPassword: "))
+	r.Output([]byte("\r\nSW1>"))
+	r.Input([]byte("enable\r"))
+	r.Output([]byte("enable\r\nPassword: \r\nSW1#"))
+	r.Input([]byte("username ops secret 0 Tecl3ado\r"))
+	r.Output([]byte("username ops secret 0 Tecl3ado\r\nSW1#"))
+	r.Close()
+	if s := b.String(); strings.Contains(s, ">>>") || strings.Contains(s, "S3cretLog9") || strings.Contains(s, "Tecl3ado") || !strings.Contains(s, "Username: admin") {
+		t.Errorf("SkipTyped:\n%s", s)
+	}
+}
+
+// Diálogo setup con lo tecleado por adelantado: el prompt y el eco llegan juntos, o el «:» llega con el eco.
+func TestSecretoAuditoriaSetupAdelantado(t *testing.T) {
+	r, b := audRec()
+	r.SkipTyped()
+	r.Output([]byte("Enter host name [Router]: "))
+	r.Input([]byte("R1\r"))
+	r.Input([]byte("S3tupSec9\r"))
+	r.Output([]byte("R1\r\n\r\nThe enable secret is a password...\r\nEnter enable secret: S3tupSec9\r\n"))
+	r.Output([]byte("\r\nEnter enable secret"))
+	r.Input([]byte("S3tupPt8\r"))
+	r.Output([]byte(": S3tupPt8\r\n"))
+	r.Close()
+	if strings.Contains(b.String(), "S3tupSec9") || strings.Contains(b.String(), "S3tupPt8") {
+		t.Errorf("FUGA:\n%s", b.String())
 	}
 }

@@ -146,7 +146,10 @@ func TestConsoleRecordingMasksSecrets(t *testing.T) {
 	c.equipo("username ops secret 0 Tecl3adoSecreto\r\nSwitch(config)#")
 	rec := c.cerrar()
 	sinSecretos(t, rec, "$1$mERr$hx5rVt7rPNoS4wqbXKX7m0", "0822455D0A16", "S3cr3tRW", "LlaveTacacs99", "Tecl3adoSecreto")
-	for _, keep := range []string{"show running-config", "snmp-server community <MASKED:", ">>> username ops secret", "### abierto"} {
+	if strings.Contains(rec, ">>>") {
+		t.Errorf("la consola grabó lo tecleado:\n%s", rec)
+	}
+	for _, keep := range []string{"show running-config", "snmp-server community <MASKED:", "Switch(config)#username ops secret 0 <MASKED:", "### abierto"} {
 		if !strings.Contains(rec, keep) {
 			t.Errorf("la grabación no trae %q:\n%s", keep, rec)
 		}
@@ -154,7 +157,7 @@ func TestConsoleRecordingMasksSecrets(t *testing.T) {
 }
 
 // Login en la consola: el eco del Enter llega aparte y la contraseña empieza a teclearse antes de «Password:»; y el
-// diálogo setup devuelve el secreto tecleado. Nada de eso queda en la grabación; el usuario sí.
+// diálogo setup devuelve el secreto tecleado. Nada de eso queda en la grabación; el eco del usuario sí.
 func TestConsoleRecordingPasswordPrompts(t *testing.T) {
 	c := abrirConsola(t)
 	c.equipo("\r\nUser Access Verification\r\n\r\nUsername: ")
@@ -179,14 +182,13 @@ func TestConsoleRecordingPasswordPrompts(t *testing.T) {
 	c.teclea("\r")
 	c.equipo("\r\n  Next: ")
 	rec := c.cerrar()
-	sinSecretos(t, rec, "Cisco12345", "isco12345", "En4bleS3c", "n4bleS3c", "Setup5ecret")
-	if !strings.Contains(rec, ">>> admin") {
-		t.Errorf("falta el usuario:\n%s", rec)
+	sinSecretos(t, rec, "Cisco12345", "isco12345", "En4bleS3c", "n4bleS3c", "Setup5ecret", ">>>")
+	if !strings.Contains(rec, "Username: admin") {
+		t.Errorf("falta el eco del usuario:\n%s", rec)
 	}
 }
 
-// Al reabrir la consola el equipo puede seguir en «Password:» sin mandar nada: lo tecleado antes de la primera salida
-// no se graba como tecleado.
+// Al reabrir la consola el equipo puede seguir en «Password:» sin mandar nada: lo tecleado a ciegas no se graba.
 func TestConsoleRecordingBlindStart(t *testing.T) {
 	c := abrirConsola(t)
 	c.teclea("Blind0Pass\r")

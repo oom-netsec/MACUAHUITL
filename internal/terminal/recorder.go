@@ -89,7 +89,8 @@ type Recorder struct {
 	cfg      bool            // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
 	cfgOK    bool            // hay prompt conocido para lo que se teclea; si no, se tapa como en config
 	hidden   bool            // lo tecleado es una contraseña: no se graba
-	echoPr   string          // la línea en curso empezó como un prompt de secreto: lo que el equipo devuelva tras él es el secreto
+	echoPr   string          // prompt de secreto que se contestó (tecleando o SecretSent): lo que el equipo devuelva tras él en esa línea es el secreto
+	noTyped  bool            // SkipTyped: lo tecleado no se graba (solo sirve para tapar su eco)
 	line     []byte          // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
@@ -119,13 +120,6 @@ func (r *Recorder) emit(s string) {
 func (r *Recorder) Output(p []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// La línea a medias es un prompt de secreto («Password: », «Enter enable secret: »): lo que siga en ella es el eco del
-	// secreto (diálogo setup de IOS, el que manda el login automático de Telnet). outLine lo tapa.
-	if r.echoPr == "" && len(r.pend) > 0 && len(r.pend) <= 256 {
-		if l := cleanLine(string(r.pend)); secretPrompt.MatchString(l) && !anyKey.MatchString(l) {
-			r.echoPr = l
-		}
-	}
 	for _, c := range p {
 		if r.pendAt.IsZero() {
 			r.pendAt = r.now()
@@ -162,6 +156,13 @@ func (r *Recorder) outLine(l string) {
 		r.echoPr = ""
 		if strings.HasPrefix(l, pr) && strings.TrimSpace(l[len(pr):]) != "" {
 			l = pr + "<MASKED:secret>"
+		}
+	}
+	// El eco de algo tecleado antes de que llegara su prompt de secreto (prompt y eco en la misma salida): se tapa lo tecleado.
+	for _, v := range append(r.held[:len(r.held):len(r.held)], r.esent...) {
+		if v != "" && strings.HasSuffix(l, v) && secretPrompt.MatchString(l[:len(l)-len(v)]) && !anyKey.MatchString(l) {
+			l = l[:len(l)-len(v)] + "<MASKED:secret>"
+			break
 		}
 	}
 	if r.win > 0 {
@@ -681,6 +682,7 @@ func (r *Recorder) Input(p []byte) {
 	for _, c := range p {
 		if !r.hidden && len(r.line) == 0 && r.asksSecret() {
 			r.hidden = true
+			r.armEcho()
 		}
 		switch {
 		case c == '\r' || c == '\n' && !r.lastCR:
@@ -753,7 +755,34 @@ func (r *Recorder) flush() {
 	}
 }
 
-func (r *Recorder) input(text string) { r.emit(r.now().Format(stamp) + " >>> " + text + "\n") }
+func (r *Recorder) input(text string) {
+	if !r.noTyped {
+		r.emit(r.now().Format(stamp) + " >>> " + text + "\n")
+	}
+}
+
+// SkipTyped deja de grabar lo tecleado (la consola serie: ahí el login es parte de la sesión y una contraseña tecleada
+// antes de su prompt no siempre se distingue de un comando). Input sigue sirviendo para tapar el eco. Antes de usarlo.
+func (r *Recorder) SkipTyped() { r.noTyped = true }
+
+// SecretSent: el núcleo contestó el prompt de secreto que está en pantalla (login automático de Telnet); si el equipo
+// devuelve lo enviado en esa misma línea, se tapa.
+func (r *Recorder) SecretSent() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.armEcho()
+}
+
+// armEcho: la línea a medias es un prompt de secreto que se está contestando; lo que el equipo devuelva tras él en esa
+// línea (diálogo setup de IOS, login de Telnet) es el secreto y outLine lo tapa. Solo al contestar: una salida que llega
+// byte a byte y pasa por un «:» («Key name: …») no se toca. Requiere r.mu.
+func (r *Recorder) armEcho() {
+	if len(r.pend) > 0 && len(r.pend) <= 256 {
+		if l := cleanLine(string(r.pend)); secretPrompt.MatchString(l) && !anyKey.MatchString(l) {
+			r.echoPr = l
+		}
+	}
+}
 
 // Mark anota un evento propio (apertura, cierre) en una línea aparte.
 func (r *Recorder) Mark(text string) {
