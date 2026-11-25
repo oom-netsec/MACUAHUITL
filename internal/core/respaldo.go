@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -145,7 +144,6 @@ func (st *respaldoStore) wipeAll() {
 // Estados de una credencial del respaldo frente a la bóveda viva, y decisiones ante un conflicto.
 const (
 	estNueva     = "nueva"
-	estIgual     = "igual"
 	estConflicto = "conflicto_etiqueta"
 	estReservada = "reservada"
 
@@ -218,12 +216,6 @@ func (c *Core) inDataDir(path string) bool {
 
 type planned struct{ state, target string }
 
-// sameCred compara el contenido completo de dos credenciales (la etiqueta ya coincide).
-func sameCred(a, b vault.Credential) bool {
-	eq := func(x, y []byte) bool { return subtle.ConstantTimeCompare(x, y) == 1 }
-	return a.Username == b.Username && eq(a.Password.Bytes(), b.Password.Bytes()) && eq(a.Enable.Bytes(), b.Enable.Bytes()) && eq(a.SSHKey.Bytes(), b.SSHKey.Bytes())
-}
-
 // planImport clasifica cada credencial del respaldo (por su ID en él) frente a la bóveda viva y da también las etiquetas ya usadas en ella.
 // Descifra de a una (la del respaldo y la viva con la que se compara) y valida su llave SSH: nunca retiene secretos.
 func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[string]bool, error) {
@@ -242,7 +234,7 @@ func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[str
 		if err != nil {
 			return nil, nil, err
 		}
-		pl, err := classify(v, c, byLabel[c.Label])
+		pl, err := classify(c, byLabel[c.Label])
 		c.Password.Destroy()
 		c.Enable.Destroy()
 		c.SSHKey.Destroy()
@@ -254,28 +246,17 @@ func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[str
 	return out, used, nil
 }
 
-func classify(v *vault.Vault, c vault.Credential, ids []string) (planned, error) {
+// classify: nueva si la etiqueta no está en la bóveda; si está, conflicto con la primera que la lleva. No compara el
+// contenido: decir «igual» haría de un respaldo armado con N candidatas un oráculo de la contraseña de la viva sin la
+// maestra (auditoría 2026-11-25).
+func classify(c vault.Credential, ids []string) (planned, error) {
 	if err := vault.ValidateKey(c.Label, c.SSHKey); err != nil {
 		return planned{}, err // todo el import falla, con la etiqueta culpable
 	}
 	if len(ids) == 0 {
 		return planned{state: estNueva}, nil
 	}
-	pl := planned{state: estConflicto, target: ids[0]}
-	for _, id := range ids {
-		lc, err := v.Get(id)
-		if err != nil {
-			return planned{}, err
-		}
-		same := sameCred(lc, c)
-		lc.Password.Destroy()
-		lc.Enable.Destroy()
-		lc.SSHKey.Destroy()
-		if same {
-			return planned{state: estIgual, target: id}, nil
-		}
-	}
-	return pl, nil
+	return planned{state: estConflicto, target: ids[0]}, nil
 }
 
 // PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Queda abierto el respaldo (su DEK en
@@ -327,7 +308,7 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 	for _, it := range items {
 		if it.State == "" {
 			it.State = plan[it.Id].state
-			if it.State == estIgual || it.State == estConflicto {
+			if it.State == estConflicto {
 				it.TargetId = plan[it.Id].target
 			}
 		}
@@ -402,23 +383,16 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 	}
 	var batch []vault.Import
 	reemplazados := map[string]string{} // ID local -> etiqueta de la credencial del respaldo que ya lo reemplaza
-	iguales := map[string]bool{}        // destinos que alguna credencial del respaldo reporta «igual»: reemplazarlos haría mentir al informe
 	var res v1.ApplyBackupImportResponse
 	for _, c := range p.infos {
 		pl, act := plan[c.ID], dec[c.ID]
 		switch {
-		case pl.state == estIgual:
-			if _, dup := reemplazados[pl.target]; dup {
-				return nil, bad("respaldo.err.double_replace", "label", c.Label)
-			}
-			iguales[pl.target] = true
-			res.Same++
 		case act == decOmitir:
 			res.Skipped++
 		case pl.state == estConflicto && act == "":
 			return nil, bad("respaldo.err.undecided", "label", c.Label)
 		case pl.state == estConflicto && act == decReemplazar:
-			if _, dup := reemplazados[pl.target]; dup || iguales[pl.target] {
+			if _, dup := reemplazados[pl.target]; dup {
 				return nil, bad("respaldo.err.double_replace", "label", c.Label)
 			}
 			reemplazados[pl.target] = c.Label

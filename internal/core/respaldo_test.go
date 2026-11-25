@@ -154,15 +154,15 @@ func TestRespaldoIdaYVuelta(t *testing.T) {
 	if len(got) != 3 || got["lab"] != "MARKER-PW" || got["core"] != "PW-CORE" || got["borde"] != "PW-BORDE" {
 		t.Fatalf("labels = %v", got)
 	}
-	// De nuevo: las 3 ya son iguales.
+	// De nuevo: las 3 ya están (misma etiqueta; no se compara el contenido) y se omiten.
 	pr2, _ := o.preview(t, path)
 	for l, s := range estados(pr2) {
-		if s != "igual" {
+		if s != "conflicto_etiqueta" {
 			t.Fatalf("%s = %s", l, s)
 		}
 	}
-	ap2, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr2.Token})
-	if err != nil || ap2.Same != 3 || ap2.Created != 0 {
+	ap2, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr2.Token, Decisions: decide(pr2, "", "")})
+	if err != nil || ap2.Skipped != 3 || ap2.Created != 0 || ap2.Same != 0 {
 		t.Fatalf("apply2: %+v %v", ap2, err)
 	}
 	if len(o.labels(t)) != 3 {
@@ -272,7 +272,7 @@ func TestRespaldoPreviewErrores(t *testing.T) {
 
 func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	h, path := bovedaConRespaldo(t, nil)
-	// Bóveda destino: "lab" igual, "core" con otra contraseña, "borde" no existe.
+	// Bóveda destino: "lab" idéntica y "core" con otra contraseña (las dos en conflicto: no se compara), "borde" no existe.
 	o := newHarness(t, nil)
 	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
 	if _, err := o.vault.PutCredential(ctx(t), &v1.PutCredentialRequest{Label: "lab", Username: "admin", Password: []byte("MARKER-PW"), EnableSecret: []byte("MARKER-EN")}); err != nil {
@@ -287,7 +287,7 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e := estados(pr); e["lab"] != "igual" || e["core"] != "conflicto_etiqueta" || e["borde"] != "nueva" || len(e) != 3 {
+	if e := estados(pr); e["lab"] != "conflicto_etiqueta" || e["core"] != "conflicto_etiqueta" || e["borde"] != "nueva" || len(e) != 3 {
 		t.Fatalf("estados = %v", e)
 	}
 	core := itemID(t, pr, "core")
@@ -306,8 +306,8 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 		}
 	}
 	// Renombrar.
-	ap, err := apply(pr.Token, &v1.VaultBackupDecision{Id: core, Action: "renombrar"})
-	if err != nil || ap.Created != 1 || ap.Renamed != 1 || ap.Same != 1 || ap.Replaced != 0 {
+	ap, err := apply(pr.Token, decide(pr, core, "renombrar")...)
+	if err != nil || ap.Created != 1 || ap.Renamed != 1 || ap.Skipped != 1 || ap.Same != 0 || ap.Replaced != 0 {
 		t.Fatalf("renombrar: %+v %v", ap, err)
 	}
 	if got := o.labels(t); len(got) != 4 || got["core"] != "OTRA" || got["core (importada)"] != "PW-CORE" || got["borde"] != "PW-BORDE" {
@@ -315,7 +315,7 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	}
 	// Renombrar otra vez: la etiqueta ya existe y se numera.
 	pr, _ = o.preview(t, path)
-	if _, err := apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "renombrar"}); err != nil {
+	if _, err := apply(pr.Token, decide(pr, itemID(t, pr, "core"), "renombrar")...); err != nil {
 		t.Fatal(err)
 	}
 	if got := o.labels(t); len(got) != 5 || got["core (importada 2)"] != "PW-CORE" {
@@ -323,13 +323,13 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	}
 	// Omitir.
 	pr, _ = o.preview(t, path)
-	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "skip"})
-	if err != nil || ap.Skipped != 1 || ap.Created != 0 || len(o.labels(t)) != 5 {
+	ap, err = apply(pr.Token, decide(pr, itemID(t, pr, "core"), "skip")...)
+	if err != nil || ap.Skipped != 3 || ap.Created != 0 || len(o.labels(t)) != 5 {
 		t.Fatalf("omitir: %+v %v", ap, err)
 	}
 	// Reemplazar.
 	pr, _ = o.preview(t, path)
-	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "replace"})
+	ap, err = apply(pr.Token, decide(pr, itemID(t, pr, "core"), "replace")...)
 	if err != nil || ap.Replaced != 1 || ap.Created != 0 {
 		t.Fatalf("reemplazar: %+v %v", ap, err)
 	}
@@ -485,22 +485,6 @@ func copyReservada(t *testing.T, path string) {
 	}
 }
 
-func TestSameCredCompraraCadaCampo(t *testing.T) {
-	mk := func(user, pw, en, key string) vault.Credential {
-		return vault.Credential{Label: "x", Username: user, Password: secret.New([]byte(pw)), Enable: secret.New([]byte(en)), SSHKey: secret.New([]byte(key))}
-	}
-	if !sameCred(mk("u", "p", "e", "k"), mk("u", "p", "e", "k")) {
-		t.Fatal("iguales no coinciden")
-	}
-	for name, otra := range map[string]vault.Credential{
-		"usuario": mk("v", "p", "e", "k"), "password": mk("u", "q", "e", "k"), "enable": mk("u", "p", "f", "k"), "llave": mk("u", "p", "e", "l"),
-	} {
-		if sameCred(mk("u", "p", "e", "k"), otra) {
-			t.Fatalf("difiere en %s y se tomó por igual", name)
-		}
-	}
-}
-
 // Con la bóveda cerrada exportar no revela si la frase es la maestra: mismo error, y sin registro de unlock fallido.
 func TestRespaldoExportCerradaNoEsOraculo(t *testing.T) {
 	h := newHarness(t, nil)
@@ -607,8 +591,8 @@ func TestRespaldoDosReemplazosAlMismoDestino(t *testing.T) {
 	}
 }
 
-// Una credencial del respaldo «igual» a la local y otra «reemplazar» hacia esa misma: el informe mentiría, se rechaza.
-func TestRespaldoIgualYReemplazoAlMismoDestino(t *testing.T) {
+// Dos credenciales del respaldo con la misma etiqueta chocan con la misma local: reemplazarla dos veces se rechaza.
+func TestRespaldoDosDelRespaldoReemplazanLaMisma(t *testing.T) {
 	h := newHarness(t, nil)
 	h.ready(t)
 	h.put(t, "dup", "u1", "PW-UNO")
@@ -624,25 +608,25 @@ func TestRespaldoIgualYReemplazoAlMismoDestino(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var conflicto string
+	var dec []*v1.VaultBackupDecision
 	for _, i := range pr.Items {
 		if i.Label == "dup" && i.State == "conflicto_etiqueta" {
-			conflicto = i.Id
+			dec = append(dec, &v1.VaultBackupDecision{Id: i.Id, Action: "reemplazar"})
 		}
 	}
-	if conflicto == "" {
-		t.Fatalf("sin conflicto: %v", estados(pr))
+	if len(dec) != 2 {
+		t.Fatalf("conflictos: %v", estados(pr))
 	}
-	_, err = o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: conflicto, Action: "reemplazar"}}})
-	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("igual + reemplazo: %v", err)
+	_, err = o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: dec})
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "dup") {
+		t.Fatalf("dos reemplazos: %v", err)
 	}
 	if got := o.labels(t); got["dup"] != "PW-UNO" || len(got) != 1 {
 		t.Fatalf("escribió algo: %v", got)
 	}
 }
 
-// 43e-3: el preview trae target_id (id vivo en la bóveda) en igual y conflicto; vacío en nueva. El id del respaldo sigue valiendo para decidir.
+// 43e-3: el preview trae target_id (id vivo en la bóveda) en conflicto; vacío en nueva. El id del respaldo sigue valiendo para decidir.
 func TestPreviewTargetIdEnIgualYConflicto(t *testing.T) {
 	_, path := bovedaConRespaldo(t, nil)
 	o := newHarness(t, nil)
@@ -663,7 +647,7 @@ func TestPreviewTargetIdEnIgualYConflicto(t *testing.T) {
 	}
 	for _, it := range pr.Items {
 		switch it.State {
-		case "igual", "conflicto_etiqueta":
+		case "conflicto_etiqueta":
 			if it.TargetId == "" || it.TargetId != vivo[it.Label] || it.TargetId == it.Id {
 				t.Fatalf("%s (%s): id=%q target_id=%q vivo=%q", it.Label, it.State, it.Id, it.TargetId, vivo[it.Label])
 			}
@@ -736,4 +720,18 @@ func TestPreviewTargetIdConDosVivasMismaEtiqueta(t *testing.T) {
 			t.Fatalf("id %s (target=%v) quedó con %q", id, id == target, got)
 		}
 	}
+}
+
+// decide arma las decisiones de una vista previa: act para id y «skip» para todo otro conflicto.
+func decide(pr *v1.PreviewBackupImportResponse, id, act string) []*v1.VaultBackupDecision {
+	var out []*v1.VaultBackupDecision
+	for _, i := range pr.Items {
+		switch {
+		case i.Id == id:
+			out = append(out, &v1.VaultBackupDecision{Id: i.Id, Action: act})
+		case i.State == "conflicto_etiqueta":
+			out = append(out, &v1.VaultBackupDecision{Id: i.Id, Action: "skip"})
+		}
+	}
+	return out
 }
