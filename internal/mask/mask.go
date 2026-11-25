@@ -24,6 +24,8 @@ const (
 	// El valor es una palabra o una cadena entre comillas (NX-OS: "ab cd"); sigue el resto de la línea. Lo pegado tras
 	// la comilla de cierre también es del valor («"ab"cd»): la 1.ª alternativa es quotedValue.
 	val = `("[^"]*"\S*|\S+)(.*)$`
+	// Llave de 0 a 9 o «hex» antes del valor (IKEv2: «pre-shared-key hex 4C45…»; ASA: «pre-shared-key hex …»).
+	hexTyp = `(?:(?:[0-9]|hex) )?`
 )
 
 // R arma una regla: el prefijo (hasta el valor) es el grupo 1, el valor el 2 y el resto el 3.
@@ -43,6 +45,23 @@ func (r rule) stopAt(expr string) rule { r.stop = regexp.MustCompile(`(?i)` + ex
 
 // Línea de keyring IKEv1: ahí «address/hostname/ipv6» no es la llave.
 var keyringLine = regexp.MustCompile(`^\s*pre-shared-key (?:address|hostname|ipv6) \S`)
+
+// El diálogo de setup de IOS imprime «password X» sin sangría tras «line vty 0 4»: sigue siendo la del bloque line
+// (no «password encryption aes», el prompt «Password:» ni password-encryption).
+var setupPassword = regexp.MustCompile(`(?i)^password (?:[0-9] )?\S`)
+
+// Comandos globales «password …» (NX-OS) que no son la contraseña de la línea.
+var setupPasswordCmd = regexp.MustCompile(`(?i)^password (?:encryption|strength-check|secure-mode|prompt)\b`)
+
+// La regla con tipo ya tapó la comunidad («version 2c 0 <MASKED:…>»): el dígito no es otra comunidad.
+var snmpHostTyped = regexp.MustCompile(`(?i)version (?:1|2c|3 (?:auth|noauth|priv)) [067] <MASKED:`)
+
+// snmpHostTail: en tipo 0 la comunidad llega hasta udp-port o el tipo de notificación que sigue.
+const snmpHostTail = `\s+(?:udp-port\b|(?:bgp|bfd|config|cpu|eigrp|entity|envmon|flash|hsrp|ipsla|isis|license|mpls|ospf|pim|snmp|syslog|tty|vrrp|vtp)\b)`
+
+// snmpHostDigitComm: tras el dígito viene un tipo de notificación o el fin de línea: el dígito es la comunidad (una
+// cadena tipo 7 real es hexadecimal y nunca es «bgp»). La regla con tipo no se aplica y la de sin tipo lo tapa.
+var snmpHostDigitComm = regexp.MustCompile(`(?i)version (?:1|2c|3 (?:auth|noauth|priv)) [067](?:` + snmpHostTail + `|\s*$)`)
 
 // HSRP/VRRP con key-chain o sin autenticación: no hay secreto en la línea.
 var fhrpNoKey = regexp.MustCompile(`authentication (?:md5 key-chain|none)\b`)
@@ -90,7 +109,7 @@ var iosRules = []rule{
 	R("psk", "", `\s*(?:crypto )?isakmp key `+typ), // ASA anterior a 8.4: «isakmp key X address …»
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
-	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
+	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+hexTyp).unless(keyringLine),
 	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|sha\d*|hmac-sha\S*|cmac(?:-aes-128)?) (?:(?:hash|plain) )?`+typ),
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
@@ -98,7 +117,9 @@ var iosRules = []rule{
 	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
 	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
 	R("snmp-community", "", `\s*snmp-server host-group \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
-	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost),
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) (?:[067] )?)?`).stopAt(snmpHostTail).guarded().unlessFn(isASASNMPHost).unless(snmpHostDigitComm),
+	// La regla anterior, sin el tipo: «version 2c 7 udp-port 1162» es la comunidad «7» y la v0.6.5 la tapaba.
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost).unless(snmpHostTyped),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
 	R("ppp-password", "", `\s*ppp (?:chap password|pap sent-username \S+ password) `+typ),
@@ -148,12 +169,12 @@ var iosRules = []rule{
 	R("isis-password", "", `\s*isis password `+typ),
 	R("ldp-password", "", `\s*mpls ldp neighbor \S+ (?:.*? )?password `+typ),
 	R("ldp-password", "", `\s*mpls ldp password fallback `+typ),
-	R("msdp-password", "", `\s*ip msdp password (?:peer )?\S+ `+typ),
+	R("msdp-password", "", `\s*ip msdp (?:vrf \S+ )?password (?:peer )?\S+ `+typ),
 	R("pim-key", "", `\s*ip pim hello-authentication ah-md5 `+typ),
 	R("bfd-key", "", `\s*bfd authentication \S+ key-id \d+ (?:hex-)?key `),
 	// ASA: passwd, IKEv1/IKEv2, failover, LDAP, EIGRP y licencia inteligente.
 	R("enable-secret", "", `\s*passwd `),
-	R("psk", "", `\s*(?:ikev1|ikev2 (?:local|remote)-authentication) pre-shared-key `+typ),
+	R("psk", "", `\s*(?:ikev1|ikev2 (?:local|remote)-authentication) pre-shared-key `+hexTyp),
 	R("failover-key", "", `\s*failover (?:key (?:hex )?|ipsec pre-shared-key )`+typ),
 	R("ldap-password", "", `\s*ldap-login-password `+typ),
 	R("eigrp-key", "", `\s*eigrp authentication key \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
@@ -165,7 +186,7 @@ var iosRules = []rule{
 	R("aaa-key", "", `\s*aaa-server \S+ (?:\(\S+\) )?host \S+ `).guarded(), // forma de una línea
 	R("token", "licsmart", `\s+token `),
 	// VPN y PKI.
-	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+typ),
+	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+hexTyp),
 	R("psk", "ezvpn", `\s+key `+typ),
 	R("psk", "", `\s*group \S+ key `+typ), // cliente EzVPN (crypto ipsec client ezvpn)
 	R("l2tp-password", "", `\s*l2tp tunnel password `+typ),
@@ -184,7 +205,35 @@ var iosRules = []rule{
 	R("cts-key", "", `\s*cts device-id \S+ password `+typ),
 	R("macsec-key", "", `\s*sap pmk `),
 	R("macsec-key", "", `\s*key-octet-string `+typ),
-	R("wccp-password", "", `\s*ip wccp (?:.*? )?password `+typ),
+	R("wccp-password", "", `\s*(?:ip )?wccp (?:.*? )?password `+typ), // ASA: «wccp 61 password X» sin «ip»
+	// Formatos de la pasada de auditoría de noviembre (sin validar en laboratorio).
+	R("radius-key", "", `\s*aaa pod server (?:.*? )?server-key `+typ),
+	R("rsvp-key", "", `\s*ip rsvp authentication (?:neighbor address \S+ )?key `+typ),
+	// FlexVPN: contraseña de la lista AAA (name-mangler o grupo) y del EAP local/remoto.
+	R("aaa-key", "", `\s*(?:aaa authorization (?:group (?:override )?|user )\S+ list|keyring aaa) \S+ (?:.*? )?password `+typ),
+	R("user-secret", "", `\s*authentication (?:local|remote) eap (?:.*? )?password `+typ),
+	// SIP-UA, voz y CME: credenciales de registro y de la administración web/XML.
+	R("user-secret", "", `\s*(?:credentials|authentication) (?:.*? )?username \S+ password `+typ).stopAt(`\s+realm\s+\S+\s*$`),
+	R("user-secret", "", `\s*web admin system name \S+ (?:password|secret) `+typ),
+	R("user-secret", "", `\s*xml user \S+ password `+typ).stopAt(`\s+\d+\s*$`),
+	R("ppp-password", "", `\s*ppp (?:eap|ms-chap(?:-v2)?) password `+typ),
+	// Radio 802.11 autónomo: llave WEP.
+	R("wifi-psk", "", `\s*encryption (?:vlan \d+ )?key \d+ size \d+bit `+typ).stopAt(`\s+transmit-key\s*$`),
+	// NX-OS: sonda de prueba del servidor AAA y contraseña de pares SXP (tras «required»).
+	R("aaa-key", "", `\s*(?:radius|tacacs)-server (?:host \S+ )?test (?:.*? )?password `+typ).stopAt(`\s+idle-time\s+\d+\s*$`),
+	R("cts-key", "", `\s*cts sxp (?:default password|connection peer \S+ (?:.*? )?password) required `+typ).stopAt(`\s+mode\s+\S+(?:\s+vrf\s+\S+)?\s*$`),
+	// ASA: proxy de WebVPN, RIP y balanceo de carga.
+	R("proxy-password", "", `\s*https?-proxy \S+ (?:\d+ )?(?:.*? )?username \S+ password `+typ),
+	R("client-password", "", `\s*rip authentication key `+commTyp).stopAt(`\s+key_id \d+\s*$`),
+	R("cluster-key", "vpnlb", `\s+cluster key `+typ),
+	R("client-password", "mount", `\s+password `+typ),
+	// Servidor RADIUS local de IOS y l2tp-class.
+	R("radius-key", "radiuslocal", `\s+nas \S+ key `+typ),
+	R("user-secret", "radiuslocal", `\s+user \S+ (?:password|nthash) `+typ),
+	R("sim-pin", "", `\s*(?:cellular \S+ )?lte sim authenticate `+typ).stopAt(`\s+slot\s+\d+\s*$`),
+	R("isis-password", "", `\s*isis authentication key `+typ).stopAt(`\s+level-[12]\s*$`),
+	R("isis-password", "isis", `\s+authentication key `+typ).stopAt(`\s+level-[12]\s*$`),
+	R("l2tp-password", "l2tp", `\s+(?:password|digest secret) `+typ).stopAt(`\s+hash\s+\S+\s*$`),
 	R("vtp-password", "", `\s*vtp password `+typ),
 	R("token", "umbrella", `\s+token `),
 	R("token", "", `\s*api-key `+typ),
@@ -208,7 +257,7 @@ var iosRules = []rule{
 	R("tacacs-key", "tacacs", `\s+key `+typ),
 	R("radius-key", "radius", `\s+key `+typ),
 	R("dot1x-password", "dot1x", `\s+password `+typ),
-	R("line-password", "line", `\s+password `+typ),
+	R("line-password", "line", `\s*password `+typ),
 }
 
 // Palabras que, como valor, no son un secreto sino otra palabra clave del comando (ntp … key 5 prefer, password default…).
@@ -277,6 +326,16 @@ func blockOf(line string) string {
 		return "trustpoint"
 	case strings.HasPrefix(line, "cluster group "):
 		return "cluster"
+	case strings.TrimSpace(line) == "radius-server local":
+		return "radiuslocal"
+	case strings.HasPrefix(line, "l2tp-class "):
+		return "l2tp"
+	case strings.TrimSpace(line) == "vpn load-balancing":
+		return "vpnlb"
+	case strings.TrimSpace(line) == "router isis":
+		return "isis"
+	case strings.HasPrefix(line, "mount ") && strings.Contains(line, " type "):
+		return "mount"
 	case strings.HasPrefix(line, "aaa-server "):
 		return "aaaserver"
 	case strings.TrimSpace(line) == "license smart":
@@ -460,7 +519,9 @@ func (s *Stream) line1(raw string) (out string, ok bool) {
 		return out + eol, true
 	}
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
-		s.block = blockOf(line)
+		if b := blockOf(line); b != "" || s.block != "line" || !setupPassword.MatchString(line) || setupPasswordCmd.MatchString(line) {
+			s.block = b
+		}
 	}
 	return s.quoted(maskLine(line, s.block, s.Platform, s.counts)) + eol, true // las reglas propias primero; lo citado, después
 }
@@ -706,7 +767,7 @@ func (s Stream) Peek(line string) string {
 }
 
 // looseBlocks son los bloques que tienen reglas propias.
-var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella", "cluster"}
+var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella", "cluster", "radiuslocal", "l2tp", "vpnlb", "mount", "isis"}
 
 // TypedLoose enmascara una línea tecleada cuyo bloque no confirmó ningún prompt: si el bloque en curso no
 // la tapa, la prueba con cada bloque que tenga reglas propias y graba la primera versión que tape algo
@@ -779,16 +840,30 @@ func Path(platform, path string) string {
 	return strings.Join(lines, " > ")
 }
 
+var showLine = regexp.MustCompile(`(?i)^\s*(?:do\s+)?sh(?:o|ow)?\s`)
+
 // Cmd enmascara un comando suelto del que se perdió su bloque (una línea rechazada, citada en un log): las reglas más
 // los key/password/secret/token sueltos. Para quien muestra una línea sin saber de qué sección venía.
 // Si trae varias líneas, cada una se procesa por separado.
 func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
+	st := Stream{counts: counts, Platform: platform}
+	// EEM: «action 1 cli command "enable secret X"». quoted solo vale si tapa algo más (no desescapa ni toca un show).
+	logged := func(n string) string {
+		base := maskLogged(n, platform, counts)
+		if showLine.MatchString(n) {
+			return base
+		}
+		if q := st.quoted(base); strings.Count(q, "<MASKED:") > strings.Count(base, "<MASKED:") {
+			return q
+		}
+		return base
+	}
 	for i, l := range lines {
 		sp := commandSpans(spLogBlock, l)
-		sp = mergeSpans(append(sp, twinSpans(l, func(n string) string { return maskLogged(n, platform, counts) })...)) // las reglas solo ven el espacio ASCII
-		lines[i], _ = cut(l, maskLogged(l, platform, counts), sp)
+		sp = mergeSpans(append(sp, twinSpans(l, logged)...)) // las reglas solo ven el espacio ASCII
+		lines[i], _ = cut(l, logged(l), sp)
 	}
 	return strings.Join(lines, "\n")
 }

@@ -26,7 +26,7 @@ var cmdKeys = []struct {
 }{
 	{"secret", false}, {"password", false}, {"key", false}, {"key-string", false}, {"community", false}, {"token", false},
 	{"pre-shared-key", false}, {"psk", false}, {"idtoken", false}, {"text", false},
-	{"authentication-key", true}, {"message-digest-key", true}, {"auth", true}, {"priv", true},
+	{"nthash", false}, {"authentication-key", true}, {"message-digest-key", true}, {"auth", true}, {"priv", true},
 }
 
 var (

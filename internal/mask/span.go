@@ -11,7 +11,7 @@ import (
 // spKeys: palabras de secreto.
 var spKeys = []string{
 	"secret", "password", "key", "key-string", "community", "token", "pre-shared-key", "psk", "idtoken", "text",
-	"authentication-key", "message-digest-key", "auth", "priv", "passphrase",
+	"nthash", "authentication-key", "message-digest-key", "auth", "priv", "passphrase",
 }
 
 // spDashKeys: palabras con guion que solo se abrevian pasado el primer guion («area-p», no «ar»): una abreviatura más
