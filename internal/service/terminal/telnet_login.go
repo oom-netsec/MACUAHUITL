@@ -37,6 +37,7 @@ type telnetLogin struct {
 	finished      bool
 	result        string // "auto" (el equipo aceptó), "manual" (sigue a mano) o "sent" (contraseña enviada, sin veredicto)
 	notice        string // clave del aviso al terminar; vacía si no hace falta
+	onSecret      func() // se llama justo antes de mandar la contraseña (la grabación tapa su eco)
 }
 
 func newTelnetLogin(user string, pass *secret.Secret, w io.Writer, quiet, first, next time.Duration) *telnetLogin {
@@ -86,6 +87,9 @@ func (l *telnetLogin) stable() {
 		l.finish("manual", "terminal.telnet.manual_login")
 	case (l.state == loginWaitFirst || l.state == loginWaitPass) && pass:
 		buf := append(append([]byte(nil), l.pass.Bytes()...), '\r')
+		if l.onSecret != nil {
+			l.onSecret() // si el equipo devuelve la contraseña en esa línea, la grabación la tapa
+		}
 		ok := l.writeAll(buf)
 		clear(buf)
 		l.pass.Destroy()

@@ -31,7 +31,9 @@ const stamp = "2006-01-02T15:04:05.000Z07:00"
 // secret, psk, token, pin o community string poco antes («New key:», «Enter TACACS+ key:», «PIN:»…). «Press any key
 // to continue:» no cuenta (anyKey).
 var (
-	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^:\r\n]{0,30}:\s*$`)
+	// Lo que sigue a la palabra puede ser largo y traer «:» («Password for 'https://u@git.example.com':», «Enter
+	// passphrase for key '/home/u/.ssh/id_ed25519':»): hasta 120 caracteres.
+	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^\r\n]{0,120}:\s*$`)
 	anyKey       = regexp.MustCompile(`(?i)\bany key\b`)
 )
 
@@ -87,6 +89,8 @@ type Recorder struct {
 	cfg      bool            // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
 	cfgOK    bool            // hay prompt conocido para lo que se teclea; si no, se tapa como en config
 	hidden   bool            // lo tecleado es una contraseña: no se graba
+	echoPr   string          // prompt de secreto que se contestó (tecleando o SecretSent): lo que el equipo devuelva tras él en esa línea es el secreto
+	noTyped  bool            // SkipTyped: lo tecleado no se graba (solo sirve para tapar su eco)
 	line     []byte          // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
@@ -143,9 +147,14 @@ func (r *Recorder) Output(p []byte) {
 // outLine enmascara y escribe una línea de salida. El prompt (SW1(config)#) se conserva y se
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
-	// Se borra la secuencia de borrado de --More-- antes de quitar los retornos de carro: no deja sangría falsa.
-	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
-	l = applyBackspaces(strings.ReplaceAll(l, "\r", "")) // el log se lee mejor sin retornos de carro
+	l = cleanLine(l)
+	masked := ""
+	if pr := r.echoPr; pr != "" {
+		r.echoPr = ""
+		if strings.HasPrefix(l, pr) && strings.TrimSpace(l[len(pr):]) != "" {
+			masked = pr + "<MASKED:secret>"
+		}
+	}
 	if r.win > 0 {
 		if r.win--; r.win == 0 {
 			r.secrets = nil
@@ -155,6 +164,10 @@ func (r *Recorder) outLine(l string) {
 		if r.win2--; r.win2 == 0 {
 			r.secrets2, r.multi2, r.prim2 = nil, nil, nil
 		}
+	}
+	if masked != "" { // el eco de un secreto contestado: se emite tapado y no pasa por el análisis (con «Password:» sin espacio parecería un prompt)
+		r.emit(r.pendAt.Format(stamp) + " " + masked + "\n")
+		return
 	}
 	out, keep := "", true
 	// Un eco partido por un syslog sigue en la línea siguiente aunque esta lleve «#» o «>» del secreto («Pa55#Xq7») y parezca
@@ -282,6 +295,13 @@ func (r *Recorder) outLine(l string) {
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+// cleanLine quita escapes, la secuencia de borrado de --More-- (antes de los retornos de carro: no deja sangría falsa),
+// los retornos de carro (el log se lee mejor sin ellos) y aplica los retrocesos.
+func cleanLine(l string) string {
+	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
+	return applyBackspaces(strings.ReplaceAll(l, "\r", ""))
 }
 
 // echoMatch: x es (el comienzo de) alguna línea enviada o de la que se teclea, o, con el eco desplazado, un trozo de ella;
@@ -656,6 +676,7 @@ func (r *Recorder) Input(p []byte) {
 	for _, c := range p {
 		if !r.hidden && len(r.line) == 0 && r.asksSecret() {
 			r.hidden = true
+			r.armEcho()
 		}
 		switch {
 		case c == '\r' || c == '\n' && !r.lastCR:
@@ -723,7 +744,34 @@ func (r *Recorder) flush() {
 	}
 }
 
-func (r *Recorder) input(text string) { r.emit(r.now().Format(stamp) + " >>> " + text + "\n") }
+func (r *Recorder) input(text string) {
+	if !r.noTyped {
+		r.emit(r.now().Format(stamp) + " >>> " + text + "\n")
+	}
+}
+
+// SkipTyped deja de grabar lo tecleado (la consola serie: ahí el login es parte de la sesión y una contraseña tecleada
+// antes de su prompt no siempre se distingue de un comando). Input sigue sirviendo para tapar el eco. Antes de usarlo.
+func (r *Recorder) SkipTyped() { r.noTyped = true }
+
+// SecretSent: el núcleo contestó el prompt de secreto que está en pantalla (login automático de Telnet); si el equipo
+// devuelve lo enviado en esa misma línea, se tapa.
+func (r *Recorder) SecretSent() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.armEcho()
+}
+
+// armEcho: la línea a medias es un prompt de secreto que se está contestando; lo que el equipo devuelva tras él en esa
+// línea (diálogo setup de IOS, login de Telnet) es el secreto y outLine lo tapa. Solo al contestar: una salida que llega
+// byte a byte y pasa por un «:» («Key name: …») no se toca. Requiere r.mu.
+func (r *Recorder) armEcho() {
+	if len(r.pend) > 0 && len(r.pend) <= 256 {
+		if l := cleanLine(string(r.pend)); secretPrompt.MatchString(l) && !anyKey.MatchString(l) {
+			r.echoPr = l
+		}
+	}
+}
 
 // Mark anota un evento propio (apertura, cierre) en una línea aparte.
 func (r *Recorder) Mark(text string) {

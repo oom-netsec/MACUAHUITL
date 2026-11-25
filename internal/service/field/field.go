@@ -22,6 +22,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
+	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
 )
 
 // fieldSvc: herramientas junto al equipo (consola serie, servidor de archivos, hashes).
@@ -67,8 +68,9 @@ func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 	return nil, i18n.New("field.err.names_busy", nil)
 }
 
-// Console conecta el stream con el puerto serie. Lo tecleado no se graba ni se
-// audita (puede ser una contraseña); solo lo que devuelve el equipo.
+// Console conecta el stream con el puerto serie. La grabación usa el grabador de la terminal SSH sin lo tecleado (en la
+// consola el login es parte de la sesión: una contraseña tecleada antes de su prompt no siempre se distingue de un
+// comando): lo que devuelve el equipo, con los secretos enmascarados; lo tecleado solo sirve para tapar su eco.
 func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	s.d.MarkActive()
 	first, err := st.Recv()
@@ -95,7 +97,8 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
 	defer f.Close()
-	rec := serialcon.NewRecorder(f, s.d.Now)
+	rec := terminal.NewRecorder(f, s.d.Now)
+	rec.SkipTyped()
 	summary := cfg.Path + " " + cfg.String()
 	rec.Mark("abierto " + summary)
 	opened := cfg.Path + " " + cfg.StringIn(i18n.Locale(st.Context()))
@@ -104,6 +107,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		return err
 	}
 	var rx, tx, breaks atomic.Int64
+	var done atomic.Bool // la sesión ya se cierra: lo que llegue después no va al grabador
 	portErr := make(chan error, 1)
 	go func() { // equipo → cliente; solo este goroutine envía por el stream desde aquí
 		buf := make([]byte, 4096)
@@ -111,7 +115,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 			n, err := p.Read(buf)
 			if n > 0 {
 				rx.Add(int64(n))
-				rec.Write(buf[:n])
+				rec.Output(buf[:n])
 				st.Send(&v1.ConsoleResponse{Data: append([]byte(nil), buf[:n]...)})
 			}
 			if err != nil {
@@ -132,12 +136,17 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 			case m.GetSendBreak():
 				if p.Break() == nil {
 					breaks.Add(1)
-					rec.Mark("BREAK")
+					if !done.Load() {
+						rec.Mark("BREAK")
+					}
 				}
 			case len(m.GetData()) > 0:
+				if !done.Load() {
+					rec.Input(m.GetData())
+				}
 				n, err := p.Write(m.GetData())
 				tx.Add(int64(n))
-				if err != nil && !errors.Is(err, os.ErrClosed) { // escritura corta o fallida: que quede en el registro
+				if err != nil && !errors.Is(err, os.ErrClosed) && !done.Load() { // escritura corta o fallida: que quede en el registro
 					rec.Mark("WRITE ERROR")
 				}
 			}
@@ -157,6 +166,8 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		lostErr = i18n.Wrap("field.err.port_lost", lost, nil)
 		reason, reasonEN = lostErr.Error(), i18n.English(lostErr)
 	}
+	done.Store(true)
+	rec.Close() // lo que quedó a medias, antes de la marca de cierre
 	rec.Mark("cerrado: " + reason)
 	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))
 	if lost != nil {

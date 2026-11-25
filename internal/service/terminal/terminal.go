@@ -619,6 +619,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if telnet && !typed {
 		pass, cred.Password = cred.Password, nil
 		lg = newTelnetLogin(cred.Username, pass, w, s.loginQuiet, s.loginFirst, s.loginNext)
+		lg.onSecret = rec.SecretSent
 		loginActive.Store(true)
 	}
 	go func() { // chunks → pantalla y grabación (y el login automático); solo este goroutine envía por el stream desde aquí

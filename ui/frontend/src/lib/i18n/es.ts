@@ -999,7 +999,7 @@ export const es = {
   "console.output": "Salida de la consola",
   "console.cmd": "Comando",
   "console.send": "Enviar",
-  "console.note": "Lo tecleado no se graba (puede ser una contraseña); se graba lo que devuelve el equipo. BREAK sirve para entrar a ROMMON durante el arranque.",
+  "console.note": "Se graba lo que devuelve el equipo, con los secretos tapados; lo tecleado no se graba (puede ser una contraseña). BREAK sirve para entrar a ROMMON durante el arranque.",
   "console.closed": "consola cerrada",
   "console.connected": "conectado a {port}; grabando en {path}",
   "ssh.title": "Terminal SSH",
