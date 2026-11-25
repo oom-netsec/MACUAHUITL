@@ -171,13 +171,13 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 	errHas(t, "frases en", err, "the passphrases do not match")
 	ruta := filepath.Join(t.TempDir(), "r.mcvault")
 	has(t, "export en", enMust(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"), "backup of 1 credentials in "+ruta)
-	has(t, "import en", enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "LABEL", "STATE", "imported: 0 new, 0 replaced, 0 renamed, 0 skipped, 1 unchanged")
+	has(t, "import en", enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=skip"), "LABEL", "STATE", "imported: 0 new, 0 replaced, 0 renamed, 1 skipped, 0 unchanged")
 	for lang, c := range map[string][]string{"en": {"BACKUP ID", "LABEL", "STATE", "VAULT ID"}, "es": {"ID EN EL RESPALDO", "ETIQUETA", "ESTADO", "ID EN LA BÓVEDA"}} {
 		var o string
 		if lang == "en" {
-			o = enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta)
+			o = enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=skip")
 		} else {
-			o = must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta)
+			o = must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=omitir")
 		}
 		has(t, "import cols "+lang, o, c...)
 		var f []string
@@ -200,7 +200,7 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 			t.Fatalf("import %s: espacios al final de línea: %q", lang, o)
 		}
 	}
-	has(t, "import es", must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "ETIQUETA", "importadas: 0 nuevas, 0 reemplazadas, 0 renombradas, 0 omitidas, 1 iguales")
+	has(t, "import es", must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=omitir"), "ETIQUETA", "importadas: 0 nuevas, 0 reemplazadas, 0 renombradas, 1 omitidas, 0 iguales")
 	_, err = en(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=x")
 	errHas(t, "import all en", err, `--all="x": use rename, replace or skip`)
 }

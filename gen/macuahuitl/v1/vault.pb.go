@@ -1518,8 +1518,8 @@ type VaultBackupItem struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // ID de la credencial dentro del respaldo (las decisiones van por él)
 	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
 	Username      string                 `protobuf:"bytes,3,opt,name=username,proto3" json:"username,omitempty"`
-	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`                       // nueva | igual | conflicto_etiqueta | reservada (se omite)
-	TargetId      string                 `protobuf:"bytes,5,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"` // ID de la credencial de la bóveda con la que coincide; solo en igual y conflicto_etiqueta, vacío en los demás
+	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`                       // nueva | conflicto_etiqueta | reservada (se omite); «igual» ya no se produce (2026-11-25): no se compara el contenido
+	TargetId      string                 `protobuf:"bytes,5,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"` // ID de la credencial de la bóveda con la misma etiqueta; solo en conflicto_etiqueta, vacío en los demás
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1759,7 +1759,7 @@ type ApplyBackupImportResponse struct {
 	Replaced      int32                  `protobuf:"varint,2,opt,name=replaced,proto3" json:"replaced,omitempty"`
 	Renamed       int32                  `protobuf:"varint,3,opt,name=renamed,proto3" json:"renamed,omitempty"`
 	Skipped       int32                  `protobuf:"varint,4,opt,name=skipped,proto3" json:"skipped,omitempty"` // omitidas por decisión o por reservadas
-	Same          int32                  `protobuf:"varint,5,opt,name=same,proto3" json:"same,omitempty"`       // ya estaban idénticas
+	Same          int32                  `protobuf:"varint,5,opt,name=same,proto3" json:"same,omitempty"`       // siempre 0 desde 2026-11-25: la vista previa no compara el contenido (las idénticas son conflicto)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

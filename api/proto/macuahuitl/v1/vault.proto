@@ -172,8 +172,8 @@ message VaultBackupItem {
   string id = 1;                       // ID de la credencial dentro del respaldo (las decisiones van por él)
   string label = 2;
   string username = 3;
-  string state = 4;                    // nueva | igual | conflicto_etiqueta | reservada (se omite)
-  string target_id = 5;                // ID de la credencial de la bóveda con la que coincide; solo en igual y conflicto_etiqueta, vacío en los demás
+  string state = 4;                    // nueva | conflicto_etiqueta | reservada (se omite); «igual» ya no se produce (2026-11-25): no se compara el contenido
+  string target_id = 5;                // ID de la credencial de la bóveda con la misma etiqueta; solo en conflicto_etiqueta, vacío en los demás
 }
 message PreviewBackupImportResponse {
   string token = 1;                    // vale 10 minutos, se gasta al aplicar y se descarta si la bóveda se cierra
@@ -194,5 +194,5 @@ message ApplyBackupImportResponse {
   int32 replaced = 2;
   int32 renamed = 3;
   int32 skipped = 4;                   // omitidas por decisión o por reservadas
-  int32 same = 5;                      // ya estaban idénticas
+  int32 same = 5;                      // siempre 0 desde 2026-11-25: la vista previa no compara el contenido (las idénticas son conflicto)
 }

@@ -48,9 +48,9 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	}
 	must(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes", "--overwrite")
 
-	// Importar sobre la misma bóveda: todo igual.
-	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta))
-	if strings.Count(out, "same") < 2 || !strings.Contains(out, "2 iguales") {
+	// Importar sobre la misma bóveda: misma etiqueta (no se compara el contenido), se omiten.
+	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=omitir"))
+	if strings.Count(out, "label_conflict") < 2 || !strings.Contains(out, "2 omitidas") {
 		t.Fatalf("import igual:\n%s", out)
 	}
 	if strings.Contains(out, "USR-") {

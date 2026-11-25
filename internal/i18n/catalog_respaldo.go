@@ -17,6 +17,7 @@ func init() {
 		"respaldo.err.decision_dup":     e("decisión repetida para {label:q}", "repeated decision for {label:q}", "label"),
 		"respaldo.err.action":           e("acción {action:q} desconocida; usa renombrar, reemplazar u omitir", "unknown action {action:q}; use \"rename\", \"replace\" or \"skip\"", "action"),
 		"respaldo.err.undecided":        e("falta decidir qué hacer con {label:q}: renombrar, reemplazar u omitir", "you still need to decide what to do with {label:q}: \"rename\", \"replace\" or \"skip\"", "label"),
+		"respaldo.err.target_changed":   e("la credencial de la bóveda que iba a reemplazar {label:q} cambió desde la vista previa; vuelve a abrir el respaldo", "the vault credential that {label:q} would replace changed since the preview; open the backup again", "label"),
 		"respaldo.err.double_replace":   e("dos credenciales del respaldo chocan en la misma credencial de la bóveda ({label:q}): una la reemplazaría y la otra es idéntica a ella o también la reemplazaría; elige otra decisión para una de ellas", "two credentials of the backup collide on the same credential of the vault ({label:q}): one would replace it and the other is identical to it or would also replace it; choose another decision for one of them", "label"),
 	})
 }
