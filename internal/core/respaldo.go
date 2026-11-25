@@ -35,6 +35,7 @@ type respaldoPend struct {
 	reserved int          // entradas del sistema del respaldo: se omiten y no se descifran
 	path     string
 	expires  time.Time
+	targets  map[string]string // conflicto -> credencial viva que mostró la vista previa: «reemplazar» no pisa otra si cambió
 }
 
 func (p respaldoPend) destroy() {
@@ -316,6 +317,10 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 			it.State = plan[it.Id].state
 			if it.State == estConflicto {
 				it.TargetId = plan[it.Id].target
+				if p.targets == nil {
+					p.targets = map[string]string{}
+				}
+				p.targets[it.Id] = it.TargetId
 			}
 		}
 	}
@@ -397,6 +402,9 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 			res.Skipped++
 		case pl.state == estConflicto && act == "":
 			return nil, bad("respaldo.err.undecided", "label", c.Label)
+		case pl.state == estConflicto && act == decReemplazar && pl.target != p.targets[c.ID]:
+			// Entre la vista previa y aquí cambió la credencial viva a la que apuntaba (otro usuario, borrada): no se pisa otra.
+			return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.target_changed", i18n.A("label", c.Label))
 		case pl.state == estConflicto && act == decReemplazar:
 			if _, dup := reemplazados[pl.target]; dup {
 				return nil, bad("respaldo.err.double_replace", "label", c.Label)

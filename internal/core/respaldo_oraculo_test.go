@@ -4,6 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
@@ -65,5 +68,33 @@ func TestRespaldoConflictoApuntaAlMismoUsuario(t *testing.T) {
 		if i.Label == "dup" && i.TargetId != vivos[i.Username] {
 			t.Fatalf("%s apunta a %s, quería %s", i.Username, i.TargetId, vivos[i.Username])
 		}
+	}
+}
+
+// Si entre la vista previa y el apply cambia la credencial viva a la que apuntaba el conflicto, «reemplazar» no pisa otra.
+func TestRespaldoReemplazoConDestinoCambiado(t *testing.T) {
+	h, path := bovedaConRespaldo(t, nil) // «core» de USR-CORE
+	_ = h
+	o := newHarness(t, nil)
+	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
+	o.put(t, "core", "otro", "PW-OTRO")
+	o.put(t, "core", "USR-CORE", "PW-VIVA")
+	pr, err := o.preview(t, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Se borra la viva de USR-CORE: ahora el destino sería la de «otro».
+	l, _ := o.vault.ListCredentials(ctx(t), &v1.ListCredentialsRequest{})
+	for _, c := range l.Credentials {
+		if c.Username == "USR-CORE" {
+			o.vault.DeleteCredential(ctx(t), &v1.DeleteCredentialRequest{Id: c.Id})
+		}
+	}
+	_, err = o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: decide(pr, itemID(t, pr, "core"), "replace")})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("destino cambiado: %v", err)
+	}
+	if got := o.labels(t); got["core"] != "PW-OTRO" {
+		t.Fatalf("pisó otra: %v", got)
 	}
 }
