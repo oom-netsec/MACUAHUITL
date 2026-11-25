@@ -171,10 +171,12 @@ func decodeTrap(x *gosnmp.GoSNMP, b []byte) (t Trap, p *gosnmp.SnmpPacket) {
 		return bad, nil
 	}
 	for _, v := range p.Variables {
-		vv := toVar(v)
-		if s, ok := vv.Value.(string); ok && v.Type == gosnmp.OctetString {
-			vv.Value = string(syslogd.MaskRaw([]byte(s))) // el texto de un syslog (clogHistMsgText) puede traer secretos
+		// El texto de un syslog (clogHistMsgText) puede traer secretos: se enmascaran los bytes antes de pasarlos a texto
+		// o a hex (con un byte que no es UTF-8 saldría en hex, legible al decodificarlo). Vale para todo valor en bytes.
+		if b, ok := v.Value.([]byte); ok {
+			v.Value = syslogd.MaskRaw(b)
 		}
+		vv := toVar(v)
 		if v.Name == oidSnmpTrapOID {
 			t.TrapOID = fmt.Sprint(vv.Value)
 		}
@@ -345,7 +347,7 @@ func readTraps(ctx context.Context, pc net.PacketConn, x *gosnmp.GoSNMP, c TrapC
 				t.Error = t.ErrorText.In(i18n.Es)
 			} else if b, ok := blindCommunity(pkt); ok {
 				// Solo si se pudo ubicar y cegar la comunidad: el crudo va a eventos y a disco.
-				t.Raw = hex.EncodeToString(b[:min(n, MaxRawTrap)])
+				t.Raw = hex.EncodeToString(syslogd.MaskRaw(b[:min(n, MaxRawTrap)])) // los varbinds también pueden traer texto con secretos
 			}
 		}
 		// Se responde al inform solo si el trap entró a la cola: si se descartó, el equipo lo reintenta.

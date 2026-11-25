@@ -1,6 +1,7 @@
 package snmp
 
 import (
+	"encoding/hex"
 	"strings"
 	"testing"
 
@@ -26,6 +27,27 @@ func TestTrapTextoSyslogEnmascarado(t *testing.T) {
 		t.Logf("%s: %s", f, line)
 		if strings.Contains(line, "Cl4veTrap99") {
 			t.Errorf("secreto en claro en formato %s", f)
+		}
+	}
+}
+
+// Un byte que no es UTF-8 en el texto hace que el valor salga en hex: el secreto tampoco queda ahí (decodificable).
+func TestTrapTextoNoUTF8Enmascarado(t *testing.T) {
+	msg := "logged command:username backup privilege 15 secret Cl4veTrap99 description caf\xe9"
+	x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: "c"}
+	pkt := &gosnmp.SnmpPacket{Version: gosnmp.Version2c, Community: "c", PDUType: gosnmp.SNMPv2Trap, Variables: []gosnmp.SnmpPDU{
+		{Name: oidSnmpTrapOID, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.9.41.2.0.1"},
+		{Name: ".1.3.6.1.4.1.9.9.41.1.2.3.1.5.77", Type: gosnmp.OctetString, Value: []byte(msg)},
+	}}
+	b, err := pkt.MarshalMsg()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, _ := decodeTrap(x, b)
+	for _, f := range []string{"texto", "crudo", "jsonl"} {
+		line := string(tr.Line(f))
+		if strings.Contains(line, "Cl4veTrap99") || strings.Contains(line, hex.EncodeToString([]byte("Cl4veTrap99"))) {
+			t.Errorf("secreto (o su hex) en formato %s: %s", f, line)
 		}
 	}
 }
