@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -374,15 +375,12 @@ func TestHTTPResumenAlDetener(t *testing.T) {
 	}
 }
 
-// El mapa de cupos se acota y, lleno, lo nuevo se audita (mejor de más que perder la primera).
+// El mapa de cupos se acota.
 func TestAuditQuotaAcotado(t *testing.T) {
 	now := time.Unix(1, 0)
 	q := newAuditQuota(func() time.Time { return now })
 	for i := 0; i < maxSeenIPs+500; i++ {
-		ok, _ := q.take(netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String())
-		if !ok {
-			t.Fatalf("la primera de cada clave se audita (i=%d)", i)
-		}
+		q.take(netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String())
 	}
 	if len(q.m) > maxSeenIPs {
 		t.Fatalf("mapa de %d entradas", len(q.m))
@@ -398,5 +396,90 @@ func TestLimiterFallosAcotado(t *testing.T) {
 	}
 	if len(l.fails) > maxSeenIPs {
 		t.Fatalf("mapa de %d entradas", len(l.fails))
+	}
+}
+
+func ipN(i int) string {
+	return netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String()
+}
+
+// Las direcciones de un mismo /64 comparten cupo; IPv4-mapped y zona se normalizan.
+func TestIPKeyAgrupaV6(t *testing.T) {
+	now := time.Unix(1, 0)
+	q := newAuditQuota(func() time.Time { return now })
+	ok := 0
+	for i := 0; i < 50; i++ {
+		if a, _ := q.take(ipKey(fmt.Sprintf("2001:db8:1:2::%x", i+1))); a {
+			ok++
+		}
+	}
+	if ok != auditPerWindow {
+		t.Fatalf("auditadas %d de 50 del mismo /64, quería %d", ok, auditPerWindow)
+	}
+	if ipKey("::ffff:1.2.3.4") != ipKey("1.2.3.4") || ipKey("fe80::1%eth0") != ipKey("fe80::2") || ipKey("1.2.3.4") == ipKey("1.2.3.5") {
+		t.Fatalf("normalización: %q %q %q", ipKey("::ffff:1.2.3.4"), ipKey("fe80::1%eth0"), ipKey("fe80::2"))
+	}
+}
+
+// Con el mapa lleno, lo nuevo comparte un cupo común de desborde en vez de auditarse siempre.
+func TestAuditQuotaLlenoUsaDesborde(t *testing.T) {
+	now := time.Unix(1, 0)
+	q := newAuditQuota(func() time.Time { return now })
+	for i := 0; i < maxSeenIPs; i++ {
+		q.take(ipN(i))
+	}
+	ok := 0
+	for i := 0; i < 50; i++ {
+		if a, _ := q.take(ipN(maxSeenIPs + i)); a {
+			ok++
+		}
+	}
+	if ok != auditPerWindow {
+		t.Fatalf("auditadas %d de 50 nuevas con el mapa lleno, quería %d", ok, auditPerWindow)
+	}
+	if got := q.flush(); len(got) == 0 {
+		t.Fatal("el desborde debe salir en el resumen")
+	}
+}
+
+// Con el mapa de fallos lleno se sigue bloqueando a los orígenes nuevos.
+func TestLimiterLlenoSigueBloqueando(t *testing.T) {
+	now := time.Unix(1, 0)
+	l := newLimiter(func() time.Time { return now })
+	for i := 0; i < maxSeenIPs; i++ {
+		l.fail(ipN(i))
+	}
+	for i := 0; i < maxAuthFails; i++ {
+		l.fail(ipN(maxSeenIPs + i))
+	}
+	if !l.blocked(ipN(maxSeenIPs + 1000)) {
+		t.Fatal("un origen nuevo debió quedar bloqueado por el desborde")
+	}
+	if l.blocked(ipN(0)) {
+		t.Fatal("un origen con un solo fallo no se bloquea")
+	}
+}
+
+// Un archivo publicado que ya no se abre tampoco audita más que el cupo.
+func TestHTTPNoSeAbreRespetaCupo(t *testing.T) {
+	r := newRecorder()
+	var p string
+	addr := serveHTTPCfg(t, 1<<10, func(c *Config) { r.tune(c); p = c.Files[0] })
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	const n = 50
+	for i := 0; i < n; i++ {
+		resp, err := http.Head("http://" + addr + "/ios.bin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	r.wait(t, n)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.audited != auditPerWindow {
+		t.Fatalf("auditadas %d, quería %d (contadas %d)", r.audited, auditPerWindow, r.counted)
 	}
 }

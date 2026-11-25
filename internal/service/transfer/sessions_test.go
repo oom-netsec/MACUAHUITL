@@ -275,3 +275,14 @@ func TestSinkRepetidasAparte(t *testing.T) {
 		t.Fatalf("rechazos=%d repetidas=%d srv=%d", rejected, k.repeated.Load(), srv.rejected.Load())
 	}
 }
+
+// El texto auditado del resumen lleva repeats, first y last.
+func TestAuditRepeatsTexto(t *testing.T) {
+	var a, d string
+	x := fileserve.Repeats{Client: "10.0.0.1", N: 7, First: time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC), Last: time.Date(2026, 11, 25, 10, 0, 40, 0, time.UTC)}
+	auditRepeats(func(ac, _, de string) { a, d = ac, de }, "S1", x)
+	if a != "transfer.serve.repeats" || !strings.Contains(d, "server=S1") || !strings.Contains(d, "repeats=7") ||
+		!strings.Contains(d, "first=2026-11-25T10:00:00Z") || !strings.Contains(d, "last=2026-11-25T10:00:40Z") {
+		t.Fatalf("%s %q", a, d)
+	}
+}

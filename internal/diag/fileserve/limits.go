@@ -2,7 +2,9 @@ package fileserve
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,6 +36,7 @@ type limiter struct {
 	n     int
 	perIP map[string]int
 	fails map[string]failState
+	over  failState        // fallos de los orígenes que no caben en fails (mapa lleno): cuentan juntos
 	now   func() time.Time // reloj del núcleo
 }
 
@@ -48,6 +51,7 @@ func newLimiter(now func() time.Time) *limiter {
 
 // acquire reserva un cupo para ip; release lo devuelve.
 func (l *limiter) acquire(ip string) (release func(), ok bool) {
+	ip = ipKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.n >= maxConns || l.perIP[ip] >= perClientTCP || l.blockedLocked(ip) {
@@ -66,6 +70,7 @@ func (l *limiter) acquire(ip string) (release func(), ok bool) {
 }
 
 func (l *limiter) fail(ip string) {
+	ip = ipKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.blockedLocked(ip) // si el bloqueo ya venció, vuelve a contar desde cero
@@ -77,22 +82,32 @@ func (l *limiter) fail(ip string) {
 				delete(l.fails, k)
 			}
 		}
-		if len(l.fails) >= maxSeenIPs {
-			return // lleno: no se cuenta (no se pierde nada de lo ya bloqueado)
+		if len(l.fails) >= maxSeenIPs { // lleno: los orígenes nuevos cuentan juntos en el desborde
+			l.blockedLocked(ip)
+			l.over = failState{l.over.n + 1, now}
+			return
 		}
 	}
 	l.fails[ip] = failState{f.n + 1, l.now()}
 }
 
 func (l *limiter) blocked(ip string) bool {
+	ip = ipKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.blockedLocked(ip)
 }
 
-// blockedLocked dice si ip sigue bloqueada; un bloqueo vencido se borra. Con l.mu tomado.
+// blockedLocked dice si ip sigue bloqueada; un bloqueo vencido se borra. Con l.mu tomado. Un origen sin entrada
+// propia con el mapa lleno responde por el desborde común.
 func (l *limiter) blockedLocked(ip string) bool {
 	f, ok := l.fails[ip]
+	if !ok && len(l.fails) >= maxSeenIPs {
+		if l.now().Sub(l.over.last) >= lockoutFor {
+			l.over = failState{}
+		}
+		return l.over.n >= maxAuthFails
+	}
 	if ok && l.now().Sub(f.last) >= lockoutFor { // los fallos también vencen, no solo el bloqueo
 		delete(l.fails, ip)
 		return false
@@ -189,6 +204,7 @@ type auditQuota struct {
 	m     map[string]*auditWin
 	now   func() time.Time
 	prune time.Time // última poda en take (a lo más una por ventana)
+	over  auditWin  // cupo común de los orígenes que no caben en m (mapa lleno)
 }
 
 type auditWin struct {
@@ -208,30 +224,34 @@ func (w *auditWin) summary(ip string) Repeats {
 
 // take dice si esta respuesta de ip se audita; closed trae los resúmenes de las ventanas que cerró.
 func (q *auditQuota) take(ip string) (allowed bool, closed []Repeats) {
+	ip = ipKey(ip)
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	now := q.now()
 	w := q.m[ip]
+	name := ip
 	if w == nil {
 		if len(q.m) >= maxSeenIPs && now.Sub(q.prune) >= auditWindow {
 			q.prune = now
 			closed = q.expireLocked(now)
 		}
 		if len(q.m) < maxSeenIPs {
-			q.m[ip] = &auditWin{start: now, n: 1}
+			w = &auditWin{}
+			q.m[ip] = w
+		} else {
+			w, name = &q.over, overflowName
 		}
-		return true, closed
 	}
-	if now.Sub(w.start) >= auditWindow {
+	if w.start.IsZero() || now.Sub(w.start) >= auditWindow {
 		if w.reps > 0 {
-			closed = append(closed, w.summary(ip))
+			closed = append(closed, w.summary(name))
 		}
 		*w = auditWin{start: now, n: 1}
 		return true, closed
 	}
 	if w.n < auditPerWindow {
 		w.n++
-		return true, nil
+		return true, closed
 	}
 	w.n++
 	if w.reps == 0 {
@@ -239,7 +259,7 @@ func (q *auditQuota) take(ip string) (allowed bool, closed []Repeats) {
 	}
 	w.reps++
 	w.last = now
-	return false, nil
+	return false, closed
 }
 
 func (q *auditQuota) expireLocked(now time.Time) (out []Repeats) {
@@ -251,8 +271,15 @@ func (q *auditQuota) expireLocked(now time.Time) (out []Repeats) {
 			delete(q.m, ip)
 		}
 	}
+	if q.over.reps > 0 && now.Sub(q.over.start) >= auditWindow {
+		out = append(out, q.over.summary(overflowName))
+		q.over = auditWin{}
+	}
 	return out
 }
+
+// overflowName es el «cliente» del resumen del cupo común de desborde.
+const overflowName = "(overflow)"
 
 // expire cierra las ventanas vencidas y devuelve sus resúmenes (vaciado periódico).
 func (q *auditQuota) expire() []Repeats {
@@ -270,13 +297,37 @@ func (q *auditQuota) flush() (out []Repeats) {
 			out = append(out, w.summary(ip))
 		}
 	}
-	q.m = map[string]*auditWin{}
+	if q.over.reps > 0 {
+		out = append(out, q.over.summary(overflowName))
+	}
+	q.m, q.over = map[string]*auditWin{}, auditWin{}
 	return out
 }
 
 // ipBusy dice si ip llegó a su tope de conexiones simultáneas (y no solo el global).
 func (l *limiter) ipBusy(ip string) bool {
+	ip = ipKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.perIP[ip] >= perClientTCP
+}
+
+// ipKey es la clave de origen de los cupos: IPv4 por dirección (también la IPv4-mapped) e IPv6 por /64, sin zona,
+// porque un atacante en su /64 tiene 2^64 direcciones. Lo que no es una IP queda tal cual.
+func ipKey(s string) string {
+	a, err := netip.ParseAddr(s)
+	if err != nil {
+		return s
+	}
+	a = a.WithZone("").Unmap()
+	if a.Is6() {
+		p, _ := a.Prefix(64)
+		return p.String()
+	}
+	return a.String()
+}
+
+// Text es el detalle de auditoría del resumen: cuántas, y desde cuándo hasta cuándo (RFC 3339).
+func (r Repeats) Text() string {
+	return fmt.Sprintf("repeats=%d first=%s last=%s", r.N, r.First.UTC().Format(time.RFC3339), r.Last.UTC().Format(time.RFC3339))
 }

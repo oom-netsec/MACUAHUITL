@@ -122,10 +122,24 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 			return
 		}
 		defer release()
+		// Todo lo que no termina en sesión pasa por el cupo de auditoría por IP.
+		limit := func() {
+			allowed, closed := quota.take(ip)
+			for _, x := range closed {
+				c.repeats(x)
+			}
+			if !allowed {
+				t.Rejected, t.Cause = true, CauseRepeat
+				if t.Result == "ok" {
+					t.Error, t.ReasonT = "repetida", lit("repetida")
+				}
+			}
+		}
 		f, st, err := src.open(name)
 		if err != nil {
 			http.Error(w, "no disponible", http.StatusInternalServerError)
 			t.setErr(err)
+			limit()
 			return
 		}
 		defer f.Close()
@@ -153,16 +167,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		// Sin sesión no entregó el archivo (HEAD, 304, Range parcial, corte temprano, 416): cupo de auditoría por IP.
 		// Pasado el cupo se cuenta con motivo propio, sin auditarla una por una; lo cortado o con error conserva su texto.
 		if cw.live == nil {
-			allowed, closed := quota.take(ip)
-			for _, x := range closed {
-				c.repeats(x)
-			}
-			if !allowed {
-				t.Rejected, t.Cause = true, CauseRepeat
-				if t.Result == "ok" {
-					t.Error, t.ReasonT = "repetida", lit("repetida")
-				}
-			}
+			limit()
 		}
 	})
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: time.Minute, MaxHeaderBytes: 8 << 10,
