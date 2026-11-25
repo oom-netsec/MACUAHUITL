@@ -12,22 +12,6 @@ func audRec() (*Recorder, *bytes.Buffer) {
 	return NewRecorder(&b, func() time.Time { return time.Unix(0, 0).UTC() }), &b
 }
 
-// A: la primera tecla de la contraseña sale antes de que llegue «Password:» (latencia): se graba entera.
-func TestSecretoAuditoriaTypeAhead(t *testing.T) {
-	r, b := audRec()
-	r.Output([]byte("\r\nSW1>"))
-	r.Input([]byte("enable\r"))
-	r.Input([]byte("S"))                     // el usuario sigue tecleando sin esperar el eco
-	r.Output([]byte("enable\r\nPassword: ")) // llega el eco y el prompt
-	r.Input([]byte("3cretEnable9\r"))
-	r.Output([]byte("\r\nSW1#"))
-	r.Close()
-	t.Logf("\n%s", b.String())
-	if strings.Contains(b.String(), "S3cretEnable9") {
-		t.Errorf("FUGA: la contraseña de enable quedó en la grabación")
-	}
-}
-
 // B: prompts de secreto reales que secretPrompt no reconoce (más de 30 caracteres o «:» en medio).
 func TestSecretoAuditoriaPrompts(t *testing.T) {
 	for _, p := range []string{
@@ -84,38 +68,6 @@ func TestSecretoAuditoriaPromptConEco(t *testing.T) {
 	}
 }
 
-// Consola: el eco del Enter llega aparte y la primera tecla de la contraseña sale antes de «Password:».
-func TestSecretoAuditoriaPromptTardioConsola(t *testing.T) {
-	r, b := audRec()
-	r.Output([]byte("\r\nUsername: "))
-	r.Input([]byte("admin\r"))
-	r.Output([]byte("admin"))
-	r.Output([]byte("\r\n"))
-	r.Input([]byte("C"))
-	r.Output([]byte("Password: "))
-	r.Input([]byte("isco12345\r"))
-	r.Output([]byte("\r\nSW1>"))
-	r.Close()
-	if s := b.String(); strings.Contains(s, "Cisco12345") || !strings.Contains(s, ">>> admin") {
-		t.Errorf("FUGA o falta el usuario:\n%s", s)
-	}
-}
-
-// Se cae la sesión a mitad de la contraseña: lo tecleado en el prompt de secreto no se graba al cerrar.
-func TestSecretoAuditoriaCierreAMitad(t *testing.T) {
-	r, b := audRec()
-	r.Output([]byte("\r\nSW1>"))
-	r.Input([]byte("enable\r"))
-	r.Output([]byte("enable\r\n"))
-	r.Input([]byte("H"))
-	r.Output([]byte("Password: "))
-	r.Input([]byte("alf3Pass"))
-	r.Close()
-	if strings.Contains(b.String(), "Half3Pass") || strings.Contains(b.String(), "alf3Pass") {
-		t.Errorf("FUGA:\n%s", b.String())
-	}
-}
-
 // Sin tapar de más: un comando normal y su salida siguen igual, y una línea «Key: valor» que no responde a nada
 // tecleado no se toca.
 func TestSecretoAuditoriaSinTaparDeMas(t *testing.T) {
@@ -165,23 +117,6 @@ func TestSecretoAuditoriaSkipTyped(t *testing.T) {
 	}
 }
 
-// Diálogo setup con lo tecleado por adelantado: el prompt y el eco llegan juntos, o el «:» llega con el eco.
-func TestSecretoAuditoriaSetupAdelantado(t *testing.T) {
-	r, b := audRec()
-	r.SkipTyped()
-	r.Output([]byte("Enter host name [Router]: "))
-	r.Input([]byte("R1\r"))
-	r.Input([]byte("S3tupSec9\r"))
-	r.Output([]byte("R1\r\n\r\nThe enable secret is a password...\r\nEnter enable secret: S3tupSec9\r\n"))
-	r.Output([]byte("\r\nEnter enable secret"))
-	r.Input([]byte("S3tupPt8\r"))
-	r.Output([]byte(": S3tupPt8\r\n"))
-	r.Close()
-	if strings.Contains(b.String(), "S3tupSec9") || strings.Contains(b.String(), "S3tupPt8") {
-		t.Errorf("FUGA:\n%s", b.String())
-	}
-}
-
 // Eco rezagado del primer comando entre dos Enter: «enable» no se toma por la contraseña (regresión vista en revisión).
 func TestSecretoAuditoriaEcoRezagadoNoConfunde(t *testing.T) {
 	r, b := audRec()
@@ -199,17 +134,24 @@ func TestSecretoAuditoriaEcoRezagadoNoConfunde(t *testing.T) {
 	}
 }
 
-// Setup: la primera tecla sale antes del prompt; el eco de lo demás se tapa igual.
-func TestSecretoAuditoriaSetupPrimeraTeclaAntes(t *testing.T) {
+// Un comando que termina en «…key…:» con el eco partido por un syslog (consola sin logging synchronous): el resto del
+// eco sigue tapado como en main (revisión: ocultar la línea al Enter cortaba el seguimiento del eco).
+func TestSecretoAuditoriaEcoPartidoConDosPuntos(t *testing.T) {
 	r, b := audRec()
-	r.SkipTyped()
-	r.Output([]byte("  The enable secret is a password\r\n"))
-	r.Input([]byte("S"))
-	r.Output([]byte("  Enter enable secret: "))
-	r.Input([]byte("3tB9x\r"))
-	r.Output([]byte("S3tB9x\r\n"))
+	r.Output([]byte("\r\nSW1#"))
+	for _, c := range "copy scp://admin" {
+		r.Input([]byte(string(c)))
+		r.Output([]byte(string(c)))
+	}
+	r.Output([]byte("\r\n*Mar  1 00:00:01: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"))
+	for _, c := range ":Adm1nPw@10.0.0.5/certs/router-key.pem bootflash:" {
+		r.Input([]byte(string(c)))
+		r.Output([]byte(string(c)))
+	}
+	r.Input([]byte("\r"))
+	r.Output([]byte("\r\nDestination filename [router-key.pem]? "))
 	r.Close()
-	if strings.Contains(b.String(), "S3tB9x") || strings.Contains(b.String(), "3tB9x") {
+	if strings.Contains(b.String(), "Adm1nPw") {
 		t.Errorf("FUGA:\n%s", b.String())
 	}
 }

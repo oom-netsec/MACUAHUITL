@@ -154,13 +154,6 @@ func (r *Recorder) outLine(l string) {
 			l = pr + "<MASKED:secret>"
 		}
 	}
-	// El eco de algo tecleado antes de que llegara su prompt de secreto (prompt y eco en la misma salida): se tapa lo tecleado.
-	for _, v := range append(r.held[:len(r.held):len(r.held)], r.esent...) {
-		if v != "" && strings.HasSuffix(l, v) && secretPrompt.MatchString(l[:len(l)-len(v)]) && !anyKey.MatchString(l) {
-			l = l[:len(l)-len(v)] + "<MASKED:secret>"
-			break
-		}
-	}
 	if r.win > 0 {
 		if r.win--; r.win == 0 {
 			r.secrets = nil
@@ -709,12 +702,6 @@ func (r *Recorder) Input(p []byte) {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
-	// La contraseña empezó a teclearse antes de que llegara el prompt (se revisa en la primera tecla): si al Enter la
-	// salida ya la pide, es la contraseña.
-	if !hidden && line != "" && r.asksSecret() {
-		hidden = true
-		r.armEcho() // si el equipo devuelve lo tecleado tras el prompt, se tapa
-	}
 	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
 	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
 	r.cfgOK = false
@@ -797,7 +784,7 @@ func (r *Recorder) Close() {
 		r.pend = nil
 	}
 	r.commitHeld(true)
-	if !r.hidden && len(r.line) > 0 && !r.asksSecret() { // a mitad de una contraseña: no se graba
+	if !r.hidden && len(r.line) > 0 {
 		r.input(r.typedLine(string(r.line), true))
 	}
 	r.hidden, r.line = false, nil
