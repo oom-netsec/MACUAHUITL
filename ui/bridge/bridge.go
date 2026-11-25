@@ -134,12 +134,25 @@ const probeMin = 5 * time.Second
 func (b *Bridge) run(ctx context.Context) {
 	t := time.NewTicker(b.Interval)
 	defer t.Stop()
+	defer func() {
+		b.mu.Lock()
+		for _, st := range b.streams {
+			st.cancel()
+		}
+		if b.conn != nil {
+			b.conn.Close()
+		}
+		b.mu.Unlock()
+	}()
 	for {
 		c, err := b.client()
 		if err == nil {
 			cctx, cancel := context.WithTimeout(ctx, max(5*b.Interval, probeMin))
 			_, err = v1.NewVaultServiceClient(c).Status(cctx, &v1.StatusRequest{})
 			cancel()
+		}
+		if ctx.Err() != nil {
+			return // cerrar el puente no es perder el núcleo: la sonda que cortó el cierre no cambia el estado ni lanza nada
 		}
 		if err != nil {
 			b.setStatus("disconnected")
@@ -154,14 +167,6 @@ func (b *Bridge) run(ctx context.Context) {
 		}
 		select {
 		case <-ctx.Done():
-			b.mu.Lock()
-			for _, st := range b.streams {
-				st.cancel()
-			}
-			if b.conn != nil {
-				b.conn.Close()
-			}
-			b.mu.Unlock()
 			return
 		case <-t.C:
 		}
