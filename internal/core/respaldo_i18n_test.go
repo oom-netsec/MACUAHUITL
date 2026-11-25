@@ -34,7 +34,7 @@ func TestRespaldoErroresEsYEn(t *testing.T) {
 		{"sin confirmar", "respaldo.err.confirm", "el respaldo contiene todas tus credenciales en un solo archivo: quien tenga el archivo y la frase las tiene todas; confirma para continuar",
 			"the backup contains all your credentials in a single file: whoever has the file and the passphrase has them all; confirm to continue",
 			func(loc string) error {
-				_, err := h.vault.ExportBackup(con(t, loc), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "n"), Passphrase: []byte(fraseResp)})
+				_, err := h.vault.ExportBackup(con(t, loc), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "n"), Passphrase: []byte(fraseResp), MasterPassword: []byte("maestra")})
 				return err
 			}},
 		{"ruta relativa", "respaldo.err.path_abs", "la ruta debe ser absoluta", "the path must be absolute",
@@ -54,7 +54,7 @@ func TestRespaldoErroresEsYEn(t *testing.T) {
 			}},
 		{"frase corta", "vault.err.short_phrase", "vault: la frase del respaldo debe tener al menos 12 caracteres", "vault: the backup passphrase must be at least 12 characters long",
 			func(loc string) error {
-				_, err := h.vault.ExportBackup(con(t, loc), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "n"), Passphrase: []byte("corta"), Confirm: true})
+				_, err := h.vault.ExportBackup(con(t, loc), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "n"), Passphrase: []byte("corta"), Confirm: true, MasterPassword: []byte("maestra")})
 				return err
 			}},
 		{"token", "respaldo.err.token", "token de importación desconocido; abre el respaldo de nuevo", "unknown import token; open the backup again",

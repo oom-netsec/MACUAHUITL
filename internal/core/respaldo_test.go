@@ -41,7 +41,7 @@ func (h *harness) put(t *testing.T, label, user, pass string) {
 
 func (h *harness) export(t *testing.T, path string, confirm bool) (*v1.ExportBackupResponse, error) {
 	t.Helper()
-	return h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: confirm})
+	return h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: confirm, MasterPassword: []byte("maestra")})
 }
 
 // bovedaConRespaldo deja una bóveda viva con 3 credenciales, una entrada reservada y un respaldo exportado.
@@ -187,7 +187,7 @@ func TestRespaldoExportRechazos(t *testing.T) {
 	dir := t.TempDir()
 	ruta := filepath.Join(dir, "r.mcvault")
 	exp := func(path, frase string, confirm bool) error {
-		_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(frase), Confirm: confirm})
+		_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(frase), Confirm: confirm, MasterPassword: []byte("maestra")})
 		return err
 	}
 	for name, tc := range map[string]struct {
@@ -215,7 +215,7 @@ func TestRespaldoExportRechazos(t *testing.T) {
 	// Igual a la maestra con 12 o más caracteres: se compara con la bóveda viva sin cerrarla.
 	h2 := newHarness(t, nil)
 	h2.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("maestra-larga-123")})
-	if _, err := h2.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: ruta, Passphrase: []byte("maestra-larga-123"), Confirm: true}); status.Code(err) != codes.InvalidArgument {
+	if _, err := h2.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: ruta, Passphrase: []byte("maestra-larga-123"), Confirm: true, MasterPassword: []byte("maestra-larga-123")}); status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("misma frase: %v", err)
 	}
 	if h2.core.vault.Unlocked() == false {
@@ -228,7 +228,7 @@ func TestRespaldoExportRechazos(t *testing.T) {
 	if err := exp(ruta, fraseResp, true); status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("existente: %v", err)
 	}
-	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: ruta, Passphrase: []byte(fraseResp), Confirm: true, Overwrite: true}); err != nil {
+	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: ruta, Passphrase: []byte(fraseResp), Confirm: true, Overwrite: true, MasterPassword: []byte("maestra")}); err != nil {
 		t.Fatal(err)
 	}
 	// Cerrada.
@@ -492,7 +492,7 @@ func TestRespaldoExportCerradaNoEsOraculo(t *testing.T) {
 	h.vault.Lock(ctx(t), &v1.LockRequest{})
 	var msgs []string
 	for _, f := range []string{"maestra-larga-123", "otra-frase-larga-1"} {
-		_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "r.mcvault"), Passphrase: []byte(f), Confirm: true})
+		_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: filepath.Join(t.TempDir(), "r.mcvault"), Passphrase: []byte(f), Confirm: true, MasterPassword: []byte("maestra")})
 		if status.Code(err) != codes.FailedPrecondition {
 			t.Fatalf("%q: %v", f, err)
 		}
@@ -530,7 +530,7 @@ func TestRespaldoExportRechazaLaCarpetaDeDatos(t *testing.T) {
 		"enlace al archivo":   enlaceArchivo,
 	} {
 		for _, ow := range []bool{false, true} {
-			_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: dst, Passphrase: []byte(fraseResp), Confirm: true, Overwrite: ow})
+			_, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: dst, Passphrase: []byte(fraseResp), Confirm: true, Overwrite: ow, MasterPassword: []byte("maestra")})
 			if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "carpeta de datos") {
 				t.Fatalf("%s (overwrite=%v): %v", name, ow, err)
 			}
@@ -543,7 +543,7 @@ func TestRespaldoExportRechazaLaCarpetaDeDatos(t *testing.T) {
 		t.Fatal("escribió dentro de la carpeta de datos")
 	}
 	// Fuera de la carpeta de datos sí.
-	r, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: filepath.Join(fuera, "ok.mcvault"), Passphrase: []byte(fraseResp), Confirm: true})
+	r, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: filepath.Join(fuera, "ok.mcvault"), Passphrase: []byte(fraseResp), Confirm: true, MasterPassword: []byte("maestra")})
 	if err != nil || r.Count != 1 || r.NoPermissions {
 		t.Fatalf("fuera: %+v %v", r, err)
 	}
@@ -556,7 +556,7 @@ func TestRespaldoDosReemplazosAlMismoDestino(t *testing.T) {
 	h.put(t, "dup", "u1", "PW-UNO")
 	h.put(t, "dup", "u2", "PW-DOS")
 	path := filepath.Join(t.TempDir(), "d.mcvault")
-	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true}); err != nil {
+	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true, MasterPassword: []byte("maestra")}); err != nil {
 		t.Fatal(err)
 	}
 	o := newHarness(t, nil)

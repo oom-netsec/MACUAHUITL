@@ -84,7 +84,7 @@ func TestIdiomaDeLosErroresMigrados(t *testing.T) {
 	bk := filepath.Join(t.TempDir(), "r.mcvault")
 	os.WriteFile(bk, []byte("x"), 0o600)
 	for lang, want := range map[string]string{"": "vault: el archivo de respaldo ya existe", "en": "vault: the backup file already exists"} {
-		_, err := h.vault.ExportBackup(con(t, lang), &v1.ExportBackupRequest{Path: bk, Passphrase: []byte(fraseResp), Confirm: true})
+		_, err := h.vault.ExportBackup(con(t, lang), &v1.ExportBackupRequest{Path: bk, Passphrase: []byte(fraseResp), Confirm: true, MasterPassword: []byte("maestra")})
 		if status.Code(err) != codes.AlreadyExists || status.Convert(err).Message() != want {
 			t.Errorf("respaldo %q: %v", lang, err)
 		}

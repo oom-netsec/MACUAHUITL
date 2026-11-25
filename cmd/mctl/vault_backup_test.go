@@ -21,32 +21,32 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	nota := func(s string) string { salidas = append(salidas, s); return s }
 
 	// Sin --yes (y sin terminal) no exporta; con frases distintas entre sí tampoco.
-	if out, err := mctl(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta); err == nil || !strings.Contains(err.Error(), "--yes") {
+	if out, err := mctl(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta); err == nil || !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("sin --yes: %v %q", err, out)
 	}
-	if _, err := mctl(t, "frase-respaldo-1\notra-frase-larga\n", "cred", "backup", "export", ruta, "--yes"); err == nil || !strings.Contains(err.Error(), "no coinciden") {
+	if _, err := mctl(t, "maestra\nfrase-respaldo-1\notra-frase-larga\n", "cred", "backup", "export", ruta, "--yes"); err == nil || !strings.Contains(err.Error(), "no coinciden") {
 		t.Fatalf("frases distintas: %v", err)
 	}
-	if _, err := mctl(t, "corta\ncorta\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
+	if _, err := mctl(t, "maestra\ncorta\ncorta\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
 		t.Fatal("aceptó una frase corta")
 	}
-	if _, err := mctl(t, "maestra\nmaestra\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
+	if _, err := mctl(t, "maestra\nmaestra\nmaestra\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
 		t.Fatal("aceptó la maestra")
 	}
 	if _, err := os.Stat(ruta); err == nil {
 		t.Fatal("dejó un archivo tras los rechazos")
 	}
-	out := nota(must(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"))
+	out := nota(must(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"))
 	if !strings.Contains(out, "2 credenciales") || !strings.Contains(out, ruta) {
 		t.Fatalf("export: %q", out)
 	}
 	if fi, err := os.Stat(ruta); err != nil || !testperm.PrivateStrict(ruta, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
-	if _, err := mctl(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
+	if _, err := mctl(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"); err == nil {
 		t.Fatal("pisó el archivo sin --overwrite")
 	}
-	must(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes", "--overwrite")
+	must(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes", "--overwrite")
 
 	// Importar sobre la misma bóveda: misma etiqueta (no se compara el contenido), se omiten.
 	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=omitir"))

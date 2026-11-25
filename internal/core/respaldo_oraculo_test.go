@@ -50,7 +50,7 @@ func TestRespaldoConflictoApuntaAlMismoUsuario(t *testing.T) {
 	h.put(t, "dup", "u1", "PW-UNO")
 	h.put(t, "dup", "u2", "PW-DOS")
 	path := filepath.Join(t.TempDir(), "d.mcvault")
-	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true}); err != nil {
+	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true, MasterPassword: []byte("maestra")}); err != nil {
 		t.Fatal(err)
 	}
 	vivos := map[string]string{} // usuario -> id vivo
