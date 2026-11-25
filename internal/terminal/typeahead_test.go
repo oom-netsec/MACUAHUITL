@@ -142,6 +142,11 @@ func TestEcoPartidoEnTrozosSeReconstruye(t *testing.T) {
 	if !strings.Contains(s, ">>> show running-config") {
 		t.Errorf("eco en trozos:\n%s", s)
 	}
+	// el primer trozo termina en el espacio entre dos palabras
+	s = sesionTA([]paso{eq("\r\nR1#"), tec("show run | sec snmp\r"), eq("show run "), eq(syslog), eq("| sec snmp\r\nR1#")})
+	if !strings.Contains(s, ">>> show run | sec ") {
+		t.Errorf("eco partido tras un espacio:\n%s", s)
+	}
 	s = sesionTA([]paso{eq("\r\nR1#"), tec("show clock\r"), eq("\r\nR1#")}) // el equipo no devolvió el eco
 	if !strings.Contains(s, ">>> [hidden]") || strings.Contains(s, ">>> show clock") {
 		t.Errorf("sin eco:\n%s", s)
@@ -220,5 +225,18 @@ func TestEcoTrasPromptDeSecretoYTrozosTapados(t *testing.T) {
 		tec("grep Zq7comm /etc/snmp/x.conf\r"), eq("grep Zq7comm /e"), eq("\r\n%ALERT-1-X: x\r\n"), eq("tc/snmp/x.conf\r\nadmin@srv:~$ ")})
 	if strings.Contains(s, "Zq7comm") {
 		t.Errorf("eco partido con un trozo tapado:\n%s", s)
+	}
+}
+
+// Eco desplazado de IOS en una línea larga («R1(config)#$p RM permit 10 …»): es el eco de lo tecleado; lo cortado no
+// se tapa, lo que la salida tapó sí. Un trozo corto tras «$» no basta (podría coincidir con una contraseña).
+func TestEcoDesplazado(t *testing.T) {
+	s := sesionTA([]paso{eq("\r\nR1(config)#"), tec("route-map RM permit 10 ; set community 65000:100\r"), eq("$p RM permit 10 ; set community 65000:100\r\nR1(config)#")})
+	if !strings.Contains(s, ">>> route-map RM permit 10 ; set community <MASKED:secret>\n") {
+		t.Errorf("desplazado:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Xy9secret\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1#"), eq("\r\nR1#$y9secret\r\nR1#")})
+	if strings.Contains(s, "Xy9secret") || strings.Contains(s, ">>> y9secret") {
+		t.Errorf("trozo corto:\n%s", s)
 	}
 }

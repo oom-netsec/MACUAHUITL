@@ -362,6 +362,40 @@ func TestIdempotencia(t *testing.T) {
 }
 
 // Negativos: lo que no es un secreto no se tapa de más; la salida nueva es igual a la de la v0.6.5.
+// igualTerminal: dos grabaciones de terminal con la misma salida, en el mismo orden, y las mismas líneas >>> en el mismo
+// orden entre sí. Desde 2026-11-25 una línea >>> se escribe cuando llega su eco (después de la línea de salida que lo
+// trae, no antes) y puede tapar de más una palabra que la salida tapó (la línea >>> no muestra lo que la salida tapó).
+func igualTerminal(n, o string) bool {
+	sal := func(s string) (out, in []string) {
+		for _, l := range strings.Split(s, "\n") {
+			if _, l, _ = strings.Cut(l, " "); strings.HasPrefix(l, ">>> ") {
+				in = append(in, l[4:])
+			} else {
+				out = append(out, l)
+			}
+		}
+		return out, in
+	}
+	no, ni := sal(n)
+	oo, oi := sal(o)
+	if strings.Join(no, "\n") != strings.Join(oo, "\n") || len(ni) != len(oi) {
+		return false
+	}
+	salida := strings.Join(no, "\n")
+	for i := range ni {
+		nw, ow := strings.Fields(ni[i]), strings.Fields(oi[i])
+		if len(nw) != len(ow) {
+			return false
+		}
+		for j := range nw {
+			if nw[j] != ow[j] && !(strings.HasPrefix(nw[j], "<MASKED:") && !strings.Contains(salida, ow[j])) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func TestNegativosIgualAV065(t *testing.T) {
 	negativos := []string{
 		"show running-config | section snmp", "show run | sec snmp", "show run | include password", "do show run | i key",
@@ -381,7 +415,7 @@ func TestNegativosIgualAV065(t *testing.T) {
 	var malos []string
 	for _, c := range negativos {
 		for _, v := range vias {
-			if n, o := v.f(nuevo, "ios-xe", c), v.f(viejo, "ios-xe", c); n != o {
+			if n, o := v.f(nuevo, "ios-xe", c), v.f(viejo, "ios-xe", c); n != o && !(strings.HasPrefix(v.nombre, "terminal") && igualTerminal(n, o)) {
 				malos = append(malos, fmt.Sprintf("[%s] %q\n  nueva:  %q\n  v0.6.5: %q", v.nombre, c, n, o))
 			}
 		}
