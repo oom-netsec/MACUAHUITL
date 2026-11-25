@@ -125,6 +125,9 @@ func TestAvisosDeSecretoGenerales(t *testing.T) {
 		r, b := newRec()
 		r.Output([]byte("R1#\r\n" + prompt))
 		r.Input([]byte("show clock\r"))
+		// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+		// equipo hace eco, como uno real.
+		r.Output([]byte("show clock\r\n"))
 		r.Close()
 		if !strings.Contains(b.String(), ">>> show clock") {
 			t.Errorf("%q ocultó lo tecleado:\n%s", prompt, b.String())

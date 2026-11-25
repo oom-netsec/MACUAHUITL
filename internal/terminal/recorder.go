@@ -68,9 +68,10 @@ type Recorder struct {
 	pendAt   time.Time // hora de su primer byte (cero = no hay línea abierta)
 	drop     bool      // la línea de salida pasó el tope: se descarta hasta el salto
 	stream   mask.Stream
-	tail     []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
-	fresh    bool   // llegó salida desde el último Enter
-	held     []string
+	tail     []byte      // últimos bytes de salida desde el último Enter, para reconocer el prompt
+	fresh    bool        // llegó salida desde el último Enter
+	eco      []ecoPend   // lo tecleado (sin las contraseñas en su prompt) que espera su eco para grabarse: ver matchEcho
+	lastOut  string      // la última línea de salida tal como se grabó (enmascarada)
 	lastBlk  string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed    mask.Stream // lleva el bloque entre las líneas tecleadas
 	sent     []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
@@ -143,12 +144,13 @@ func (r *Recorder) Output(p []byte) {
 		r.tail = r.tail[len(r.tail)-tailMax:]
 	}
 	r.fresh = true
-	r.settle()
 }
 
 // outLine enmascara y escribe una línea de salida. El prompt (SW1(config)#) se conserva y se
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
+	// Para reconocer el eco de lo tecleado: la salida cruda, sin escapes ni retornos y con los retrocesos aplicados.
+	raw := applyBackspaces(strings.ReplaceAll(ansi.ReplaceAllString(l, ""), "\r", ""))
 	l = cleanLine(l)
 	masked := ""
 	if pr := r.echoPr; pr != "" {
@@ -294,8 +296,13 @@ func (r *Recorder) outLine(l string) {
 	} else if cover >= 0 && keep {
 		out = mask.CutFrom(l, out, cover)
 	}
+	if !keep {
+		out = ""
+	}
+	r.matchEcho(raw, out)
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
+		r.lastOut = out
 	}
 }
 
@@ -304,6 +311,72 @@ func (r *Recorder) outLine(l string) {
 func cleanLine(l string) string {
 	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
 	return applyBackspaces(strings.ReplaceAll(l, "\r", ""))
+}
+
+// ecoPend: una línea tecleada, ya enmascarada (out), que espera su eco.
+type ecoPend struct{ text, out, got string } // got: lo que ya llegó del eco cuando un mensaje del equipo lo partió
+
+// matchEcho graba lo tecleado cuyo eco llegó: la primera línea pendiente con la que termina esta línea de salida (tras
+// el prompt, una pregunta o sola). Lo que se tecleó antes y nunca tuvo eco se graba [hidden]: una contraseña no hace
+// eco, así que no se puede grabar en claro aunque se haya tecleado antes de su prompt. out es la línea de salida como se
+// grabó: lo tecleado no muestra nada que ahí quedó tapado (visibleOnly). Requiere r.mu.
+func (r *Recorder) matchEcho(raw, out string) {
+	t := strings.TrimRight(raw, " \t")
+	if len(r.eco) > 0 && t != "" && !equipoMsg(strings.TrimSpace(t)) {
+		// Eco partido por un syslog: «R1#show cl», el mensaje, «ock». Se recuerda el comienzo y el resto lo completa.
+		e := &r.eco[0]
+		if rest := e.text[len(e.got):]; e.got != "" && (strings.HasPrefix(rest, t) || strings.HasPrefix(rest, strings.TrimLeft(t, " \t"))) {
+			if strings.HasPrefix(rest, t) {
+				e.got += t
+			} else {
+				e.got += strings.TrimLeft(t, " \t")
+			}
+			if e.got == e.text { // el eco llegó entero, en trozos
+				r.input(visibleOnly(e.out, out))
+				r.eco = r.eco[1:]
+			}
+			return
+		}
+		for k := len(e.text) - 1; k > 0; k-- {
+			if strings.HasSuffix(t, e.text[:k]) {
+				if p := t[:len(t)-k]; p == "" || !isWordByte(p[len(p)-1]) {
+					e.got = e.text[:k]
+					return
+				}
+			}
+		}
+	}
+	for i, e := range r.eco {
+		if !strings.HasSuffix(t, e.text) {
+			continue
+		}
+		if p := t[:len(t)-len(e.text)]; p != "" && isWordByte(p[len(p)-1]) {
+			continue // «barfoo» no es el eco de «foo»
+		}
+		for range r.eco[:i] {
+			r.input("[hidden]")
+		}
+		r.input(visibleOnly(e.out, out))
+		r.eco = r.eco[i+1:]
+		return
+	}
+}
+
+var token = regexp.MustCompile(`\S+`)
+
+// visibleOnly: si la salida grabada out tapó algo, tapa en typed toda palabra que no se ve en out: la línea >>> nunca
+// muestra lo que la salida tapó. Si out no tapó nada, typed va tal cual (una palabra puede faltar en out solo por cómo
+// se limpió el eco, p. ej. una corrección con retroceso).
+func visibleOnly(typed, out string) string {
+	if !strings.Contains(out, "<MASKED:") {
+		return typed
+	}
+	return token.ReplaceAllStringFunc(typed, func(w string) string {
+		if strings.Contains(w, "<MASKED:") || strings.Contains(out, w) {
+			return w
+		}
+		return "<MASKED:secret>"
+	})
 }
 
 // echoMatch: x es (el comienzo de) alguna línea enviada o de la que se teclea, o, con el eco desplazado, un trozo de ella;
@@ -399,15 +472,6 @@ func indexOf(l []string, s string) int {
 }
 
 var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
-
-// peekSecrets alimenta la red por contenido con lo que ya se detecta en una línea retenida, sin tocar
-// el estado de bloque de lo tecleado (su bloque lo da el prompt que aún no llega).
-func (r *Recorder) peekSecrets(line string) {
-	line, m := maskTyped(line, r.typed.Peek, true) // sin prompt que lo confirme: se tapa como en config
-	r.noteSecrets(line, m)
-	_, vals := mask.CutCommandV(r.blk2, line, m)
-	r.note2(vals)
-}
 
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
 func (r *Recorder) typedLine(line string, loose bool) string {
@@ -648,29 +712,6 @@ func (r *Recorder) asksSecret() bool {
 	return secretPrompt.MatchString(l) && !anyKey.MatchString(l)
 }
 
-// settle decide sobre las líneas retenidas con la salida nueva: si pide un secreto, la primera era
-// la contraseña; si es el prompt normal del equipo, eran comandos. Con otra cosa sigue esperando.
-func (r *Recorder) settle() {
-	switch {
-	case len(r.held) == 0:
-	case r.asksSecret():
-		r.held = r.held[1:]
-		r.input("[hidden]")
-		r.tail = nil
-	case shellPrompt.MatchString(r.lastLine()):
-		r.commitHeld(false)
-	}
-}
-
-// commitHeld graba como comandos las líneas retenidas. Requiere r.mu.
-func (r *Recorder) commitHeld(loose bool) {
-	h := r.held
-	r.held = nil
-	for _, l := range h {
-		r.input(r.typedLine(l, loose))
-	}
-}
-
 // Input graba lo que teclea el ingeniero, una línea al pulsar Enter.
 func (r *Recorder) Input(p []byte) {
 	r.mu.Lock()
@@ -732,16 +773,14 @@ func (r *Recorder) flush() {
 	case hidden:
 		r.input("[hidden]")
 	case line == "":
-	case fresh && len(r.held) == 0:
-		r.input(r.typedLine(line, false)) // shortcut: ver la nota del paquete sobre abreviaturas
 	default:
-		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
-		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
-		r.peekSecrets(line) // los valores ya detectados entran a la red por contenido; se graba al llegar el prompt con su bloque
-		r.held = append(r.held, line)
-		if len(r.held) > heldMax {
-			r.input(r.typedLine(r.held[0], true))
-			r.held = r.held[1:]
+		// Se enmascara ya (con el bloque del prompt de ahora; sus valores entran a la red por contenido para tapar el
+		// eco) y se graba cuando llega su eco. Sin salida nueva desde el Enter anterior el prompt no se sabe: más estricto.
+		// shortcut: ver la nota del paquete sobre abreviaturas.
+		r.eco = append(r.eco, ecoPend{text: line, out: r.typedLine(line, !fresh)})
+		if len(r.eco) > heldMax {
+			r.eco = r.eco[1:]
+			r.input("[hidden]") // sin eco en todo ese tiempo: no se sabe qué era
 		}
 	}
 }
@@ -790,9 +829,16 @@ func (r *Recorder) Close() {
 		r.outLine(string(r.pend))
 		r.pend = nil
 	}
-	r.commitHeld(true)
-	if !r.hidden && len(r.line) > 0 {
-		r.input(r.typedLine(string(r.line), true))
+	for range r.eco {
+		r.input("[hidden]") // nunca hizo eco: pudo ser una contraseña
+	}
+	r.eco = nil
+	if !r.hidden && len(r.line) > 0 { // tecleado sin Enter: solo si su eco está en la última salida
+		if line := string(r.line); strings.HasSuffix(strings.TrimRight(applyBackspaces(r.lastLine()), " \t"), line) {
+			r.input(visibleOnly(r.typedLine(line, true), r.lastOut))
+		} else {
+			r.input("[hidden]")
+		}
 	}
 	r.hidden, r.line = false, nil
 }

@@ -1,0 +1,149 @@
+package terminal
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+	"time"
+)
+
+// paso de una sesión: salida del equipo (out) o lo tecleado.
+type paso struct {
+	out bool
+	s   string
+}
+
+func eq(s string) paso  { return paso{true, s} }
+func tec(s string) paso { return paso{false, s} }
+
+func sesionTA(pasos []paso) string {
+	var b bytes.Buffer
+	r := NewRecorder(&b, func() time.Time { return time.Unix(0, 0).UTC() })
+	for _, p := range pasos {
+		if p.out {
+			r.Output([]byte(p.s))
+		} else {
+			r.Input([]byte(p.s))
+		}
+	}
+	r.Close()
+	return b.String()
+}
+
+func porByte(s string) []paso {
+	var out []paso
+	for _, c := range []byte(s) {
+		out = append(out, eq(string(c)))
+	}
+	return out
+}
+
+// Contraseña tecleada antes de que llegue su prompt (type-ahead), en todas las formas vistas en la auditoría y en las
+// revisiones: no se graba.
+func TestTypeAheadNoGrabaLaContrasena(t *testing.T) {
+	casos := []struct {
+		nombre, secreto string
+		pasos           []paso
+	}{
+		{"primera tecla antes", "S3cretEnable9", []paso{eq("\r\nSW1>"), tec("enable\r"), tec("S"), eq("enable\r\nPassword: "), tec("3cretEnable9\r"), eq("\r\nSW1#")}},
+		{"eco rezagado", "S3cretEnable9", []paso{eq("\r\nSW1>"), tec("enabl"), eq("enab"), tec("e\r"), eq("le"), tec("S3cretEnable9\r"), eq("\r\nPassword: "), eq("\r\nSW1#")}},
+		{"aaa lento", "S3cretAAA9", []paso{eq("\r\n\r\nUser Access Verification\r\n\r\nUsername: "), tec("admin\r"), eq("admin\r\n"), tec("S3cretAAA9\r"), eq("Password: "), eq("\r\nSW1>")}},
+		{"dos retenidas", "S3cretEn9", []paso{eq("\r\nSW1>"), tec("terminal length 0\r"), tec("enable\r"), tec("S3cretEn9\r"), eq("terminal length 0\r\nSW1>enable\r\nPassword: "), eq("\r\nSW1#")}},
+		{"dos retenidas en trozos", "S3cretEn9", []paso{eq("\r\nSW1>"), tec("show clock\r"), tec("enable\r"), tec("S3cretEn9\r"), eq("show clock\r\n*10:00:00 UTC\r\nSW1>"), eq("enable\r\nPassword: "), eq("\r\nSW1#")}},
+		{"enter vacío y pegado", "S3cretLog9", []paso{eq("\r\nUsername: "), tec("\radmin\rS3cretLog9\r"), eq("\r\nUsername: admin\r\nPassword: "), eq("\r\nSW1>")}},
+		{"syslog entre prompt y tecla", "S3cretSys9", []paso{eq("\r\nSW1>"), tec("enable\r"), eq("enable\r\nPassword: "), eq("\r\n*Nov 25 10:00:01.123: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/11, changed state to up\r\n"), tec("S3cretSys9\r"), eq("\r\nSW1#")}},
+		{"varias líneas en un trozo", "S3cretEnable9", []paso{eq("\r\nSW1>"), tec("enable\rS3cretEnable9\rshow run | i secret\r"), eq("enable\r\nPass"), eq("word: \r\nSW1#show run | i secret\r\nenable secret 9 $9$abc\r\nSW1#")}},
+	}
+	// Revisión 1 de la rama: eco editado (retroceso, Tab, flecha), contraseña igual al usuario, contraseña que empieza
+	// como el eco partido del comando anterior y prompt partido con el Enter en medio.
+	casos = append(casos, []struct {
+		nombre, secreto string
+		pasos           []paso
+	}{
+		{"retroceso en lo adelantado", "S3cretTypo9", []paso{eq("\r\nR1>"), tec("show clock\r"), eq("show clock\r\n"), tec("enablx\x7fe\r"), eq("*10:00:00 UTC\r\nR1>"), eq("enablx\b \be\r\nPassword: "), tec("S3cretTypo9\r"), eq("\r\nR1#")}},
+		{"retroceso en un trozo", "S3cretTypo9", []paso{eq("\r\nR1>"), tec("show clock\r"), eq("show clock\r\n"), tec("enablx\x7fe\r"), eq("*10:00:00 UTC\r\nR1>enablx\b \be\r\nPassword: "), tec("S3cretTypo9\r"), eq("\r\nR1#")}},
+		{"tab", "S3cretTab9", []paso{eq("\r\nR1>"), tec("show clock\r"), eq("show clock\r\n"), tec("en\t\r"), eq("*10:00:00 UTC\r\nR1>"), eq("enable\r\nPassword: "), tec("S3cretTab9\r"), eq("\r\nR1#")}},
+		{"flecha arriba", "S3cretArr9", []paso{eq("\r\nR1#"), tec("show clock\r"), eq("show clock\r\n"), tec("\x1b[A\r"), eq("*10:00:00 UTC\r\nR1#"), eq("show clock\r\n*10:00:01 UTC\r\nR1#"), tec("disable\r"), eq("disable\r\nR1>"), tec("enable\r"), eq("enable\r\nPassword: "), tec("S3cretArr9\r"), eq("\r\nR1#")}},
+		{"eco editado envenena", "S3cretLater9", []paso{eq("\r\nR1>"), tec("show clock\r"), eq("show clock\r\n"), tec("show verx\x7fsion\r"), eq("*10:00:00 UTC\r\nR1>"), eq("show verx\b \bsion\r\nCisco IOS\r\nR1>"),
+			tec("show users\r"), eq("show users\r\n  Line  User\r\nR1>"), tec("enable\r"), eq("enable\r\nPassword: "), tec("S3cretLater9\r"), eq("\r\nR1#"), tec("show clock\r"), eq("show clock\r\n*10:00 UTC\r\nR1#")}},
+		{"su en linux", ">>> admin", []paso{eq("\r\nbob@srv:~$ "), tec("su admin\r"), tec("admin\r"), eq("su admin\r\nPassword: "), eq("\r\nadmin@srv:~$ ")}},
+		{"empieza como el eco partido", "S3cretPre9", []paso{eq("\r\nR1>"), tec("enable\r"), tec("eS3cretPre9\r"), eq("e\r\n*Mar  1 00:00:01.123: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"), eq("nable\r\nPassword: "), eq("\r\nR1#")}},
+		{"prompt partido con el Enter en medio", "S3cretSplit9", []paso{eq("\r\nR1>"), tec("enable\r"), tec("S3cretSplit9"), eq("enable\r\nPass"), tec("\r"), eq("word: "), eq("\r\nR1#")}},
+		{"prompt partido 2", "S3cretSplit9", []paso{eq("\r\nR1>"), tec("enable\r"), eq("enable\r\nPass"), tec("S3cretSplit9\r"), tec("show clock\r"), eq("word: "), eq("\r\nR1#"), eq("show clock\r\n*10:00 UTC\r\nR1#")}},
+	}...)
+	for _, c := range casos {
+		if s := sesionTA(c.pasos); strings.Contains(s, c.secreto) {
+			t.Errorf("%s: FUGA\n%s", c.nombre, s)
+		}
+	}
+	// Contraseña igual al usuario (cisco/cisco): el usuario se graba una vez y la contraseña no.
+	for _, pasos := range [][]paso{
+		{eq("\r\nUsername: "), tec("cisco\r"), tec("cisco\r"), eq("cisco\r\nPassword: "), eq("\r\nR1>")},
+		{eq("\r\nUser Access Verification\r\n\r\nUsername: "), tec("c"), eq("c"), tec("i"), eq("i"), tec("s"), eq("s"), tec("c"), eq("c"), tec("o"), eq("o"), tec("\r"), tec("cisco\r"), eq("\r\nPassword: "), eq("\r\nR1>")},
+	} {
+		if s := sesionTA(pasos); strings.Count(s, ">>> cisco") != 1 || !strings.Contains(s, ">>> [hidden]") {
+			t.Errorf("usuario igual a la contraseña:\n%s", s)
+		}
+	}
+	// Byte a byte (consola serie a 9600): la contraseña adelantada tampoco.
+	pasos := []paso{eq("\r\nSW1>"), tec("enable\r"), tec("S3cretByte9\r")}
+	pasos = append(pasos, porByte("enable\r\nPassword: \r\nSW1#")...)
+	if s := sesionTA(pasos); strings.Contains(s, "S3cretByte9") {
+		t.Errorf("byte a byte: FUGA\n%s", s)
+	}
+}
+
+// Lo que ya funcionaba y no debe romperse al arreglar lo anterior (regresiones vistas en revisión).
+func TestTypeAheadNoRompeLoQueFuncionaba(t *testing.T) {
+	// El eco rezagado del primer comando no hace que «enable» se tome por la contraseña.
+	s := sesionTA([]paso{eq("\r\nR1>"), tec("show clock\r"), eq("k"), tec("enable\r"), eq("\r\n*10:00:00 UTC\r\nR1>en"), eq("able\r\nPassword: "), tec("S3cretRz9\r"), eq("\r\nR1#")})
+	if strings.Contains(s, "S3cretRz9") || !strings.Contains(s, ">>> enable") {
+		t.Errorf("eco rezagado:\n%s", s)
+	}
+	// Un comando que termina en «…key…:» con el eco partido por un syslog: el resto del eco sigue tapado.
+	pasos := []paso{eq("\r\nSW1#")}
+	for _, c := range "copy scp://admin" {
+		pasos = append(pasos, tec(string(c)), eq(string(c)))
+	}
+	pasos = append(pasos, eq("\r\n*Mar  1 00:00:01: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"))
+	for _, c := range ":Adm1nPw@10.0.0.5/certs/router-key.pem bootflash:" {
+		pasos = append(pasos, tec(string(c)), eq(string(c)))
+	}
+	pasos = append(pasos, tec("\r"), eq("\r\nDestination filename [router-key.pem]? "))
+	if s := sesionTA(pasos); strings.Contains(s, "Adm1nPw") {
+		t.Errorf("copy scp partido:\n%s", s)
+	}
+	// Comandos normales, también los que terminan en «:», se graban (enmascarados si llevan secreto).
+	s = sesionTA([]paso{eq("\r\nR1#"), tec("show crypto key mypubkey rsa | i Key name:\r"), eq("show crypto key mypubkey rsa | i Key name:\r\n Key name: R1.lab\r\nR1#"), tec("show version\r"), eq("show version\r\nCisco IOS\r\nR1#")})
+	if !strings.Contains(s, ">>> show crypto key mypubkey rsa | i Key name:") || !strings.Contains(s, ">>> show version") {
+		t.Errorf("comandos:\n%s", s)
+	}
+	// «Key Data:» de un show no es un prompt de secreto: lo tecleado después (o adelantado) se graba.
+	for _, pasos := range [][]paso{
+		{eq("\r\nR1#"), tec("show crypto key mypubkey rsa\r"), tec("show clock\r"), eq("show crypto key mypubkey rsa\r\nKey name: R1.lab\r\n Key Data:\r\n  30820122 300D0609\r\nR1#"), eq("show clock\r\n*10:00 UTC\r\nR1#")},
+		{eq("\r\nR1#"), tec("show crypto key mypubkey rsa\r"), eq("show crypto key mypubkey rsa\r\nKey name: R1.lab\r\n Key Data:\r\n"), tec("s"), eq("  30820122 300D0609\r\nR1#"), eq("s"), tec("how clock\r"), eq("how clock\r\n*10:00 UTC\r\nR1#")},
+	} {
+		if s := sesionTA(pasos); !strings.Contains(s, ">>> show clock") || strings.Contains(s, "[hidden]") {
+			t.Errorf("Key Data:\n%s", s)
+		}
+	}
+	// La contraseña en su prompt, tecleada después de que llega, sigue oculta como siempre.
+	s = sesionTA([]paso{eq("\r\nasa> "), tec("enable\r"), eq("enable\r\nPassword: "), tec("AsaPw9x\r"), eq("\r\nasa# ")})
+	if strings.Contains(s, "AsaPw9x") || !strings.Contains(s, ">>> [hidden]") {
+		t.Errorf("asa:\n%s", s)
+	}
+}
+
+// Opción A (2026-11-25): lo tecleado se graba solo con su eco. Un eco partido por syslog en varios trozos se reconstruye
+// y el comando se graba; lo que nunca hizo eco sale [hidden].
+func TestEcoPartidoEnTrozosSeReconstruye(t *testing.T) {
+	syslog := "\r\n*Mar  1 00:00:01.123: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"
+	s := sesionTA([]paso{eq("\r\nR1#"), tec("show running-config\r"), eq("show ru"), eq(syslog), eq("nnin"), eq(syslog), eq("g-config\r\nhostname R1\r\nR1#")})
+	if !strings.Contains(s, ">>> show running-config") {
+		t.Errorf("eco en trozos:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1#"), tec("show clock\r"), eq("\r\nR1#")}) // el equipo no devolvió el eco
+	if !strings.Contains(s, ">>> [hidden]") || strings.Contains(s, ">>> show clock") {
+		t.Errorf("sin eco:\n%s", s)
+	}
+}

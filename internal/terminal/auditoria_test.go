@@ -219,11 +219,13 @@ func TestAuditoriaFTDConTabulador(t *testing.T) {
 // Una línea tecleada con Tab se graba tapada desde el Tab: el equipo completó palabras que las reglas no ven.
 func TestAuditoriaTabuladorTecleadoSeTapaDesdeElTab(t *testing.T) {
 	for _, c := range []struct{ prompt, in, want, no string }{
-		{"> ", "configure man\tadd 10.1.1.10 RegK3yAA NatId1AA", ">>> configure man<MASKED:secret>\n", "RegK3yAA"},
-		{"SW1(config)#", "username a\tpassword 0 SecretoXX", ">>> username a<MASKED:secret>\n", "SecretoXX"},
-		{"SW1#", "show ver\tsion", ">>> show ver<MASKED:secret>\n", "sion"},
-		{"SW1(config)#", "username bob password 0 SecretoXX\tfoo", ">>> username bob password 0 <MASKED:user-secret>\n", "SecretoXX"},
-		{"SW1(config)#", "snmp-server community ComunXX ro\tfoo", ">>> snmp-server community <MASKED:secret>\n", "ComunXX"},
+		// Desde 2026-11-25 lo tecleado se graba solo con su eco; con Tab el equipo completa y el eco no es lo tecleado,
+		// así que la línea sale [hidden] (el eco completado queda en la salida, enmascarado). Lo que importa sigue: no se ve.
+		{"> ", "configure man\tadd 10.1.1.10 RegK3yAA NatId1AA", ">>> [hidden]\n", "RegK3yAA"},
+		{"SW1(config)#", "username a\tpassword 0 SecretoXX", ">>> [hidden]\n", "SecretoXX"},
+		{"SW1#", "show ver\tsion", ">>> [hidden]\n", "sion"},
+		{"SW1(config)#", "username bob password 0 SecretoXX\tfoo", ">>> [hidden]\n", "SecretoXX"},
+		{"SW1(config)#", "snmp-server community ComunXX ro\tfoo", ">>> [hidden]\n", "ComunXX"},
 	} {
 		for _, pegado := range []bool{false, true} {
 			r, b := newRec()

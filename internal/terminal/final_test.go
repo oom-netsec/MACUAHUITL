@@ -17,6 +17,9 @@ func TestAvisosDeLlaveNoSeGrabanLoTecleado(t *testing.T) {
 		r.Input([]byte("MASTERK1\r"))
 		r.Output([]byte("\r\nR1(config)#"))
 		r.Input([]byte("show clock\r"))
+		// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+		// equipo hace eco, como uno real.
+		r.Output([]byte("show clock\r\n"))
 		r.Close()
 		out := b.String()
 		if strings.Contains(out, "MASTERK1") || !strings.Contains(out, ">>> [hidden]") || !strings.Contains(out, ">>> show clock") {
@@ -27,6 +30,7 @@ func TestAvisosDeLlaveNoSeGrabanLoTecleado(t *testing.T) {
 	r, b := newRec()
 	r.Output([]byte("R1#Press any key to continue: "))
 	r.Input([]byte("show clock\r"))
+	r.Output([]byte("show clock\r\n")) // eco (ver arriba)
 	r.Close()
 	if !strings.Contains(b.String(), ">>> show clock") {
 		t.Errorf("ocultó lo tecleado:\n%s", b.String())
@@ -91,6 +95,10 @@ func tecleado(line string) string {
 	r, b := newRec()
 	r.Output([]byte("R1(config)#"))
 	r.Input([]byte(line + "\r"))
+	// Desde 2026-11-25 lo tecleado se graba (>>>) solo cuando el equipo devuelve su eco; sin eco sale [hidden]. Aquí el
+	// equipo hace eco, como uno real.
+	echo := line[strings.LastIndexByte(line, 0x15)+1:] // Ctrl-U: el equipo muestra la línea nueva
+	r.Output([]byte(echo + "\r\nR1(config)#"))
 	r.Close()
 	return b.String()
 }
