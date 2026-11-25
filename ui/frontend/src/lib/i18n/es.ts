@@ -2412,7 +2412,7 @@ export const es = {
   "vault.backup.cancel": "Cancelar",
   "vault.backup.needs": "Elige qué hacer con cada conflicto para aplicar.",
   "vault.backup.memory": "Lo descifrado vive solo en memoria y se descarta al aplicar, a los 10 minutos o al cerrar la bóveda.",
-  "vault.backup.done": "Importación lista: {created} nuevas, {replaced} reemplazadas, {renamed} renombradas, {skipped} omitidas, {same} iguales.",
+  "vault.backup.done": "Importación lista: {created} nuevas, {replaced} reemplazadas, {renamed} renombradas, {skipped} omitidas.",
   "vault.backup.expired": "La vista previa venció o ya se usó: vuelve a abrir el respaldo.",
   "vault.backup.discarded": "La bóveda se cerró y, por seguridad, se descartó la vista previa del respaldo. Abre la bóveda y vuelve a abrir el archivo.",
   "vault.backup.noPerms": "El sistema de archivos no admitió los permisos 0600 (p. ej. una memoria vfat): el contenido va cifrado, pero cuida quién puede leer el archivo.",
@@ -3154,6 +3154,9 @@ export const es = {
   "vault.backup.masterHint": "Confirma que eres tú: sacar el respaldo da acceso a todas tus credenciales.",
   "vault.backup.err.master": "Escribe la contraseña maestra actual.",
   "transfer.log.repeated": "repetida",
+  "vault.backup.col.id": "ID en el respaldo",
+  "vault.backup.col.targetId": "ID en la bóveda",
+  "vault.backup.skipAll": "Omitir todas",
 };
 
 export type Key = keyof typeof es;

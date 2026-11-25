@@ -714,8 +714,8 @@ Exportar todas las credenciales a un archivo cifrado con una frase **distinta de
 **Import en dos pasos.**
 1. `previewVaultBackupImport(path, passphrase)` → `{ token, expiresMs, items }`. No escribe nada. Cada `item` es `{ id, label, username, state }` (nunca secretos); `id` es el de la credencial **dentro del respaldo** y las decisiones van por él. `state`:
    - `nueva`: la etiqueta no existe en la bóveda viva; se importa sola.
-   - `igual`: misma etiqueta y mismo contenido (usuario y los tres secretos); se omite sola.
-   - `conflicto_etiqueta`: misma etiqueta, otro contenido; pide decisión.
+   - `conflicto_etiqueta`: misma etiqueta que una de la bóveda viva, aunque el contenido sea idéntico; pide decisión.
+   - `igual`: ya no llega (ver «Sin "igual"»).
    - `reservada`: entrada del sistema; se omite sola.
    - Errores: no es un respaldo (texto, JSON, vacío, truncado) → `InvalidArgument` «no es un respaldo de bóveda de MACUAHUITL»; frase incorrecta (o archivo alterado, no se distingue) → `PermissionDenied`; archivo inexistente → `NotFound`; bóveda viva cerrada → `FailedPrecondition`.
    - Un respaldo con más de 10 000 credenciales o con parámetros de Argon2id fuera de tope → `InvalidArgument` / «no es un respaldo», sin descifrar nada.

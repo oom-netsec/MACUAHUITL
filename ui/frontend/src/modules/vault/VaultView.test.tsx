@@ -261,6 +261,9 @@ describe("respaldo cifrado", () => {
     expect(f).toHaveValue(""); // la frase no se queda en el campo
     expect(screen.getByText("Core DC")).toBeInTheDocument();
     expect(screen.getByText("Se omite (del sistema)")).toBeInTheDocument();
+    expect(screen.queryByText(/igual/i)).not.toBeInTheDocument();
+    expect(screen.getByText("ID en el respaldo")).toBeInTheDocument();
+    expect(screen.getByText("ID en la bóveda: v7")).toBeInTheDocument();
     const apply = screen.getByRole("button", { name: "Aplicar importación" });
     expect(apply).toBeDisabled();
     expect(screen.getByText(/Elige qué hacer con cada conflicto/)).toBeInTheDocument();
@@ -268,9 +271,32 @@ describe("respaldo cifrado", () => {
     expect(apply).toBeEnabled();
     await userEvent.click(apply);
     await waitFor(() => expect(core.applyVaultBackupImport).toHaveBeenCalledWith("tok-vault-1", [{ id: "a3", action: "reemplazar" }]));
-    expect(await screen.findByRole("status")).toHaveTextContent("Importación lista: 1 nuevas, 0 reemplazadas, 1 renombradas, 1 omitidas, 1 iguales.");
+    expect(await screen.findByRole("status")).toHaveTextContent("Importación lista: 1 nuevas, 0 reemplazadas, 1 renombradas, 1 omitidas.");
     expect(screen.queryByText("Vista previa de la importación")).not.toBeInTheDocument();
     await waitFor(() => expect(vi.mocked(core.listCredentials).mock.calls.length).toBeGreaterThan(1)); // recarga la lista
+  });
+
+  test("«Omitir todas» marca omitir en cada conflicto y habilita aplicar", async () => {
+    const core = fakeCore({ pickPath: vi.fn(async () => "/home/u/r.mcvault") });
+    await abrirVistaPrevia(core);
+    const apply = screen.getByRole("button", { name: "Aplicar importación" });
+    expect(apply).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Omitir todas" }));
+    expect(screen.getByLabelText("Qué hacer con Laboratorio")).toHaveValue("omitir");
+    await userEvent.click(apply);
+    await waitFor(() => expect(core.applyVaultBackupImport).toHaveBeenCalledWith("tok-vault-1", [{ id: "a3", action: "omitir" }]));
+  });
+
+  test("si la credencial de la bóveda cambió, se cierra la vista previa y se muestra el texto del núcleo", async () => {
+    const core = fakeCore({
+      pickPath: vi.fn(async () => "/home/u/r.mcvault"),
+      applyVaultBackupImport: vi.fn(async () => { throw Object.assign(new Error("rpc error: code = FailedPrecondition desc = la credencial cambió; vuelve a abrir el respaldo"), { cause: { code: "FailedPrecondition", reason: "respaldo.err.target_changed", metadata: {} } }); }),
+    });
+    await abrirVistaPrevia(core);
+    await userEvent.click(screen.getByRole("button", { name: "Omitir todas" }));
+    await userEvent.click(screen.getByRole("button", { name: "Aplicar importación" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("la credencial cambió");
+    expect(screen.queryByText("Vista previa de la importación")).not.toBeInTheDocument();
   });
 
   test("una frase incorrecta o un archivo ajeno se anuncian como error y no abren la vista previa", async () => {
