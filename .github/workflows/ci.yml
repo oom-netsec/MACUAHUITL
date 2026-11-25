@@ -204,15 +204,19 @@ jobs:
         run: CGO_ENABLED=0 go vet -tags wails ./ui/
       # Hasta que la app y el núcleo compilen en Windows (43a), el instalador se arma con binarios de prueba: lo que se
       # prueba es la plantilla (deploy/windows/macuahuitl.nsi), no los programas.
+      - name: caché del zip de NSIS (tools/ci/nsis.sh lo verifica con su SHA256)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nsis/nsis-*.zip
+          key: nsis-3.13-${{ runner.os }}
       - name: instalador NSIS (binarios de prueba)
         working-directory: .
         run: |
           mkdir -p bin-win
           for f in macuahuitl.exe macuahuitld.exe mctl.exe; do echo "binario de prueba" > "bin-win/$f"; done
-          # NSIS: la imagen del runner ya no siempre lo trae, y choco puede dejarlo en cualquiera de las dos carpetas.
-          nsis() { for d in "/c/Program Files (x86)/NSIS" "/c/Program Files/NSIS"; do [ -x "$d/makensis.exe" ] && export PATH="$PATH:$d" && return 0; done; return 1; }
-          command -v makensis >/dev/null || nsis || { choco install nsis -y --no-progress && nsis; } || true
-          command -v makensis >/dev/null || { echo "::error::makensis no está en el PATH tras choco install nsis"; exit 1; }
+          # NSIS: el del runner, el zip portable con versión y SHA256 fijos (caché), y choco solo al final (tools/ci/nsis.sh).
+          d=$(tools/ci/nsis.sh "$RUNNER_TEMP/nsis")
+          export PATH="$PATH:$d"
           VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
           TEST_DELETE_DATA=1 VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/prueba-borrado.exe
       - name: instalar, desinstalar y que /S no borre los datos
@@ -247,12 +251,16 @@ jobs:
         run: |
           (cd ui/frontend && npm ci && npm run build)
           go build -tags wails,production -ldflags -H=windowsgui -o bin-win/macuahuitl.exe ./ui
+      - name: caché del zip de NSIS (tools/ci/nsis.sh lo verifica con su SHA256)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nsis/nsis-*.zip
+          key: nsis-3.13-${{ runner.os }}
       - name: instalador NSIS
         run: |
-          # NSIS: la imagen del runner ya no siempre lo trae, y choco puede dejarlo en cualquiera de las dos carpetas.
-          nsis() { for d in "/c/Program Files (x86)/NSIS" "/c/Program Files/NSIS"; do [ -x "$d/makensis.exe" ] && export PATH="$PATH:$d" && return 0; done; return 1; }
-          command -v makensis >/dev/null || nsis || { choco install nsis -y --no-progress && nsis; } || true
-          command -v makensis >/dev/null || { echo "::error::makensis no está en el PATH tras choco install nsis"; exit 1; }
+          # NSIS: el del runner, el zip portable con versión y SHA256 fijos (caché), y choco solo al final (tools/ci/nsis.sh).
+          d=$(tools/ci/nsis.sh "$RUNNER_TEMP/nsis")
+          export PATH="$PATH:$d"
           VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
       - name: windows-e2e (usuarios estándar, pipe, bóveda, Patrol, instalador)
         shell: pwsh
