@@ -61,3 +61,29 @@ func TestImportTelnetNoAtaCredencial(t *testing.T) {
 		t.Fatalf("auditoría: %s", au)
 	}
 }
+
+// «Reemplazar» un host guardado con credencial por una fila «TELNET » del archivo: no hereda la credencial vieja ni ata
+// la de la etiqueta.
+func TestImportTelnetReemplazoNoHeredaCredencial(t *testing.T) {
+	s, d := nuevoSvc(t)
+	cid := cred(t, d, "admin lab")
+	poner(t, s, &v1.Device{Name: "SW-CORE", Target: &v1.Target{Address: "10.0.0.1"}, Platform: "ios-xe", CredentialId: cid})
+	csv := "name,address,port,platform,folder,tags,credential_label,notes,startup_command,protocol\n" +
+		"SW-CORE,203.0.113.66,,ios-xe,,,admin lab,,, TELNET \n"
+	ruta := filepath.Join(t.TempDir(), "h.csv")
+	if err := os.WriteFile(ruta, []byte(csv), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p, err := s.PreviewImportHosts(bg, &v1.PreviewImportHostsRequest{Path: ruta})
+	if err != nil || len(p.Items) != 1 || !p.Items[0].TelnetTyped || p.Items[0].State != "conflicto" {
+		t.Fatalf("preview: %v %v", p, err)
+	}
+	if _, err := s.ApplyImportHosts(bg, &v1.ApplyImportHostsRequest{Token: p.Token, Decisions: []*v1.ImportHostDecision{{Key: p.Items[0].Key, Action: "replace"}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range lista(t, s, &v1.ListDevicesRequest{}) {
+		if x.CredentialId != "" {
+			t.Fatalf("quedó con credencial: %v", x)
+		}
+	}
+}
