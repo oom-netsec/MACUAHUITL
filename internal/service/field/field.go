@@ -22,6 +22,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
+	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
 )
 
 // fieldSvc: herramientas junto al equipo (consola serie, servidor de archivos, hashes).
@@ -67,8 +68,8 @@ func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 	return nil, i18n.New("field.err.names_busy", nil)
 }
 
-// Console conecta el stream con el puerto serie. Lo tecleado no se graba ni se
-// audita (puede ser una contraseña); solo lo que devuelve el equipo.
+// Console conecta el stream con el puerto serie. La grabación es la de la terminal SSH: lo que devuelve el equipo y
+// lo tecleado, con los secretos enmascarados (también en el eco) y sin las contraseñas que pide un prompt sin eco.
 func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	s.d.MarkActive()
 	first, err := st.Recv()
@@ -95,7 +96,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
 	defer f.Close()
-	rec := serialcon.NewRecorder(f, s.d.Now)
+	rec := terminal.NewRecorder(f, s.d.Now)
 	summary := cfg.Path + " " + cfg.String()
 	rec.Mark("abierto " + summary)
 	opened := cfg.Path + " " + cfg.StringIn(i18n.Locale(st.Context()))
@@ -111,7 +112,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 			n, err := p.Read(buf)
 			if n > 0 {
 				rx.Add(int64(n))
-				rec.Write(buf[:n])
+				rec.Output(buf[:n])
 				st.Send(&v1.ConsoleResponse{Data: append([]byte(nil), buf[:n]...)})
 			}
 			if err != nil {
@@ -135,6 +136,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 					rec.Mark("BREAK")
 				}
 			case len(m.GetData()) > 0:
+				rec.Input(m.GetData())
 				n, err := p.Write(m.GetData())
 				tx.Add(int64(n))
 				if err != nil && !errors.Is(err, os.ErrClosed) { // escritura corta o fallida: que quede en el registro
@@ -157,6 +159,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		lostErr = i18n.Wrap("field.err.port_lost", lost, nil)
 		reason, reasonEN = lostErr.Error(), i18n.English(lostErr)
 	}
+	rec.Close() // lo que quedó a medias, antes de la marca de cierre
 	rec.Mark("cerrado: " + reason)
 	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))
 	if lost != nil {
