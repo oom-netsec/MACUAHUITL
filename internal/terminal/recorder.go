@@ -140,11 +140,7 @@ func (r *Recorder) Output(p []byte) {
 	if len(r.tail) > tailMax {
 		r.tail = r.tail[len(r.tail)-tailMax:]
 	}
-	// Solo cuenta como salida nueva si trae un salto de línea: el resto del eco de lo ya tecleado (rezagado tras el
-	// Enter) no es la respuesta del equipo, y la línea siguiente podría ser la contraseña que todavía no se pidió.
-	if strings.ContainsAny(string(p), "\r\n") {
-		r.fresh = true
-	}
+	r.fresh = true
 	r.settle()
 }
 
@@ -717,6 +713,7 @@ func (r *Recorder) flush() {
 	// salida ya la pide, es la contraseña.
 	if !hidden && line != "" && r.asksSecret() {
 		hidden = true
+		r.armEcho() // si el equipo devuelve lo tecleado tras el prompt, se tapa
 	}
 	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
 	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
