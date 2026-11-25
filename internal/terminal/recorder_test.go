@@ -879,3 +879,15 @@ func TestRadiusSueltoDeOtrasPlataformasNoCambia(t *testing.T) {
 		t.Errorf("cambió:\n%s", b.String())
 	}
 }
+
+// Una secuencia OSC (título de ventana; ConPTY de Windows pone ahí la orden que corre) no queda en la grabación, con
+// BEL o con ST como cierre.
+func TestOSCNoQuedaEnLaGrabacion(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("\x1b]0;C:\\Windows\\system32\\cmd.exe - mysql -pS3cr3tX\x07C:\\>"))
+	r.Output([]byte("\x1b]2;titulo2 -pOtro9resto\x1b\\dir\r\n"))
+	r.Close()
+	if s := b.String(); strings.Contains(s, "S3cr3tX") || strings.Contains(s, "Otro9resto") || !strings.Contains(s, "C:\\>dir") {
+		t.Errorf("%q", s)
+	}
+}

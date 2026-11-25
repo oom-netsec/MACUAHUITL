@@ -2796,7 +2796,7 @@ export const en: Record<Key, string> = {
   "transfer.live.rej.announce": "New rejections: {n}",
   "hosts.f.start": "Start command",
   "hosts.f.start.hint": "One line, up to 256 characters; tabs and invisible characters are rejected. What you type runs on the device when you connect, as is and without assisted mode.",
-  "hosts.f.start.audit": "The start command is kept in the audit log and in the session recording: do not put passwords or secrets in it.",
+  "hosts.f.start.audit": "The start command is stored in clear text in the host list and its exports (the audit log and the recording only note that there is one): do not put passwords or secrets in it.",
   "hosts.cred.keyOnlyGeneric": "Key-only credentials are offered only for linux or windows hosts.",
   "hosts.v.startCommand": "The start command must be a single line, with no control characters, up to 256 characters, with no leading or trailing spaces.",
   "hosts.move": "Move to…",

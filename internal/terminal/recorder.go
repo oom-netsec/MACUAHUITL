@@ -38,7 +38,9 @@ var (
 )
 
 var (
-	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
+	// OSC entera (título de ventana: ConPTY de Windows pone ahí la orden que corre, quizá con un secreto), hasta BEL o ST;
+	// luego CSI y el resto de escapes de dos bytes.
+	ansi = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
 	// Prompt del equipo: «SW1(config)#», el de ISE con espacio «ise/admin(config-Policy List)#», el de AireOS
 	// «(Cisco Controller) >» / «(Cisco Controller) config>» y el «> » de FTD (solo si sigue un espacio o el fin).
 	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\S+\([^()\r\n]*\)[#>]|\([^()\r\n]+\) (?:config)?>|>(?: |$))`)

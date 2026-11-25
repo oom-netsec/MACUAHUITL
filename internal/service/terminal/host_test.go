@@ -132,8 +132,9 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	}
 	h.logMu.Unlock()
 	a := h.d.AuditText()
-	if !strings.Contains(a, `host=h1`) || !strings.Contains(a, `startup=\"cmd /c echo macuahuitl-ok\"`) {
-		t.Fatalf("falta host=/startup= en la auditoría:\n%s", a)
+	// La orden puede llevar un secreto en la línea de comandos («mysql -pX»): la auditoría y la grabación solo dicen que la hay.
+	if !strings.Contains(a, `host=h1 startup=set`) || strings.Contains(a, "macuahuitl-ok") {
+		t.Fatalf("auditoría: falta host=/startup=set o trae la orden:\n%s", a)
 	}
 	for _, s := range []string{"PRIVATE KEY", pwSecreto} {
 		if strings.Contains(a, s) {
@@ -142,8 +143,8 @@ func TestHostConOrdenCorreExecConPty(t *testing.T) {
 	}
 	_, rec := h.cerrada("terminal.close", "the device closed the session")
 	b, err := os.ReadFile(rec)
-	if err != nil || !strings.Contains(string(b), "orden de inicio: "+strconv.Quote(startup)) {
-		t.Fatalf("la grabación no marca la orden (%v):\n%s", err, b)
+	if err != nil || !strings.Contains(string(b), "### orden de inicio de la libreta") || strings.Contains(string(b), "orden de inicio: "+strconv.Quote(startup)) { // lo que devuelve el equipo sí se graba
+		t.Fatalf("la grabación no marca la huella de la orden o trae su texto (%v):\n%s", err, b)
 	}
 }
 
