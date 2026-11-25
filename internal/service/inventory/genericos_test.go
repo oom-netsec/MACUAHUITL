@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -52,7 +51,7 @@ func TestOrdenDeInicioIdaYVueltaYAuditoria(t *testing.T) {
 	e.Id = id
 	poner(t, s, e)
 	au := d.AuditText()
-	if !strings.Contains(au, "platform=windows") || !strings.Contains(au, "startup="+devices.StartupPrint("wsl -d Ubuntu-26.04 --cd ~")) || !strings.Contains(au, "startup="+devices.StartupPrint("cmd")) || strings.Contains(au, "Ubuntu-26.04") {
+	if !strings.Contains(au, "platform=windows") || !strings.Contains(au, "startup=set") || strings.Contains(au, "Ubuntu-26.04") || strings.Contains(au, `startup=\"`) {
 		t.Fatalf("auditoría:\n%s", au)
 	}
 	if strings.Contains(au, "pi-panel 192.168.3.61:22 platform=linux startup") {

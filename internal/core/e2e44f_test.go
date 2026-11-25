@@ -179,12 +179,15 @@ func TestE2EWindowsLlaveOrdenDeInicio(t *testing.T) {
 
 	// Auditoría: keygen, alta con startup=, terminal.open con host= y startup=; ni semilla ni PEM de la privada.
 	a := h.auditText(t)
-	for _, want := range []string{`"action":"credential.keygen"`, `"action":"terminal.open"`, "host=" + hostID + ` startup=\"` + e2eStartup + `\"`} {
+	for _, want := range []string{`"action":"credential.keygen"`, `"action":"terminal.open"`, "host=" + hostID + " startup=set"} {
 		if !strings.Contains(a, want) {
 			t.Fatalf("falta %q en la auditoría:\n%s", want, a)
 		}
 	}
-	if !strings.Contains(a, "platform=windows startup=") {
+	if strings.Contains(a, e2eStartup) {
+		t.Fatalf("la orden de inicio quedó en la auditoría:\n%s", a)
+	}
+	if !strings.Contains(a, "platform=windows startup=set") {
 		t.Fatalf("el alta del host no audita startup=:\n%s", a)
 	}
 	c, err := h.core.vault.Get(keyID)

@@ -564,9 +564,9 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	if o.HostId != "" {
 		start := "none"
-		if startup != "" {
-			start = devices.StartupPrint(startup)
-			rec.Mark("orden de inicio: " + start)
+		if startup != "" { // su texto no se guarda: puede llevar un secreto en la línea de comandos («mysql -pX»)
+			start = "set"
+			rec.Mark("orden de inicio de la libreta (su texto no se graba)")
 		}
 		detail += " host=" + o.HostId + " startup=" + start
 	}

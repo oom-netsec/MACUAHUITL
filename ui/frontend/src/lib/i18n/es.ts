@@ -2795,7 +2795,7 @@ export const es = {
   "transfer.live.rej.announce": "Rechazos nuevos: {n}",
   "hosts.f.start": "Orden de inicio",
   "hosts.f.start.hint": "Una línea, hasta 256 caracteres; se rechazan tabuladores y caracteres invisibles. Lo que escribas se ejecuta en el equipo al conectar, tal cual y sin modo asistido.",
-  "hosts.f.start.audit": "La orden de inicio queda en la auditoría y en la grabación de la sesión: no le pongas contraseñas ni secretos.",
+  "hosts.f.start.audit": "La orden de inicio se guarda en claro en la libreta y en sus exports (la auditoría y la grabación solo anotan que la hay): no le pongas contraseñas ni secretos.",
   "hosts.cred.keyOnlyGeneric": "Las credenciales de solo llave se ofrecen únicamente para hosts linux o windows.",
   "hosts.v.startCommand": "La orden de inicio es una sola línea, sin caracteres de control, de hasta 256 caracteres y sin espacios al inicio ni al final.",
   "hosts.move": "Mover a…",

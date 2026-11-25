@@ -79,8 +79,8 @@ func (s *svc) auditHost(action string, h devices.Host) {
 	if h.Protocol == "telnet" {
 		d += " protocol=telnet"
 	}
-	if h.StartupCommand != "" { // su huella, no el texto: puede llevar un secreto en la línea de comandos
-		d += " startup=" + devices.StartupPrint(h.StartupCommand)
+	if h.StartupCommand != "" { // solo que la hay: su texto puede llevar un secreto en la línea de comandos («mysql -pX»)
+		d += " startup=set"
 	}
 	s.d.Audit(action, h.ID, d)
 }
