@@ -96,13 +96,19 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 }
 
 // resolve lleva los hosts del archivo a hosts de la libreta, con la credencial resuelta por etiqueta contra la
-// bóveda local: una etiqueta que no está, o que está repetida, deja el host sin credencial (missing[i]).
-func (s *svc) resolve(files []devices.FileHost) (hosts []devices.Host, missing []bool, vaultOK bool) {
+// bóveda local: una etiqueta que no está, o que está repetida, deja el host sin credencial (missing[i]). Una fila
+// Telnet nunca ata la credencial (telnet[i]): el archivo es ajeno, fija la dirección y Telnet la mandaría en claro sin
+// huella que confirmar; el host queda con credencial tecleada, como al elegir Telnet en la libreta.
+func (s *svc) resolve(files []devices.FileHost) (hosts []devices.Host, missing, telnet []bool, vaultOK bool) {
 	infos, vaultOK := s.creds()
-	hosts, missing = make([]devices.Host, len(files)), make([]bool, len(files))
+	hosts, missing, telnet = make([]devices.Host, len(files)), make([]bool, len(files)), make([]bool, len(files))
 	for i, f := range files {
 		hosts[i] = f.Host()
 		if f.CredentialLabel == "" {
+			continue
+		}
+		if hosts[i].Protocol == "telnet" {
+			telnet[i] = true
 			continue
 		}
 		var id string
@@ -130,8 +136,12 @@ func lineReason(ctx context.Context, e devices.LineError) string {
 }
 
 func devicePB(h devices.Host, label string) *v1.Device {
+	proto := "ssh" // como la libreta: vacío es SSH
+	if h.Protocol == "telnet" {
+		proto = "telnet"
+	}
 	return &v1.Device{Name: h.Name, Hostname: h.Name, Target: &v1.Target{Address: h.Address}, Profile: portPB(h), Platform: h.Platform,
-		Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand}
+		Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand, Protocol: proto}
 }
 
 // PreviewImportHosts lee y valida el archivo entero sin tocar la libreta y deja un token de un solo uso.
@@ -158,7 +168,7 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	if err != nil {
 		return nil, internal(err)
 	}
-	hosts, missing, vaultOK := s.resolve(files)
+	hosts, missing, telnet, vaultOK := s.resolve(files)
 	tok, exp := s.pend.Add(s.clock(), tokenTTL, previa{hosts, path, len(parsed.Errors)})
 	out := &v1.PreviewImportHostsResponse{Token: tok, ExpiresMs: exp.UnixMilli(), Format: format}
 	for _, e := range parsed.Errors {
@@ -167,13 +177,19 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	if parsed.NoSum {
 		out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.no_sum", nil))
 	}
-	faltan := 0
+	faltan, tecleadas := 0, 0
 	for i, it := range devices.Plan(hosts, saved) {
 		if missing[i] {
 			faltan++
 		}
+		if telnet[i] {
+			tecleadas++
+		}
 		out.Items = append(out.Items, &v1.ImportHostItem{Host: devicePB(it.Host, files[i].CredentialLabel), Key: devices.Key(it.Host), State: it.Estado,
-			Reason: it.Motivo, ConflictsWith: it.Con, CredentialMissing: missing[i], HasStartupCommand: it.Host.StartupCommand != ""})
+			Reason: it.Motivo, ConflictsWith: it.Con, CredentialMissing: missing[i], HasStartupCommand: it.Host.StartupCommand != "", TelnetTyped: telnet[i]})
+	}
+	if tecleadas > 0 {
+		out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.import_telnet", i18n.A("n", tecleadas)))
 	}
 	switch {
 	case faltan > 0 && !vaultOK:
@@ -199,7 +215,7 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 	dec := map[string]string{}
 	invalid := false
 	var res devices.Resultado
-	withStartup := 0
+	withStartup, withCred, telnet := 0, 0, 0
 	var newFolders []string
 	var err error
 	for _, d := range r.Decisions {
@@ -233,6 +249,12 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 				if h.StartupCommand != "" {
 					withStartup++
 				}
+				if h.CredentialID != "" {
+					withCred++
+				}
+				if h.Protocol == "telnet" {
+					telnet++
+				}
 				if err := putHost(tx, h); err != nil {
 					return internal(err)
 				}
@@ -247,8 +269,8 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 		return nil, err
 	}
 	s.auditNewFolders("import", newFolders...)
-	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d invalid, with_startup=%d",
-		res.Created, res.Replaced, res.Renamed, res.Skipped, pv.invalid, withStartup))
+	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d invalid, with_startup=%d with_credential=%d telnet=%d",
+		res.Created, res.Replaced, res.Renamed, res.Skipped, pv.invalid, withStartup, withCred, telnet))
 	return &v1.ApplyImportHostsResponse{Created: int32(res.Created), Replaced: int32(res.Replaced), Renamed: int32(res.Renamed), Skipped: int32(res.Skipped + pv.invalid), Invalid: int32(pv.invalid), FoldersCreated: int32(len(newFolders))}, nil
 }
 

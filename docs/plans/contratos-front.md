@@ -1484,6 +1484,12 @@ Solo núcleo y proto; el puente y la vista son de Front (48-5). Aditivo: sin `pr
   suma); el CSV suma la columna `protocol` al final y sigue aceptando los archivos sin ella.
 - **Patrol, respaldos, ad hoc y cambios** usan SSH siempre: al elegir equipos de la libreta para esas tareas, la UI no
   debería ofrecer hosts telnet (marcarían SSH al puerto 23 y fallarían).
+- **Import con Telnet (2026-11-25):** `ImportHostItem.host.protocol` viene siempre (`"ssh"` o `"telnet"`); la vista
+  previa lo muestra por fila. Una fila telnet con `credential_label` **no ata la credencial** (el archivo es ajeno y
+  Telnet la mandaría en claro): `ImportHostItem.telnet_typed` (8) = true, `credential_missing` = false, y el host queda
+  sin credencial (se teclea al conectar, como al elegir Telnet en la libreta). Si hay alguna, `warnings` trae
+  `hosts.warn.import_telnet` ({n}). La UI marca esas filas (p. ej. «Telnet: se teclea») en vez de mostrar la etiqueta
+  como si se fuera a usar. La auditoría `hosts.importar` suma `with_credential=` y `telnet=`.
 
 ## Huellas pendientes en ad hoc y respaldos (pedido de Front, 2026-11-20)
 

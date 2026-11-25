@@ -93,6 +93,7 @@ func init() {
 		"hosts.warn.label_lost":    e("{name}: no se pudo leer la etiqueta de su credencial (bóveda cerrada o credencial borrada); sale sin credencial", "{name}: could not read its credential label (vault closed or credential deleted); it is exported without a credential"),
 		"hosts.warn.no_sum":        e("archivo sin suma de verificación: nada comprueba que no esté dañado o modificado; revisa su contenido", "file without a checksum: nothing verifies that it is not damaged or modified; review its contents"),
 		"hosts.warn.import_closed": e("la bóveda está cerrada: {n} host(s) con credencial quedarían sin ella; ábrela y vuelve a abrir el archivo", "the vault is closed: {n} host(s) with a credential would be left without it; open it and open the file again"),
+		"hosts.warn.import_telnet": e("{n} host(s) Telnet traen una etiqueta de credencial: no se ata (Telnet va en claro) y al conectar se teclea", "{n} Telnet host(s) carry a credential label: it is not attached (Telnet is clear text) and the login is typed when connecting"),
 		"hosts.warn.import_label":  e("{n} host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial", "{n} host(s) carry a credential label that is not in the vault (or is repeated) and would be left without a credential"),
 
 		// Lista de equipos conocidos
