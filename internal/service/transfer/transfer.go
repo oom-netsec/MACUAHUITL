@@ -170,7 +170,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	cfg.OnStart = srv.reg.Start
 	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t, loc) }
 	cfg.OnRepeats = func(x fileserve.Repeats) {
-		s.d.Audit("transfer.serve.repeats", x.Client, fmt.Sprintf("server=%s proto=http file=%q repeats=%d", id, x.File, x.N))
+		s.d.Audit("transfer.serve.repeats", x.Client, fmt.Sprintf("server=%s proto=http repeats=%d", id, x.N))
 	}
 	cfg.OnReady = func(rd fileserve.Ready) {
 		from, recv := fileserve.Folders(cfg)
@@ -201,7 +201,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	if err != nil {
 		reason = "error: " + i18n.English(err)
 	}
-	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d reason=%q", id, r.Protocol, n, rejected, reason))
+	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d repeated=%d reason=%q", id, r.Protocol, n, rejected, k.repeated.Load(), reason))
 	if err != nil {
 		return service.ErrFrom(ctx, codes.Unavailable, err)
 	}
@@ -279,6 +279,7 @@ type sink struct {
 	events      chan *v1.StartServerResponse
 	drained     chan struct{}
 	n, rejected atomic.Int64
+	repeated    atomic.Int64 // repeticiones agrupadas (HTTP): no son rechazos
 }
 
 func newSink(send func(*v1.StartServerResponse) error) *sink {
@@ -299,6 +300,14 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	shown.DirCode = service.DirEN(t.Dir)
 	b, _ := json.Marshal(shown)
 	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
+	if t.Rejected && t.Cause == fileserve.CauseRepeat {
+		k.repeated.Add(1)
+		select {
+		case k.events <- ev:
+		default:
+		}
+		return
+	}
 	if t.Rejected {
 		k.rejected.Add(1)
 		srv.rejected.Add(1)

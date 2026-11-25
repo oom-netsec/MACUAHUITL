@@ -214,7 +214,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	k.reg = s.d.TransferSessions().Open(serverID)
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, DenyDirs: s.d.DenyDirs(), Now: s.d.Now, OnTransfer: k.onTransfer, OnStart: k.reg.Start}
 	cfg.OnRepeats = func(x fileserve.Repeats) {
-		s.d.Audit("field.serve.repeats", x.Client, fmt.Sprintf("proto=http file=%q repeats=%d", x.File, x.N))
+		s.d.Audit("field.serve.repeats", x.Client, fmt.Sprintf("proto=http repeats=%d", x.N))
 	}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
@@ -223,7 +223,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	err := fileserve.Serve(ctx, cfg)
 	k.reg.Shutdown(func(x service.Stranded) { k.finished(x.T, x.ID, x.Total) }) // cierre de seguridad
 	n, rejected := k.stop()
-	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d", n, rejected))
+	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d repeated=%d", n, rejected, k.repeated.Load()))
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
@@ -239,6 +239,7 @@ type serveSink struct {
 	events      chan *v1.ServeFilesResponse
 	drained     chan struct{}
 	n, rejected atomic.Int64
+	repeated    atomic.Int64           // repeticiones agrupadas (HTTP): no son rechazos
 	reg         *service.SessionServer // sesiones en vivo; nil-safe
 }
 
@@ -259,6 +260,14 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 	shown.DirCode = service.DirEN(t.Dir)
 	b, _ := json.Marshal(shown)
 	ev := &v1.ServeFilesResponse{TransferJson: string(b)}
+	if t.Rejected && t.Cause == fileserve.CauseRepeat {
+		k.repeated.Add(1)
+		select {
+		case k.events <- ev:
+		default:
+		}
+		return
+	}
 	if t.Rejected {
 		k.rejected.Add(1)
 		k.reg.Reject(t)

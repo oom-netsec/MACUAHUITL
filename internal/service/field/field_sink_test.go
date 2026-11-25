@@ -69,3 +69,16 @@ func TestServeSinkShutdownAuditsStranded(t *testing.T) {
 		t.Fatalf("auditoría: %v", audits)
 	}
 }
+
+// Las repeticiones agrupadas se cuentan aparte de los rechazos.
+func TestServeSinkRepetidasAparte(t *testing.T) {
+	k := newServeSink("es", func(a, _, d string) {}, func(*v1.ServeFilesResponse) error { return nil })
+	for i := 0; i < 3; i++ {
+		k.onTransfer(fileserve.Transfer{Proto: "http", File: "x", Result: "ok", Rejected: true, Cause: fileserve.CauseRepeat})
+	}
+	k.onTransfer(fileserve.Transfer{Proto: "http", File: "x", Result: "error", Rejected: true, Cause: fileserve.CauseNotFound})
+	_, rejected := k.stop()
+	if rejected != 1 || k.repeated.Load() != 3 {
+		t.Fatalf("rechazos=%d repetidas=%d", rejected, k.repeated.Load())
+	}
+}

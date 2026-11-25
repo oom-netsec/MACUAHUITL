@@ -221,64 +221,6 @@ func rangeGet(t *testing.T, addr, name string) {
 	get(t, req)
 }
 
-// Las repeticiones del mismo archivo desde la misma IP se resumen: la primera se audita, el resto se cuenta sin
-// sesión y con motivo propio, y al cerrar la ventana sale una línea con el total.
-func TestHTTPRepeticionesDelMismoArchivo(t *testing.T) {
-	r := newRecorder()
-	addr := serveHTTPCfg(t, 1<<10, r.tune)
-	for i := 0; i < 200; i++ {
-		rangeGet(t, addr, "ios.bin")
-	}
-	r.wait(t, 200)
-	r.mu.Lock()
-	if r.audited != 1 || r.counted != 199 || r.failed != 0 || r.repeatReason != 199 || len(r.started) != 1 || r.rejectedWithSession != 0 {
-		t.Fatalf("auditadas %d contadas %d fallos %d motivo %d sesiones %d", r.audited, r.counted, r.failed, r.repeatReason, len(r.started))
-	}
-	if len(r.summaries) != 0 {
-		t.Fatalf("resumen antes de cerrar la ventana: %v", r.summaries)
-	}
-	r.now = r.now.Add(auditWindow)
-	r.mu.Unlock()
-	rangeGet(t, addr, "ios.bin")
-	r.wait(t, 201)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.audited != 2 {
-		t.Fatalf("tras la ventana debió auditar otra: %d", r.audited)
-	}
-	if len(r.summaries) != 1 || r.summaries[0].N != 199 || r.summaries[0].File != "ios.bin" || r.summaries[0].Client != "127.0.0.1" {
-		t.Fatalf("resumen: %+v", r.summaries)
-	}
-}
-
-// Archivos distintos desde una misma IP se auditan todos, con su sesión normal.
-func TestHTTPArchivosDistintosSeAuditanTodos(t *testing.T) {
-	r := newRecorder()
-	var names []string
-	addr := serveHTTPCfg(t, 1<<10, func(c *Config) {
-		r.tune(c)
-		for i := 0; i < 8; i++ {
-			p, _ := image(t, fmt.Sprintf("cfg%d.txt", i), 100)
-			c.Files = append(c.Files, p)
-			names = append(names, fmt.Sprintf("cfg%d.txt", i))
-		}
-	})
-	for _, n := range names {
-		get(t, mustReq(t, "http://"+addr+"/"+n))
-	}
-	r.wait(t, len(names))
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.audited != len(names) || r.counted != 0 || len(r.started) != len(names) {
-		t.Fatalf("auditadas %d contadas %d sesiones %d", r.audited, r.counted, len(r.started))
-	}
-	for l := range r.started {
-		if !r.finished[l] {
-			t.Fatal("sesión sin transferencia terminada")
-		}
-	}
-}
-
 func mustReq(t *testing.T, u string) *http.Request {
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
@@ -287,8 +229,106 @@ func mustReq(t *testing.T, u string) *http.Request {
 	return req
 }
 
-// Los GET cortados a medias tampoco esquivan el cupo.
+// Lo que no entrega el archivo (Range de 1 byte, HEAD) comparte un cupo por IP: las primeras auditPerWindow se
+// auditan y el resto se cuenta con motivo propio, sin sesión.
+func TestHTTPCupoPorIPDeLoQueNoEntrega(t *testing.T) {
+	r := newRecorder()
+	addr := serveHTTPCfg(t, 1<<10, r.tune)
+	for i := 0; i < 200; i++ {
+		rangeGet(t, addr, "ios.bin")
+	}
+	r.wait(t, 200)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.audited != auditPerWindow || r.counted != 200-auditPerWindow || r.failed != 0 || r.repeatReason != 200-auditPerWindow || len(r.started) != 0 {
+		t.Fatalf("auditadas %d contadas %d fallos %d motivo %d sesiones %d", r.audited, r.counted, r.failed, r.repeatReason, len(r.started))
+	}
+}
+
+// Un HEAD, o muchos, no le quita la auditoría a una descarga completa del mismo archivo.
+func TestHTTPDescargaCompletaSiempreSeAudita(t *testing.T) {
+	r := newRecorder()
+	addr := serveHTTPCfg(t, 1<<10, r.tune)
+	for i := 0; i < 20; i++ {
+		resp, err := http.Head("http://" + addr + "/ios.bin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	r.wait(t, 20)
+	get(t, mustReq(t, "http://"+addr+"/ios.bin"))
+	r.wait(t, 21)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.started) != 1 || len(r.finished) != 1 || r.rejectedWithSession != 0 {
+		t.Fatalf("la descarga completa debió auditarse con su sesión: sesiones %d terminadas %d", len(r.started), len(r.finished))
+	}
+}
+
+// El cupo es por IP: muchos archivos distintos por HEAD no lo esquivan (ni los alias del nombre).
+func TestHTTPCupoPorIPNoPorNombre(t *testing.T) {
+	r := newRecorder()
+	var names []string
+	addr := serveHTTPCfg(t, 1<<10, func(c *Config) {
+		r.tune(c)
+		for i := 0; i < 40; i++ {
+			p, _ := image(t, fmt.Sprintf("cfg%d.txt", i), 100)
+			c.Files = append(c.Files, p)
+			names = append(names, fmt.Sprintf("cfg%d.txt", i))
+		}
+	})
+	for i := 0; i < 200; i++ {
+		resp, err := http.Head("http://" + addr + "/" + names[i%len(names)])
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	r.wait(t, 200)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.audited != auditPerWindow {
+		t.Fatalf("auditadas %d, quería %d (contadas %d)", r.audited, auditPerWindow, r.counted)
+	}
+}
+
+// El resumen sale solo al vencer la ventana, sin nueva petición, con la primera y la última hora.
+func TestHTTPResumenPeriodico(t *testing.T) {
+	old := summaryTick
+	summaryTick = 10 * time.Millisecond
+	t.Cleanup(func() { summaryTick = old })
+	r := newRecorder()
+	addr := serveHTTPCfg(t, 1<<10, r.tune)
+	first := r.now
+	for i := 0; i < auditPerWindow+7; i++ {
+		rangeGet(t, addr, "ios.bin")
+	}
+	r.wait(t, auditPerWindow+7)
+	r.mu.Lock()
+	r.now = r.now.Add(auditWindow)
+	r.mu.Unlock()
+	for i := 0; i < 500; i++ {
+		r.mu.Lock()
+		n := len(r.summaries)
+		r.mu.Unlock()
+		if n > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.summaries) != 1 || r.summaries[0].N != 7 || !r.summaries[0].First.Equal(first) || !r.summaries[0].Last.Equal(first) || r.summaries[0].Client != "127.0.0.1" {
+		t.Fatalf("resumen: %+v", r.summaries)
+	}
+}
+
+// Los GET cortados antes de que empiece la sesión tampoco esquivan el cupo.
 func TestHTTPInterrumpidosSeCuentan(t *testing.T) {
+	old := liveAfter
+	liveAfter = 1 << 40 // ninguna sesión antes de completar: el corte es determinista
+	t.Cleanup(func() { liveAfter = old })
 	r := newRecorder()
 	addr := serveHTTPCfg(t, 64<<20, r.tune)
 	const n = 30
@@ -305,11 +345,8 @@ func TestHTTPInterrumpidosSeCuentan(t *testing.T) {
 	r.wait(t, n)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.audited != 1 {
-		t.Fatalf("auditadas %d, quería 1 (contadas %d)", r.audited, r.counted)
-	}
-	if r.rejectedWithSession != 0 {
-		t.Fatal("un rechazo con sesión")
+	if r.audited > auditPerWindow || len(r.started) != 0 {
+		t.Fatalf("auditadas %d (tope %d), sesiones %d", r.audited, auditPerWindow, len(r.started))
 	}
 }
 
@@ -324,10 +361,10 @@ func TestHTTPResumenAlDetener(t *testing.T) {
 	r.tune(&cfg)
 	go func() { Serve(ctx, cfg); close(done) }()
 	addr := <-ready
-	for i := 0; i < 10; i++ {
+	for i := 0; i < auditPerWindow+9; i++ {
 		rangeGet(t, addr, "ios.bin")
 	}
-	r.wait(t, 10)
+	r.wait(t, auditPerWindow+9)
 	cancel()
 	<-done
 	r.mu.Lock()
@@ -342,7 +379,7 @@ func TestAuditQuotaAcotado(t *testing.T) {
 	now := time.Unix(1, 0)
 	q := newAuditQuota(func() time.Time { return now })
 	for i := 0; i < maxSeenIPs+500; i++ {
-		ok, _ := q.take(netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String(), "f")
+		ok, _ := q.take(netip.AddrFrom4([4]byte{10, byte(i >> 16), byte(i >> 8), byte(i)}).String())
 		if !ok {
 			t.Fatalf("la primera de cada clave se audita (i=%d)", i)
 		}

@@ -157,86 +157,120 @@ func (c *idleConn) Write(p []byte) (int, error) {
 	return c.Conn.Write(p)
 }
 
-// Cupo de auditoría de HTTP: por IP y ventana, auditPerWindow respuestas se auditan (la primera siempre); el resto
-// solo se cuenta como rechazo, salvo cuerpos de bigBody o más, que siempre se auditan.
+// Cupo de auditoría de HTTP. Una descarga completa (GET 200 con todo el cuerpo) se audita siempre, con su sesión.
+// Lo que no entrega el archivo (HEAD, 304, Range parcial, GET cortado, 416) comparte un cupo por IP: las primeras
+// auditPerWindow de cada ventana se auditan y el resto se cuenta y sale en un resumen. Es por IP y no por archivo,
+// así los alias del nombre (mayúsculas, 8.3, //x) no lo esquivan.
 const (
-	auditWindow = time.Minute
-	maxSeenIPs  = 4096
+	auditWindow    = time.Minute
+	auditPerWindow = 5
+	maxSeenIPs     = 4096
 )
 
-// Repeats resume las repeticiones de un archivo desde una IP dentro de una ventana.
+var (
+	// summaryTick es cada cuánto se vacían los resúmenes de las ventanas vencidas. Variable solo para las pruebas.
+	summaryTick = auditWindow
+	// liveAfter son los bytes enviados a partir de los cuales una descarga abre su sesión en vivo (antes de eso,
+	// una descarga que se corta aún cuenta contra el cupo); una completa la abre siempre. Variable para las pruebas.
+	liveAfter = int64(64 << 10)
+)
+
+// Repeats resume lo que una IP repitió dentro de una ventana sin que se auditara una por una.
 type Repeats struct {
-	Client, File string
-	N            int
+	Client      string
+	N           int
+	First, Last time.Time
 }
 
-// auditQuota agrupa las repeticiones del mismo archivo desde la misma IP: la primera de cada ventana se audita
-// normal y las siguientes solo se cuentan; al cerrar la ventana (o al detener el servidor, flush) sale el resumen.
-// El mapa se acota a maxSeenIPs: lleno y sin ventanas vencidas que podar, una clave nueva no se guarda y se
-// audita (más seguro auditar de más que perder la primera).
+// auditQuota lleva el cupo de auditoría por IP. El mapa se acota a maxSeenIPs: lleno y sin ventanas vencidas que
+// podar, una IP nueva no se guarda y se audita (más seguro auditar de más que perder la primera).
 type auditQuota struct {
 	mu    sync.Mutex
-	m     map[auditKey]*auditWin
+	m     map[string]*auditWin
 	now   func() time.Time
-	prune time.Time // última poda de ventanas vencidas (a lo más una por ventana)
+	prune time.Time // última poda en take (a lo más una por ventana)
 }
 
-type auditKey struct{ ip, file string }
-
 type auditWin struct {
-	start time.Time
-	reps  int
+	start       time.Time
+	n           int // respuestas de la ventana (auditadas y contadas)
+	reps        int // las contadas
+	first, last time.Time
 }
 
 func newAuditQuota(now func() time.Time) *auditQuota {
-	return &auditQuota{m: map[auditKey]*auditWin{}, now: now}
+	return &auditQuota{m: map[string]*auditWin{}, now: now}
 }
 
-// take dice si esta respuesta se audita normal; closed trae los resúmenes de las ventanas que cerró.
-func (q *auditQuota) take(ip, file string) (allowed bool, closed []Repeats) {
+func (w *auditWin) summary(ip string) Repeats {
+	return Repeats{Client: ip, N: w.reps, First: w.first, Last: w.last}
+}
+
+// take dice si esta respuesta de ip se audita; closed trae los resúmenes de las ventanas que cerró.
+func (q *auditQuota) take(ip string) (allowed bool, closed []Repeats) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	now := q.now()
-	k := auditKey{ip, file}
-	w := q.m[k]
+	w := q.m[ip]
 	if w == nil {
 		if len(q.m) >= maxSeenIPs && now.Sub(q.prune) >= auditWindow {
 			q.prune = now
-			for kk, v := range q.m {
-				if now.Sub(v.start) >= auditWindow {
-					if v.reps > 0 {
-						closed = append(closed, Repeats{kk.ip, kk.file, v.reps})
-					}
-					delete(q.m, kk)
-				}
-			}
+			closed = q.expireLocked(now)
 		}
 		if len(q.m) < maxSeenIPs {
-			q.m[k] = &auditWin{start: now}
+			q.m[ip] = &auditWin{start: now, n: 1}
 		}
 		return true, closed
 	}
 	if now.Sub(w.start) >= auditWindow {
 		if w.reps > 0 {
-			closed = append(closed, Repeats{ip, file, w.reps})
+			closed = append(closed, w.summary(ip))
 		}
-		w.start, w.reps = now, 0
+		*w = auditWin{start: now, n: 1}
 		return true, closed
 	}
+	if w.n < auditPerWindow {
+		w.n++
+		return true, nil
+	}
+	w.n++
+	if w.reps == 0 {
+		w.first = now
+	}
 	w.reps++
+	w.last = now
 	return false, nil
+}
+
+func (q *auditQuota) expireLocked(now time.Time) (out []Repeats) {
+	for ip, w := range q.m {
+		if now.Sub(w.start) >= auditWindow {
+			if w.reps > 0 {
+				out = append(out, w.summary(ip))
+			}
+			delete(q.m, ip)
+		}
+	}
+	return out
+}
+
+// expire cierra las ventanas vencidas y devuelve sus resúmenes (vaciado periódico).
+func (q *auditQuota) expire() []Repeats {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return q.expireLocked(q.now())
 }
 
 // flush devuelve los resúmenes pendientes y vacía el cupo.
 func (q *auditQuota) flush() (out []Repeats) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for k, v := range q.m {
-		if v.reps > 0 {
-			out = append(out, Repeats{k.ip, k.file, v.reps})
+	for ip, w := range q.m {
+		if w.reps > 0 {
+			out = append(out, w.summary(ip))
 		}
 	}
-	q.m = map[auditKey]*auditWin{}
+	q.m = map[string]*auditWin{}
 	return out
 }
 
