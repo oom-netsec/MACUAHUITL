@@ -155,6 +155,7 @@ message ExportBackupRequest {
   bytes passphrase = 2;                // frase del respaldo: al menos 12 caracteres y distinta de la maestra; se borra al terminar
   bool overwrite = 3;                  // sin ella no pisa un archivo existente
   bool confirm = 4;                    // obligatoria: el respaldo contiene todas las credenciales
+  bytes master_password = 5;           // obligatoria: la maestra actual; sin ella (o errada) PermissionDenied y no se escribe nada; se borra al terminar
 }
 message ExportBackupResponse {
   int32 count = 1;                     // credenciales guardadas (las reservadas del sistema no viajan)

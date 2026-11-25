@@ -694,10 +694,16 @@ Exportar todas las credenciales a un archivo cifrado con una frase **distinta de
   vale siempre 0. Reimportar el mismo respaldo pide decidir cada conflicto; `omitir` no cambia nada. La UI puede dejar de
   mostrar «igual» y sugerir «omitir todas» para el caso de reimportar. La vista debe rotular `id` como «ID en el respaldo» y puede mostrar `target_id` como «ID en la bóveda»; un cliente que lo ignore sigue funcionando.
 - RPC (`VaultService`): `ExportBackup`, `PreviewBackupImport`, `ApplyBackupImport`. CLI: `mctl cred backup export RUTA [--overwrite] [--yes]` e `import RUTA [--decision ID|ETIQUETA=acción]... [--all=acción] [--preview]`; las frases se leen sin eco o de stdin, nunca como argumento.
-- Puente → `core` (módulo `vault`): `exportVaultBackup(path, passphrase, overwrite, confirm): Promise<{ count, noPermissions }>`, `removeEmptyFile(path): Promise<void>`, `previewVaultBackupImport(path, passphrase): Promise<VaultBackupPreview>` y `applyVaultBackupImport(token, decisions): Promise<VaultBackupResult>`. El doble está en `modules/vault/fake.ts` (`sampleVaultBackup`). La vista es `BackupSection` dentro de la vista de la bóveda (solo con la bóveda abierta).
+- Puente → `core` (módulo `vault`): `exportVaultBackup(path, passphrase, masterPassword, overwrite, confirm): Promise<{ count, noPermissions }>`, `removeEmptyFile(path): Promise<void>`, `previewVaultBackupImport(path, passphrase): Promise<VaultBackupPreview>` y `applyVaultBackupImport(token, decisions): Promise<VaultBackupResult>`. El doble está en `modules/vault/fake.ts` (`sampleVaultBackup`). La vista es `BackupSection` dentro de la vista de la bóveda (solo con la bóveda abierta).
 
-**Export** (`exportVaultBackup(path, passphrase, overwrite, confirm)`): devuelve `{ count, noPermissions }`: cuántas credenciales guardó y si el sistema de archivos (p. ej. una memoria vfat) no admitió los permisos 0600 (el archivo va cifrado igual; la vista lo avisa).
+**Export** (`exportVaultBackup(path, passphrase, masterPassword, overwrite, confirm)`): devuelve `{ count, noPermissions }`: cuántas credenciales guardó y si el sistema de archivos (p. ej. una memoria vfat) no admitió los permisos 0600 (el archivo va cifrado igual; la vista lo avisa).
 - `confirm: true` es obligatorio; sin ella → `FailedPrecondition` («el respaldo contiene todas tus credenciales…»). La vista lo liga a una casilla.
+- **`master_password` (2026-11-25, campo 5 de `ExportBackupRequest`): obligatoria.** La maestra actual, que la vista pide en
+  el mismo diálogo (campo de contraseña, se borra al terminar). Vacía o errada → `PermissionDenied` con el texto de
+  contraseña maestra incorrecta y no se escribe nada (queda auditado `vault.respaldo.exportar_fallido`). Se comprueba
+  después de `confirm`, de la ruta y de la bóveda abierta (cerrada sigue siendo `FailedPrecondition`) y antes de la frase.
+  El puente pasa a `exportVaultBackup(path, passphrase, masterPassword, overwrite, confirm)`. mctl la pide sin eco antes
+  de la frase.
 - `passphrase`: al menos 12 caracteres y distinta de la maestra (se comprueba contra la bóveda viva sin cambiar su estado) → si no, `InvalidArgument`. Bóveda cerrada → `FailedPrecondition`. `path` absoluta; si no, `InvalidArgument`.
 - Bóveda cerrada → `FailedPrecondition` **antes** de evaluar la frase: con la bóveda cerrada, una frase igual a la maestra y una distinta dan el mismo error.
 - `path` dentro de la carpeta de datos del núcleo (la bóveda, su `.bak` o cualquier archivo ahí, también por enlaces simbólicos) → `InvalidArgument`.

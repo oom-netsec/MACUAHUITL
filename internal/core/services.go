@@ -117,6 +117,9 @@ func (s *vaultSvc) ChangeMasterPassword(ctx context.Context, r *v1.ChangeMasterP
 		return nil, err
 	}
 	if err := v.ChangeMasterPassword(r.CurrentMasterPassword, r.NewMasterPassword); err != nil {
+		if errors.Is(err, vault.ErrWrongPassword) {
+			s.c.audit("vault.change_master_failed", "", "wrong current master password")
+		}
 		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.audit("vault.change_master", "", "")

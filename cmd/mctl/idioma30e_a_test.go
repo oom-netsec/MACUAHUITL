@@ -167,10 +167,10 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 	errHas(t, "export sin yes en", err, "the backup holds all your credentials: confirm with --yes")
 	_, err = mctl(t, "", "cred", "backup", "export", filepath.Join(t.TempDir(), "r"))
 	errHas(t, "export sin yes es", err, "el respaldo contiene todas tus credenciales: confirma con --yes")
-	_, err = en(t, "frase-respaldo-1\notra-frase-larga\n", "cred", "backup", "export", filepath.Join(t.TempDir(), "r"), "--yes")
+	_, err = en(t, "maestra\nfrase-respaldo-1\notra-frase-larga\n", "cred", "backup", "export", filepath.Join(t.TempDir(), "r"), "--yes")
 	errHas(t, "frases en", err, "the passphrases do not match")
 	ruta := filepath.Join(t.TempDir(), "r.mcvault")
-	has(t, "export en", enMust(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"), "backup of 1 credentials in "+ruta)
+	has(t, "export en", enMust(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"), "backup of 1 credentials in "+ruta)
 	has(t, "import en", enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=skip"), "LABEL", "STATE", "imported: 0 new, 0 replaced, 0 renamed, 1 skipped, 0 unchanged")
 	for lang, c := range map[string][]string{"en": {"BACKUP ID", "LABEL", "STATE", "VAULT ID"}, "es": {"ID EN EL RESPALDO", "ETIQUETA", "ESTADO", "ID EN LA BÓVEDA"}} {
 		var o string

@@ -1332,13 +1332,14 @@ func (*DeleteCredentialResponse) Descriptor() ([]byte, []int) {
 }
 
 type ExportBackupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`             // absoluta; extensión sugerida .mcvault
-	Passphrase    []byte                 `protobuf:"bytes,2,opt,name=passphrase,proto3" json:"passphrase,omitempty"` // frase del respaldo: al menos 12 caracteres y distinta de la maestra; se borra al terminar
-	Overwrite     bool                   `protobuf:"varint,3,opt,name=overwrite,proto3" json:"overwrite,omitempty"`  // sin ella no pisa un archivo existente
-	Confirm       bool                   `protobuf:"varint,4,opt,name=confirm,proto3" json:"confirm,omitempty"`      // obligatoria: el respaldo contiene todas las credenciales
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Path           string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`                                           // absoluta; extensión sugerida .mcvault
+	Passphrase     []byte                 `protobuf:"bytes,2,opt,name=passphrase,proto3" json:"passphrase,omitempty"`                               // frase del respaldo: al menos 12 caracteres y distinta de la maestra; se borra al terminar
+	Overwrite      bool                   `protobuf:"varint,3,opt,name=overwrite,proto3" json:"overwrite,omitempty"`                                // sin ella no pisa un archivo existente
+	Confirm        bool                   `protobuf:"varint,4,opt,name=confirm,proto3" json:"confirm,omitempty"`                                    // obligatoria: el respaldo contiene todas las credenciales
+	MasterPassword []byte                 `protobuf:"bytes,5,opt,name=master_password,json=masterPassword,proto3" json:"master_password,omitempty"` // obligatoria: la maestra actual; sin ella (o errada) PermissionDenied y no se escribe nada; se borra al terminar
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExportBackupRequest) Reset() {
@@ -1397,6 +1398,13 @@ func (x *ExportBackupRequest) GetConfirm() bool {
 		return x.Confirm
 	}
 	return false
+}
+
+func (x *ExportBackupRequest) GetMasterPassword() []byte {
+	if x != nil {
+		return x.MasterPassword
+	}
+	return nil
 }
 
 type ExportBackupResponse struct {
@@ -1908,14 +1916,15 @@ const file_macuahuitl_v1_vault_proto_rawDesc = "" +
 	"\x0fprevious_origin\x18\x02 \x01(\tR\x0epreviousOrigin\")\n" +
 	"\x17DeleteCredentialRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1a\n" +
-	"\x18DeleteCredentialResponse\"\x81\x01\n" +
+	"\x18DeleteCredentialResponse\"\xaa\x01\n" +
 	"\x13ExportBackupRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
 	"\n" +
 	"passphrase\x18\x02 \x01(\fR\n" +
 	"passphrase\x12\x1c\n" +
 	"\toverwrite\x18\x03 \x01(\bR\toverwrite\x12\x18\n" +
-	"\aconfirm\x18\x04 \x01(\bR\aconfirm\"\x7f\n" +
+	"\aconfirm\x18\x04 \x01(\bR\aconfirm\x12'\n" +
+	"\x0fmaster_password\x18\x05 \x01(\fR\x0emasterPassword\"\x7f\n" +
 	"\x14ExportBackupResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x05R\x05count\x12%\n" +
 	"\x0eno_permissions\x18\x02 \x01(\bR\rnoPermissions\x12*\n" +

@@ -126,7 +126,7 @@ func TestVault44(t *testing.T) {
 	if _, err := b.PutCredential("a", "u", "p", "e"); err != nil || len(f.put.SshPrivateKey) != 0 {
 		t.Fatalf("put %+v %v", f.put, err)
 	}
-	e, _ := b.ExportVaultBackup("/x", "frase-larga-123", true, true)
+	e, _ := b.ExportVaultBackup("/x", "frase-larga-123", "m", true, true)
 	if e.Count != 2 || e.SSHKeysIncluded != 1 {
 		t.Fatalf("%+v", e)
 	}

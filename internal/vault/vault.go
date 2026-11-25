@@ -97,6 +97,7 @@ func (i Info) IsKey() bool { return i.HasSSHKey && !i.HasPassword && !i.HasEnabl
 // Vault es una bóveda abierta desde disco. Es segura para uso concurrente.
 type Vault struct {
 	mu       sync.Mutex
+	kdf      sync.Mutex // Matches: un Argon2 a la vez (no se puede probar la maestra en paralelo ni agotar la memoria)
 	path     string
 	hdr      header
 	entries  []rawEntry

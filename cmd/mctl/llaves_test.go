@@ -65,7 +65,7 @@ func TestCredBackupAvisaLlaves(t *testing.T) {
 	must(t, "maestra\nmaestra\n", "vault", "create")
 	keygen(t, "ops")
 	ruta := filepath.Join(t.TempDir(), "r.mcvault")
-	out := must(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes")
+	out := must(t, "maestra\nfrase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes")
 	if strings.Count(out, "1 llave") < 2 {
 		t.Fatalf("falta el aviso antes y después:\n%s", out)
 	}

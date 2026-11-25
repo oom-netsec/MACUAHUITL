@@ -169,6 +169,7 @@ func respaldoErr(ctx context.Context, err error) error {
 // ExportBackup escribe un respaldo cifrado con una frase distinta de la maestra (internal/vault.WriteBackup).
 func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) (*v1.ExportBackupResponse, error) {
 	defer clear(r.Passphrase)
+	defer clear(r.MasterPassword)
 	s.c.markActive()
 	if !r.Confirm {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.confirm", nil)
@@ -183,6 +184,16 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	}
 	if s.c.inDataDir(path) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "respaldo.err.in_data_dir", nil)
+	}
+	// El respaldo saca todas las credenciales (y las llaves SSH) con una frase que elige quien lo pide: se exige la
+	// maestra actual, como al cambiarla. Matches no cambia el estado de la bóveda. Con la bóveda cerrada no se compara
+	// (no sería más que otro oráculo de la maestra): el error es el de siempre.
+	if !v.Unlocked() {
+		return nil, service.VaultErr(ctx, vault.ErrLocked)
+	}
+	if !v.Matches(r.MasterPassword) {
+		s.c.audit("vault.respaldo.exportar_fallido", path, "wrong master password")
+		return nil, service.VaultErr(ctx, vault.ErrWrongPassword)
 	}
 	n, keys, noPerms, err := vault.WriteBackupKeys(v, path, r.Passphrase, r.Overwrite)
 	if errors.Is(err, vault.ErrBackupExists) {

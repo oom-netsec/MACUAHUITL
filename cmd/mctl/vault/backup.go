@@ -61,6 +61,11 @@ func backupExport(c *cli.Env, args []string) error {
 			fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_keys_before", "n", n))
 		}
 	}
+	m, err := c.Secret(cli.T("mctl.vault.prompt_master"))
+	if err != nil {
+		return err
+	}
+	defer wipe(m)
 	a, err := c.Secret(cli.T("mctl.vault.prompt_backup_phrase_new"))
 	if err != nil {
 		return err
@@ -74,7 +79,7 @@ func backupExport(c *cli.Env, args []string) error {
 	if string(a) != string(b) {
 		return cli.Err("mctl.vault.phrase_mismatch")
 	}
-	r, err := v1.NewVaultServiceClient(c.Conn).ExportBackup(context.Background(), &v1.ExportBackupRequest{Path: path, Passphrase: a, Overwrite: overwrite, Confirm: true})
+	r, err := v1.NewVaultServiceClient(c.Conn).ExportBackup(context.Background(), &v1.ExportBackupRequest{Path: path, Passphrase: a, Overwrite: overwrite, Confirm: true, MasterPassword: m})
 	if err != nil {
 		return err
 	}

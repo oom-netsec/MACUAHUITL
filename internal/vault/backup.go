@@ -53,11 +53,15 @@ func (v *Vault) Params() Params {
 }
 
 // Matches dice si master es la contraseña de esta bóveda, sin cambiar su estado de bloqueo ni dejar la DEK en memoria. No borra master.
-// La cabecera se copia bajo el lock y el Argon2 corre fuera de él: un Lock() concurrente no espera.
+// La cabecera se copia bajo el lock y el Argon2 corre fuera de él: un Lock() concurrente no espera. Las llamadas a
+// Matches van de a una (kdf): por aquí no se prueban maestras en paralelo (Unlock y ChangeMasterPassword van bajo v.mu;
+// otros Argon2, como abrir un respaldo, no pasan por este candado).
 func (v *Vault) Matches(master []byte) bool {
 	if len(master) == 0 {
 		return false
 	}
+	v.kdf.Lock()
+	defer v.kdf.Unlock()
 	v.mu.Lock()
 	h := v.hdr
 	v.mu.Unlock()
