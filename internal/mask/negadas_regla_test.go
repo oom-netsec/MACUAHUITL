@@ -13,6 +13,10 @@ var ejemplosReglas = []ejemploRegla{
 	// Pasada de auditoría de noviembre (sin validar en laboratorio).
 	{"", "ios", " ip msdp vrf RED password peer 1.1.1.1 Cl4ve"},
 	{"", "ios", "aaa pod server server-key Cl4ve"},
+	{"", "ios", " lte sim authenticate 0 Cl4ve slot 0"},
+	{"", "nx-os", "radius-server test username U password Cl4ve"},
+	{"", "asa", " isis authentication key Cl4ve level-1"},
+	{"isis", "asa", " authentication key Cl4ve level-1"},
 	{"", "ios", "ip rsvp authentication key Cl4ve"},
 	{"", "ios", " keyring aaa L name-mangler M password Cl4ve"},
 	{"", "ios", " authentication local eap mschapv2 username U password Cl4ve"},

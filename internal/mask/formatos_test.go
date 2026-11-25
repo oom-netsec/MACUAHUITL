@@ -19,7 +19,16 @@ var formatosPositivos = []struct{ plat, cfg string }{
 	{"ios-xe", "sip-ua\n credentials username 1001 password LEAKq realm cisco.com\n authentication username u password LEAKr\ntelephony-service\n web admin system name a password LEAKs\n xml user u password LEAKt 15\n"},
 	{"ios-xe", "interface Dialer1\n ppp eap password LEAKu\n ppp ms-chap password LEAKv\n ppp ms-chap-v2 password LEAKw\n"},
 	{"ios-xe", "interface Dot11Radio0\n encryption key 1 size 128bit 0 LEAK1234567890ABCDEF transmit-key\n encryption vlan 10 key 1 size 40bit LEAK123456\n"},
-	{"ios-xe", "snmp-server community 7 LEAKx RO\nsnmp-server community 6 LEAKy RO\n"},
+	{"ios-xe", "snmp-server host 10.0.0.1 version 2c 7 LEAKx\nsnmp-server host 10.0.0.1 vrf M version 2c 6 LEAKy udp-port 162\n"},
+	{"ios-xe", "crypto ikev2 profile P\n aaa authorization group override psk list L name-mangler M password LEAKz\n aaa authorization group cert override list L G password 0 LEAKw\n"},
+	{"ios-xe", "line con 0\npassword LEAKl1\nline vty 0 4\npassword 7 LEAKl2\nlogin\n"},
+	{"ios-xe", "cellular 0/1/0 lte sim authenticate 0 LEAKpin slot 0\ncellular 0/1/0 lte sim authenticate 7 LEAKpin2\n"},
+	{"ios-xe", "event manager applet A\n action 1.0 cli command \"enable secret LEAKeem\"\n action 2.0 cli command \"username a secret LEAKeem2\"\n"},
+	{"nx-os", "radius-server test username U password LEAKt1 idle-time 5\ntacacs-server test username U password LEAKt2\nradius-server test password LEAKt3\n"},
+	{"asa", "interface g0/0\n rip authentication key 0 LEAKr1 key_id 1\n rip authentication key 8 LEAKr2 key_id 2\n isis authentication key LEAKi1\n isis authentication key 8 LEAKi2 level-1\nrouter isis\n authentication key LEAKi3 level-2\n authentication key 0 LEAKi4\n"},
+	{"asa", "http-proxy 10.1.1.1 username u password LEAKp1\nhttps-proxy 10.1.1.1 username u password LEAKp2\n"},
+	{"asa", "vpn load-balancing  \n  cluster key LEAKv1\n"},
+	{"ios-xe", "radius-server local  \n nas 1.1.1.1 key LEAKn1\n"},
 	{"nx-os", "radius-server host 10.1.1.1 test username probe password LEAKnx1 idle-time 5\ntacacs-server host 10.1.1.2 test username probe password LEAKnx2\ncts sxp connection peer 1.1.1.1 password required LEAKnx3 mode speaker\ncts sxp connection peer 1.1.1.1 source 2.2.2.2 password required 7 LEAKnx4 mode listener vrf x\n"},
 	{"asa", "webvpn\n http-proxy 10.1.1.1 80 username u password LEAKa1\n https-proxy 10.1.1.1 80 username u password LEAKa2\nwccp 61 password LEAKa3\nmount M type cifs\n server 1.1.1.1\n username u\n password LEAKa4\n domain d\nmount F type ftp\n password LEAKa5\ninterface g0/0\n rip authentication key LEAKa6 key_id 1\nvpn load-balancing\n cluster key LEAKa7\n"},
 	{"asa", "tunnel-group X ipsec-attributes\n ikev1 pre-shared-key hex 4C45414B00112233\n ikev2 local-authentication pre-shared-key hex 4C45414B00112234\n ikev2 remote-authentication pre-shared-key hex 4C45414B00112244\n"},
@@ -64,6 +73,43 @@ func TestFormatosAuditoriaNegativos(t *testing.T) {
 		}
 		if strings.Contains(c.cfg, "community public") && !strings.Contains(out, "<MASKED:snmp-community>") {
 			t.Errorf("la comunidad public sigue tapándose como siempre:\n%s", out)
+		}
+	}
+}
+
+// El tipo 0 deja pasar las palabras del propio comando que siguen al valor (realm, transmit-key, hash, idle-time, mode…).
+func TestFormatosAuditoriaColaTipo0(t *testing.T) {
+	for _, c := range []struct{ plat, in, want string }{
+		{"ios-xe", "sip-ua\n credentials username 1001 password 0 LEAK uno dos realm cisco.com\n", " realm cisco.com"},
+		{"ios-xe", "interface Dot11Radio0\n encryption key 1 size 128bit 0 LEAK uno transmit-key\n", " transmit-key"},
+		{"ios-xe", "l2tp-class L\n digest secret 0 LEAK uno hash sha\n", " hash sha"},
+		{"nx-os", "radius-server host 1.1.1.1 test username u password 0 LEAK uno idle-time 5\n", " idle-time 5"},
+		{"nx-os", "cts sxp connection peer 1.1.1.1 password required 0 LEAK uno mode speaker\n", " mode speaker"},
+		{"ios-xe", "telephony-service\n xml user u password 0 LEAK uno 15\n", " 15"},
+		{"ios-xe", "aaa authorization group psk list L name-mangler M password 0 LEAK uno\n", ""},
+	} {
+		out, _ := mask.Apply(c.plat, c.in)
+		if strings.Contains(out, "LEAK") || strings.Contains(out, "uno") || !strings.HasSuffix(strings.TrimSpace(out), strings.TrimSpace(c.want)) || !strings.Contains(out, "<MASKED") {
+			t.Errorf("[%s] %q -> %q (se esperaba valor tapado y cola %q)", c.plat, c.in, out, c.want)
+		}
+	}
+}
+
+// El prompt «Password:», password-encryption y la comunidad que se llama «7» no se tocan.
+func TestFormatosAuditoriaNoTapaDeMas(t *testing.T) {
+	for _, in := range []string{
+		"line vty 0 4\nPassword: \n", "line vty 0 4\npassword encryption aes\n", "line vty 0 4\nlogin\n", "service password-encryption\n",
+		"snmp-server community 7 RO\n", "radius-server test idle-time 5\n", "line con 0\nexec-timeout 0 0\n",
+	} {
+		out, _ := mask.Apply("ios-xe", in)
+		if in == "snmp-server community 7 RO\n" {
+			if strings.Contains(out, "RO") && !strings.Contains(out, "<MASKED") {
+				t.Errorf("la comunidad 7 debe taparse como siempre: %q", out)
+			}
+			continue
+		}
+		if strings.Contains(out, "<MASKED") {
+			t.Errorf("taparon de más %q -> %q", in, out)
 		}
 	}
 }
