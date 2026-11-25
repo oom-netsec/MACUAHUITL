@@ -102,7 +102,7 @@ func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 			return err
 		}
 	}
-	lim := newLimiter()
+	lim := newLimiter(c.clock)
 	c.ready(Ready{Addr: ln.Addr().String(), User: c.User, Pass: c.Pass})
 	var wg sync.WaitGroup
 	defer wg.Wait()

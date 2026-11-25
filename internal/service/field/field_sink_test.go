@@ -69,3 +69,27 @@ func TestServeSinkShutdownAuditsStranded(t *testing.T) {
 		t.Fatalf("auditoría: %v", audits)
 	}
 }
+
+// Las repeticiones agrupadas se cuentan aparte de los rechazos.
+func TestServeSinkRepetidasAparte(t *testing.T) {
+	k := newServeSink("es", func(a, _, d string) {}, func(*v1.ServeFilesResponse) error { return nil })
+	for i := 0; i < 3; i++ {
+		k.onTransfer(fileserve.Transfer{Proto: "http", File: "x", Result: "ok", Rejected: true, Cause: fileserve.CauseRepeat})
+	}
+	k.onTransfer(fileserve.Transfer{Proto: "http", File: "x", Result: "error", Rejected: true, Cause: fileserve.CauseNotFound})
+	_, rejected := k.stop()
+	if rejected != 1 || k.repeated.Load() != 3 {
+		t.Fatalf("rechazos=%d repetidas=%d", rejected, k.repeated.Load())
+	}
+}
+
+// El texto auditado del resumen lleva repeats, first y last.
+func TestAuditRepeatsTexto(t *testing.T) {
+	var a, tg, d string
+	x := fileserve.Repeats{Client: "10.0.0.1", N: 7, First: time.Date(2026, 11, 25, 10, 0, 0, 0, time.UTC), Last: time.Date(2026, 11, 25, 10, 0, 40, 0, time.UTC)}
+	auditRepeats(func(ac, ta, de string) { a, tg, d = ac, ta, de }, x)
+	if a != "field.serve.repeats" || tg != "10.0.0.1" || !strings.Contains(d, "repeats=7") ||
+		!strings.Contains(d, "first=2026-11-25T10:00:00Z") || !strings.Contains(d, "last=2026-11-25T10:00:40Z") {
+		t.Fatalf("%s %s %q", a, tg, d)
+	}
+}

@@ -125,7 +125,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	id := service.NewID()
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, FromDir: r.FromDir,
 		Write: r.Write, RecvDir: r.RecvDir, DenyDirs: s.d.DenyDirs(), MaxFile: r.MaxFileBytes, MaxTotal: r.MaxTotalBytes, Allow: allow,
-		Legacy: r.LegacySsh, PassivePorts: [2]uint16{uint16(r.PassivePortMin), uint16(r.PassivePortMax)}}
+		Legacy: r.LegacySsh, Now: s.d.Now, PassivePorts: [2]uint16{uint16(r.PassivePortMin), uint16(r.PassivePortMax)}}
 	if r.PassivePortMin > 65535 || r.PassivePortMax > 65535 || r.PassivePortMin > r.PassivePortMax {
 		return bad(ctx, "transfer.svc.passive")
 	}
@@ -169,6 +169,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	loc := i18n.Locale(ctx)
 	cfg.OnStart = srv.reg.Start
 	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t, loc) }
+	cfg.OnRepeats = func(x fileserve.Repeats) { auditRepeats(s.d.Audit, id, x) }
 	cfg.OnReady = func(rd fileserve.Ready) {
 		from, recv := fileserve.Folders(cfg)
 		s.mu.Lock()
@@ -198,7 +199,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	if err != nil {
 		reason = "error: " + i18n.English(err)
 	}
-	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d reason=%q", id, r.Protocol, n, rejected, reason))
+	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d repeated=%d reason=%q", id, r.Protocol, n, rejected, k.repeated.Load(), reason))
 	if err != nil {
 		return service.ErrFrom(ctx, codes.Unavailable, err)
 	}
@@ -276,6 +277,7 @@ type sink struct {
 	events      chan *v1.StartServerResponse
 	drained     chan struct{}
 	n, rejected atomic.Int64
+	repeated    atomic.Int64 // repeticiones agrupadas (HTTP): no son rechazos
 }
 
 func newSink(send func(*v1.StartServerResponse) error) *sink {
@@ -289,6 +291,11 @@ func newSink(send func(*v1.StartServerResponse) error) *sink {
 	return k
 }
 
+// auditRepeats audita el resumen de repeticiones agrupadas con su primera y última hora.
+func auditRepeats(audit func(a, t, d string), id string, x fileserve.Repeats) {
+	audit("transfer.serve.repeats", x.Client, fmt.Sprintf("server=%s proto=http %s", id, x.Text()))
+}
+
 // onTransfer reenvía la transferencia al cliente con su motivo en el idioma loc; la auditoría lo lleva en inglés.
 func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.Transfer, loc string) {
 	shown := t
@@ -296,6 +303,14 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	shown.DirCode = service.DirEN(t.Dir)
 	b, _ := json.Marshal(shown)
 	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
+	if t.Rejected && t.Cause == fileserve.CauseRepeat {
+		k.repeated.Add(1)
+		select {
+		case k.events <- ev:
+		default:
+		}
+		return
+	}
 	if t.Rejected {
 		k.rejected.Add(1)
 		srv.rejected.Add(1)

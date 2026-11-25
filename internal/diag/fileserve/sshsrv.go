@@ -73,7 +73,7 @@ func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
-	lim := newLimiter()
+	lim := newLimiter(c.clock)
 	cfg := &ssh.ServerConfig{
 		MaxAuthTries:  3,
 		ServerVersion: "SSH-2.0-macuahuitl",

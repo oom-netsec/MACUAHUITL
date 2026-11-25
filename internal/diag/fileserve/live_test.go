@@ -312,6 +312,14 @@ func TestLiveHTTP(t *testing.T) {
 		}
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
+		if rng != "" {
+			// Un Range parcial no entrega el archivo: va por el cupo por IP, sin sesión (la primera se audita).
+			x := rec.waitEnds(t, 1)[0]
+			if starts, _, _ := rec.snap(); len(starts) != 0 || x.Live != nil || x.Rejected || x.Bytes != total {
+				t.Fatalf("Range %q: sesiones=%d live=%v rechazada=%v bytes=%d", rng, len(starts), x.Live, x.Rejected, x.Bytes)
+			}
+			continue
+		}
 		l, x := rec.one(t)
 		if l.Total() != total || x.Bytes != total {
 			t.Fatalf("Range %q: total=%d bytes=%d", rng, l.Total(), x.Bytes)
