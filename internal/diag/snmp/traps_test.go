@@ -248,3 +248,42 @@ func TestBlindCommunity(t *testing.T) {
 		}
 	}
 }
+
+// Un trap que no decodifica: sin secreto, Raw es el crudo cegado tal cual (sirve para diagnosticar); con un secreto en un
+// varbind, Raw no se guarda (enmascarado ya no sería el paquete que llegó).
+func TestTrapCrudoConSecretoNoSeGuarda(t *testing.T) {
+	for _, c := range []struct {
+		texto string
+		raw   bool
+	}{{"Interface Gi1/0/1, changed state to down", true}, {"logged command:username b privilege 15 secret Cl4veTrap99", false}} {
+		var out bytes.Buffer
+		var mu sync.Mutex
+		addr, sink := startTraps(t, TrapConfig{Out: lockedWriter{&mu, &out}})
+		x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: "c"}
+		pkt, err := x.SnmpEncodePacket(gosnmp.SNMPv2Trap, []gosnmp.SnmpPDU{
+			{Name: oidSnmpTrapOID, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.9.41.2.0.1"},
+			{Name: ".1.3.6.1.4.1.9.9.41.1.2.3.1.5.77", Type: gosnmp.OctetString, Value: []byte(c.texto)},
+			{Name: ".1.3.6.1.2.1.1.5.0", Type: gosnmp.OctetString, Value: []byte("relleno-relleno")},
+		}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn, err := net.Dial("udp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.Write(pkt[:len(pkt)-6])
+		conn.Close()
+		tr := sink.wait(t, 1)[0]
+		js, _ := json.Marshal(tr)
+		if strings.Contains(string(js), "Cl4veTrap99") || strings.Contains(string(js), hex.EncodeToString([]byte("Cl4veTrap99"))) {
+			t.Fatalf("secreto en el crudo: %s", js)
+		}
+		if (tr.Raw != "") != c.raw {
+			t.Fatalf("%q: Raw=%q", c.texto, tr.Raw)
+		}
+		if c.raw && !strings.Contains(tr.Raw, hex.EncodeToString([]byte(c.texto))) {
+			t.Fatalf("el crudo sin secreto cambió: %s", tr.Raw)
+		}
+	}
+}

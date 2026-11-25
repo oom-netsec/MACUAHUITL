@@ -51,3 +51,26 @@ func TestTrapTextoNoUTF8Enmascarado(t *testing.T) {
 		}
 	}
 }
+
+// Un valor binario (la MAC de port-security, BITS) no se toca: el enmascarado solo cambia algo si de verdad tapa un secreto.
+func TestTrapBinarioIntacto(t *testing.T) {
+	mac := []byte{0x00, 0x0a, 0x20, 0x01, 0x02, 0x03}
+	x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: "c"}
+	pkt := &gosnmp.SnmpPacket{Version: gosnmp.Version2c, Community: "c", PDUType: gosnmp.SNMPv2Trap, Variables: []gosnmp.SnmpPDU{
+		{Name: oidSnmpTrapOID, Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.9.9.315.0.0.1"},
+		{Name: ".1.3.6.1.4.1.9.9.315.1.2.1.1.10.5", Type: gosnmp.OctetString, Value: mac},
+		{Name: ".1.3.6.1.4.1.9.9.315.1.2.1.1.11.5", Type: gosnmp.OctetString, Value: []byte{0x0a}},
+	}}
+	b, err := pkt.MarshalMsg()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, _ := decodeTrap(x, b)
+	got := map[string]any{}
+	for _, v := range tr.Vars {
+		got[v.OID] = v.Value
+	}
+	if got[".1.3.6.1.4.1.9.9.315.1.2.1.1.10.5"] != string(mac) || got[".1.3.6.1.4.1.9.9.315.1.2.1.1.11.5"] != "\n" {
+		t.Errorf("el valor binario cambió: %q", got)
+	}
+}
