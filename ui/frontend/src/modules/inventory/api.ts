@@ -67,6 +67,7 @@ export interface HostImportItem {
   conflictsWith: string; // id del host guardado con el que choca o coincide; vacío si es nuevo
   credentialMissing: boolean; // trae etiqueta pero no hay (o hay varias) credencial con ella: quedaría sin credencial
   hasStartCommand: boolean; // el host del archivo trae orden de inicio (va en host.startCommand): la vista previa la muestra antes de aplicar
+  telnetTyped: boolean; // fila Telnet con etiqueta de credencial: el import no la ata (Telnet va en claro); se teclea al conectar
 }
 // Una fila (CSV) o entrada (JSON) inválida. No bloquea las demás: al aplicar cuenta como omitida.
 export interface HostImportError {

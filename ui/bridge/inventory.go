@@ -92,6 +92,7 @@ type HostImportItemDTO struct {
 	ConflictsWith     string  `json:"conflictsWith"`
 	CredentialMissing bool    `json:"credentialMissing"` // trae etiqueta pero no hay credencial con ella: quedaría sin credencial
 	HasStartupCommand bool    `json:"hasStartCommand"`   // el host del archivo trae orden de inicio (en host.startCommand)
+	TelnetTyped       bool    `json:"telnetTyped"`       // fila Telnet con etiqueta: el import no ata la credencial; se teclea al conectar
 }
 
 // HostImportErrorDTO es una fila (CSV) o entrada (JSON) inválida; no bloquea las demás.
@@ -200,7 +201,7 @@ func (b *Bridge) PreviewHostsImport(path, format string) (HostsImportPreviewDTO,
 		}
 		for _, it := range r.GetItems() {
 			out.Items = append(out.Items, HostImportItemDTO{Host: hostDTO(it.GetHost()), Key: it.GetKey(), State: it.GetState(), Reason: it.GetReason(),
-				ConflictsWith: it.GetConflictsWith(), CredentialMissing: it.GetCredentialMissing(), HasStartupCommand: it.GetHasStartupCommand()})
+				ConflictsWith: it.GetConflictsWith(), CredentialMissing: it.GetCredentialMissing(), HasStartupCommand: it.GetHasStartupCommand(), TelnetTyped: it.GetTelnetTyped()})
 		}
 		return out, err
 	})

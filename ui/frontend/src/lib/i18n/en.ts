@@ -3149,4 +3149,6 @@ export const en: Record<Key, string> = {
   "ssh.saved.telnetCred": "Telnet · credential in clear text",
   "hosts.telnetCred": "Telnet: the saved credential travels in clear text; anyone who can watch the network can see it.",
   "backup.alreadyArmed": "Backup {job} was already armed: it is running, no need to retry.",
+  "hosts.data.import.col.proto": "Protocol",
+  "hosts.data.import.telnetTyped": "Telnet: typed at login",
 };

@@ -38,10 +38,10 @@ export const sampleHostsImport: HostsImportPreview = {
   warnings: ["1 host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial"],
   errors: [{ line: 14, field: "address", reason: "dirección \"admin@10.0.0.9\": use una IP o un nombre DNS" }, { line: 15, field: "", reason: "tiene 3 columnas; se esperaban 8" }],
   items: [
-    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1", platform: "linux", startCommand: "tmux attach" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false, hasStartCommand: true },
-    { host: host({ id: "", name: "OFI-SW", address: "10.8.0.1", platform: "", folder: "Oficina", tags: ["acceso", "dc-1"] }), key: "10.8.0.1:22", state: "igual", reason: "", conflictsWith: "d".repeat(32), credentialMissing: false, hasStartCommand: false },
-    { host: host({ id: "", name: "OTRO-NOMBRE", address: "10.9.0.1", credentialLabel: "admin lab" }), key: "10.9.0.1:22", state: "conflicto", reason: "direccion", conflictsWith: "a".repeat(32), credentialMissing: false, hasStartCommand: false },
-    { host: host({ id: "", name: "LAB-AP", address: "ap2.lab", credentialLabel: "no existe" }), key: "ap2.lab:22", state: "conflicto", reason: "nombre", conflictsWith: "b".repeat(32), credentialMissing: true, hasStartCommand: false },
+    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1", platform: "linux", startCommand: "tmux attach" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false, hasStartCommand: true, telnetTyped: false },
+    { host: host({ id: "", name: "OFI-SW", address: "10.8.0.1", platform: "", folder: "Oficina", tags: ["acceso", "dc-1"] }), key: "10.8.0.1:22", state: "igual", reason: "", conflictsWith: "d".repeat(32), credentialMissing: false, hasStartCommand: false, telnetTyped: false },
+    { host: host({ id: "", name: "OTRO-NOMBRE", address: "10.9.0.1", credentialLabel: "admin lab" }), key: "10.9.0.1:22", state: "conflicto", reason: "direccion", conflictsWith: "a".repeat(32), credentialMissing: false, hasStartCommand: false, telnetTyped: false },
+    { host: host({ id: "", name: "LAB-AP", address: "ap2.lab", credentialLabel: "no existe" }), key: "ap2.lab:22", state: "conflicto", reason: "nombre", conflictsWith: "b".repeat(32), credentialMissing: true, hasStartCommand: false, telnetTyped: false },
   ],
 };
 

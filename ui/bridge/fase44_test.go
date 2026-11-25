@@ -60,7 +60,8 @@ func (f *fake44) ListDevices(context.Context, *v1.ListDevicesRequest) (*v1.ListD
 	return &v1.ListDevicesResponse{Devices: []*v1.Device{{Id: "h1", Name: "pi", Platform: "linux", StartupCommand: "tmux attach"}}}, nil
 }
 func (f *fake44) PreviewImportHosts(context.Context, *v1.PreviewImportHostsRequest) (*v1.PreviewImportHostsResponse, error) {
-	return &v1.PreviewImportHostsResponse{Items: []*v1.ImportHostItem{{Host: &v1.Device{Name: "x", StartupCommand: "ls"}, HasStartupCommand: true}}}, nil
+	return &v1.PreviewImportHostsResponse{Items: []*v1.ImportHostItem{{Host: &v1.Device{Name: "x", StartupCommand: "ls"}, HasStartupCommand: true},
+		{Host: &v1.Device{Name: "t", Protocol: "telnet", CredentialLabel: "admin"}, TelnetTyped: true}}}, nil
 }
 func (f *fake44) ApplyImportHosts(context.Context, *v1.ApplyImportHostsRequest) (*v1.ApplyImportHostsResponse, error) {
 	return &v1.ApplyImportHostsResponse{Created: 1, FoldersCreated: 2}, nil
@@ -153,6 +154,9 @@ func TestHosts44(t *testing.T) {
 	pv, _ := b.PreviewHostsImport("/h.csv", "")
 	if !pv.Items[0].HasStartupCommand || pv.Items[0].Host.StartupCommand != "ls" {
 		t.Fatalf("%+v", pv.Items)
+	}
+	if pv.Items[0].TelnetTyped || !pv.Items[1].TelnetTyped || pv.Items[1].Host.Protocol != "telnet" {
+		t.Fatalf("telnetTyped: %+v", pv.Items)
 	}
 	ap, _ := b.ApplyHostsImport("t", nil)
 	if ap.FoldersCreated != 2 || ap.Created != 1 {
