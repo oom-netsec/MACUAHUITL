@@ -28,6 +28,8 @@ interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done
 const advKeys: Key[] = ["transfer.err.port", "transfer.err.allow", "transfer.err.anyAllow", "transfer.err.minutes"]; // validaciones de campos dentro de Avanzado
 const protos: [TransferProto, string][] = [["tftp", "TFTP"], ["ftp", "FTP"], ["scp", "SCP"], ["sftp", "SFTP"], ["http", "HTTP"]];
 
+const rep = (l: TransferLine) => l.Rejected && l.Cause === "repeat"; // repetida: neutra, no cuenta como rechazo
+
 function Log({ lines }: { lines: TransferLine[] }) {
   const t = useT();
   if (!lines.length) return <p className="meta">{t("transfer.log.empty")}</p>;
@@ -42,9 +44,9 @@ function Log({ lines }: { lines: TransferLine[] }) {
             <td>{l.Client}</td>
             <td>{showHidden(l.File)} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
-            <td className="num">{l.Rejected ? "" : formatDuration(l.Duration / 1e6)}</td>
+            <td className="num">{l.Rejected && !rep(l) ? "" : formatDuration(l.Duration / 1e6)}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
-            <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {showHidden(l.Error ?? "")}</td>
+            <td><Badge tone={rep(l) ? "" : l.Result === "ok" ? "ok" : "bad"}>{rep(l) ? t("transfer.log.repeated") : l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {rep(l) && l.Result === "ok" ? "" : showHidden(l.Error ?? "")}</td>
           </tr>
         ))}
       </tbody>

@@ -3153,6 +3153,7 @@ export const es = {
   "vault.backup.master": "Contraseña maestra actual",
   "vault.backup.masterHint": "Confirma que eres tú: sacar el respaldo da acceso a todas tus credenciales.",
   "vault.backup.err.master": "Escribe la contraseña maestra actual.",
+  "transfer.log.repeated": "repetida",
 };
 
 export type Key = keyof typeof es;
