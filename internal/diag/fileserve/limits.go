@@ -20,22 +20,37 @@ const (
 // USER, bytes sueltos del handshake) no lo renueva. Variable solo para las pruebas.
 var authWindow = 30 * time.Second
 
+// httpWriteIdle es el plazo sin avanzar una escritura HTTP (se renueva en cada Write): un cliente que no lee
+// suelta su cupo, y una imagen grande por un enlace lento sigue mientras avance. Variable solo para las pruebas.
+var httpWriteIdle = 2 * time.Minute
+
+// lockoutFor es lo que dura el bloqueo de un origen por contraseñas erróneas, contado desde su último fallo.
+const lockoutFor = 5 * time.Minute
+
 // limiter acota conexiones y reintentos de contraseña: nadie acapara cupos ni adivina la
 // contraseña a fuerza bruta (aun con 80 bits, el servidor no regala intentos).
 type limiter struct {
 	mu    sync.Mutex
 	n     int
 	perIP map[string]int
-	fails map[string]int
+	fails map[string]failState
+	now   func() time.Time // reloj del núcleo
 }
 
-func newLimiter() *limiter { return &limiter{perIP: map[string]int{}, fails: map[string]int{}} }
+type failState struct {
+	n    int
+	last time.Time
+}
+
+func newLimiter(now func() time.Time) *limiter {
+	return &limiter{perIP: map[string]int{}, fails: map[string]failState{}, now: now}
+}
 
 // acquire reserva un cupo para ip; release lo devuelve.
 func (l *limiter) acquire(ip string) (release func(), ok bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.n >= maxConns || l.perIP[ip] >= perClientTCP || l.fails[ip] >= maxAuthFails {
+	if l.n >= maxConns || l.perIP[ip] >= perClientTCP || l.blockedLocked(ip) {
 		return nil, false
 	}
 	l.n++
@@ -52,14 +67,29 @@ func (l *limiter) acquire(ip string) (release func(), ok bool) {
 
 func (l *limiter) fail(ip string) {
 	l.mu.Lock()
-	l.fails[ip]++
-	l.mu.Unlock()
+	defer l.mu.Unlock()
+	l.blockedLocked(ip) // si el bloqueo ya venció, vuelve a contar desde cero
+	f := l.fails[ip]
+	l.fails[ip] = failState{f.n + 1, l.now()}
 }
 
 func (l *limiter) blocked(ip string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.fails[ip] >= maxAuthFails
+	return l.blockedLocked(ip)
+}
+
+// blockedLocked dice si ip sigue bloqueada; un bloqueo vencido se borra. Con l.mu tomado.
+func (l *limiter) blockedLocked(ip string) bool {
+	f := l.fails[ip]
+	if f.n < maxAuthFails {
+		return false
+	}
+	if l.now().Sub(f.last) >= lockoutFor {
+		delete(l.fails, ip)
+		return false
+	}
+	return true
 }
 
 // credsOK compara usuario y contraseña en tiempo constante, sin cortocircuito.

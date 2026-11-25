@@ -212,7 +212,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	k := newServeSink(i18n.Locale(st.Context()), s.d.Audit, st.Send)
 	serverID := service.NewID()
 	k.reg = s.d.TransferSessions().Open(serverID)
-	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, DenyDirs: s.d.DenyDirs(), OnTransfer: k.onTransfer, OnStart: k.reg.Start}
+	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, DenyDirs: s.d.DenyDirs(), Now: s.d.Now, OnTransfer: k.onTransfer, OnStart: k.reg.Start}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
 		k.events <- &v1.ServeFilesResponse{ServerId: serverID, Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}

@@ -125,7 +125,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	id := service.NewID()
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, FromDir: r.FromDir,
 		Write: r.Write, RecvDir: r.RecvDir, DenyDirs: s.d.DenyDirs(), MaxFile: r.MaxFileBytes, MaxTotal: r.MaxTotalBytes, Allow: allow,
-		Legacy: r.LegacySsh, PassivePorts: [2]uint16{uint16(r.PassivePortMin), uint16(r.PassivePortMax)}}
+		Legacy: r.LegacySsh, Now: s.d.Now, PassivePorts: [2]uint16{uint16(r.PassivePortMin), uint16(r.PassivePortMax)}}
 	if r.PassivePortMin > 65535 || r.PassivePortMax > 65535 || r.PassivePortMin > r.PassivePortMax {
 		return bad(ctx, "transfer.svc.passive")
 	}

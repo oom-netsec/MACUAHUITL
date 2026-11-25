@@ -10,6 +10,7 @@ func init() {
 		// motivos de rechazo (sin argumentos: ReasonIn los busca por su texto en español)
 		"fileserve.reason.origin":           e("origen no permitido", "origin not allowed"),
 		"fileserve.reason.not_published":    e("archivo no publicado", "file not published"),
+		"fileserve.reason.repeat_nobody":    e("petición repetida sin cuerpo", "repeated request without a body"),
 		"fileserve.reason.many_transfers":   e("demasiadas transferencias simultáneas", "too many simultaneous transfers"),
 		"fileserve.reason.many_from_client": e("demasiadas transferencias simultáneas desde este cliente", "too many simultaneous transfers from this client"),
 		"fileserve.reason.many_conn":        e("demasiadas conexiones o contraseñas erróneas desde este origen", "too many connections or wrong passwords from this origin"),

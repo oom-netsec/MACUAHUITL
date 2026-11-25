@@ -101,6 +101,16 @@ type Config struct {
 	// OnStart (opcional) avisa que una transferencia empezó; su Live avanza hasta que llega
 	// OnTransfer con la misma Transfer.Live. Los rechazos no la llaman.
 	OnStart func(*Live)
+	// Now (opcional) es el reloj del núcleo para los plazos de bloqueo; nil = time.Now.
+	Now func() time.Time
+}
+
+// clock da el reloj inyectado o el del sistema.
+func (c Config) clock() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
 }
 
 // Topes por omisión de lo que se recibe.
