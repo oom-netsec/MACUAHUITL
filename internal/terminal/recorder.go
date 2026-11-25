@@ -337,8 +337,8 @@ func (r *Recorder) matchEcho(raw, out string) string {
 	}
 	if rest := r.secretRest; rest != "" {
 		r.secretRest = ""
-		if s := strings.TrimLeft(t, " \t"); strings.HasPrefix(rest, s) {
-			r.secretRest = rest[len(s):]
+		if s, rr := strings.TrimLeft(t, " \t"), strings.TrimLeft(rest, " \t"); strings.HasPrefix(rr, s) {
+			r.secretRest = rr[len(s):]
 			return "<MASKED:secret>" // el resto del eco de un secreto, partido por un mensaje del equipo
 		}
 	}
@@ -359,7 +359,12 @@ func (r *Recorder) matchEcho(raw, out string) string {
 		// got no lleva los espacios del final del trozo (la línea se recortó): el resto puede empezar con ellos.
 		rest, t2 := e.text[len(e.got):], strings.TrimLeft(t, " \t")
 		if r2 := strings.TrimLeft(rest, " \t"); strings.HasPrefix(rest, t) || strings.HasPrefix(r2, t2) {
-			e.seen += out + " " // >>> no muestra lo que algún trozo tapó
+			// >>> no muestra lo que algún trozo tapó; a media palabra («stp pr» + «i») los trozos se unen sin espacio.
+			if strings.HasPrefix(rest, " ") || strings.HasPrefix(rest, "\t") {
+				e.seen += " " + out
+			} else {
+				e.seen = strings.TrimRight(e.seen, " \t") + out
+			}
 			if strings.HasPrefix(rest, t) {
 				e.got += t
 			} else {
@@ -379,7 +384,7 @@ func (r *Recorder) matchEcho(raw, out string) string {
 			// Lo que IOS cortó al desplazar no se grabó pero tampoco se tapó: cuenta como visible.
 			lead = t[:d]
 			if cut := e.text[:len(e.text)-(len(t)-d-1)]; strings.HasPrefix(out, t[:d+1]) {
-				vis = t[:d] + cut + out[d+1:]
+				vis = t[:d] + r.scrub2(r.scrub(cut, false), false) + out[d+1:]
 			}
 		} else if !strings.HasSuffix(t, e.text) || !echoLead(lead) {
 			continue // «barfoo» no es el eco de «foo», ni «hostname cisco» el de «cisco»
@@ -406,7 +411,7 @@ func (r *Recorder) matchEcho(raw, out string) string {
 				r.eco, r.secretRest = r.eco[1:], e.text[k:]
 				return tapaFinal(out, e.text[:k])
 			}
-			e.got, e.seen = e.text[:k], out+" "
+			e.got, e.seen = e.text[:k], out
 			return out
 		}
 	}
@@ -414,13 +419,14 @@ func (r *Recorder) matchEcho(raw, out string) string {
 }
 
 // shiftedEcho: t es el eco desplazado de IOS de text («R1(config)#$p RM permit 10 …»: la línea no cabe y se ve su
-// final); devuelve dónde está el «$», o -1. El final tiene que ser largo: uno corto podría coincidir con una contraseña.
+// final); devuelve dónde está el «$», o -1. El final tiene que ser largo y traer un espacio: uno corto, o uno de una sola
+// palabra (un PIN largo adelantado), podría ser el final de una contraseña.
 func shiftedEcho(t, text string) int {
 	pr := promptRe.FindString(t)
 	if pr == "" || !strings.HasPrefix(t[len(pr):], "$") {
 		return -1
 	}
-	if x := t[len(pr)+1:]; len(x) >= 20 && len(x) < len(text) && strings.HasSuffix(text, x) {
+	if x := t[len(pr)+1:]; len(x) >= 20 && strings.ContainsAny(x, " \t") && len(x) < len(text) && strings.HasSuffix(text, x) {
 		return len(pr)
 	}
 	return -1

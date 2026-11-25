@@ -388,7 +388,7 @@ func igualTerminal(n, o string) bool {
 			return false
 		}
 		for j := range nw {
-			if nw[j] != ow[j] && !(strings.HasPrefix(nw[j], "<MASKED:") && !strings.Contains(salida, ow[j])) {
+			if nw[j] != ow[j] && !(strings.HasPrefix(nw[j], "<MASKED:") && strings.Contains(salida, "<MASKED:") && !strings.Contains(salida, ow[j])) {
 				return false
 			}
 		}

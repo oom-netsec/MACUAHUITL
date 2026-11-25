@@ -240,3 +240,26 @@ func TestEcoDesplazado(t *testing.T) {
 		t.Errorf("trozo corto:\n%s", s)
 	}
 }
+
+// Revisión 3: lo cortado del eco desplazado pasa por la red de secretos conocidos; un final sin espacios (un PIN largo
+// adelantado) no es eco desplazado; el resto de un secreto partido tras un espacio se tapa; y los trozos de un eco
+// partido a media palabra se unen sin espacio para comparar con lo que la salida tapó.
+func TestEcoRevision3(t *testing.T) {
+	cfg := []paso{eq("\r\nR1(config)#"), tec("snmp-server community Zq7comm RO\r"), eq("snmp-server community Zq7comm RO\r\nR1(config)#"), tec("interface Gi0/11\r"), eq("interface Gi0/11\r\nR1(config-if)#")}
+	s := sesionTA(append(cfg, tec("description Zq7comm link to the distribution switch number twelve\r"), eq("$ link to the distribution switch number twelve\r\nR1(config-if)#")))
+	if strings.Contains(s, "Zq7comm") || !strings.Contains(s, ">>> description <MASKED:secret> link to") {
+		t.Errorf("secreto conocido en lo cortado:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1>"), tec("token\r"), tec("Xy9secretVeryLongPassword2026abc\r"), eq("token\r\nEnter PIN: "), eq("\r\nR1#"), eq("\r\nR1#$secretVeryLongPassword2026abc\r\nR1#")})
+	if strings.Contains(s, ">>> Xy9secret") {
+		t.Errorf("PIN largo como eco desplazado:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nWould you like to enter basic management setup? [yes/no]: "), tec("yes\r"), tec("my Long phrase99\r"), eq("yes\r\n  Enter enable secret: my "), eq("\r\n*Mar  1 00:00:01.123: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"), eq("Long phrase99\r\n  Enter enable password: ")})
+	if strings.Contains(s, "phrase99") {
+		t.Errorf("resto del secreto tras un espacio:\n%s", s)
+	}
+	s = sesionTA([]paso{eq("\r\nR1(config)#"), tec("stp pri 4096\r"), eq("stp pr"), eq("\r\n*Mar  1 00:00:01.123: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"), eq("i 4096\r\nR1(config)#")})
+	if strings.Contains(s, ">>> stp <MASKED") {
+		t.Errorf("trozos a media palabra:\n%s", s)
+	}
+}
