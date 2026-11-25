@@ -421,7 +421,7 @@ test("el host con orden de inicio lo muestra con una marca y su orden en el titl
   expect(screen.getAllByText("Orden de inicio")).toHaveLength(1);
 });
 
-test("la credencial de solo llave se ofrece solo con linux o windows, y la orden de inicio avisa que queda en la auditoría", async () => {
+test("la credencial de solo llave se ofrece solo con linux o windows, y la orden de inicio avisa que va en claro en la libreta", async () => {
   const key = { ...cred, id: "k".repeat(32), label: "llave pi", kind: "key" as const, hasSshKey: true };
   setup({ listCredentials: vi.fn(async () => [cred, key]) });
   await screen.findByRole("table", { name: "Hosts de la libreta" });
@@ -431,10 +431,10 @@ test("la credencial de solo llave se ofrece solo con linux o windows, y la orden
   expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(false); // sin plataforma
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "ios-xe");
   expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(false);
-  expect(screen.queryByText(/queda en la auditoría y en la grabación/)).toBeNull();
+  expect(screen.queryByText(/la auditoría y la grabación solo anotan que la hay/)).toBeNull();
   await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
   expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(true);
-  expect(screen.getByText(/queda en la auditoría y en la grabación/)).toBeVisible();
+  expect(screen.getByText(/la auditoría y la grabación solo anotan que la hay/)).toBeVisible();
 });
 
 test("la credencial de solo llave también se ofrece con windows", async () => {
