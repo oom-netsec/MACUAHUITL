@@ -202,3 +202,23 @@ func TestVisibleOnlyPorPalabra(t *testing.T) {
 		}
 	}
 }
+
+// Revisión 2: un prompt de secreto que devuelve lo tecleado (diálogo setup de IOS) con la respuesta adelantada no la
+// graba en >>> ni en la salida, entera o partida por un syslog; y en un eco partido >>> no muestra lo que un trozo
+// anterior tapó.
+func TestEcoTrasPromptDeSecretoYTrozosTapados(t *testing.T) {
+	setup := []paso{eq("\r\nWould you like to enter basic management setup? [yes/no]: "), tec("yes\r"), tec("S3cretSet1\r")}
+	for nombre, pasos := range map[string][]paso{
+		"entero":  append(append([]paso{}, setup...), eq("yes\r\n  Enter enable secret: "), eq("S3cretSet1\r\n  Enter enable password: ")),
+		"partido": append(append([]paso{}, setup...), eq("yes\r\n  Enter enable secret: S3cr"), eq("\r\n*Mar  1 00:00:01.123: %LINK-3-UPDOWN: Interface Gi0/1, changed state to up\r\n"), eq("etSet1\r\n  Enter enable password: ")),
+	} {
+		if s := sesionTA(pasos); strings.Contains(s, "S3cretSet1") || strings.Contains(s, "S3cr\n") || strings.Contains(s, "etSet1") {
+			t.Errorf("setup %s:\n%s", nombre, s)
+		}
+	}
+	s := sesionTA([]paso{eq("\r\nadmin@srv:~$ "), tec("snmp-server community Zq7comm RO\r"), eq("snmp-server community Zq7comm RO\r\nbash: snmp-server: not found\r\nadmin@srv:~$ "),
+		tec("grep Zq7comm /etc/snmp/x.conf\r"), eq("grep Zq7comm /e"), eq("\r\n%ALERT-1-X: x\r\n"), eq("tc/snmp/x.conf\r\nadmin@srv:~$ ")})
+	if strings.Contains(s, "Zq7comm") {
+		t.Errorf("eco partido con un trozo tapado:\n%s", s)
+	}
+}
