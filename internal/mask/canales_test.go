@@ -105,7 +105,7 @@ var canalPlantillas = []struct{ plat, tpl string }{
 	{"ios-xe", "ppp eap password {1}"}, {"ios-xe", "ppp ms-chap password {1}"}, {"ios-xe", "ppp ms-chap-v2 password 0 {1}"},
 	{"ios-xe", "nas 10.1.1.1 key {1}"}, {"ios-xe", "user u1 nthash {1}"}, {"ios-xe", "digest secret {1} hash sha"}, {"ios-xe", "digest secret 0 {1}"},
 	{"ios-xe", "encryption key 1 size 128bit 0 {1} transmit-key"}, {"ios-xe", "encryption vlan 10 key 1 size 40bit {1}"},
-	{"ios-xe", "snmp-server host 10.1.1.1 version 2c 7 {1}"}, {"ios-xe", "snmp-server host 10.1.1.1 vrf M version 2c 6 {1} udp-port 162"},
+	{"ios-xe", "snmp-server host 10.1.1.1 version 2c 0 {1} udp-port 1162 bgp"}, {"ios-xe", "snmp-server host 10.1.1.1 version 2c 7 {1}"}, {"ios-xe", "snmp-server host 10.1.1.1 vrf M version 2c 6 {1} udp-port 162"},
 	{"ios-xe", "aaa authorization group override psk list L name-mangler M password {1}"},
 	{"ios-xe", "lte sim authenticate 0 {1} slot 0"}, {"ios-xe", "lte sim authenticate 7 {1}"},
 	{"ios-xe", "action 1.0 cli command \"enable secret {1}\""},

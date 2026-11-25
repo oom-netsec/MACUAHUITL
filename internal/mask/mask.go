@@ -50,6 +50,15 @@ var keyringLine = regexp.MustCompile(`^\s*pre-shared-key (?:address|hostname|ipv
 // (no «password encryption aes», el prompt «Password:» ni password-encryption).
 var setupPassword = regexp.MustCompile(`(?i)^password (?:[0-9] )?\S`)
 
+// Comandos globales «password …» (NX-OS) que no son la contraseña de la línea.
+var setupPasswordCmd = regexp.MustCompile(`(?i)^password (?:encryption|strength-check|secure-mode|prompt)\b`)
+
+// La regla con tipo ya tapó la comunidad («version 2c 0 <MASKED:…>»): el dígito no es otra comunidad.
+var snmpHostTyped = regexp.MustCompile(`(?i)version (?:1|2c|3 (?:auth|noauth|priv)) [067] <MASKED:`)
+
+// snmpHostTail: en tipo 0 la comunidad llega hasta udp-port o el tipo de notificación que sigue.
+const snmpHostTail = `\s+(?:udp-port\b|(?:bgp|bfd|config|cpu|eigrp|entity|envmon|flash|hsrp|ipsla|isis|license|mpls|ospf|pim|snmp|syslog|tty|vrrp|vtp)\b)`
+
 // HSRP/VRRP con key-chain o sin autenticación: no hay secreto en la línea.
 var fhrpNoKey = regexp.MustCompile(`authentication (?:md5 key-chain|none)\b`)
 
@@ -104,7 +113,9 @@ var iosRules = []rule{
 	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
 	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
 	R("snmp-community", "", `\s*snmp-server host-group \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
-	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) (?:[067] )?)?`).guarded().unlessFn(isASASNMPHost),
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) (?:[067] )?)?`).stopAt(snmpHostTail).guarded().unlessFn(isASASNMPHost),
+	// La regla anterior, sin el tipo: «version 2c 7 udp-port 1162» es la comunidad «7» y la v0.6.5 la tapaba.
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost).unless(snmpHostTyped),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
 	R("ppp-password", "", `\s*ppp (?:chap password|pap sent-username \S+ password) `+typ),
@@ -504,7 +515,7 @@ func (s *Stream) line1(raw string) (out string, ok bool) {
 		return out + eol, true
 	}
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
-		if b := blockOf(line); b != "" || s.block != "line" || !setupPassword.MatchString(line) || strings.HasPrefix(strings.ToLower(line), "password encryption") {
+		if b := blockOf(line); b != "" || s.block != "line" || !setupPassword.MatchString(line) || setupPasswordCmd.MatchString(line) {
 			s.block = b
 		}
 	}
@@ -825,6 +836,8 @@ func Path(platform, path string) string {
 	return strings.Join(lines, " > ")
 }
 
+var showLine = regexp.MustCompile(`(?i)^\s*(?:do\s+)?sh(?:o|ow)?\s`)
+
 // Cmd enmascara un comando suelto del que se perdió su bloque (una línea rechazada, citada en un log): las reglas más
 // los key/password/secret/token sueltos. Para quien muestra una línea sin saber de qué sección venía.
 // Si trae varias líneas, cada una se procesa por separado.
@@ -832,7 +845,17 @@ func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
 	st := Stream{counts: counts, Platform: platform}
-	logged := func(n string) string { return st.quoted(maskLogged(n, platform, counts)) } // EEM: «action 1 cli command "enable secret X"»
+	// EEM: «action 1 cli command "enable secret X"». quoted solo vale si tapa algo más (no desescapa ni toca un show).
+	logged := func(n string) string {
+		base := maskLogged(n, platform, counts)
+		if showLine.MatchString(n) {
+			return base
+		}
+		if q := st.quoted(base); strings.Count(q, "<MASKED:") > strings.Count(base, "<MASKED:") {
+			return q
+		}
+		return base
+	}
 	for i, l := range lines {
 		sp := commandSpans(spLogBlock, l)
 		sp = mergeSpans(append(sp, twinSpans(l, logged)...)) // las reglas solo ven el espacio ASCII

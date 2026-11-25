@@ -113,3 +113,43 @@ func TestFormatosAuditoriaNoTapaDeMas(t *testing.T) {
 		}
 	}
 }
+
+// 2.ª revisión: la comunidad de un dígito seguida de una palabra protegida se sigue tapando (como la v0.6.5), y en
+// tipo 0 la comunidad llega hasta udp-port o el tipo de notificación.
+func TestFormatosAuditoriaSnmpHostDigito(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"snmp-server host 10.1.1.1 version 2c 7 udp-port 1162", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community> udp-port 1162"},
+		{"snmp-server host 10.1.1.1 traps version 2c 0 informs", "snmp-server host 10.1.1.1 traps version 2c <MASKED:snmp-community> informs"},
+		{"snmp-server host 10.1.1.1 version 2c 6 vrf", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community> vrf"},
+		{"snmp-server host 10.1.1.1 version 2c 0 MYCOMM udp-port 1162 bgp", "snmp-server host 10.1.1.1 version 2c 0 <MASKED:snmp-community> udp-port 1162 bgp"},
+		{"snmp-server host 10.1.1.1 version 2c 0 MYCOMM bgp config", "snmp-server host 10.1.1.1 version 2c 0 <MASKED:snmp-community> bgp config"},
+	} {
+		if out, _ := mask.Apply("ios-xe", c.in+"\n"); strings.TrimSpace(out) != c.want {
+			t.Errorf("%q -> %q, se esperaba %q", c.in, strings.TrimSpace(out), c.want)
+		}
+	}
+}
+
+// Cmd no toca los filtros de un show ni los textos entre comillas que no son secretos, ni desescapa comillas sin tapar.
+func TestFormatosAuditoriaCmdNoTapaDeMas(t *testing.T) {
+	for _, in := range []string{
+		`show logging | include "password changed"`, `show run | i "pre-shared-key address"`,
+		`do show run | i "secret x"`, `action 1 puts \"hola\"`,
+	} {
+		if out := mask.Cmd("ios-xe", in); out != in {
+			t.Errorf("Cmd cambió %q -> %q", in, out)
+		}
+	}
+	if out := mask.Cmd("ios-xe", `action 1.0 cli command "enable secret LEAKeem"`); strings.Contains(out, "LEAK") {
+		t.Errorf("EEM visible: %q", out)
+	}
+}
+
+// NX-OS: tras «line vty», password strength-check / secure-mode / prompt sin sangría son comandos, no la contraseña.
+func TestFormatosAuditoriaSetupPasswordNxos(t *testing.T) {
+	for _, in := range []string{"line vty\npassword strength-check\n", "line vty\npassword secure-mode\n", "line vty\npassword prompt username\n"} {
+		if out, _ := mask.Apply("nx-os", in); strings.Contains(out, "<MASKED") {
+			t.Errorf("taparon de más %q -> %q", in, out)
+		}
+	}
+}
