@@ -14,10 +14,8 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
-
-// maxSeenIPs acota la memoria del conjunto de IP ya auditadas; pasado el tope todo repetido se cuenta.
-const maxSeenIPs = 4096
 
 // netAddr adapta r.RemoteAddr (texto) a net.Addr para hostOf.
 type netAddr string
@@ -60,8 +58,8 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	if err != nil {
 		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
-	lim := newLimiter(c.clock)   // cupo global y por IP; aquí no hay contraseñas
-	var seen = map[string]bool{} // IP cuya primera petición sin cuerpo ya se auditó (bajo hmu)
+	lim := newLimiter(c.clock) // cupo global y por IP; aquí no hay contraseñas
+	quota := newAuditQuota(c.clock)
 	// srv.Close no espera a los handlers: Serve los espera para no volver antes de su OnTransfer (el que
 	// llama cierra su canal de eventos al volver y una transferencia tardía se perdería de la auditoría).
 	var (
@@ -102,7 +100,11 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		release, ok := lim.acquire(ip)
 		if !ok {
 			http.Error(w, "ocupado", http.StatusServiceUnavailable)
-			t.Error, t.ReasonT, t.Rejected, t.Cause = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true, CauseBusy
+			msg := "demasiadas transferencias simultáneas"
+			if lim.ipBusy(ip) {
+				msg = "demasiadas transferencias simultáneas desde este cliente"
+			}
+			t.Error, t.ReasonT, t.Rejected, t.Cause = msg, lit(msg), true, CauseBusy
 			return
 		}
 		defer release()
@@ -116,9 +118,17 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		t.Path = f.Name()
 		// Sesión solo con un GET que responde 2xx (HEAD, 304, 412 y 416 no la crean: un escáner
 		// con Range inválidos no desplaza la historia). El arranque es perezoso, en WriteHeader.
+		// El cupo se decide antes de servir: sin cupo no hay sesión (salvo cuerpos grandes), y lo que no abre
+		// sesión puede salir como contado; una sesión abierta nunca termina como rechazo.
+		allowed := quota.take(ip)
 		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK}
 		if r.Method == http.MethodGet {
-			cw.begin = func(total int64) *Live { return c.start(t, total) }
+			cw.begin = func(total int64) *Live {
+				if !allowed && total < bigBody {
+					return nil
+				}
+				return c.start(t, total)
+			}
 		}
 		http.ServeContent(cw, r, name, st.ModTime(), f) // atiende Range e If-Modified-Since
 		t.Bytes, t.Live = cw.n, cw.live
@@ -130,15 +140,13 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		default:
 			t.Result = "ok"
 		}
-		// Una petición sin cuerpo (HEAD, 304...) solo se audita la primera de cada IP; las demás se cuentan como rechazos.
-		if cw.n == 0 && cw.err == nil && cw.status < 400 {
-			hmu.Lock()
-			repeat := seen[ip] || len(seen) >= maxSeenIPs
-			seen[ip] = true
-			hmu.Unlock()
-			if repeat {
-				t.Rejected, t.Cause, t.Result = true, CauseOther, "error"
-				t.Error, t.ReasonT = "petición repetida sin cuerpo", lit("petición repetida sin cuerpo")
+		// Sin cupo y sin sesión: se cuenta como rechazo (no es un fallo de la transferencia) y no se audita.
+		if !allowed && cw.live == nil && cw.err == nil {
+			t.Rejected, t.Cause = true, CauseOther
+			t.Error, t.ReasonT = "", i18n.Text{}
+			if cw.status >= 400 {
+				t.Result = "error"
+				t.Error = fmt.Sprintf("HTTP %d", cw.status)
 			}
 		}
 	})

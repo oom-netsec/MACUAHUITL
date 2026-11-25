@@ -81,15 +81,12 @@ func (l *limiter) blocked(ip string) bool {
 
 // blockedLocked dice si ip sigue bloqueada; un bloqueo vencido se borra. Con l.mu tomado.
 func (l *limiter) blockedLocked(ip string) bool {
-	f := l.fails[ip]
-	if f.n < maxAuthFails {
-		return false
-	}
-	if l.now().Sub(f.last) >= lockoutFor {
+	f, ok := l.fails[ip]
+	if ok && l.now().Sub(f.last) >= lockoutFor { // los fallos también vencen, no solo el bloqueo
 		delete(l.fails, ip)
 		return false
 	}
-	return true
+	return f.n >= maxAuthFails
 }
 
 // credsOK compara usuario y contraseña en tiempo constante, sin cortocircuito.
@@ -147,4 +144,70 @@ func (c *idleConn) Read(p []byte) (int, error) {
 func (c *idleConn) Write(p []byte) (int, error) {
 	c.Conn.SetWriteDeadline(c.deadline())
 	return c.Conn.Write(p)
+}
+
+// Cupo de auditoría de HTTP: por IP y ventana, auditPerWindow respuestas se auditan (la primera siempre); el resto
+// solo se cuenta como rechazo, salvo cuerpos de bigBody o más, que siempre se auditan.
+const (
+	auditPerWindow = 5
+	auditWindow    = time.Minute
+	bigBody        = 1 << 20
+	maxSeenIPs     = 4096
+)
+
+// auditQuota lleva el cupo de auditoría por IP y ventana. El mapa se acota a maxSeenIPs: lleno y sin ventanas
+// vencidas que podar, una IP nueva no entra y se cuenta como rechazo (solo las grandes se auditan).
+type auditQuota struct {
+	mu    sync.Mutex
+	m     map[string]*auditWin
+	now   func() time.Time
+	prune time.Time // última poda de ventanas vencidas (a lo más una por ventana)
+}
+
+type auditWin struct {
+	start time.Time
+	n     int
+}
+
+func newAuditQuota(now func() time.Time) *auditQuota {
+	return &auditQuota{m: map[string]*auditWin{}, now: now}
+}
+
+// take dice si esta respuesta de ip entra al cupo de auditoría.
+func (q *auditQuota) take(ip string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	now := q.now()
+	w := q.m[ip]
+	if w == nil {
+		if len(q.m) >= maxSeenIPs && now.Sub(q.prune) >= auditWindow {
+			q.prune = now
+			for k, v := range q.m {
+				if now.Sub(v.start) >= auditWindow {
+					delete(q.m, k)
+				}
+			}
+		}
+		if len(q.m) >= maxSeenIPs {
+			return false
+		}
+		q.m[ip] = &auditWin{start: now, n: 1}
+		return true
+	}
+	if now.Sub(w.start) >= auditWindow {
+		w.start, w.n = now, 1
+		return true
+	}
+	if w.n < auditPerWindow {
+		w.n++
+		return true
+	}
+	return false
+}
+
+// ipBusy dice si ip llegó a su tope de conexiones simultáneas (y no solo el global).
+func (l *limiter) ipBusy(ip string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.perIP[ip] >= perClientTCP
 }
