@@ -1,6 +1,7 @@
 package core
 
 import (
+	"path/filepath"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -35,5 +36,34 @@ func TestRespaldoPreviewNoComparaContrasenas(t *testing.T) {
 	}
 	if tc == "" || tb == "" {
 		t.Fatalf("target_id vacío: %q %q", tc, tb)
+	}
+}
+
+// Con dos credenciales vivas de la misma etiqueta, el conflicto apunta a la del mismo usuario: «reemplazar» no pisa
+// la otra (el usuario ya es público en ListCredentials; no abre ningún oráculo).
+func TestRespaldoConflictoApuntaAlMismoUsuario(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	h.put(t, "dup", "u1", "PW-UNO")
+	h.put(t, "dup", "u2", "PW-DOS")
+	path := filepath.Join(t.TempDir(), "d.mcvault")
+	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true}); err != nil {
+		t.Fatal(err)
+	}
+	vivos := map[string]string{} // usuario -> id vivo
+	l, _ := h.vault.ListCredentials(ctx(t), &v1.ListCredentialsRequest{})
+	for _, c := range l.Credentials {
+		if c.Label == "dup" {
+			vivos[c.Username] = c.Id
+		}
+	}
+	pr, err := h.preview(t, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, i := range pr.Items {
+		if i.Label == "dup" && i.TargetId != vivos[i.Username] {
+			t.Fatalf("%s apunta a %s, quería %s", i.Username, i.TargetId, vivos[i.Username])
+		}
 	}
 }

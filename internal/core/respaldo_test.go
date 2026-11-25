@@ -591,43 +591,8 @@ func TestRespaldoDosReemplazosAlMismoDestino(t *testing.T) {
 	}
 }
 
-// Dos credenciales del respaldo con la misma etiqueta chocan con la misma local: reemplazarla dos veces se rechaza.
-func TestRespaldoDosDelRespaldoReemplazanLaMisma(t *testing.T) {
-	h := newHarness(t, nil)
-	h.ready(t)
-	h.put(t, "dup", "u1", "PW-UNO")
-	h.put(t, "dup", "u2", "PW-DOS")
-	path := filepath.Join(t.TempDir(), "d.mcvault")
-	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true}); err != nil {
-		t.Fatal(err)
-	}
-	o := newHarness(t, nil)
-	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
-	o.put(t, "dup", "u1", "PW-UNO")
-	pr, err := o.preview(t, path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var dec []*v1.VaultBackupDecision
-	for _, i := range pr.Items {
-		if i.Label == "dup" && i.State == "conflicto_etiqueta" {
-			dec = append(dec, &v1.VaultBackupDecision{Id: i.Id, Action: "reemplazar"})
-		}
-	}
-	if len(dec) != 2 {
-		t.Fatalf("conflictos: %v", estados(pr))
-	}
-	_, err = o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: dec})
-	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "dup") {
-		t.Fatalf("dos reemplazos: %v", err)
-	}
-	if got := o.labels(t); got["dup"] != "PW-UNO" || len(got) != 1 {
-		t.Fatalf("escribió algo: %v", got)
-	}
-}
-
 // 43e-3: el preview trae target_id (id vivo en la bóveda) en conflicto; vacío en nueva. El id del respaldo sigue valiendo para decidir.
-func TestPreviewTargetIdEnIgualYConflicto(t *testing.T) {
+func TestPreviewTargetIdEnConflicto(t *testing.T) {
 	_, path := bovedaConRespaldo(t, nil)
 	o := newHarness(t, nil)
 	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})

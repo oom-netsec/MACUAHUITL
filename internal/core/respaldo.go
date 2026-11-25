@@ -217,15 +217,15 @@ func (c *Core) inDataDir(path string) bool {
 type planned struct{ state, target string }
 
 // planImport clasifica cada credencial del respaldo (por su ID en él) frente a la bóveda viva y da también las etiquetas ya usadas en ella.
-// Descifra de a una (la del respaldo y la viva con la que se compara) y valida su llave SSH: nunca retiene secretos.
+// Descifra de a una las del respaldo (no las vivas: no se comparan) y valida su llave SSH: nunca retiene secretos.
 func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[string]bool, error) {
 	live, err := v.List()
 	if err != nil {
 		return nil, nil, err
 	}
-	byLabel, used := map[string][]string{}, map[string]bool{}
+	byLabel, used := map[string][]vault.Info{}, map[string]bool{}
 	for _, i := range live {
-		byLabel[i.Label] = append(byLabel[i.Label], i.ID)
+		byLabel[i.Label] = append(byLabel[i.Label], i)
 		used[i.Label] = true
 	}
 	out := map[string]planned{}
@@ -246,17 +246,23 @@ func planImport(v, b *vault.Vault, in []vault.Info) (map[string]planned, map[str
 	return out, used, nil
 }
 
-// classify: nueva si la etiqueta no está en la bóveda; si está, conflicto con la primera que la lleva. No compara el
-// contenido: decir «igual» haría de un respaldo armado con N candidatas un oráculo de la contraseña de la viva sin la
-// maestra (auditoría 2026-11-25).
-func classify(c vault.Credential, ids []string) (planned, error) {
+// classify: nueva si la etiqueta no está en la bóveda; si está, conflicto con la viva de esa etiqueta y el mismo usuario
+// (si no hay, la primera): «reemplazar» no pisa otra credencial de la misma etiqueta. No compara el contenido: decir
+// «igual» haría de un respaldo armado con N candidatas un oráculo de la contraseña de la viva sin la maestra (auditoría
+// 2026-11-25); el usuario ya es público en ListCredentials.
+func classify(c vault.Credential, live []vault.Info) (planned, error) {
 	if err := vault.ValidateKey(c.Label, c.SSHKey); err != nil {
 		return planned{}, err // todo el import falla, con la etiqueta culpable
 	}
-	if len(ids) == 0 {
+	if len(live) == 0 {
 		return planned{state: estNueva}, nil
 	}
-	return planned{state: estConflicto, target: ids[0]}, nil
+	for _, i := range live {
+		if i.Username == c.Username {
+			return planned{state: estConflicto, target: i.ID}, nil
+		}
+	}
+	return planned{state: estConflicto, target: live[0].ID}, nil
 }
 
 // PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Queda abierto el respaldo (su DEK en
@@ -415,8 +421,8 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 			return nil, service.VaultErr(ctx, err)
 		}
 	}
-	s.c.audit("vault.respaldo.importar", p.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d identical; decisions: %s",
-		res.Created, res.Replaced, res.Renamed, res.Skipped, res.Same, resumenDecisiones(dec, label)))
+	s.c.audit("vault.respaldo.importar", p.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped; decisions: %s",
+		res.Created, res.Replaced, res.Renamed, res.Skipped, resumenDecisiones(dec, label)))
 	return &res, nil
 }
 
