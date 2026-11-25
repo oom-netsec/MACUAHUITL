@@ -170,3 +170,57 @@ func (lentoVault) Status(context.Context, *v1.StatusRequest) (*v1.StatusResponse
 	time.Sleep(200 * time.Millisecond)
 	return &v1.StatusResponse{}, nil
 }
+
+// Cerrar el puente con una sonda en vuelo no es perder el núcleo: el estado sigue «connected» y no se consulta al
+// lanzador. Determinista: la segunda sonda se queda colgada hasta que la cancelen (en Windows la sonda por named pipe
+// tarda más y el cierre de la prueba caía en medio).
+func TestRunCerrarConSondaEnVueloNoDesconecta(t *testing.T) {
+	sock := ipctest.Addr(t.TempDir())
+	v := &colgadoVault{enVuelo: make(chan struct{}, 1)}
+	l, err := ipc.Listen(sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sctx, scancel := context.WithCancel(context.Background())
+	defer scancel()
+	go ipc.Serve(sctx, l, func(r ipc.Registrar) { v1.RegisterVaultServiceServer(r, v) })
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, func(string, any) {})
+	b.Interval = 10 * time.Millisecond
+	var sondas atomic.Int32
+	b.Launcher = &CoreLauncher{Running: func() (bool, error) { sondas.Add(1); return false, nil }, Start: func() error { return nil }}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { b.run(ctx); close(done) }()
+	select {
+	case <-v.enVuelo: // la primera sonda respondió (conectado) y la segunda está colgada
+	case <-time.After(30 * time.Second):
+		t.Fatal("la segunda sonda nunca llegó")
+	}
+	sondas.Store(0)
+	cancel()
+	<-done
+	if s := b.Status(); s != "connected" {
+		t.Fatalf("cerrar el puente lo dejó %q", s)
+	}
+	if n := sondas.Load(); n != 0 {
+		t.Fatalf("al cerrar se consultó al lanzador %d veces", n)
+	}
+}
+
+type colgadoVault struct {
+	v1.UnimplementedVaultServiceServer
+	n       atomic.Int32
+	enVuelo chan struct{}
+}
+
+func (v *colgadoVault) Status(ctx context.Context, _ *v1.StatusRequest) (*v1.StatusResponse, error) {
+	if v.n.Add(1) == 1 {
+		return &v1.StatusResponse{}, nil
+	}
+	select {
+	case v.enVuelo <- struct{}{}:
+	default:
+	}
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
