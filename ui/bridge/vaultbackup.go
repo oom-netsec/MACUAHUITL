@@ -18,7 +18,8 @@ type VaultBackupItemDTO struct {
 	ID       string `json:"id"` // ID dentro del respaldo: las decisiones van por él
 	Label    string `json:"label"`
 	Username string `json:"username"`
-	State    string `json:"state"` // nueva | igual | conflicto_etiqueta | reservada
+	State    string `json:"state"`    // nueva | conflicto_etiqueta | reservada (el núcleo ya no manda «igual»)
+	TargetID string `json:"targetId"` // ID de la credencial de la bóveda que se reemplaza; solo en conflictos
 }
 
 type VaultBackupPreviewDTO struct {
@@ -84,7 +85,7 @@ func (b *Bridge) PreviewVaultBackupImport(path, passphrase string) (VaultBackupP
 		r, err := v1.NewVaultServiceClient(c).PreviewBackupImport(ctx, &v1.PreviewBackupImportRequest{Path: path, Passphrase: []byte(passphrase)})
 		out := VaultBackupPreviewDTO{Token: r.GetToken(), ExpiresMs: r.GetExpiresMs(), Items: []VaultBackupItemDTO{}}
 		for _, it := range r.GetItems() {
-			out.Items = append(out.Items, VaultBackupItemDTO{ID: it.GetId(), Label: it.GetLabel(), Username: it.GetUsername(), State: it.GetState()})
+			out.Items = append(out.Items, VaultBackupItemDTO{ID: it.GetId(), Label: it.GetLabel(), Username: it.GetUsername(), State: it.GetState(), TargetID: it.GetTargetId()})
 		}
 		return out, err
 	})

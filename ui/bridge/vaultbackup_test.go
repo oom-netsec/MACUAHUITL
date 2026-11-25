@@ -24,7 +24,7 @@ func (f *fakeVaultBackup) ExportBackup(_ context.Context, r *v1.ExportBackupRequ
 }
 func (f *fakeVaultBackup) PreviewBackupImport(_ context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	f.prv = r
-	return &v1.PreviewBackupImportResponse{Token: "tok", ExpiresMs: 9, Items: []*v1.VaultBackupItem{{Id: "a1", Label: "core", Username: "admin", State: "conflicto_etiqueta"}}}, nil
+	return &v1.PreviewBackupImportResponse{Token: "tok", ExpiresMs: 9, Items: []*v1.VaultBackupItem{{Id: "a1", Label: "core", Username: "admin", State: "conflicto_etiqueta", TargetId: "v9"}}}, nil
 }
 func (f *fakeVaultBackup) ApplyBackupImport(_ context.Context, r *v1.ApplyBackupImportRequest) (*v1.ApplyBackupImportResponse, error) {
 	f.app = r
@@ -51,7 +51,7 @@ func TestVaultBackupBridge(t *testing.T) {
 		t.Fatalf("export sin banderas: %+v %v %+v", n, err, f.exp)
 	}
 	p, err := b.PreviewVaultBackupImport("/tmp/r.mcvault", "la-frase-12345")
-	if err != nil || p.Token != "tok" || p.ExpiresMs != 9 || len(p.Items) != 1 || p.Items[0] != (VaultBackupItemDTO{ID: "a1", Label: "core", Username: "admin", State: "conflicto_etiqueta"}) || string(f.prv.Passphrase) != "la-frase-12345" {
+	if err != nil || p.Token != "tok" || p.ExpiresMs != 9 || len(p.Items) != 1 || p.Items[0] != (VaultBackupItemDTO{ID: "a1", Label: "core", Username: "admin", State: "conflicto_etiqueta", TargetID: "v9"}) || string(f.prv.Passphrase) != "la-frase-12345" {
 		t.Fatalf("preview: %+v %v", p, err)
 	}
 	r, err := b.ApplyVaultBackupImport("tok", []VaultBackupDecisionDTO{{ID: "a1", Action: "renombrar"}})

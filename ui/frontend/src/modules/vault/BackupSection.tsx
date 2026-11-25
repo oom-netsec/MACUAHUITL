@@ -7,6 +7,7 @@ import { Segmented } from "../../components/Segmented";
 import { Icon } from "../../components/Icon";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
+import { errInfo } from "../../lib/coreError";
 import type { Msg } from "./VaultView";
 
 const MIN_PHRASE = 12;
@@ -72,7 +73,7 @@ export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, on
   const end = (r?: VaultBackupResult) => {
     setPreview(null);
     if (!r) return;
-    setMsg({ kind: "ok", text: t("vault.backup.done", { created: String(r.created), replaced: String(r.replaced), renamed: String(r.renamed), skipped: String(r.skipped), same: String(r.same) }) });
+    setMsg({ kind: "ok", text: t("vault.backup.done", { created: String(r.created), replaced: String(r.replaced), renamed: String(r.renamed), skipped: String(r.skipped) }) });
     onImported();
   };
   const expired = () => { setPreview(null); setMsg({ kind: "error", text: t("vault.backup.expired") }); };
@@ -129,6 +130,8 @@ function PreviewPanel({ core, preview, onClose, onExpired, onClosed, setMsg }: {
       // Si la bóveda se cerró, el núcleo ya descartó lo descifrado: se sabe por su estado, no por el texto del error.
       const st = await core.vaultStatus().then((v) => v.state, () => "unlocked");
       if (st !== "unlocked") { onClosed(); return; }
+      // La credencial de la bóveda cambió tras la vista previa: se cierra y se muestra el texto del núcleo.
+      if (errInfo(e)?.reason === "respaldo.err.target_changed") { onClose(); setMsg({ kind: "error", text: errorText(e) }); return; }
       // NotFound (token gastado o descartado) y FailedPrecondition (vencido o bóveda cerrada) no se corrigen con otra decisión; InvalidArgument sí.
       if (/code = (NotFound|FailedPrecondition)\b/.test(e instanceof Error ? e.message : String(e))) { onExpired(); return; }
       setMsg({ kind: "error", text: errorText(e) }); setBusy(false);
@@ -138,12 +141,13 @@ function PreviewPanel({ core, preview, onClose, onExpired, onClosed, setMsg }: {
     <ResultPanel title={t("vault.backup.preview")} pad
       actions={<><RunButton primary quiet busy={busy} missing={[!ready && t("need.backupDecisions")]} onClick={apply}>{t("vault.backup.apply")}</RunButton><button type="button" onClick={() => onClose()}>{t("vault.backup.cancel")}</button></>}>
       <table>
-        <thead><tr><th>{t("vault.col.label")}</th><th>{t("vault.col.user")}</th><th>{t("vault.backup.col.state")}</th><th>{t("vault.backup.col.action")}</th></tr></thead>
+        <thead><tr><th>{t("vault.col.label")}</th><th>{t("vault.col.user")}</th><th>{t("vault.backup.col.id")}</th><th>{t("vault.backup.col.state")}</th><th>{t("vault.backup.col.action")}</th></tr></thead>
         <tbody>
           {preview.items.map((i) => (
             <tr key={i.id}>
               <td>{i.label}</td>
               <td className="mono">{i.username}</td>
+              <td className="mono">{i.id}{i.state === "conflicto_etiqueta" && i.targetId ? <><br /><span>{t("vault.backup.col.targetId")}: {i.targetId}</span></> : null}</td>
               <td><Badge tone={tone[i.state]}>{t(`vault.backup.state.${i.state}` as Key)}</Badge></td>
               <td>
                 {i.state === "conflicto_etiqueta" && (
@@ -159,6 +163,7 @@ function PreviewPanel({ core, preview, onClose, onExpired, onClosed, setMsg }: {
           ))}
         </tbody>
       </table>
+      {conflicts.length > 0 && <div className="actions"><button type="button" onClick={() => setPicks(Object.fromEntries(conflicts.map((i) => [i.id, "omitir" as const])))}>{t("vault.backup.skipAll")}</button></div>}
       {!ready && <Notice kind="info">{t("vault.backup.needs")}</Notice>}
       <Notice kind="info">{t("vault.backup.memory")}</Notice>
     </ResultPanel>

@@ -8,7 +8,7 @@ export { passwordCreds } from "../../lib/credentials";
 // Respaldo cifrado (fase 29d): archivo de bóveda con frase propia; el import va en dos pasos con un token de 10 minutos.
 export type VaultBackupState = "nueva" | "igual" | "conflicto_etiqueta" | "reservada"; // «reservada» (del sistema) se omite sola
 export type VaultBackupAction = "renombrar" | "reemplazar" | "omitir";
-export interface VaultBackupItem { id: string; label: string; username: string; state: VaultBackupState } // id: el de la credencial dentro del respaldo
+export interface VaultBackupItem { id: string; label: string; username: string; state: VaultBackupState; targetId?: string } // id: el de la credencial dentro del respaldo; targetId: la de la bóveda que se reemplaza (solo conflictos)
 export interface VaultBackupPreview { token: string; expiresMs: number; items: VaultBackupItem[] }
 export interface VaultBackupDecision { id: string; action: VaultBackupAction }
 export interface VaultBackupExport { count: number; noPermissions: boolean; sshKeysIncluded: number } // noPermissions: el sistema de archivos (p. ej. vfat) no admitió 0600; el archivo va cifrado igual

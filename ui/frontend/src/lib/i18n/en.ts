@@ -2414,7 +2414,7 @@ export const en: Record<Key, string> = {
   "vault.backup.cancel": "Cancel",
   "vault.backup.needs": "Resolve every conflict before applying.",
   "vault.backup.memory": "Decrypted data stays in memory only and is discarded when you apply, after 10 minutes, or when the vault is locked.",
-  "vault.backup.done": "Import complete: {created} new, {replaced} replaced, {renamed} renamed, {skipped} skipped, {same} identical.",
+  "vault.backup.done": "Import complete: {created} new, {replaced} replaced, {renamed} renamed, {skipped} skipped.",
   "vault.backup.expired": "The preview expired or was already used: open the backup again.",
   "vault.backup.discarded": "The vault was locked and, for security, the backup preview was discarded. Unlock the vault and open the file again.",
   "vault.backup.noPerms": "The file system did not accept 0600 permissions (e.g. a vfat drive): the content is encrypted, but be careful who can read the file.",
@@ -3155,4 +3155,7 @@ export const en: Record<Key, string> = {
   "vault.backup.masterHint": "Confirms it is you: the backup gives access to all your credentials.",
   "vault.backup.err.master": "Enter the current master password.",
   "transfer.log.repeated": "repeated",
+  "vault.backup.col.id": "ID in the backup",
+  "vault.backup.col.targetId": "ID in the vault",
+  "vault.backup.skipAll": "Skip all",
 };
