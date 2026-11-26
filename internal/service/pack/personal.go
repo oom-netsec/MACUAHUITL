@@ -26,6 +26,9 @@ import (
 // beforePublish es un gancho de pruebas: corre justo antes de publicar los playbooks del import (nil en producción).
 var beforePublish func()
 
+// afterStage es un gancho de pruebas: corre justo después de preparar los playbooks del import (nil en producción).
+var afterStage func()
+
 func internal(err error) error { return status.Error(codes.Internal, err.Error()) }
 
 func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.PackServiceExportResponse, error) {
@@ -158,6 +161,25 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	var sres scripts.Resultado
 	// Orden de candados: primero el del almacén, después la base (Install toma el del almacén y luego abre su transacción).
 	err = s.store.Locked(func() error {
+		// Orden: los playbooks se preparan con nombre temporal (el catálogo no los lee), se confirman los scripts y recién
+		// entonces se publican con un enlace atómico. Una caída entre el commit y la publicación deja los scripts confirmados y los
+		// playbooks solo como temporales (invisibles): el reimport los ve como scripts iguales y publica los playbooks.
+		// Se preparan antes de abrir la transacción: escribir y sincronizar archivos (en Windows, FlushFileBuffers puede tardar
+		// segundos) no retiene la única conexión de la base, que la auditoría y las demás llamadas esperan. Y la auditoría del
+		// rechazo escribe en la misma base: aquí todavía no hay transacción abierta.
+		var err error
+		if pbRes, err = s.store.StagePlaybooksLocked(p, dir, userIDs, pbDec); err != nil {
+			return s.reject(ctx, err, p, sum, path)
+		}
+		if afterStage != nil {
+			afterStage()
+		}
+		ok := false
+		defer func() {
+			if !ok {
+				pbRes.Undo(dir)
+			}
+		}()
 		tx, err := s.d.DB().Begin()
 		if err != nil {
 			return internal(err)
@@ -179,17 +201,10 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 				return internal(err)
 			}
 		}
-		// Orden: los playbooks se preparan con nombre temporal (el catálogo no los lee), se confirman los scripts y recién
-		// entonces se publican con un enlace atómico. Una caída entre el commit y la publicación deja los scripts confirmados y los
-		// playbooks solo como temporales (invisibles): el reimport los ve como scripts iguales y publica los playbooks.
-		if pbRes, err = s.store.StagePlaybooksLocked(p, dir, userIDs, pbDec); err != nil {
-			tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
-			return s.reject(ctx, err, p, sum, path)
-		}
 		if err := tx.Commit(); err != nil {
-			pbRes.Undo(dir)
 			return internal(err)
 		}
+		ok = true
 		return nil
 	})
 	if err != nil {

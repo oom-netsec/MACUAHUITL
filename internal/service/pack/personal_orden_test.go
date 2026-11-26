@@ -2,6 +2,7 @@ package pack
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,4 +118,55 @@ func sumOf(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return dom.SHA256(b)
+}
+
+// Preparar los playbooks escribe y sincroniza archivos (en Windows, FlushFileBuffers puede tardar segundos): no se hace con
+// la única conexión de la base tomada, que la auditoría y las demás llamadas esperan.
+func TestImportPreparaPlaybooksSinTenerLaBase(t *testing.T) {
+	s2, d2, mp, _ := prepImport(t)
+	var libre error = errors.New("el gancho no corrió")
+	afterStage = func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		c, err := d2.DB().Conn(ctx)
+		if err == nil {
+			c.Close()
+		}
+		libre = err
+	}
+	t.Cleanup(func() { afterStage = nil })
+	if _, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true, Sha256: sumOf(t, mp)}); err != nil {
+		t.Fatal(err)
+	}
+	if libre != nil {
+		t.Fatalf("al preparar los playbooks la conexión de la base estaba tomada: %v", libre)
+	}
+}
+
+// Si la base falla después de preparar los playbooks, los temporales se borran: no queda nada a medias.
+func TestImportFallaTrasPrepararBorraTemporales(t *testing.T) {
+	s2, d2, mp, pbDir := prepImport(t)
+	tmp := false
+	afterStage = func() {
+		es, _ := os.ReadDir(pbDir)
+		for _, e := range es {
+			tmp = tmp || strings.HasSuffix(e.Name(), ".tmp")
+		}
+		if _, err := d2.DB().Exec(`CREATE TRIGGER no_insertar BEFORE INSERT ON scripts BEGIN SELECT RAISE(ABORT, 'no-insertar'); END`); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { afterStage = nil })
+	if _, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true, Sha256: sumOf(t, mp)}); err == nil || !strings.Contains(err.Error(), "no-insertar") {
+		t.Fatalf("debía fallar al insertar los scripts: %v", err)
+	}
+	if !tmp {
+		t.Fatal("no había temporal tras preparar: la prueba no prueba el deshacer")
+	}
+	if es, _ := os.ReadDir(pbDir); len(es) != 0 {
+		t.Fatalf("quedaron archivos: %v", es)
+	}
+	if n := nScripts(t, d2.DB()); n != 0 {
+		t.Fatalf("quedaron %d scripts", n)
+	}
 }
