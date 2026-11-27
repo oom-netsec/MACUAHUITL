@@ -107,6 +107,10 @@ type Config struct {
 	OnRepeats func(Repeats)
 	// Now (opcional) es el reloj del núcleo para los plazos de bloqueo; nil = time.Now.
 	Now func() time.Time
+	// Solo para las pruebas (cero = el de siempre): cada cuánto se vacían los resúmenes (auditWindow) y desde cuántos
+	// bytes una descarga abre su sesión en vivo (liveAfter).
+	summaryTick time.Duration
+	liveAfter   int64
 }
 
 // repeats entrega un resumen de repeticiones, si alguien lo escucha.

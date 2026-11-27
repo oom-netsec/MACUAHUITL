@@ -182,13 +182,11 @@ const (
 	maxSeenIPs     = 4096
 )
 
-var (
-	// summaryTick es cada cuánto se vacían los resúmenes de las ventanas vencidas. Variable solo para las pruebas.
-	summaryTick = auditWindow
-	// liveAfter son los bytes enviados a partir de los cuales una descarga abre su sesión en vivo (antes de eso,
-	// una descarga que se corta aún cuenta contra el cupo); una completa la abre siempre. Variable para las pruebas.
-	liveAfter = int64(64 << 10)
-)
+// liveAfter son los bytes enviados a partir de los cuales una descarga abre su sesión en vivo (antes de eso, una descarga
+// que se corta aún cuenta contra el cupo); una completa la abre siempre. Las pruebas lo cambian por Config.liveAfter, y
+// summaryTick (cada cuánto se vacían los resúmenes de las ventanas vencidas, auditWindow) por Config.summaryTick: el
+// servidor no lee variables de paquete que una prueba cambie mientras otro servidor sigue vivo.
+const liveAfter = int64(64 << 10)
 
 // Repeats resume lo que una IP repitió dentro de una ventana sin que se auditara una por una.
 type Repeats struct {
