@@ -419,6 +419,9 @@ func normOne(s string) (string, []int) {
 	return b.String(), append(idx, len(s))
 }
 
+// quoteEdge: el byte junto a una comilla la vuelve borde de cita (abre o cierra) y no parte del valor.
+func quoteEdge(c byte) bool { return strings.IndexByte(" \t\r\n,;)}]:.", c) >= 0 }
+
 // twinSpans: los tramos de orig que la cadena de reglas taparía si vieran los espacios Unicode como un espacio ASCII: corre
 // chain sobre la copia (normOne) y lleva lo que cambió de vuelta a las coordenadas de orig.
 func twinSpans(orig string, chain func(string) string) [][2]int {
@@ -433,17 +436,19 @@ func twinSpans(orig string, chain func(string) string) [][2]int {
 	for i := range sp {
 		// Hasta los bordes de la palabra: el desescape de «\"» en la cadena también cuenta como cambio, y un tramo a
 		// media palabra dejaba que la 2.ª pasada tapara la palabra entera (fuzz). Así se tapa de más, nunca de menos.
+		// La comilla que abre o cierra una cita no es de la palabra: tapada, la 2.ª pasada veía la cita abierta hasta el fin
+		// de la línea y tapaba lo de fuera (fuzz). Una pegada a texto («Zq1"Zq2») sí es del valor.
 		a, b := idx[sp[i][0]], idx[sp[i][1]]
 		for a > 0 {
 			r, n := utf8.DecodeLastRuneInString(orig[:a])
-			if unicode.IsSpace(r) {
+			if unicode.IsSpace(r) || r == '"' && (a == 1 || quoteEdge(orig[a-2])) {
 				break
 			}
 			a -= n
 		}
 		for b < len(orig) {
 			r, n := utf8.DecodeRuneInString(orig[b:])
-			if unicode.IsSpace(r) {
+			if unicode.IsSpace(r) || r == '"' && (b == 0 || orig[b-1] != '\\') && (b+1 == len(orig) || quoteEdge(orig[b+1])) { // «\"» no cierra
 				break
 			}
 			b += n
