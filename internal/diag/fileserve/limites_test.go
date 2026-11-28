@@ -18,13 +18,19 @@ func serveHTTPCfg(t *testing.T, size int, tune func(*Config)) string {
 	t.Helper()
 	p, _ := image(t, "ios.bin", size)
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	ready := make(chan string, 1)
+	ready, done := make(chan string, 1), make(chan struct{})
+	t.Cleanup(func() { cancel(); <-done }) // la prueba siguiente no corre con este servidor vivo
 	cfg := Config{Addr: "127.0.0.1:0", Proto: "http", Files: []string{p},
 		OnListening: func(a string) { ready <- a }, OnTransfer: func(Transfer) {}}
 	tune(&cfg)
-	go Serve(ctx, cfg)
-	return <-ready
+	go func() { Serve(ctx, cfg); close(done) }()
+	select {
+	case a := <-ready:
+		return a
+	case <-done:
+		t.Fatal("Serve terminó sin escuchar")
+		return ""
+	}
 }
 
 // stalled abre n GET que no leen el cuerpo y espera la línea de estado de cada uno.
@@ -296,11 +302,8 @@ func TestHTTPCupoPorIPNoPorNombre(t *testing.T) {
 
 // El resumen sale solo al vencer la ventana, sin nueva petición, con la primera y la última hora.
 func TestHTTPResumenPeriodico(t *testing.T) {
-	old := summaryTick
-	summaryTick = 10 * time.Millisecond
-	t.Cleanup(func() { summaryTick = old })
 	r := newRecorder()
-	addr := serveHTTPCfg(t, 1<<10, r.tune)
+	addr := serveHTTPCfg(t, 1<<10, func(c *Config) { r.tune(c); c.summaryTick = 10 * time.Millisecond })
 	first := r.now
 	for i := 0; i < auditPerWindow+7; i++ {
 		rangeGet(t, addr, "ios.bin")
@@ -327,11 +330,9 @@ func TestHTTPResumenPeriodico(t *testing.T) {
 
 // Los GET cortados antes de que empiece la sesión tampoco esquivan el cupo.
 func TestHTTPInterrumpidosSeCuentan(t *testing.T) {
-	old := liveAfter
-	liveAfter = 1 << 40 // ninguna sesión antes de completar: el corte es determinista
-	t.Cleanup(func() { liveAfter = old })
 	r := newRecorder()
-	addr := serveHTTPCfg(t, 64<<20, r.tune)
+	// Ninguna sesión antes de completar: el corte es determinista.
+	addr := serveHTTPCfg(t, 64<<20, func(c *Config) { r.tune(c); c.liveAfter = 1 << 40 })
 	const n = 30
 	for i := 0; i < n; i++ {
 		c, err := net.Dial("tcp", addr)

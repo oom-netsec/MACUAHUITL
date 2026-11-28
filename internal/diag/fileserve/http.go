@@ -1,6 +1,7 @@
 package fileserve
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -24,13 +25,14 @@ func (a netAddr) String() string  { return string(a) }
 
 type countingWriter struct {
 	http.ResponseWriter
-	n      int64
-	status int
-	err    error
-	live   *Live
-	idle   time.Duration           // plazo de inactividad de escritura
-	total  int64                   // Content-Length de la respuesta 2xx
-	begin  func(total int64) *Live // abre la sesión de un GET 2xx
+	liveAfter int64 // bytes desde los que abre la sesión en vivo
+	n         int64
+	status    int
+	err       error
+	live      *Live
+	idle      time.Duration           // plazo de inactividad de escritura
+	total     int64                   // Content-Length de la respuesta 2xx
+	begin     func(total int64) *Live // abre la sesión de un GET 2xx
 }
 
 func (w *countingWriter) WriteHeader(s int) {
@@ -55,7 +57,7 @@ func (w *countingWriter) Write(b []byte) (int, error) {
 	http.NewResponseController(w.ResponseWriter).SetWriteDeadline(time.Now().Add(w.idle))
 	n, err := w.ResponseWriter.Write(b)
 	w.n += int64(n)
-	if w.live == nil && w.n >= liveAfter {
+	if w.live == nil && w.n >= w.liveAfter {
 		w.startLive()
 	} else {
 		w.live.add(int64(n))
@@ -146,7 +148,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		t.Path = f.Name()
 		// Sesión solo con un GET 2xx: arranca al pasar liveAfter bytes o, si se entrega completo, al terminar. HEAD, 304,
 		// 412 y 416 no la crean: un escáner con Range inválidos no desplaza la historia.
-		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK, idle: writeIdle}
+		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK, idle: writeIdle, liveAfter: cmp.Or(c.liveAfter, liveAfter)}
 		if r.Method == http.MethodGet {
 			cw.begin = func(total int64) *Live { return c.start(t, total) }
 		}
@@ -179,7 +181,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	ticker.Add(1)
 	go func() {
 		defer ticker.Done()
-		tk := time.NewTicker(summaryTick)
+		tk := time.NewTicker(cmp.Or(c.summaryTick, auditWindow))
 		defer tk.Stop()
 		for {
 			select {
