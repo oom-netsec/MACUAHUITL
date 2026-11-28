@@ -7,15 +7,20 @@ import (
 	"net"
 	"os"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
 )
 
-// winRefused: el mismo «connection refused» como lo escribe Windows; el golden guarda el texto de Linux.
-var winRefused = strings.NewReplacer("connectex: No connection could be made because the target machine actively refused it.", "connect: connection refused")
 var volatileDNS = regexp.MustCompile(`"RTT":[0-9]+|127\.0\.0\.[0-9]+:[0-9]+`)
+
+// sysErr: tras «dnsq: tcp://X: » viene el texto del sistema operativo (EOF, «connection refused», el de Windows…), que cambia
+// según la plataforma y la carrera del cierre del puerto: no es parte de la regresión de hallazgos. Solo ahí (las pruebas que
+// comparan dos vistas de la misma corrida siguen viendo el texto entero).
+var sysErr = regexp.MustCompile(`("Error":"dnsq: tcp://X: )(?:[^"\\]|\\.)*"`)
+
+// viewDNSSys es viewDNS sin el texto del sistema de la sonda TCP.
+func viewDNSSys(r any) string { return sysErr.ReplaceAllString(viewDNS(r), `${1}X"`) }
 
 // udpOnly escucha solo por UDP: TCP/53 no responde.
 func (l *lab) udpOnly(t *testing.T, ip string, h dns.Handler) {
@@ -163,14 +168,14 @@ func escenariosDNS(t *testing.T) map[string]any {
 
 func viewDNS(r any) string {
 	b, _ := json.Marshal(r)
-	return volatileDNS.ReplaceAllString(winRefused.Replace(string(b)), "X")
+	return volatileDNS.ReplaceAllString(string(b), "X")
 }
 
 // Regresión: el JSON en español de cada revisión es el de antes del catálogo (UPDATE_GOLDEN=1 lo reescribe).
 func TestFindingsEspanolRegresion(t *testing.T) {
 	got := map[string]string{}
 	for n, r := range escenariosDNS(t) {
-		got[n] = viewDNS(r)
+		got[n] = viewDNSSys(r)
 	}
 	const file = "testdata/findings_es.golden.json"
 	if os.Getenv("UPDATE_GOLDEN") != "" {
@@ -237,6 +242,20 @@ func TestLocalizeEspanolEsIdentidad(t *testing.T) {
 	for n, r := range escenariosDNS(t) {
 		if a, b := viewDNS(r), viewDNS(Localize(r, "es")); a != b {
 			t.Errorf("%s: Localize(es) cambia el JSON:\n%s\n%s", n, a, b)
+		}
+	}
+}
+
+// El texto del error del sistema en una sonda (EOF, «connection refused» de Linux o de Windows) no es parte de la regresión:
+// lo que importa son los hallazgos.
+func TestViewDNSNoDependeDelTextoDelSistema(t *testing.T) {
+	mk := func(e string) string {
+		return viewDNSSys(map[string]any{"Probes": []map[string]string{{"Transport": "tcp", "Error": "dnsq: tcp://127.0.0.31:53: " + e}}})
+	}
+	base := mk("dial tcp 127.0.0.31:53: connect: connection refused")
+	for _, e := range []string{"EOF", "dial tcp 127.0.0.31:53: connectex: No connection could be made because the target machine actively refused it.", "read tcp 127.0.0.1:5000->127.0.0.31:53: wsarecv: An existing connection was forcibly closed by the remote host."} {
+		if g := mk(e); g != base {
+			t.Errorf("%q:\n got: %s\nwant: %s", e, g, base)
 		}
 	}
 }
